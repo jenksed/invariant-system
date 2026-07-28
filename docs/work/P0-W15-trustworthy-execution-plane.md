@@ -1,6 +1,6 @@
 # P0-W15: Trustworthy execution plane
 
-- **Status:** Implemented; verification pending
+- **Status:** Implemented and verified
 - **Branch:** `work/p0-w15-trustworthy-execution-plane`
 - **Depends on:** P0-W06 through P0-W14
 - **Scope:** Planning and contracts only
@@ -93,6 +93,15 @@ Additional work-package criteria:
 - **P0-W15-AC53:** Existing domain, Capability, Context, Git, Evidence, delegation, interface, knowledge, and knowledge-security decisions remain intact.
 
 ## Verification
+
+Verification result:
+
+- the committed schema blob matches the locally validated file digest;
+- JSON parsing and Draft 2020-12 meta-schema validation passed;
+- ten representative positive documents passed;
+- ten protected negative documents were rejected;
+- the final design diff contains documentation and JSON contracts only;
+- GitHub CI run `30403068021` passed on the design head.
 
 Repository checks:
 
