@@ -2,13 +2,13 @@
 
 Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
 
-Kiln is not an application scaffolder, an autonomous software company, an agent-management framework, or a catalog of protocol implementations. It is the durable runtime around model-driven repository work: execution, state, context, permissions, runs, interruption, recovery, and verification.
+Kiln is not an application scaffolder, an autonomous software company, an agent-management framework, a replacement version-control system, or a catalog of protocol implementations. It is the durable runtime around model-driven Repository work: execution, state, Context, permissions, Runs, change isolation, interruption, recovery, and verification.
 
 ## Project thesis
 
 A model supplies intelligence. The harness determines whether that intelligence becomes trustworthy software.
 
-Kiln is designed to move work through:
+Kiln moves work through:
 
 > Intent → Orientation → Investigation → Change → Verification → Reconciliation → Completion
 
@@ -23,7 +23,7 @@ Workspace: local operating and trust boundary
             └── Root Run: Project Steward responsibility
 ```
 
-The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, and external protocols operate within or beneath Runs.
+The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Git branches, worktrees, and external protocols operate within or beneath Runs without becoming Run identity.
 
 Kiln supports bounded Child Runs without turning the product into an artificial organization of agents.
 
@@ -40,13 +40,16 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 - **Objective boundary:** one durable Session
 - **Desired-work boundary:** one bounded Task
 - **Execution model:** one Root Run and a navigable Run graph
-- **Primary execution unit:** Run, not Agent persona or model invocation
+- **Primary execution unit:** Run, not Agent persona, branch, process, or model invocation
 - **Delivery coordination:** Project Steward responsibility on the Root Run
+- **Git change isolation:** protected trunk, short-lived task branches, and one exclusive writable worktree per independently mutating Run
+- **Read-only work:** no branch or worktree by default unless stable state requires one
+- **Restricted mutation:** Patch Artifacts for Child Runs that should not own a writable checkout
 - **Initial interface:** command-line interface
 - **Durable state:** SQLite and an append-oriented event journal
 - **Source truth:** Git and the filesystem
-- **Authority:** explicit Capabilities, policy, and scoped grants
-- **Evidence:** Claims remain separate from Evidence and Receipts
+- **Authority:** explicit Capabilities, policy, scoped grants, and separate authoring and integration authority
+- **Evidence:** Claims remain separate from Evidence and Receipts; verification binds to exact Repository state
 - **Web interface:** Phoenix LiveView, after the runtime is proven
 - **Extensions:** language-neutral supervised subprocess protocol
 - **First external software development kit:** TypeScript, after the protocol is proven
@@ -55,6 +58,8 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 No external protocol may become Kiln's internal domain model.
 
 MCP is an optional protocol boundary, not Kiln's default integration layer and not a security sandbox.
+
+Git remains the version-control authority. Kiln records intent, authorization, ownership, Evidence, and recovery state without creating parallel commit, branch, or merge semantics.
 
 ## Capability integration
 
@@ -74,7 +79,7 @@ Kiln selects the earliest practical option that satisfies the required contract.
 Initial positions:
 
 - Repository reads and writes are native.
-- Git normally uses a native adapter backed by the Git CLI.
+- Git uses a native adapter backed by the Git CLI.
 - Build, test, lint, format, compiler, package-manager, and static-analysis behavior uses existing CLIs.
 - Raw LSP remains behind a native semantic adapter.
 - Local MCP requires material lifecycle, state, sharing, replacement, discovery, or existing-implementation value.
@@ -118,13 +123,46 @@ For Elixir Projects, documentation resolution prefers:
 8. general web research;
 9. model memory.
 
-Context7 remains supported, but it cannot override Repository-local or exact version-matched documentation.
-
 See [Context system](docs/CONTEXT-SYSTEM.md).
+
+## Git change isolation
+
+Kiln uses protected trunk-based development with short-lived task branches and one dedicated Git worktree for each independently mutating Run.
+
+The initial product loop supports:
+
+- shared read-only access for safe Scout Runs;
+- one exclusive writable worktree and lease for a mutating Run;
+- Patch Artifacts for restricted Child Runs;
+- exact commit-bound or dirty-fingerprint-bound verification;
+- a Verifier that does not repair the branch it evaluates;
+- projected-merge checks against current protected trunk;
+- manual user-approved local integration;
+- deterministic Receipts, cleanup, and crash reconciliation.
+
+A Child Run does not inherit its Parent Run's branch or write authority. A branch does not require a permanent OTP process. The authoring Run does not authorize its own merge.
+
+See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
+
+## Protocol strategy
+
+Kiln ranks protocols by direct product value and keeps each behind a replaceable adapter.
+
+Accepted positions include:
+
+- ACP as the primary future editor and coding-client interface after the native event model;
+- MCP client support before optional server support;
+- normalized LSP and internal Tree-sitter infrastructure;
+- AG-UI projections from the same native event stream;
+- A2A only for independent external agents;
+- Agent Skills as first-class procedural packages;
+- OpenTelemetry for operational observation without replacing the event journal.
+
+See [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md).
 
 ## Project Steward
 
-The Project Steward uses Kiln's Run graph, Tasks, specifications, Repository observations, Capability policy, Evidence, and completion gates to coordinate work.
+The Project Steward uses Kiln's Run graph, Tasks, specifications, Repository observations, Capability policy, Context state, Git ownership, Evidence, and completion gates to coordinate work.
 
 The Steward can:
 
@@ -133,51 +171,42 @@ The Steward can:
 - request independent verification;
 - track requirements, mutations, Evidence, risks, and unknowns;
 - reconcile Repository state against the accepted specification;
-- recommend continuation, blocking, or completion.
+- recommend continuation, blocking, integration, or completion.
 
-The Steward cannot override user authority, policy, Repository truth, Evidence freshness, or completion gates.
+The Steward cannot override user authority, policy, Repository truth, Evidence freshness, Git ownership, or completion gates.
 
 ## Current milestone
 
-Phase 0 is defining the Repository and runtime foundation before implementation begins.
+Phase 0 defines the Repository and runtime foundation before implementation begins.
 
-P0-W05 audits the integrated and stacked planning state. Read [Planning baseline](docs/PLANNING-BASELINE.md) before product, architecture, or roadmap work.
+- P0-W05 established the planning baseline.
+- P0-W06 defined the protocol-neutral internal domain model.
+- P0-W07 defined Capability integration and the broker.
+- P0-W08 defined the bounded Context system and documentation resolver.
+- P0-W09 defined the protocol and standards strategy.
+- P0-W10 defines Git change isolation, worktree ownership, Evidence staleness, integration, and recovery.
 
-P0-W06 defines the [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md), JSON contracts, protocol-adapter boundary, and Run-centered execution semantics before Phase 1 implementation.
+The next roadmap reconciliation must align Phase 1 with:
 
-P0-W07 defines the [Capability integration](docs/CAPABILITY-INTEGRATION.md) hierarchy, deterministic broker, compact model-facing Tools, result normalization, duplicate policy, and initial non-MCP boundary.
-
-P0-W08 defines the [Context system](docs/CONTEXT-SYSTEM.md), bounded package contract, token policy, progressive disclosure, documentation resolver, independent Child and Verifier Context, and Context observability.
-
-The later roadmap reconciliation must align Phase 1 with:
-
-- Workspace, Project, Repository, and Environment identity;
-- Session, Task, Run, and event identity;
-- minimum Context, Capability, Claim, Evidence, Receipt, and Checkpoint primitives;
-- Context compile requests, manifests, packages, budgets, invalidation, and observability;
-- native Repository and Git behavior;
-- just-in-time file, symbol, line, documentation, and Artifact retrieval;
-- Capability registration, availability, selection, permission, normalization, and phase-specific Tool exposure;
-- fake navigable Child Runs with independent Context;
-- Client-local focus;
-- attention routing;
-- Project Steward projection;
-- supervised execution;
+- Workspace, Project, Repository, Environment, Session, Task, Run, and event identity;
+- minimum Context, Capability, Claim, Evidence, Receipt, Checkpoint, branch-contract, worktree, lease, and Git-operation state;
 - Repository observation and trust policy;
-- provider-backed Root Runs;
-- read-only Child Runs;
-- independent verification;
-- authoritative version-matched documentation resolution.
+- controlled native Repository and Git adapters;
+- Repository-scoped Git mutation serialization;
+- exact-state Context and Evidence binding;
+- one isolated mutating Run and one restricted Patch Artifact path;
+- independent read-only verification;
+- projected-merge verification and manual integration approval;
+- cleanup and restart reconciliation;
+- fake navigable Child Runs with independent Context;
+- Client-local focus, attention routing, and Project Steward projection;
+- provider-backed Root Runs after the deterministic kernel is proven.
 
-See [Plan reconciliation](docs/PLAN-RECONCILIATION.md).
-
-Provider and protocol experiments may run on isolated spike branches. They must not bypass the internal domain, integration hierarchy, execution-kernel, policy, privacy, Context, output, Artifact, and Evidence gates.
+See [Roadmap](docs/ROADMAP.md) and [Plan reconciliation](docs/PLAN-RECONCILIATION.md).
 
 ## Work planning
 
 Kiln uses short-lived branches and stable work-package identifiers.
-
-Example:
 
 ```text
 Plan:      docs/work/P1-W03-command-supervision.md
@@ -187,7 +216,7 @@ Criterion: P1-W03-AC01
 Evidence:  P1-W03-E01
 ```
 
-See [Branching and work planning](docs/BRANCHING-AND-WORK-PLANNING.md) before planned implementation.
+See [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md) before planned implementation.
 
 ## Agent-ready development
 
@@ -200,7 +229,7 @@ scripts/agent-preflight
 scripts/check
 ```
 
-Project-local skills live under `.agents/skills/`:
+Project-local Skills live under `.agents/skills/`:
 
 - `kiln-work-package`
 - `kiln-elixir-otp`
@@ -208,7 +237,7 @@ Project-local skills live under `.agents/skills/`:
 - `kiln-integrity-review`
 - `kiln-evidence-closeout`
 
-Optional Pi specialist agents live under `.pi/agents/`. The OTP and integrity agents are read-only. The verifier may run non-mutating checks but may not edit files.
+Optional Pi specialist agents live under `.pi/agents/`. The OTP and integrity agents are read-only. The verifier can run non-mutating checks but cannot edit files.
 
 The main coding agent remains the default writer and owns final implementation decisions.
 
@@ -218,6 +247,8 @@ The main coding agent remains the default writer and owns final implementation d
 - [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md)
 - [Capability integration](docs/CAPABILITY-INTEGRATION.md)
 - [Context system](docs/CONTEXT-SYSTEM.md)
+- [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md)
+- [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md)
 - [Domain contracts](docs/contracts/README.md)
 - [Project provenance](docs/PROJECT-PROVENANCE.md)
 - [Architecture](docs/ARCHITECTURE.md)
@@ -230,7 +261,7 @@ The main coding agent remains the default writer and owns final implementation d
 - [Project invariants](docs/PROJECT-INVARIANTS.md)
 - [Agent-friendly codebase rules](docs/AGENT-FRIENDLY-CODEBASE.md)
 - [Elixir and OTP engineering guide](docs/ELIXIR-OTP-ENGINEERING.md)
-- [Branching and work planning](docs/BRANCHING-AND-WORK-PLANNING.md)
+- [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md)
 - [Engineering quality rules](docs/ENGINEERING-QUALITY-RULES.md)
 - [Architecture decisions](docs/decisions/README.md)
 - [Implementation plan template](docs/templates/IMPLEMENTATION-PLAN.md)
@@ -247,8 +278,8 @@ scripts/agent-preflight
 scripts/check
 ```
 
-The repository intentionally begins with no third-party runtime dependencies. Use the project dependency-review skill before adding a library, executable, service, native implemented function (NIF), port program, development tool, or protocol client.
+The Repository intentionally begins with no third-party runtime dependencies. Use the Project dependency-review Skill before adding a library, executable, service, native implemented function, port program, development tool, or protocol client.
 
 ## Status
 
-Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software projects.
+Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software Projects.
