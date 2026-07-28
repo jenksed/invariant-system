@@ -49,15 +49,15 @@ for file in "${agents[@]}"; do
   name=$(frontmatter_value "$file" name)
   description=$(frontmatter_value "$file" description)
   tools=$(frontmatter_value "$file" tools)
+  normalized_tools=$(printf '%s' "$tools" | tr -d '[:space:]')
 
   [[ -n "$name" ]] || fail "$file has no agent name"
   [[ -n "$description" ]] || fail "$file has no agent description"
   [[ -n "$tools" ]] || fail "$file has no explicit tool allowlist"
 
-  if [[ ",$tools," == *",edit,"* || ",$tools," == *",write,"* ]]; then
+  if [[ ",$normalized_tools," == *",edit,"* || ",$normalized_tools," == *",write,"* ]]; then
     fail "$file grants a specialist agent write tools"
   fi
-
 done
 
 required_prompts=(
