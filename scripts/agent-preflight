@@ -9,7 +9,7 @@ fail() {
 root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
 cd "$root"
 
-branch=$(git branch --show-current)
+branch=${KILN_BRANCH:-$(git branch --show-current)}
 [[ -n "$branch" ]] || fail "detached HEAD is not a valid implementation state"
 
 case "$branch" in
