@@ -1,6 +1,6 @@
 # P0-W11: Delegated work model
 
-- **Status:** Implemented; verification pending
+- **Status:** Implemented and verified; review pending
 - **Branch:** `work/p0-w11-delegated-work-model`
 - **Depends on:** P0-W04 through P0-W10
 - **Scope:** Planning and contracts only
@@ -9,20 +9,20 @@
 
 Define how Kiln creates, displays, controls, verifies, interrupts, recovers, and records delegated work.
 
-The work must make delegation useful without optimizing for Agent count or creating hidden work.
+The work makes delegation useful without optimizing for Agent count or creating hidden work.
 
-## Observed current state
+## Observed starting state
 
-- ADR 0004 requires first-class Runs for delegated work.
-- ADR 0007 makes Run the primary durable execution unit.
-- `docs/RUN-MODEL.md` defines Root, Parent, Child, foreground, background, Context, authority, and initial limits.
-- `docs/PROJECT-STEWARDSHIP.md` defines bounded delegation and Project Steward responsibility.
-- P0-W08 requires independent Child and Verifier Context.
-- P0-W10 requires Git isolation and prevents Verifiers from repairing evaluated work.
-- The existing Run state list does not include `waiting_for_command`.
-- The existing Attention contract does not include verification blockers, merge blockers, Resource limits, stale Evidence, or the complete user action set.
-- Scout and Verifier descriptions do not yet provide machine-readable role-result contracts.
-- Cancellation, timeout, result delivery, and crash behavior require more precise rules.
+- ADR 0004 required first-class Runs for delegated work.
+- ADR 0007 made Run the primary durable execution unit.
+- `docs/RUN-MODEL.md` defined Root, Parent, Child, foreground, background, Context, authority, and initial limits.
+- `docs/PROJECT-STEWARDSHIP.md` defined bounded delegation and Project Steward responsibility.
+- P0-W08 required independent Child and Verifier Context.
+- P0-W10 required Git isolation and prevented Verifiers from repairing evaluated work.
+- The Run state list omitted `waiting_for_command`.
+- Attention did not include verification blockers, merge blockers, Resource limits, stale Evidence, or the complete user action set.
+- Scout and Verifier did not have machine-readable result contracts.
+- Cancellation, timeout, result delivery, crash, and orphan behavior needed precise rules.
 
 ## Protected invariants
 
@@ -34,6 +34,8 @@ This work preserves:
 - `KILN-INV-024` through `KILN-INV-034`;
 - `KILN-INV-045` through `KILN-INV-056`;
 - ADRs 0004, 0005, 0007, 0010, and 0013.
+
+ADR 0014 and `docs/DELEGATED-WORK.md` add detailed delegated-work constraints without reversing these invariants.
 
 ## Requirements
 
@@ -55,83 +57,76 @@ This work preserves:
 
 ## Changes
 
-- Add `docs/DELEGATED-WORK.md`.
-- Add `docs/contracts/kiln-delegation.schema.json`.
-- Add ADR 0014.
-- Update `docs/RUN-MODEL.md` with the authoritative delegation specification and missing state.
-- Update `docs/PROJECT-STEWARDSHIP.md` to make Scout and Verifier the only initial Child roles.
-- Update core and execution schemas where the existing contracts conflict with P0-W11.
-- Update Project invariants, README, roadmap, ADR index, and contract index.
+- Added `docs/DELEGATED-WORK.md`.
+- Added `docs/contracts/kiln-delegation.schema.json`.
+- Added ADR 0014.
+- Reconciled `docs/RUN-MODEL.md` with the complete state list and initial delegated roles.
+- Reconciled `docs/PROJECT-STEWARDSHIP.md` with Scout and Verifier as the only initial Child role contracts.
+- Updated README, roadmap, ADR index, and contract index.
+- Recorded `kiln.delegation/v0` as the detailed v0 authority for delegated transitions and Attention.
+- Deferred consolidation of the generic `kiln.domain/v0` Run status and `kiln.domain/v0` Attention snapshot schemas to the Phase 1 contract work package. Runtime implementation must not use the older generic subsets as complete delegated-work validators before that consolidation.
 
 ## Acceptance criteria
 
 The normative criteria are `P0-W11-AC01` through `P0-W11-AC25` in `docs/DELEGATED-WORK.md`.
 
-Additional work-package criteria are:
+Additional work-package criteria:
 
-- **P0-W11-AC26:** The diff contains documentation and JSON contracts only.
-- **P0-W11-AC27:** Repository CI passes on the final branch head.
-- **P0-W11-AC28:** The delegation schema passes Draft 2020-12 meta-schema validation.
-- **P0-W11-AC29:** Representative positive and negative delegation documents validate as expected.
-- **P0-W11-AC30:** Existing Git isolation, Context, authority, Evidence, and recovery decisions remain intact.
+- **P0-W11-AC26:** Pass. The diff contains documentation and JSON contracts only.
+- **P0-W11-AC27:** Pass. GitHub CI run `30391491391` passed on the design head.
+- **P0-W11-AC28:** Pass. The delegation schema passed Draft 2020-12 meta-schema validation.
+- **P0-W11-AC29:** Pass. Ten positive documents validated and seven protected negative cases were rejected.
+- **P0-W11-AC30:** Pass. Git isolation, Context, authority, Evidence, and recovery decisions remain intact.
 
-## Verification
+## Verification Evidence
 
-Repository checks:
+### Repository CI
 
-```bash
-scripts/agent-preflight
-scripts/validate-agent-assets
-vale .
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix xref graph --format cycles --label compile-connected --fail-above 0
-mix test
-```
+GitHub CI run `30391491391` passed:
 
-Contract checks:
+- Vale prose checks;
+- agent preflight behavior;
+- Project agent-asset validation;
+- dependency installation;
+- Elixir formatting;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit tests.
 
-```bash
-python -m json.tool docs/contracts/kiln-delegation.schema.json
-```
+### Contract validation
 
-A Draft 2020-12 validator must validate representative documents for:
+The schema passed:
 
-- delegation contract;
-- Scout result;
-- Verifier `PASS`, `FAIL`, and `BLOCKED` results;
-- Run transition;
-- Attention event;
-- cancellation record;
-- timeout policy;
-- Child result delivery.
+- JSON parsing;
+- Draft 2020-12 meta-schema validation;
+- representative positive validation for delegation contract, Scout result, Verifier `PASS`, Verifier `FAIL`, Verifier `BLOCKED`, Run transition, Attention event, cancellation record, timeout policy, and Child result delivery.
 
-Negative cases must reject:
+The schema rejected:
 
 - depth greater than two;
-- a Scout with Verifier permissions;
-- a Verifier `PASS` without reproduced Evidence;
-- a blocking Attention event without escalation;
-- a user or permission wait transition without Attention and resume state;
-- peer communication or shared mutable Context enabled;
-- a Child role with `max_child_runs` greater than zero.
+- Scout with Verifier permissions;
+- peer communication enabled;
+- shared mutable Context enabled;
+- Child delegation allowance greater than zero;
+- Verifier `PASS` without reproduced Evidence;
+- user or permission wait with null or missing Attention and resume state;
+- blocking Attention with null or missing escalation.
 
-## Evidence
+## Evidence register
 
-- **P0-W11-E01:** Delegated-work specification covers every required output.
-- **P0-W11-E02:** Delegation schema parses and validates.
+- **P0-W11-E01:** `docs/DELEGATED-WORK.md` covers all requested outputs and acceptance criteria.
+- **P0-W11-E02:** `docs/contracts/kiln-delegation.schema.json` parses and validates.
 - **P0-W11-E03:** ADR 0014 records accepted and rejected positions.
-- **P0-W11-E04:** Run, Steward, roadmap, README, invariant, ADR, and contract authorities link to the specification.
-- **P0-W11-E05:** Diff contains planning and contracts only.
-- **P0-W11-E06:** Repository CI passes on the final branch head.
+- **P0-W11-E04:** Run, Steward, roadmap, README, ADR, and contract authorities link to the specification.
+- **P0-W11-E05:** The branch comparison contains planning and contracts only.
+- **P0-W11-E06:** GitHub CI run `30391491391` passed.
 
 ## Exclusions
 
 This work does not implement:
 
-- Run processes;
+- Run processes or scheduling;
 - Worker leases;
-- scheduling;
 - model-backed Child Runs;
 - Scout or Verifier runtime code;
 - Attention routing;
@@ -145,3 +140,7 @@ This work does not implement:
 - peer communication;
 - shared mutable Context;
 - deeper or wider delegation limits.
+
+## Completion statement
+
+Implemented and verified as a planning-and-contract package. Review and owner acceptance remain before integration.
