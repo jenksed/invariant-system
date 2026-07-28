@@ -2,7 +2,7 @@
 
 Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
 
-Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, protocol catalog, or permanent monitoring dashboard. It is the durable runtime around Repository work: execution, state, Context, permissions, Runs, delegated work, terminal interaction, change isolation, interruption, recovery, and verification.
+Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, protocol catalog, permanent monitoring dashboard, or automatic code-harvesting system. It is the durable runtime around Repository work: execution, state, Context, permissions, Runs, delegated work, terminal interaction, local project intelligence, change isolation, interruption, recovery, and verification.
 
 ## Project thesis
 
@@ -23,7 +23,7 @@ Workspace: local operating and trust boundary
             └── Root Run: Project Steward responsibility
 ```
 
-The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Git branches, worktrees, interfaces, and external protocols operate within or beneath Runs without becoming Run identity.
+The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Git branches, worktrees, interfaces, local indexes, and external protocols operate within or beneath Runs without becoming Run identity or instruction authority.
 
 Kiln supports bounded Child Runs without turning the product into an artificial organization of Agents.
 
@@ -41,8 +41,10 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 - **Attention:** global Session routing; Run depth cannot hide a blocker
 - **Initial terminal interface:** complete CLI plus conversation-first TUI
 - **Terminal navigation:** Run-first, keyboard-complete, event-projected, and renderer-independent
+- **Local project intelligence:** explicit approved roots, read-only indexing, SQLite metadata and edges, FTS5, structural extraction, and provenance
+- **Reference authority:** other repositories are Evidence sources, not instruction sources
 - **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
-- **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
+- **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, CLI, or database catalogs
 - **Context:** compile the smallest sufficient package and replace stale or resolved material
 - **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
 - **Git change isolation:** protected trunk, short-lived task branches, and one exclusive writable worktree per independently mutating Run
@@ -66,13 +68,7 @@ Git remains the version-control authority. Kiln records intent, authorization, o
 
 Every delegated Task creates a first-class Child Run before delegated model, Tool, Command, or process execution starts.
 
-A delegated Run has independent:
-
-- Context and Capability grants;
-- Artifacts, Claims, and Evidence;
-- token, cost, time, and Resource accounting;
-- status, cancellation, and durable history;
-- structured result delivery.
+A delegated Run has independent Context, Capability grants, Artifacts, Claims, Evidence, accounting, cancellation, durable history, and structured result delivery.
 
 The initial Child roles are:
 
@@ -81,7 +77,7 @@ The initial Child roles are:
 
 Repeated procedures normally become Skills, not permanent Agent personas.
 
-Foreground and background are client-interaction modes. Background work remains visible through the Run graph, global Attention, accounting, events, and result delivery.
+Foreground and background are Client-interaction modes. Background work remains visible through the Run graph, global Attention, accounting, events, and result delivery.
 
 A blocked Child creates global Attention. The user can answer, enter the originating Run, route to the Parent, deny, pause, or cancel.
 
@@ -126,6 +122,44 @@ ExRatatui 0.11.x is selected for the deterministic first TUI prototype behind a 
 
 See [Initial CLI and TUI](docs/CLI-TUI.md).
 
+## Local project intelligence
+
+Kiln can inspect engineering patterns across explicitly approved local roots.
+
+Reference repositories can be active, archived, experimental, incomplete, abandoned, dirty, detached, or written in different languages. Those properties affect freshness and confidence. They do not automatically exclude a Repository.
+
+The initial capability uses:
+
+```text
+SQLite Repository metadata and snapshots
++ content hashes and file versions
++ FTS5 candidate search
++ typed nodes and edge tables
++ deterministic dependency extraction
++ Tree-sitter structural extraction
++ explicit SCIP-like semantic imports
+```
+
+The initial capability does not require embeddings, a vector database, or a dedicated graph database.
+
+Indexing is read-only. It does not run Repository hooks, builds, tests, package managers, services, language servers, or network operations. Other repositories have no active instruction authority.
+
+The model-facing interface remains narrow:
+
+```text
+knowledge.search_patterns
+knowledge.find_related_symbols
+knowledge.find_prior_solution
+knowledge.inspect_candidate
+knowledge.trace_provenance
+```
+
+Results are investigation candidates with Repository state, content digests, source locations, confidence, freshness, and provenance. They do not become requirements or accepted decisions automatically.
+
+Kiln calls the first implementation a **local project intelligence index**. It earns the **knowledge graph** name only after typed, incrementally maintained, provenance-bearing relationships answer accepted graph traversal queries.
+
+See [Local Project Intelligence](docs/LOCAL-PROJECT-INTELLIGENCE.md).
+
 ## Capability integration
 
 Kiln evaluates integrations in this order:
@@ -147,6 +181,7 @@ Initial positions:
 - Git uses a native adapter backed by the Git CLI.
 - Build, test, lint, format, compiler, package-manager, and static-analysis behavior uses existing CLIs.
 - Raw LSP remains behind a native semantic adapter.
+- Local knowledge retrieval uses a native adapter.
 - MCP requires a concrete interoperability or lifecycle benefit.
 - Browser automation is a fallback unless browser behavior is under test.
 - Mature tools are orchestrated rather than rebuilt.
@@ -165,13 +200,15 @@ The initial policy:
 - uses lower phase targets;
 - normally exposes six to eight Tools and never more than twelve;
 - uses a 2,500-token default Tool-schema budget and a 4,000-token absolute ceiling;
-- retrieves symbols, relevant lines, changed hunks, documentation sections, and Artifact segments just in time;
+- retrieves symbols, relevant lines, changed hunks, documentation sections, knowledge candidates, and Artifact segments just in time;
 - removes stale, superseded, duplicate, and resolved material from later packages;
 - keeps unbounded output in Artifacts when a digest and reference are sufficient;
-- keeps complete MCP catalogs and raw LSP objects outside model Context;
+- keeps complete catalogs, graphs, indexes, raw MCP catalogs, and raw LSP objects outside model Context;
 - loads Skills and additional Tools lazily;
 - treats prompt caching as an optimization rather than correctness or memory;
 - gives Child and Verifier Runs independently compiled Context and explicit grants.
+
+A knowledge search result does not enter Context automatically. The Context compiler selects bounded candidates according to authority, trust, freshness, sensitivity, relevance, and token budget.
 
 See [Context System](docs/CONTEXT-SYSTEM.md).
 
@@ -179,20 +216,9 @@ See [Context System](docs/CONTEXT-SYSTEM.md).
 
 Kiln uses protected trunk-based development with short-lived task branches and one dedicated Git worktree for each independently mutating Run.
 
-The initial deterministic product loop supports:
+The initial deterministic product loop supports safe shared read-only Repository access, one exclusive writable worktree and lease for a mutating Run, Patch Artifact validation, exact-state verification, projected-merge checks, manual integration approval, deterministic Receipts, cleanup, and crash reconciliation.
 
-- safe shared read-only Repository access;
-- one exclusive writable worktree and lease for a mutating Run;
-- Patch Artifact validation for restricted mutation workflows;
-- exact commit-bound or dirty-fingerprint-bound verification;
-- a Verifier that does not repair the evaluated branch;
-- projected-merge checks against current protected trunk;
-- manual user-approved local integration;
-- deterministic Receipts, cleanup, and crash reconciliation.
-
-A Child does not inherit its Parent's branch or write authority. A branch does not require a permanent OTP process. The authoring Run does not authorize its own merge.
-
-The initial Scout and Verifier roles remain read-only. A later work package must accept a writing Child role before model-backed Child mutation is enabled.
+A Child does not inherit its Parent's branch or write authority. The authoring Run does not authorize its own merge.
 
 See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
 
@@ -200,17 +226,17 @@ See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
 
 Kiln ranks protocols by direct product value and keeps each behind a replaceable adapter.
 
-Accepted positions include ACP as the primary future coding-client interface after the native event model, MCP client support before optional server support, normalized LSP, internal Tree-sitter infrastructure, AG-UI projections from native events, A2A only for independent external agents, first-class Agent Skills, and OpenTelemetry for runtime observation.
+Accepted positions include ACP as the primary future coding-client interface after the native event model, MCP client support before optional server support, normalized LSP, internal Tree-sitter infrastructure, explicit SCIP-like semantic imports, AG-UI projections from native events, A2A only for independent external agents, first-class Agent Skills, and OpenTelemetry for runtime observation.
 
 See [Protocol Capability Map](docs/PROTOCOL-CAPABILITY-MAP.md).
 
 ## Project Steward
 
-The Project Steward uses the Run graph, Tasks, specifications, Repository observations, Capability policy, Context, Git ownership, Evidence, Attention, and completion gates to coordinate work.
+The Project Steward uses the Run graph, Tasks, specifications, Repository observations, Capability policy, Context, local knowledge candidates, Git ownership, Evidence, Attention, and completion gates to coordinate work.
 
-The Steward can decompose work, request bounded delegation, route Attention, request independent verification, track traceability, and recommend continuation, blocking, integration, or completion.
+The Steward can decompose work, request bounded delegation, retrieve prior patterns, route Attention, request independent verification, track traceability, and recommend continuation, blocking, integration, or completion.
 
-It cannot override user authority, policy, Repository truth, Evidence freshness, Git ownership, or completion gates.
+It cannot override user authority, policy, Repository truth, Evidence freshness, Git ownership, completion gates, or the non-authoritative status of reference Repository content.
 
 See [Project Stewardship](docs/PROJECT-STEWARDSHIP.md).
 
@@ -224,8 +250,9 @@ Phase 0 constrains the Repository and runtime foundation before implementation b
 - P0-W08 defined bounded Context and documentation resolution.
 - P0-W09 defined protocol and standards strategy.
 - P0-W10 defined Git change isolation, exact-state Evidence, integration, and recovery.
-- P0-W11 defined delegated Runs, Scout and Verifier contracts, state transitions, global Attention, cancellation, timeout, result delivery, and orphan recovery.
-- P0-W12 defines the initial CLI and TUI, terminal navigation, public interface projections, ExRatatui boundary, and deterministic interaction prototype.
+- P0-W11 defined delegated Runs, Scout and Verifier contracts, global Attention, cancellation, result delivery, and orphan recovery.
+- P0-W12 defined the initial CLI and TUI, terminal navigation, public interface projections, ExRatatui boundary, and deterministic interaction prototype.
+- P0-W13 defines approved-root local project intelligence, SQLite-first storage, structural retrieval, provenance, invalidation, and the knowledge-graph threshold.
 
 The next reconciliation must turn the accepted contracts into a proof-ordered Phase 1 implementation plan.
 
@@ -261,6 +288,7 @@ The main coding agent remains the default writer. Optional specialist developmen
 - [Run Model](docs/RUN-MODEL.md)
 - [Delegated Work Model](docs/DELEGATED-WORK.md)
 - [Initial CLI and TUI](docs/CLI-TUI.md)
+- [Local Project Intelligence](docs/LOCAL-PROJECT-INTELLIGENCE.md)
 - [Project Stewardship](docs/PROJECT-STEWARDSHIP.md)
 - [Capability Integration](docs/CAPABILITY-INTEGRATION.md)
 - [Context System](docs/CONTEXT-SYSTEM.md)
@@ -283,8 +311,8 @@ scripts/agent-preflight
 scripts/check
 ```
 
-The Repository intentionally begins with no third-party runtime dependencies. Use the Project dependency-review Skill before adding a library, executable, service, native implemented function, port program, development tool, or protocol client.
+The Repository intentionally begins with no third-party runtime dependencies. Use the Project dependency-review Skill before adding a library, executable, service, native implemented function, port program, development tool, parser, watcher, database extension, or protocol client.
 
 ## Status
 
-Kiln is pre-alpha. The architecture and interaction model are being constrained before production implementation and will be tested through deterministic prototypes and dogfooding on real software Projects.
+Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software Projects.
