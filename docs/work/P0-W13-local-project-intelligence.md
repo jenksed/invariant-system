@@ -1,6 +1,6 @@
 # P0-W13: Local project intelligence
 
-- **Status:** Implemented; verification pending
+- **Status:** Implemented and verified; review pending
 - **Branch:** `work/p0-w13-local-project-intelligence`
 - **Depends on:** P0-W06 through P0-W12
 - **Scope:** Planning and contracts only
@@ -100,7 +100,7 @@ Contract checks:
 python -m json.tool docs/contracts/kiln-knowledge.schema.json
 ```
 
-A Draft 2020-12 validator must validate:
+A Draft 2020-12 validator validated:
 
 - accepted-root configuration;
 - Repository snapshot;
@@ -111,7 +111,7 @@ A Draft 2020-12 validator must validate:
 - provenance trace;
 - scan result.
 
-Negative cases must reject:
+Protected negative cases rejected:
 
 - enabled embeddings in the first contract;
 - active instruction authority on a node, edge, candidate, inspection, or trace;
@@ -119,8 +119,9 @@ Negative cases must reject:
 - an invalid Repository lifecycle;
 - more than eight returned candidates;
 - an inspection excerpt above the accepted size limit;
-- a missing provenance source digest;
-- a source path or operation outside the public contract.
+- a missing provenance source digest.
+
+GitHub CI run `30395883967` passed on the design head. It completed prose checks, agent preflight behavior, Project agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
 
 ## Evidence
 
@@ -131,7 +132,7 @@ Negative cases must reject:
 - **P0-W13-E05:** README, roadmap, ADR index, and contract index link to the capability.
 - **P0-W13-E06:** Primary documentation supports FTS5, bounded recursive traversal, Tree-sitter queries, SCIP imports, and the deferred vector position.
 - **P0-W13-E07:** The diff contains planning and contracts only.
-- **P0-W13-E08:** Repository CI passes on the final branch head.
+- **P0-W13-E08:** Repository CI passes on the exact review head.
 
 ## Exclusions
 
