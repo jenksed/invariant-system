@@ -23,7 +23,7 @@ P0-W16 reconciles:
 - Git change isolation;
 - local project intelligence and security;
 - trustworthy execution, Commands, Patches, Evidence, Receipts, telemetry, and attestations;
-- current README, roadmap, contracts, ADRs, and work-package history.
+- current README, roadmap, contracts, ADRs, templates, and work-planning rules.
 
 ## Protected decisions
 
@@ -56,7 +56,9 @@ P0-W16 reconciles:
 - **P0-W16-R10:** Define a realistic first twelve-week target.
 - **P0-W16-R11:** Update the document hierarchy and close stale planning authorities.
 - **P0-W16-R12:** Be aggressive about exclusions and avoid adding a subsystem merely because the final architecture may need it.
-- **P0-W16-R13:** Do not implement production runtime code or dependencies.
+- **P0-W16-R13:** Align branch, plan, PR, gate, demo, and Receipt identifiers with the vertical roadmap.
+- **P0-W16-R14:** Reconcile protocol “priority” with actual slice entry conditions.
+- **P0-W16-R15:** Do not add production runtime code or dependencies.
 
 ## Integrated decisions
 
@@ -78,7 +80,7 @@ The initial writing Child remains read-only and returns an immutable Patch Artif
 
 ### Protocol ordering
 
-Adapter seams are foundational. Protocol implementation is not. ACP, structured result adapters, MCP, OpenAPI, Dev Containers, and OCI enter only after native Runs, authority, execution, Evidence, and recovery are proven.
+Adapter seams are foundational. Protocol implementation is not. ACP, structured result adapters, MCP, OpenAPI, Dev Containers, and OCI enter only after native Runs, authority, execution, Evidence, and recovery are proven. OpenTelemetry begins only after durable operation semantics stabilize and remains observation rather than state.
 
 ### Version 0.1
 
@@ -94,14 +96,18 @@ navigable simulated Runs
 
 ## Changes
 
-- add `docs/IMPLEMENTATION-SLICES.md`;
+- add `docs/IMPLEMENTATION-SLICES.md` with all ten vertical slices, tickets, security boundaries, criteria, tests, Receipts, demos, exit conditions, deferrals, risks, first task, and twelve-week target;
+- add `docs/SLICE-ACCEPTANCE-GATES.md` with aggregate gate identifiers and machine-readable gate expectations;
 - replace `docs/ARCHITECTURE.md` with the integrated architecture authority;
-- replace `docs/ROADMAP.md` with the vertical-slice roadmap;
+- replace `docs/ROADMAP.md` with the vertical-slice implementation order and milestones;
 - simplify `README.md` around the integrated product and first milestone;
+- replace the protocol backlog with a slice-linked adapter-entry map in `docs/PROTOCOL-CAPABILITY-MAP.md`;
 - mark `docs/PLAN-RECONCILIATION.md` resolved;
 - mark `docs/PLANNING-BASELINE.md` historical and superseded as current authority;
-- add ADR 0019;
-- update ADR, contract, and work-planning references;
+- update `docs/BRANCHING-AND-WORK-PLANNING.md` for slice and ticket identifiers, small coherent branches, aggregate gates, demos, and Receipts;
+- update `docs/templates/IMPLEMENTATION-PLAN.md` with slice contribution, security, deterministic verification, demo, and Receipt fields;
+- update `docs/contracts/README.md` so schemas are boundaries rather than a horizontal backlog;
+- add ADR 0019 and update the ADR index;
 - record P0-W16 and the first coding task.
 
 ## Acceptance criteria
@@ -120,8 +126,11 @@ navigable simulated Runs
 - **P0-W16-AC12:** The first twelve-week target is explicit and excludes later systems.
 - **P0-W16-AC13:** Planning baseline and reconciliation documents no longer claim current roadmap authority.
 - **P0-W16-AC14:** Subject specifications remain normative for boundaries but cannot independently reorder implementation.
-- **P0-W16-AC15:** Repository CI passes on the final branch head.
-- **P0-W16-AC16:** The diff changes documentation only.
+- **P0-W16-AC15:** Protocol and standards positions identify slice entry, concrete workflow, security, and removal gates rather than implied early backlog status.
+- **P0-W16-AC16:** Work governance supports small slice tickets and prevents scattered tickets from falsely claiming aggregate slice completion.
+- **P0-W16-AC17:** Every slice has explicit aggregate gate, demo, and Receipt identifiers.
+- **P0-W16-AC18:** Repository CI passes on the final branch head.
+- **P0-W16-AC19:** The diff changes documentation only.
 
 ## Verification
 
@@ -142,19 +151,23 @@ Planning checks:
 - search active authorities for superseded P1-W implementation-order references;
 - verify every required subsystem appears in the integrated architecture;
 - verify all ten slices contain every required field;
-- verify the roadmap and detailed slice dependencies agree;
-- verify README, architecture, roadmap, ADR index, and documentation hierarchy link correctly;
+- verify the roadmap, slice details, gate registry, and work-planning identifiers agree;
+- verify protocol entry positions match the vertical roadmap;
+- verify README, architecture, roadmap, ADR index, contract index, templates, and documentation hierarchy link correctly;
 - verify no production source, tests, dependency, workflow, script, Skill, prompt, or runtime configuration changed.
 
 ## Evidence
 
 - **P0-W16-E01:** `docs/ARCHITECTURE.md` is the integrated architecture authority.
-- **P0-W16-E02:** `docs/IMPLEMENTATION-SLICES.md` defines all ten vertical slices, tickets, gates, demos, Receipts, risks, exclusions, first task, and twelve-week target.
-- **P0-W16-E03:** `docs/ROADMAP.md` defines implementation order, milestones, dependencies, and version 0.1.
-- **P0-W16-E04:** ADR 0019 records the vertical-slice and minimal-architecture decision.
-- **P0-W16-E05:** planning baseline and reconciliation records are historical rather than competing authorities.
-- **P0-W16-E06:** the final diff is planning-only.
-- **P0-W16-E07:** final-head CI passes.
+- **P0-W16-E02:** `docs/IMPLEMENTATION-SLICES.md` defines all ten vertical slices, tickets, criteria, tests, Receipts, demos, risks, exclusions, first task, and twelve-week target.
+- **P0-W16-E03:** `docs/SLICE-ACCEPTANCE-GATES.md` defines explicit aggregate gate identifiers and result requirements.
+- **P0-W16-E04:** `docs/ROADMAP.md` defines implementation order, milestones, dependencies, and version 0.1.
+- **P0-W16-E05:** `docs/PROTOCOL-CAPABILITY-MAP.md` ties adapter entry to slices and concrete evidence.
+- **P0-W16-E06:** ADR 0019 records the vertical-slice and minimal-architecture decision.
+- **P0-W16-E07:** planning baseline and reconciliation records are historical rather than competing authorities.
+- **P0-W16-E08:** branching rules and the implementation-plan template use the new slice/ticket/gate/demo/Receipt vocabulary.
+- **P0-W16-E09:** the final diff is planning-only.
+- **P0-W16-E10:** final-head CI passes.
 
 ## Exclusions
 
