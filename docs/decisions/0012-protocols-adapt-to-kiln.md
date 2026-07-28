@@ -1,41 +1,42 @@
-# ADR 0004: Protocols adapt to Kiln
+# ADR 0012: Protocols adapt to Kiln
 
-- **Status:** Accepted
+- **Decision status:** Accepted
+- **Integration status:** Proposed on P0-W09
 - **Date:** 2026-07-28
 
 ## Context
 
-Kiln needs editor integration, external capabilities, code intelligence, user interfaces, execution isolation, and evidence exchange. Several open protocols address parts of this surface.
+Kiln needs editor integration, external Capabilities, code intelligence, user interfaces, execution isolation, and Evidence exchange. Several open protocols address parts of this surface.
 
 Adopting a protocol too early can allow its object model, lifecycle, transport, or security assumptions to define Kiln's product. Kiln already has stronger product constraints:
 
 - Kiln owns durable Session and Run truth.
 - Interfaces are projections.
-- The event journal and repository observations support recovery.
+- The event journal and Repository observations support recovery.
 - Capabilities remain behind explicit policy mediation.
-- Completion depends on current evidence.
+- Completion depends on current Evidence.
 
 ## Decision
 
-Kiln will use protocols through replaceable adapters around native domain concepts.
+Kiln uses protocols through replaceable adapters around Kiln-native domain concepts.
 
-The internal event model, command API, query API, capability broker, artifact model, and evidence model must exist independently of any external protocol.
+The internal event model, command API, query API, Capability broker, Artifact model, and Evidence model MUST exist independently of any external protocol.
 
 The accepted protocol positions are:
 
 1. ACP is the primary editor and coding-client interface after Kiln proves its internal event stream.
-2. AG-UI projects the same internal Run events and state used by the CLI, TUI, and ACP adapter.
-3. AHP is a design reference for authoritative, reconnectable, synchronized sessions. Kiln does not depend on AHP while the protocol is unstable.
+2. AG-UI projects the same internal Run events and state used by the command-line interface, terminal user interface, LiveView, and ACP adapter.
+3. AHP is a design reference for authoritative, reconnectable, synchronized Sessions. Kiln does not depend on AHP while the protocol is unstable.
 4. MCP client support has higher priority than MCP server support.
-5. MCP catalogs, discovery, and invocation remain behind Kiln's capability broker.
-6. A2A is reserved for independent external agents. Local child Runs use Kiln's native execution model.
+5. MCP catalogs, discovery, and invocation remain behind Kiln's Capability broker.
+6. A2A is reserved for independent external agents. Local Child Runs use Kiln's native execution model.
 7. OpenAPI is preferred over MCP when a narrow existing service already has a precise HTTP contract and does not need model-oriented discovery.
 8. LSP is normalized into a narrow semantic interface. Raw LSP is not exposed directly to models.
-9. Tree-sitter is internal structural infrastructure. It is not a primary model-facing tool.
+9. Tree-sitter is internal structural infrastructure. It is not a primary model-facing Tool.
 10. DAP is valuable after the first useful coding loop. It is not required for that loop.
 11. Agent Skills-compatible `SKILL.md` packages are first-class and load lazily.
 12. OpenTelemetry observes Kiln itself. OTLP export is optional and replaceable.
-13. Structured evidence formats are ingested into Kiln's evidence model. They do not become the canonical evidence model.
+13. Structured Evidence formats are ingested into Kiln's Evidence model. They do not become the canonical Evidence model.
 14. WASI and WIT remain plugin-boundary experiments until a concrete extension justifies them.
 15. Protocol versions and raw external identifiers are recorded at adapter boundaries so adapters can be replaced without rewriting durable Kiln state.
 
@@ -43,22 +44,22 @@ The detailed ranking, mappings, boundaries, and acceptance criteria are defined 
 
 ## Consequences
 
-- Kiln must define stable native concepts before shipping major adapters.
-- Adapters translate external messages into Kiln commands, queries, events, capabilities, artifacts, and evidence.
+- Kiln MUST define stable native concepts before it ships major adapters.
+- Adapters translate external messages into Kiln commands, queries, events, Capabilities, Artifacts, and Evidence.
 - Protocol-specific state is stored as versioned adapter metadata, not as the primary domain model.
 - Protocol catalogs cannot grant authority.
-- A protocol implementation can be removed without invalidating Sessions, Runs, evidence receipts, or repository history.
-- Kiln may support only a useful subset of a protocol.
-- Conformance tests must cover translation, cancellation, reconnection, authorization, and compatibility failure.
+- A protocol implementation can be removed without invalidating Sessions, Runs, Evidence Receipts, or Repository history.
+- Kiln MAY support only a useful subset of a protocol.
+- Conformance tests MUST cover translation, cancellation, reconnection, authorization, and compatibility failure.
 
 ## Rejected positions
 
 - Using ACP as Kiln's internal event model.
-- Allowing MCP servers to bypass capability policy.
-- Using A2A for local sub-agent orchestration.
-- Exposing raw Tree-sitter trees or entire LSP catalogs to every model request.
-- Treating AG-UI shared state or a transcript as authoritative session state.
-- Making JUnit, SARIF, OpenTelemetry, in-toto, or SLSA the canonical Kiln evidence representation.
+- Allowing MCP servers to bypass Capability policy.
+- Using A2A for local Child Run orchestration.
+- Exposing raw Tree-sitter trees or complete LSP catalogs to every model invocation.
+- Treating AG-UI shared state or a transcript as authoritative Session state.
+- Making JUnit, SARIF, OpenTelemetry, in-toto, or SLSA the canonical Kiln Evidence representation.
 - Requiring WASI or WIT for the first extension protocol.
 
 ## Review triggers
@@ -70,4 +71,4 @@ Review this decision when one of these conditions becomes true:
 - MCP server demand exceeds MCP client demand for real Kiln workflows.
 - a supported language cannot provide useful normalized semantics through LSP or another stable source;
 - a WASI component delivers materially stronger isolation or portability than supervised native subprocesses;
-- evidence export becomes a release or supply-chain requirement rather than a local completion requirement.
+- Evidence export becomes a release or supply-chain requirement rather than a local completion requirement.

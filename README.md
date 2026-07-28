@@ -2,7 +2,7 @@
 
 Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
 
-Kiln is not an application scaffolder, an autonomous software company, or an agent-management framework. It is the durable runtime around model-driven repository work: execution, state, context, permissions, interruption, recovery, and verification.
+Kiln is not an application scaffolder, an autonomous software company, an agent-management framework, or a catalog of protocol implementations. It is the durable runtime around model-driven repository work: execution, state, context, permissions, runs, interruption, recovery, and verification.
 
 ## Project thesis
 
@@ -12,42 +12,229 @@ Kiln is designed to move work through:
 
 > Intent → Orientation → Investigation → Change → Verification → Reconciliation → Completion
 
-The first product is for one developer working on local repositories. Other interfaces, extensions, and products may eventually build on the runtime, but they are not allowed to bloat the initial core.
+Kiln uses these foundational boundaries:
+
+```text
+Workspace: local operating and trust boundary
+└── Project: durable software product or body of work
+    └── Session: one accepted objective and work history
+        ├── Tasks: bounded desired outcomes
+        └── Run graph: durable execution and coordination attempts
+            └── Root Run: Project Steward responsibility
+```
+
+The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, and external protocols operate within or beneath Runs.
+
+Kiln supports bounded Child Runs without turning the product into an artificial organization of agents.
 
 ## Foundational direction
 
 - **Runtime:** Elixir and OTP
-- **Initial interface:** CLI
-- **Durable state:** SQLite
+- **Internal model:** Kiln-native and protocol-neutral
+- **External integration:** adapters map protocols and mature tools to Kiln domain commands, events, and schemas
+- **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
+- **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
+- **Context compilation:** compile the smallest sufficient package for the next decision or action; do not fill a larger model window
+- **Context continuity:** replace stale and resolved material with immutable manifests and compact Checkpoints rather than append forever
+- **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
+- **Objective boundary:** one durable Session
+- **Desired-work boundary:** one bounded Task
+- **Execution model:** one Root Run and a navigable Run graph
+- **Primary execution unit:** Run, not Agent persona or model invocation
+- **Delivery coordination:** Project Steward responsibility on the Root Run
+- **Initial interface:** command-line interface
+- **Durable state:** SQLite and an append-oriented event journal
 - **Source truth:** Git and the filesystem
+- **Authority:** explicit Capabilities, policy, and scoped grants
+- **Evidence:** Claims remain separate from Evidence and Receipts
 - **Web interface:** Phoenix LiveView, after the runtime is proven
 - **Extensions:** language-neutral supervised subprocess protocol
-- **First external SDK:** TypeScript, after the protocol is proven
+- **First external software development kit:** TypeScript, after the protocol is proven
 - **Gleam:** deferred until a concrete pure domain component earns it
+
+No external protocol may become Kiln's internal domain model.
+
+MCP is an optional protocol boundary, not Kiln's default integration layer and not a security sandbox.
+
+## Capability integration
+
+Kiln evaluates integrations in this order:
+
+1. in-process function or library;
+2. native Kiln adapter;
+3. direct deterministic CLI;
+4. local service API or Unix-domain socket;
+5. local MCP server;
+6. remote API or software development kit;
+7. remote MCP server;
+8. browser or user-interface automation.
+
+Kiln selects the earliest practical option that satisfies the required contract.
+
+Initial positions:
+
+- Repository reads and writes are native.
+- Git normally uses a native adapter backed by the Git CLI.
+- Build, test, lint, format, compiler, package-manager, and static-analysis behavior uses existing CLIs.
+- Raw LSP remains behind a native semantic adapter.
+- Local MCP requires material lifecycle, state, sharing, replacement, discovery, or existing-implementation value.
+- Remote MCP requires material interoperability and discovery value beyond a narrow API.
+- Browser automation is a fallback unless browser behavior is under test.
+- Mature tools are orchestrated rather than rebuilt.
+
+The full Capability catalog remains outside model Context. A Run receives a small phase-relevant Tool projection such as `repo.read`, `code.inspect`, `command.run`, and `verify.run`.
+
+See [Capability integration](docs/CAPABILITY-INTEGRATION.md).
+
+## Context system
+
+Kiln compiles a new bounded Context package for each model invocation or other Context-consuming Worker step.
+
+The package is built for one immediate purpose from current intent, accepted requirements, Task and Run state, Repository state, Evidence, assumptions, unknowns, the active Skill, phase-relevant Tools, permissions, model characteristics, remaining token budget, and compact Checkpoints.
+
+The initial policy:
+
+- defaults to a 16,000-token active input ceiling even when the provider supports more;
+- uses lower phase targets;
+- normally exposes six to eight Tools and never more than twelve;
+- uses a 2,500-token default Tool-schema budget and a 4,000-token absolute ceiling;
+- retrieves symbols, relevant lines, changed hunks, documentation sections, and Artifact segments just in time;
+- removes stale, superseded, duplicate, and resolved material from the next package;
+- keeps complete logs, test streams, documentation pages, DOM snapshots, database results, and large output in Artifacts when a digest and reference are sufficient;
+- keeps complete MCP catalogs and raw LSP objects outside model Context;
+- loads Skills and additional Tools lazily;
+- treats prompt caching as an optimization rather than correctness or memory;
+- gives Child Runs and Verifier Runs independently compiled Context and explicit grants.
+
+For Elixir Projects, documentation resolution prefers:
+
+1. active Repository documentation;
+2. accepted ADRs and specifications;
+3. dependency-authored usage rules;
+4. version-locked local ExDoc;
+5. running-Project documentation through a native adapter;
+6. Context7;
+7. official external documentation;
+8. general web research;
+9. model memory.
+
+Context7 remains supported, but it cannot override Repository-local or exact version-matched documentation.
+
+See [Context system](docs/CONTEXT-SYSTEM.md).
+
+## Project Steward
+
+The Project Steward uses Kiln's Run graph, Tasks, specifications, Repository observations, Capability policy, Evidence, and completion gates to coordinate work.
+
+The Steward can:
+
+- decompose work into bounded Tasks and Runs;
+- route attention;
+- request independent verification;
+- track requirements, mutations, Evidence, risks, and unknowns;
+- reconcile Repository state against the accepted specification;
+- recommend continuation, blocking, or completion.
+
+The Steward cannot override user authority, policy, Repository truth, Evidence freshness, or completion gates.
 
 ## Current milestone
 
-The first milestone is a local execution kernel that can:
+Phase 0 is defining the Repository and runtime foundation before implementation begins.
 
-1. open a repository workspace;
-2. create and persist a session;
-3. supervise a command;
-4. stream and record its output;
-5. cancel it safely;
-6. observe repository state before and after execution;
-7. restart and reconstruct the session accurately.
+P0-W05 audits the integrated and stacked planning state. Read [Planning baseline](docs/PLANNING-BASELINE.md) before product, architecture, or roadmap work.
 
-LLM integration follows only after those semantics are trustworthy.
+P0-W06 defines the [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md), JSON contracts, protocol-adapter boundary, and Run-centered execution semantics before Phase 1 implementation.
+
+P0-W07 defines the [Capability integration](docs/CAPABILITY-INTEGRATION.md) hierarchy, deterministic broker, compact model-facing Tools, result normalization, duplicate policy, and initial non-MCP boundary.
+
+P0-W08 defines the [Context system](docs/CONTEXT-SYSTEM.md), bounded package contract, token policy, progressive disclosure, documentation resolver, independent Child and Verifier Context, and Context observability.
+
+The later roadmap reconciliation must align Phase 1 with:
+
+- Workspace, Project, Repository, and Environment identity;
+- Session, Task, Run, and event identity;
+- minimum Context, Capability, Claim, Evidence, Receipt, and Checkpoint primitives;
+- Context compile requests, manifests, packages, budgets, invalidation, and observability;
+- native Repository and Git behavior;
+- just-in-time file, symbol, line, documentation, and Artifact retrieval;
+- Capability registration, availability, selection, permission, normalization, and phase-specific Tool exposure;
+- fake navigable Child Runs with independent Context;
+- Client-local focus;
+- attention routing;
+- Project Steward projection;
+- supervised execution;
+- Repository observation and trust policy;
+- provider-backed Root Runs;
+- read-only Child Runs;
+- independent verification;
+- authoritative version-matched documentation resolution.
+
+See [Plan reconciliation](docs/PLAN-RECONCILIATION.md).
+
+Provider and protocol experiments may run on isolated spike branches. They must not bypass the internal domain, integration hierarchy, execution-kernel, policy, privacy, Context, output, Artifact, and Evidence gates.
+
+## Work planning
+
+Kiln uses short-lived branches and stable work-package identifiers.
+
+Example:
+
+```text
+Plan:      docs/work/P1-W03-command-supervision.md
+Branch:    work/p1-w03-command-supervision
+PR:        [P1-W03] Add supervised command execution
+Criterion: P1-W03-AC01
+Evidence:  P1-W03-E01
+```
+
+See [Branching and work planning](docs/BRANCHING-AND-WORK-PLANNING.md) before planned implementation.
+
+## Agent-ready development
+
+Project-local Skills, prompts, and specialist agents support the coding agent that builds Kiln. They are development controls. They are not Kiln runtime Runs, Agent definitions, or Workers.
+
+The default workflow is:
+
+```bash
+scripts/agent-preflight
+scripts/check
+```
+
+Project-local skills live under `.agents/skills/`:
+
+- `kiln-work-package`
+- `kiln-elixir-otp`
+- `kiln-dependency-review`
+- `kiln-integrity-review`
+- `kiln-evidence-closeout`
+
+Optional Pi specialist agents live under `.pi/agents/`. The OTP and integrity agents are read-only. The verifier may run non-mutating checks but may not edit files.
+
+The main coding agent remains the default writer and owns final implementation decisions.
 
 ## Documentation
 
+- [Planning baseline](docs/PLANNING-BASELINE.md)
+- [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md)
+- [Capability integration](docs/CAPABILITY-INTEGRATION.md)
+- [Context system](docs/CONTEXT-SYSTEM.md)
+- [Domain contracts](docs/contracts/README.md)
 - [Project provenance](docs/PROJECT-PROVENANCE.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Session model](docs/SESSION-MODEL.md)
+- [Run model](docs/RUN-MODEL.md)
+- [Project Stewardship](docs/PROJECT-STEWARDSHIP.md)
 - [Security model](docs/SECURITY-MODEL.md)
-- [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Plan reconciliation](docs/PLAN-RECONCILIATION.md)
+- [Project invariants](docs/PROJECT-INVARIANTS.md)
+- [Agent-friendly codebase rules](docs/AGENT-FRIENDLY-CODEBASE.md)
+- [Elixir and OTP engineering guide](docs/ELIXIR-OTP-ENGINEERING.md)
+- [Branching and work planning](docs/BRANCHING-AND-WORK-PLANNING.md)
+- [Engineering quality rules](docs/ENGINEERING-QUALITY-RULES.md)
 - [Architecture decisions](docs/decisions/README.md)
+- [Implementation plan template](docs/templates/IMPLEMENTATION-PLAN.md)
+- [ADR template](docs/templates/ADR.md)
 
 ## Development
 
@@ -56,13 +243,12 @@ Kiln targets Elixir 1.20 on Erlang/OTP 28.
 ```bash
 mise install
 mix deps.get
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix test
+scripts/agent-preflight
+scripts/check
 ```
 
-The repository intentionally begins with no third-party runtime dependencies. Dependencies should be introduced only when an accepted milestone requires them.
+The repository intentionally begins with no third-party runtime dependencies. Use the project dependency-review skill before adding a library, executable, service, native implemented function (NIF), port program, development tool, or protocol client.
 
 ## Status
 
-Kiln is pre-alpha. The architecture is intentionally narrow and will be validated by dogfooding on real software projects.
+Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software projects.

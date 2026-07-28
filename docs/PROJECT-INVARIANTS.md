@@ -1,0 +1,464 @@
+# Project Invariants
+
+**Document type:** Reference
+
+This register gives stable identifiers to Kiln constraints that coding agents and reviewers must preserve.
+
+An invariant is not a complete architecture description. Each invariant links to the source that establishes its rationale.
+
+A work package that changes an invariant MUST include a new or superseding architecture decision record (ADR).
+
+## Invariant register
+
+### KILN-INV-001: Work is the central abstraction
+
+Kiln MUST model the state of repository work. Kiln MUST NOT use an artificial organization of agents as its core abstraction.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `docs/ARCHITECTURE.md`
+
+### KILN-INV-002: The initial product serves one developer
+
+Kiln MUST optimize the initial product for one developer working on local repositories.
+
+Hosted collaboration and multi-user control planes remain deferred.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `docs/ROADMAP.md`
+
+### KILN-INV-003: Elixir and OTP own runtime coordination
+
+Elixir and OTP MUST own session lifecycle, supervision, cancellation, streaming, resources, and runtime side effects in the initial system.
+
+A second implementation language requires an accepted ADR.
+
+**Source:** `docs/decisions/0001-elixir-otp-core.md`
+
+### KILN-INV-004: Supervision is not persistence
+
+A supervisor restart MUST restore runtime structure only.
+
+Kiln MUST reconstruct durable development state from persisted events and current repository observations.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `docs/SESSION-MODEL.md`
+
+### KILN-INV-005: The session journal is not the transcript
+
+Kiln MUST store durable session and run events separately from conversational transcript projections.
+
+A transcript MAY be a projection of events and model content.
+
+**Source:** `docs/decisions/0002-durable-session-journal.md`, `docs/RUN-MODEL.md`
+
+### KILN-INV-006: Git and the filesystem remain source truth
+
+Kiln MUST NOT replace Git as source-history authority.
+
+Kiln MUST observe repository state and bind its evidence to that state.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `docs/ARCHITECTURE.md`
+
+### KILN-INV-007: Completion requires current evidence
+
+Kiln MUST distinguish model claims from observations.
+
+Kiln MUST NOT treat stale evidence as proof of the current repository state.
+
+**Source:** `docs/SESSION-MODEL.md`, `docs/PROJECT-STEWARDSHIP.md`
+
+### KILN-INV-008: Permissions use explicit capabilities
+
+Tools, extensions, and runs MUST request explicit capabilities.
+
+BEAM process isolation MUST NOT be represented as operating-system containment.
+
+**Source:** `docs/SECURITY-MODEL.md`, `docs/RUN-MODEL.md`
+
+### KILN-INV-009: Interfaces do not own session truth
+
+The command-line interface, Phoenix interface, and future clients MUST use an explicit domain API.
+
+An interface MUST NOT become the authoritative owner of durable session or run state.
+
+**Source:** `docs/ARCHITECTURE.md`
+
+### KILN-INV-010: The command-line interface remains independent
+
+Kiln MUST remain usable through the command-line interface without Phoenix or a browser.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `docs/ROADMAP.md`
+
+### KILN-INV-011: Extensions cross a language-neutral boundary
+
+The primary public extension boundary MUST use supervised external processes and a versioned language-neutral protocol.
+
+Native Elixir extensions MAY exist. They MUST NOT become the only extension path.
+
+**Source:** `docs/decisions/0003-language-neutral-extensions.md`
+
+### KILN-INV-012: Scaffolding is outside the core
+
+Application generators, web framework defaults, database selection, authentication scaffolds, and deployment generators MUST NOT enter the core runtime.
+
+These features MAY exist later as external extensions or products.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`
+
+### KILN-INV-013: Deterministic code owns bookkeeping
+
+Kiln MUST use deterministic code for repository fingerprints, event recording, permission enforcement, evidence freshness, invalidation, cancellation, acceptance status, and state reconstruction when deterministic implementation is feasible.
+
+**Source:** `docs/PROJECT-PROVENANCE.md`, `AGENTS.md`
+
+### KILN-INV-014: Development agents are not product runs
+
+Project-local skills, prompts, and specialist agents support the construction and review of Kiln.
+
+They MUST NOT be described as Kiln runtime components or used as evidence that the Kiln run model is implemented.
+
+**Source:** `docs/work/P0-W03-agent-ready-development.md`, `docs/RUN-MODEL.md`
+
+### KILN-INV-015: Delegated work is a first-class run
+
+When delegated work requires independent inspection, steering, cancellation, evidence, or recovery, Kiln MUST create a child run.
+
+Kiln MUST NOT hide such work inside an opaque background tool call.
+
+**Source:** `docs/decisions/0004-first-class-run-graph.md`, `docs/RUN-MODEL.md`
+
+### KILN-INV-016: Run lineage is not OTP supervision
+
+Kiln MUST store logical parent-child run relationships independently from OTP supervisor-child relationships.
+
+A user-interface hierarchy MUST NOT dictate fault-containment structure.
+
+**Source:** `docs/decisions/0004-first-class-run-graph.md`, `docs/ARCHITECTURE.md`
+
+### KILN-INV-017: Run focus is client-local
+
+Each client MUST own its focused run independently from the session and from other clients.
+
+Changing client focus MUST NOT change run execution or another client's view.
+
+**Source:** `docs/RUN-MODEL.md`, `docs/ARCHITECTURE.md`
+
+### KILN-INV-018: Attention routing is depth-independent
+
+A run that requires user input, permission, conflict resolution, or failure handling MUST emit a normalized attention item.
+
+Attention delivery MUST NOT depend on the run's nesting depth.
+
+**Source:** `docs/RUN-MODEL.md`, `docs/SESSION-MODEL.md`
+
+### KILN-INV-019: Concurrent writers require isolation
+
+Kiln MUST NOT allow multiple writing runs to modify one checkout concurrently.
+
+A writing child requires an isolated Git worktree or a patch artifact that a controlling run reviews and applies.
+
+**Source:** `docs/RUN-MODEL.md`, `docs/decisions/0004-first-class-run-graph.md`
+
+### KILN-INV-020: The root run carries Project Steward responsibility
+
+Each session root run MUST carry Project Steward responsibility by default.
+
+The Steward MUST maintain delivery traceability and reconcile the objective, repository state, and current evidence.
+
+**Source:** `docs/decisions/0005-project-steward.md`, `docs/PROJECT-STEWARDSHIP.md`
+
+### KILN-INV-021: The Project Steward is constrained
+
+The Project Steward MUST NOT override user authority, capability policy, repository truth, evidence freshness, acceptance status, or completion gates.
+
+The Steward MUST disclose blocked work, failed verification, material uncertainty, and unresolved specification gaps.
+
+**Source:** `docs/decisions/0005-project-steward.md`, `docs/PROJECT-STEWARDSHIP.md`
+
+### KILN-INV-022: Delegation must serve delivery
+
+The Project Steward SHOULD delegate only when a child run improves evidence, parallelism, specialization, independent review, steering, cancellation, or recovery.
+
+Kiln MUST NOT optimize for the number of active runs.
+
+**Source:** `docs/PROJECT-STEWARDSHIP.md`, `docs/PROJECT-PROVENANCE.md`
+
+### KILN-INV-023: Kiln owns the internal domain
+
+No external protocol MAY define Kiln's core entities, identifiers, lifecycle, authority, persistence, or Evidence semantics.
+
+External protocols MUST connect through adapters that use Kiln domain commands, queries, events, and schemas.
+
+**Source:** `docs/decisions/0006-protocol-neutral-internal-domain.md`, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-024: Run is the primary execution unit
+
+Every independently inspectable unit of model-backed or deterministic work MUST be a Run.
+
+An Agent persona, Worker process, model invocation, Tool call, protocol thread, or operating-system process MUST NOT replace Run identity.
+
+**Source:** `docs/decisions/0007-run-primary-execution-unit.md`, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-025: Task and Run remain separate
+
+A Task MUST state desired work. A Run MUST represent one execution or coordination attempt for that Task.
+
+Every Run MUST reference one Task. Completing a Run MUST NOT automatically satisfy the Task.
+
+**Source:** `docs/decisions/0007-run-primary-execution-unit.md`, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-026: Agent, Worker, and invocation remain separate
+
+An Agent MUST be a versioned execution definition. A Worker MUST be a transient executor lease. A model invocation MUST be one provider request and response stream.
+
+None of these concepts MAY own the durable work identity that belongs to the Run.
+
+**Source:** `docs/decisions/0007-run-primary-execution-unit.md`, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-027: Availability is not permission
+
+Kiln MUST distinguish Capability availability, policy allowance, Capability grant, and effective authority.
+
+A Tool, Skill, Agent, adapter, or Environment MUST NOT grant itself authority.
+
+**Source:** `docs/SECURITY-MODEL.md`, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-028: Child runs inherit no ambient authority
+
+A Child Run MUST receive explicit Capability grants, Resource scope, Context, and limits.
+
+A Parent Run MUST NOT transfer ambient path, network, secret, write, or publication authority.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`, ADR 0007
+
+### KILN-INV-029: Claims are not evidence
+
+A model statement, Agent conclusion, user assertion, Tool result summary, or completion narrative MUST be a Claim until Evidence supports or refutes it.
+
+Kiln MUST NOT use confidence as proof.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-030: Evidence and receipts remain distinct
+
+Evidence MUST be an immutable observation with method, producer, result, state binding, and freshness rule.
+
+A Receipt MUST be an immutable sealed manifest that references Evidence. A Receipt MUST NOT make stale or missing Evidence current.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-031: Artifact inclusion is explicit
+
+An Artifact MUST NOT enter model Context without a provenance-bearing Context item and immutable Context manifest.
+
+Artifact existence MUST NOT imply instruction authority, Evidence status, or model visibility.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-032: Active project instructions outrank reference content
+
+Content from a reference-only Repository or Project MUST remain untrusted input.
+
+Reference content MUST NOT change active Project instructions, policy, product direction, or write authority unless the user explicitly accepts and records the change.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-033: Privacy policy gates egress
+
+Kiln MUST evaluate Privacy policy before Context, Artifacts, traces, Evidence, or secret-derived values leave their allowed boundary.
+
+Capability to call a provider or adapter MUST NOT authorize all data to leave the local system.
+
+**Source:** `docs/INTERNAL-DOMAIN-MODEL.md`, `docs/SECURITY-MODEL.md`
+
+### KILN-INV-034: Process identity is not domain identity
+
+Kiln MUST NOT persist a PID, port, monitor reference, BEAM Task, function, supervisor path, connection, or external request identifier as core domain identity.
+
+A process MUST exist only when it owns concurrent state, lifecycle, timing, subscriptions, external communication, or fault isolation.
+
+**Source:** ADR 0001, ADR 0007, `docs/INTERNAL-DOMAIN-MODEL.md`
+
+### KILN-INV-035: Capability integration follows the simplest reliable hierarchy
+
+Kiln MUST evaluate in-process code, native adapters, deterministic CLIs, local services, local MCP, remote APIs, remote MCP, and browser automation in that order.
+
+Kiln MUST select the earliest option that satisfies lifecycle, security, interoperability, isolation, output, and replaceability requirements.
+
+**Source:** `docs/decisions/0008-simplest-reliable-capability-integration.md`, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-036: Repository operations remain native
+
+Initial Repository reads, writes, path resolution, patch application, mutation observation, and fingerprint binding MUST use Kiln-native operations.
+
+Kiln MUST NOT put its core Repository authority behind MCP.
+
+**Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-037: Mature development tools remain mature tools
+
+Git SHOULD use a native adapter backed by the Git CLI.
+
+Build, test, lint, format, compiler, package-manager, and static-analysis behavior SHOULD use existing deterministic CLIs rather than Kiln reimplementations.
+
+**Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-038: Raw LSP stays behind semantic intent
+
+A model MUST NOT send or receive raw LSP messages through the core Tool surface.
+
+Kiln MUST translate language-server behavior through a native semantic adapter and Kiln-native result contracts.
+
+**Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-039: MCP is optional and is not a sandbox
+
+Kiln MUST NOT select MCP solely because a capability can be wrapped in MCP.
+
+MCP availability MUST NOT bypass Capability grants, Repository trust, Privacy policy, Approval, output limits, Artifact storage, Evidence rules, Traces, or Receipts.
+
+**Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`, `docs/SECURITY-MODEL.md`
+
+### KILN-INV-040: The full Capability catalog stays outside model Context
+
+The model-facing Tool projection MUST contain only the small intent-level operations relevant to the current Task phase, Run state, availability, and authority.
+
+Kiln MUST NOT expose one Tool for every CLI command, API endpoint, MCP Tool, LSP method, or adapter operation.
+
+**Source:** `docs/decisions/0009-broker-intent-level-capabilities.md`, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-041: The Capability broker is deterministic and cannot grant authority
+
+The broker MUST inventory, filter, rank, authorize, route, normalize, limit, and record Capability use through deterministic rules.
+
+The broker MUST NOT invent grants, infer permission from availability, or let an implementation select itself.
+
+**Source:** ADR 0009, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-042: Capability results are bounded and provenance-bearing
+
+Every Capability invocation MUST return a bounded Kiln-native result envelope.
+
+Large or binary results MUST become Artifacts. Kiln MUST preserve the selected implementation, authority decision, native status, normalization, redaction, truncation, fallback, and Repository state when relevant.
+
+**Source:** ADR 0009, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-043: Duplicate capabilities collapse behind one intent Tool
+
+Implementations that satisfy the same semantic operation MUST belong to a replacement group and appear as one model-facing Tool.
+
+A fallback MUST receive a new authority evaluation and MUST disclose implementation changes or semantic loss.
+
+**Source:** ADR 0009, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-044: Browser automation is a fallback
+
+Kiln MUST prefer a supported library, native adapter, CLI, service, API, or justified protocol integration over browser automation.
+
+Browser automation MAY be primary when browser behavior itself is under test.
+
+**Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`
+
+### KILN-INV-045: Context is the smallest sufficient package
+
+Kiln MUST compile Context for the immediate decision or action under an explicit Run and phase budget.
+
+A provider's larger Context window MUST NOT automatically increase the active Context ceiling or justify loading lower-value material.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-046: Context is replaced, not accumulated forever
+
+Every model invocation or Context-consuming Worker step MUST use one new immutable Context manifest.
+
+The active package MUST remove or replace stale, superseded, duplicate, resolved, and irrelevant material while preserving historical manifests for audit and recovery.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-047: Context retrieval is just in time and progressively disclosed
+
+Kiln MUST prefer the narrowest sufficient symbol, relevant line range, changed hunk, documentation section, structured page, or Artifact segment before loading a complete source.
+
+Deep disclosure MUST NOT permanently enlarge later Context packages.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-048: Context items preserve authority, trust, freshness, and provenance
+
+Every model-visible Context item MUST record source authority, trust, sensitivity, freshness, state binding, selection reason, token estimate, transformation history, and retrieval provenance.
+
+A current observation MUST replace a stale summary of the same state in active Context.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-049: Tool and Skill exposure is bounded and lazy
+
+The model-facing Tool set MUST normally contain six to eight Tools and MUST never exceed twelve.
+
+Tool schemas MUST remain within the accepted budget, and additional Tools and Skill sections MUST be disclosed only when the current phase and intent justify them.
+
+**Source:** ADR 0010, ADR 0009, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-050: Large results remain outside active Context
+
+Complete logs, test output, documentation pages, DOM snapshots, database results, large diffs, binary output, and other unbounded results MUST become Artifacts when a bounded digest, excerpt, and continuation are sufficient.
+
+Truncation and pagination MUST be explicit, and cursors MUST be bound to the source snapshot.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-051: Documentation resolves by authority and version
+
+For Elixir Projects, Kiln MUST prefer active Repository documentation, accepted ADRs and specifications, dependency-authored rules, exact local ExDoc, and running-Project documentation before Context7, official external sources, general web research, or model memory.
+
+Context7 or model memory MUST NOT override a higher-authority version-matched source.
+
+**Source:** ADR 0011, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-052: Prompt caching is an optimization only
+
+A prompt-cache hit MUST NOT restore stale Context, reintroduce removed Tools, expand authority, bypass Privacy policy, or replace generation of a new Context manifest.
+
+Kiln correctness MUST NOT depend on provider cache behavior.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-053: Child Runs inherit no ambient Context
+
+A Child Run MUST receive an independently compiled Context manifest, bounded delegation brief, selected references, explicit output contract, and explicit Capability grants.
+
+A Parent Run MUST NOT transfer its transcript, Tool schemas, Skill body, working set, or hidden context by default.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `KILN-INV-028`
+
+### KILN-INV-054: Verifier Context is independent and bias-reduced
+
+A Verifier Run MUST independently retrieve the acceptance criteria, relevant Change set, source state, verification methods, and current Evidence.
+
+The implementer's conclusion MUST remain a Claim to test, and write Tools MUST be excluded from the first-pass Verifier Context by default.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-055: Context cost and behavior are observable
+
+Kiln MUST measure model input and output tokens, Tool-schema tokens, retained Tool-result tokens, cache behavior, active Tool count, repeated reads and commands, compactions, retrieval sources, retained Artifacts, and token cost by Run and accepted Change set.
+
+Metrics SHOULD retain identifiers, digests, classes, counts, and reasons rather than sensitive raw Context content.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-056: Omission is preferred over weak Context
+
+Kiln SHOULD omit low-confidence or low-relevance material when it is not required to disclose a material contradiction or unknown.
+
+Unused Context budget MUST remain unused rather than be filled with weaker content.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+## Review use
+
+A plan MUST list each invariant that constrains the work.
+
+An integrity review MUST identify:
+
+- preserved invariants;
+- threatened invariants;
+- invariant changes that require an ADR;
+- unknown effects that need verification.
