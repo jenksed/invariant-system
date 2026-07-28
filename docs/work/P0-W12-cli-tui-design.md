@@ -1,6 +1,6 @@
 # P0-W12: Initial CLI and TUI design
 
-- **Status:** Implemented; verification pending
+- **Status:** Implemented and verified; review pending
 - **Branch:** `work/p0-w12-cli-tui-design`
 - **Depends on:** P0-W04 through P0-W11
 - **Scope:** Planning and contracts only
@@ -96,7 +96,7 @@ Contract checks:
 python -m json.tool docs/contracts/kiln-interface.schema.json
 ```
 
-A Draft 2020-12 validator must validate:
+A Draft 2020-12 validator validated:
 
 - interface event;
 - projection snapshot;
@@ -105,7 +105,7 @@ A Draft 2020-12 validator must validate:
 - successful CLI result;
 - error CLI result.
 
-Negative cases must reject:
+Negative cases rejected:
 
 - sequence zero for a durable event;
 - unknown event type;
@@ -116,15 +116,17 @@ Negative cases must reject:
 - a Client state without a focused Run;
 - an unsupported permission action.
 
+Repository CI run `30393671140` passed on the review head. It completed Vale, agent preflight behavior, Project agent-asset validation, dependency installation, Elixir formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit tests.
+
 ## Evidence
 
-- **P0-W12-E01:** CLI/TUI specification covers every required output.
-- **P0-W12-E02:** Interface schema parses and validates.
+- **P0-W12-E01:** `docs/CLI-TUI.md` covers every required output and acceptance question.
+- **P0-W12-E02:** `kiln.interface/v0` parses and passes Draft 2020-12 positive and negative validation.
 - **P0-W12-E03:** ADR 0015 records accepted and rejected interface positions.
 - **P0-W12-E04:** README, roadmap, ADR index, and contract index link to the specification.
 - **P0-W12-E05:** ExRatatui evaluation uses current package and primary project documentation.
-- **P0-W12-E06:** Diff contains planning and contracts only.
-- **P0-W12-E07:** Repository CI passes on the final branch head.
+- **P0-W12-E06:** The branch diff contains planning and contracts only.
+- **P0-W12-E07:** GitHub CI run `30393671140` passed on commit `5682b9032635ea83fcda9e264532a20a62e0273b`.
 
 ## Exclusions
 
