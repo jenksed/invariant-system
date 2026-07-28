@@ -1,12 +1,11 @@
 # P0-W17: Establish the planning-completion baseline
 
 **Document type:** Implementation plan  
-**Status:** Implemented and verified on the audit head  
+**Status:** Implemented; final-head CI pending  
 **Branch:** `work/p0-w17-planning-completion-baseline`  
 **Depends on:** P0-W16 integrated through pull request 20  
 **Scope:** Planning audit and status correction only  
-**Verified audit head:** `d96c68ebec6a1315e7a8e19c4b2138ca2b09d2ca`  
-**GitHub CI:** run `30407773538`, success
+**Current audit content head:** `3265181fbc18e5dd86467ce47f53bc6ea4cbf35b`
 
 ## Objective
 
@@ -69,7 +68,7 @@ The pass completed these changes:
 4. Recorded the preflight, template, Run-process, source-layout, Schema, gate-script, and status-header conflicts for later passes.
 5. Preserved historical work records and planning rationale.
 
-The pass did not mass-edit the architecture, roadmap, slice, gate, Run, README, or AGENTS documents. Those files contain conflicts that require Prompt 2 or Prompt 3 adjudication. A status-only rewrite across those documents would hide the unresolved conflict or cross the Prompt 1 boundary.
+The pass did not mass-edit the architecture, roadmap, slice, gate, Run, README, or AGENTS documents. Those files contain conflicts that require Prompt 2 or Prompt 3 adjudication. A status-only rewrite across those documents would hide unresolved conflict or cross the Prompt 1 boundary.
 
 ## Files or components expected to change
 
@@ -88,21 +87,21 @@ No production source, test, dependency manifest, workflow, runtime configuration
 | Criterion | Result | Evidence |
 | --- | --- | --- |
 | P0-W17-AC01: One current authority is identified for each required subject or the gap is explicit. | Pass | Source-of-truth map in the current baseline |
-| P0-W17-AC02: Material artifact groups have authority, overlap, conflict, implication, and disposition. | Pass | Artifact map A01 through A31 |
+| P0-W17-AC02: Material artifact groups have authority, overlap, conflict, implication, and disposition. | Pass | Artifact map A01 through A16 |
 | P0-W17-AC03: Implementation claims are bound to source, test, configuration, or CI Evidence. | Pass | Broad implementation-state map |
 | P0-W17-AC04: The preflight and ticket-grammar mismatch is a blocker without script changes. | Pass | Conflicts C01 and C02; no script diff |
-| P0-W17-AC05: The obsolete Run supervision example and controlling architecture are explicit. | Pass | Artifact A09 and conflict C05 |
+| P0-W17-AC05: The obsolete Run supervision example and controlling architecture are explicit. | Pass | Artifact A04 and conflict C05 |
 | P0-W17-AC06: Exact ADR 0019 integration status is corrected and remaining branch-era status labels are visible. | Pass | ADR diff and conflict C04 |
-| P0-W17-AC07: Historical planning evidence remains preserved and cannot override current authority. | Pass | Historical baseline gateway and artifact A30 |
-| P0-W17-AC08: Retain, narrow, merge, archive, supersede, and historical dispositions are explicit. | Pass | Canonical, merge, and historical disposition section |
+| P0-W17-AC07: Historical planning evidence remains preserved and cannot override current authority. | Pass | Historical gateway and artifact A16 |
+| P0-W17-AC08: Retain, narrow, merge, archive, supersede, and historical dispositions are explicit. | Pass | Disposition summary |
 | P0-W17-AC09: Prompt 2 and Prompt 3 inputs are explicit without executing those passes. | Pass | Later-pass sections |
-| P0-W17-AC10: Prompt 2 is the exact next action after integration. | Pass | Exact next action section |
+| P0-W17-AC10: Prompt 2 is the exact next action after integration. | Pass | Exact next action |
 | P0-W17-AC11: The diff changes planning and status documents only. | Pass | GitHub compare against `main` |
-| P0-W17-AC12: Repository validation passes on the audit head. | Pass | GitHub CI run `30407773538` |
+| P0-W17-AC12: Repository validation passes on the final branch head. | Pending | Final-head GitHub CI after this work-record update |
 
 ## Verification commands
 
-The Repository pipeline represented these checks on audit head `d96c68ebec6a1315e7a8e19c4b2138ca2b09d2ca`:
+The Repository pipeline uses:
 
 ```bash
 scripts/test-agent-preflight
@@ -115,7 +114,10 @@ mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-GitHub CI run `30407773538` passed both jobs and every listed step.
+Audit content heads passed:
+
+- CI run `30407773538` on `d96c68ebec6a1315e7a8e19c4b2138ca2b09d2ca`;
+- CI run `30407875314` on `708b3a6ac744933eb2da0a167f986b281262cfef`.
 
 The audit also inspected:
 
@@ -125,9 +127,9 @@ The audit also inspected:
 - work governance, plan template, preflight, and preflight tests;
 - development-agent Skills, prompts, agents, and validation;
 - open and merged planning pull requests;
-- current branch compare against `main`.
+- branch compares against `main`.
 
-The closeout-only commit that records this result must pass final-head CI before merge.
+The final head created by this closeout update must pass the same CI pipeline. That result belongs in the pull-request completion record and final owner review.
 
 ## Required completion evidence
 
@@ -139,7 +141,7 @@ The closeout-only commit that records this result must pass final-head CI before
 | P0-W17-E04 | P0-W17-AC06 through AC07 | ADR status diff and historical-baseline gateway |
 | P0-W17-E05 | P0-W17-AC08 through AC10 | Disposition, later-pass, build-blocker, and exact-next-action sections |
 | P0-W17-E06 | P0-W17-AC11 | Documentation-only compare against `main` |
-| P0-W17-E07 | P0-W17-AC12 | GitHub CI run `30407773538` |
+| P0-W17-E07 | P0-W17-AC12 | Final-head GitHub CI recorded on pull request 22 |
 
 ## Explicit exclusions
 
