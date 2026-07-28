@@ -1,163 +1,144 @@
 # Plan Reconciliation
 
-**Document type:** Reference  
-**Status:** Pending  
-**Trigger:** Complete P0-W04 and reconcile before P1-W01 implementation begins.
+**Document type:** Historical planning record  
+**Status:** Resolved by P0-W16  
+**Resolution:** `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/IMPLEMENTATION-SLICES.md`
 
-This document records accepted foundational inputs that require a new roadmap dependency pass.
+## Purpose
 
-It does not reorder the roadmap. The next planning pass must produce that change with explicit evidence and exclusions.
+This document originally recorded conflicts that had to be resolved before implementation.
 
-## Accepted inputs
+P0-W16 resolves those conflicts and replaces the candidate component sequence with a vertical-slice roadmap. This document remains as evidence of the questions that drove the reconciliation. It is no longer implementation-order authority.
 
-The reconciliation must preserve:
+## Preserved inputs
+
+P0-W16 preserves:
 
 1. Elixir and OTP own runtime coordination.
-2. A session is the durable boundary for one repository objective.
-3. Each session contains one root run.
-4. The run graph is the durable execution model for independently inspectable work.
-5. The root run carries Project Steward responsibility by default.
-6. Logical run lineage is separate from OTP supervision.
-7. Each client owns its focused run.
-8. Attention routing is independent of run depth.
-9. Read-only child runs precede writing child runs.
-10. Concurrent writers require worktree or patch isolation.
-11. Evidence-backed completion and repository-state binding remain foundational.
-12. The first direct provider target is MiniMax.
-13. Kimi and Codex platform sign-in require managed-client bridge evaluation.
-14. The command-line interface remains independent from Phoenix.
-15. Development-agent skills and prompts are not Kiln runtime runs.
+2. A Session is the durable boundary for one accepted Project objective.
+3. Each Session contains exactly one Root Run.
+4. The Run graph is the durable model for independently inspectable work.
+5. Project Steward responsibility belongs to the Root Run by default.
+6. Logical Run lineage is separate from OTP supervision.
+7. Each Client owns its focused Run.
+8. Attention routing is independent of Run depth.
+9. Read-only Child Runs precede writing delegation.
+10. Concurrent writers require isolation.
+11. Evidence-backed completion and Repository-state binding remain foundational.
+12. MiniMax is the first direct provider target.
+13. CLI and TUI remain independent from Phoenix.
+14. development-agent Skills and prompts are not Kiln runtime Runs.
+15. external protocols adapt to Kiln-native concepts.
 
-## Current conflicts
+## Resolved conflicts
 
-### Session domain scope
+### Session and Run scope
 
-The current P1-W01 work package defines session-domain types but does not include:
+**Resolution:** Session, Task, Run, lineage, Attention, Client focus, and Steward projections are introduced through P1-S01 through P1-S05 as each user-visible slice needs them. There is no horizontal “complete domain package” before the first product demo.
 
-- root runs;
-- child-run lineage;
-- run status;
-- attention;
-- client focus;
-- Project Steward projection.
+### Event journal scope
 
-The next plan must decide whether P1-W01 expands or splits into session-domain and run-domain packages.
-
-### Event-journal scope
-
-The current P1-W02 work package persists session events.
-
-The next plan must decide whether the initial schema persists session and run events together or adds a separate run-event work package.
+**Resolution:** Slices 1 through 4 prove event semantics through deterministic in-memory fixtures. P1-S05 persists the same versioned event envelopes in one SQLite journal and rebuilds Session, Run, Attention, execution, Evidence, and interface projections.
 
 ### Interface proof order
 
-The accepted direction values navigable runs early.
-
-The current roadmap places the first substantial interface after persistence, command supervision, and Git observation.
-
-The next plan must decide whether a fake-run terminal projection should occur before provider integration to prove:
-
-- run tree;
-- breadcrumbs;
-- parent and child navigation;
-- child projections;
-- client-local focus;
-- global attention.
+**Resolution:** P1-S01 is the first implementation slice. It delivers simulated Root and Child Runs, breadcrumbs, Child cards, Parent and sibling navigation, streamed deterministic events, and headless TUI tests before providers, Commands, Git, or persistence.
 
 ### Provider proof order
 
-The current Phase 2 plan adds one provider-backed model loop after the execution kernel.
+**Resolution:** P1-S02 adds one real read-only Scout using a fixed-policy direct provider adapter, MiniMax first. Broad multi-provider routing, Kimi or Codex managed-client bridges, fallback, and ensembles remain later evidence-based work.
 
-The provider-access spike can proceed in isolation, but the next plan must decide:
+### Project Steward proof order
 
-- when the first direct MiniMax adapter becomes accepted product code;
-- whether the first provider-backed loop creates only the root run;
-- when the first real read-only child run becomes available;
-- when Kimi ACP and Codex app-server bridges enter the roadmap.
+**Resolution:** Steward responsibility emerges through the first five slices:
 
-### Steward proof order
+```text
+navigable Run graph
+→ evidence-backed Scout
+→ visible Attention and control
+→ independent verification
+→ durable recovery and completion projection
+```
 
-The Project Steward requires:
-
-- accepted intent and completion contract;
-- run graph;
-- repository observations;
-- evidence and acceptance projections;
-- attention routing;
-- deterministic completion constraints.
-
-The next plan must define the smallest vertical Steward slice that can be tested before all later subsystems exist.
+There is no separate early Steward service or Agent persona.
 
 ### Evidence timing
 
-The current roadmap places full evidence freshness in Phase 3.
+**Resolution:** minimal Evidence and Receipts appear with the first real Scout and Verifier. P1-S05 makes them durable and recoverable. Later slices extend structured results, Patch, integration, and delivery Evidence without redefining the concepts.
 
-The Steward cannot protect completion integrity without at least a minimal acceptance and evidence projection.
+### Command supervision timing
 
-The next plan must decide which evidence primitives move earlier without pulling the complete Phase 3 scope into the kernel.
+**Resolution:** the minimum registered Command runner enters in P1-S04 because the independent Verifier needs controlled execution. Environment, network, secret, process-tree, container, and broader result support expand only when later slices require them.
 
-## Required decisions
+### Writing isolation
 
-The reconciliation must decide:
+**Resolution:** P1-S07 chooses Patch Artifact mode for delegated writing. The Child remains read-only. The Parent owns one exclusive writable worktree and applies one selected Patch transactionally. Direct writing Child worktrees are deferred.
 
-1. the revised Phase 1 work-package boundaries;
-2. the first schema for session, run, attention, and event identifiers;
-3. the point at which fake navigable runs become executable acceptance criteria;
-4. the first terminal interface scope;
-5. the first Project Steward vertical slice;
-6. the first provider-backed root-run slice;
-7. the first real child-run slice;
-8. the timing of independent verification;
-9. the timing and mechanism of writing-run isolation;
-10. the role of MiniMax, Kimi, and Codex in the accepted provider plan;
-11. the revised version 0.1 completion scenario;
-12. the migration from current work-package identifiers if identifiers change.
+### Code intelligence and local project intelligence
 
-## Candidate proof order
+**Resolution:** Tree-sitter, on-demand LSP, documentation resolution, and persistent normalized semantic facts form one code-intelligence path. Local project intelligence reuses those primitives under stricter approved-root, read-only, instruction-quarantine, licensing, and Privacy policy.
 
-This order is proposed for evaluation. It is not accepted roadmap order.
+### Protocol priority
+
+**Resolution:** protocol seams remain accepted, but implementations do not precede the native product loop. ACP, structured result adapters, MCP, OpenAPI, Dev Containers, and OCI are independently evidence-gated in P1-S08.
+
+### Persistence versus early product learning
+
+**Resolution:** do not force SQLite before the Run interaction is understood. Do not claim durability until P1-S05. The same domain events and projections are exercised in-memory first, then persisted without changing their semantic roles.
+
+## Accepted vertical order
 
 ```text
-Repository and agent controls
-→ workspace, session, run, and event identity
-→ append-oriented session and run journal
-→ fake navigable root and child runs
-→ attention and client-local focus
-→ supervised command execution
-→ Git observation and repository fingerprints
-→ restart recovery
-→ direct MiniMax root run
-→ Project Steward delivery projection
-→ one real read-only Scout child
-→ independent Verifier child
-→ evidence freshness and completion reconciliation
-→ writing-run isolation
-→ writing child runs
-→ Phoenix projection and additional provider bridges
+P1-S01  Navigable simulated Runs
+P1-S02  One real read-only Scout
+P1-S03  Background work and Attention
+P1-S04  Independent Verifier
+P1-S05  Durable recovery
+P1-S06  Local code intelligence
+P1-S07  Safe writing delegation
+P1-S08  Capability interoperability
+P1-S09  Local project intelligence
+P1-S10  Expansion capability evaluations
 ```
 
-## Reconciliation acceptance criteria
+## Version 0.1 decision
 
-The revised plan should:
+Version 0.1 is the Durable Operator Kernel through P1-S05.
 
-- preserve stable work-package identifiers where the purpose remains unchanged;
-- introduce new identifiers when one package gains an independent objective;
-- identify dependencies explicitly;
-- define one observable exit condition for each phase;
-- place provider experiments outside accepted product code until their contract is proven;
-- keep initial delegation limits explicit;
-- include required verification and completion evidence for each work package;
-- identify what is deferred from version 0.1;
-- explain each change from the current roadmap.
+It demonstrates:
 
-## Required output
+- navigable Root and Child Runs;
+- one real read-only Scout;
+- visible background work and Attention;
+- independent controlled verification;
+- Artifacts, Evidence, and Receipts sufficient for those flows;
+- SQLite durability, Checkpoints, client cursors, restart recovery, and honest orphan state.
 
-The reconciliation pass must update:
+It does not mutate source.
 
-- `docs/ROADMAP.md`;
-- the Phase 1 work-package map;
-- the Phase 2 provider and run plan;
-- the version 0.1 definition;
-- work-package plan filenames and branches when required;
-- architecture diagrams only if the accepted architecture changes;
-- ADRs only if the accepted decisions change.
+## Identifier migration
+
+The provisional component packages `P1-W01` through `P1-W13` are superseded as implementation-order identifiers.
+
+New implementation planning uses:
+
+```text
+P1-S01       vertical slice
+P1-S01-T01   implementation ticket
+P1-S01-G01   acceptance gate
+P1-S01-D01   demo
+P1-S01-R01   Receipt
+```
+
+Historical work-package files remain records. New implementation plans use the slice identifiers and branch names in `docs/ROADMAP.md`.
+
+## Current authorities
+
+1. `docs/ARCHITECTURE.md`
+2. `docs/ROADMAP.md`
+3. `docs/IMPLEMENTATION-SLICES.md`
+4. accepted ADRs
+5. subject specifications
+6. machine-readable contracts
+
+No statement in this historical document overrides those authorities.

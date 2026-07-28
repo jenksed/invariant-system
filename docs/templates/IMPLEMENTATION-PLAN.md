@@ -1,21 +1,33 @@
 # <WORK-ID>: <Objective>
 
-**Document type:** Reference  
+**Document type:** Implementation plan  
 **Status:** Proposed | Accepted | In progress | Blocked | Complete  
+**Parent slice:** None | <P1-SXX>  
 **Branch:** `<class>/<work-id>-<purpose>`  
 **Depends on:** None | <WORK-ID list>
 
+## Slice contribution
+
+When this plan belongs to a vertical slice, state:
+
+- the slice's user-visible outcome;
+- the exact behavior this ticket adds;
+- the slice gate, demo step, and aggregate Receipt that consume this ticket's Evidence;
+- the behavior that remains unreachable, simulated, disabled, or deferred after this ticket merges.
+
+A ticket does not claim the entire slice complete unless it executes the aggregate gate and demo against the exact tested state.
+
 ## Objective
 
-State one outcome for this work package.
+State one mergeable outcome for this ticket or planning work package.
 
 ## Observed current state
 
-Use only direct repository, command, test, runtime, or version-matched documentation evidence.
+Use only direct Repository, Command, test, runtime, or version-matched documentation Evidence.
 
 | Observation | Evidence | Collected by | Date or commit |
 | --- | --- | --- | --- |
-| <Observed fact> | `<path:symbol>`, `<command>` exit `<status>`, or artifact | <actor> | <date or SHA> |
+| <Observed fact> | `<path:symbol>`, `<command>` exit `<status>`, or Artifact | <actor> | <date or SHA> |
 
 ## Assumptions and unknowns
 
@@ -29,14 +41,27 @@ Use only direct repository, command, test, runtime, or version-matched documenta
 
 ## Requirements
 
-Use Easy Approach to Requirements Syntax (EARS)-compatible statements when applicable.
+Use Easy Approach to Requirements Syntax-compatible statements when applicable.
 
 - **<WORK-ID>-R01:** The <system> shall <response>.
 - **<WORK-ID>-R02:** When <trigger>, the <system> shall <response>.
 
+## Security boundary
+
+State:
+
+- allowed Resources and paths;
+- denied Capabilities;
+- authority and policy inputs;
+- network, secret, filesystem, process, and external-disclosure behavior;
+- failure or degraded-isolation behavior;
+- protected invariants from the parent slice.
+
+Do not defer a security boundary that becomes necessary in this ticket.
+
 ## Proposed changes
 
-Describe proposed behavior. Do not describe proposed behavior as current behavior.
+Describe proposed behavior. Do not describe it as current behavior.
 
 1. <Change>
 2. <Change>
@@ -55,9 +80,9 @@ Do not invent a path only to complete this table. Write `Unknown` when discovery
   - **Given** <observable initial state>
   - **When** <one action or event>
   - **Then** <observable result>
-  - **Evidence:** <required command, output, artifact, or runtime observation>
+  - **Evidence:** <required Command, output, Artifact, Receipt, or runtime observation>
 
-## Verification commands
+## Deterministic verification
 
 ```bash
 <exact command>
@@ -65,15 +90,36 @@ Do not invent a path only to complete this table. Write `Unknown` when discovery
 
 State the expected exit status or output for each command.
 
-## Required completion evidence
+Tests must not require a live provider, external protocol server, public network, or nondeterministic clock unless the plan labels that path as an optional smoke test and provides a deterministic fixture for CI.
 
-| Evidence ID | Acceptance criterion | Required evidence |
+## Demo contribution
+
+State the exact step this ticket enables in the parent slice demo.
+
+```text
+<P1-SXX-D01 step>
+```
+
+When the ticket has its own focused demo helper, identify it separately. Do not duplicate the aggregate slice demo unnecessarily.
+
+## Required completion Evidence
+
+| Evidence ID | Acceptance criterion | Required Evidence |
 | --- | --- | --- |
-| <WORK-ID>-E01 | <WORK-ID>-AC01 | <command output, test result, path, or artifact> |
+| <WORK-ID>-E01 | <WORK-ID>-AC01 | <Command output, structured result, path, Artifact, Receipt, or runtime observation> |
+
+### Slice gate contribution
+
+| Slice gate or Receipt | Contribution |
+| --- | --- |
+| <P1-SXX-G01> | <Evidence supplied by this ticket> |
+| <P1-SXX-R01> | <manifest items or references supplied by this ticket> |
 
 ## Explicit exclusions
 
-- <Behavior or component that this work package does not include>
+- <Behavior or component that this ticket does not include>
+
+State exclusions aggressively. A future architecture seam is not a reason to implement it now.
 
 ## Completion record
 
@@ -91,7 +137,14 @@ Complete this section before merge.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| `<command>` | `<status>` | <PR log, artifact, or report> |
+| `<command>` | `<status>` | <PR log, Artifact, or report> |
+
+### Demo and slice status
+
+- Ticket demo contribution: Pass | Fail | Blocked | Not yet exercised
+- Parent slice gate affected: `<P1-SXX-GXX>`
+- Aggregate Receipt updated: Yes | No | Not applicable
+- Slice completion claimed: No | Yes with exact aggregate Evidence
 
 ### Failures and warnings
 
@@ -106,3 +159,5 @@ Complete this section before merge.
 - Commit: `<SHA>`
 - Branch: `<branch>`
 - Diff reviewed: Yes | No
+- Exact CI run: `<run or status>`
+- Parent slice status after merge: <unchanged | advanced with reason>

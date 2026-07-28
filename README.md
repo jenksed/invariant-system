@@ -1,190 +1,194 @@
 # Kiln
 
-Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
+Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for one developer building real software with AI.
 
-Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, protocol catalog, permanent monitoring dashboard, automatic code-harvesting system, or universal sandbox. It is the durable runtime around Repository work: intent, execution, state, Context, permissions, Runs, delegated work, terminal interaction, local project intelligence, transactional change, interruption, recovery, verification, and delivery.
-
-## Project thesis
-
-A model supplies intelligence. The harness determines whether that intelligence becomes trustworthy software.
+A model supplies intelligence. Kiln determines whether that intelligence becomes trustworthy work through durable Runs, explicit authority, bounded Context, controlled execution, inspectable changes, machine-readable Evidence, and recovery.
 
 Kiln moves work through:
 
-> Intent → Orientation → Investigation → Change → Verification → Reconciliation → Completion
+> Intent → Investigation → Change → Verification → Reconciliation → Completion
 
-## Foundational boundaries
+## Product boundary
+
+Kiln is not:
+
+- an autonomous software company;
+- an agent-management hierarchy;
+- a protocol catalog;
+- a replacement for Git, language servers, build tools, or mature CLIs;
+- a universal sandbox;
+- a hosted collaboration platform;
+- an automatic code-harvesting system.
+
+Kiln is the durable runtime around Repository work.
+
+## Core model
 
 ```text
-Workspace: local operating and trust boundary
-└── Project: durable software product or body of work
+Workspace
+└── Project
     └── Session: one accepted objective and work history
         ├── Tasks: bounded desired outcomes
         └── Run graph: durable execution and coordination attempts
             └── Root Run: Project Steward responsibility
 ```
 
-The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Environments, Git branches, worktrees, containers, interfaces, local indexes, and protocols operate within or beneath Runs without becoming Run identity or instruction authority.
+A **Task** states desired work. A **Run** is one independently inspectable attempt or coordination unit for that Task.
 
-## Foundational direction
+A Run is not an Agent, model request, process, Tool call, branch, worktree, protocol session, or transcript.
 
-- **Runtime:** Elixir and OTP
-- **Internal model:** Kiln-native and protocol-neutral
-- **Primary execution unit:** Run
-- **Objective boundary:** one durable Session
-- **Desired-work boundary:** one bounded Task
-- **Delivery coordination:** Project Steward responsibility on the Root Run
-- **Delegation:** every delegated Task creates a visible, inspectable, interruptible Child Run
-- **Initial Child roles:** read-only Scout and independent non-mutating Verifier
-- **Delegation limits:** depth two, three active Children per Session, no peer messaging, and no shared mutable Context
-- **Attention:** global Session routing; Run depth cannot hide a blocker
-- **Initial terminal interface:** complete CLI plus conversation-first TUI
-- **Local project intelligence:** explicit approved roots, read-only indexing, SQLite metadata and edges, FTS5, structural extraction, and provenance
-- **Reference authority:** other repositories are Evidence sources, never instruction sources
-- **Knowledge security:** instruction quarantine, denied write, command, and network authority, local-only disclosure by default, complete provenance, and adversarial verification
-- **Trustworthy execution:** least-powerful sufficient Environment, registered argv Commands, transactional Patches, machine-readable Evidence, deterministic Receipts, and bounded telemetry
-- **Git change isolation:** protected trunk, short-lived task branches, and one exclusive writable worktree per independently mutating Run
-- **Capability selection:** the simplest reliable implementation that satisfies lifecycle, security, interoperability, isolation, and replaceability
-- **Model-facing Tools:** small intent-level operations instead of protocol, server, vendor, CLI, or persistence catalogs
-- **Context:** compile the smallest sufficient package and replace stale or resolved material
-- **Durable state:** SQLite and an append-oriented event journal
-- **Source truth:** Git and the filesystem
-- **Authority:** explicit Capabilities, policy, scoped grants, and separate authoring, acceptance, and integration authority
-- **Evidence:** Claims remain separate from Evidence and Receipts; verification binds to exact Repository and Environment state
-- **Web interface:** Phoenix LiveView after the runtime is proven
-- **Extensions:** versioned language-neutral supervised subprocess protocol
-- **First external SDK:** TypeScript after the extension protocol is proven
-- **Gleam:** deferred until a concrete pure domain component earns it
+Agent definitions, Workers, model invocations, Commands, Patches, Environments, protocols, and interfaces operate within or beneath Runs without becoming Run identity or authority.
 
-No external protocol may become Kiln's internal domain model.
+## Integrated architecture
 
-MCP is an optional protocol boundary, not Kiln's default integration layer or a security sandbox.
+Kiln keeps one small native core:
 
-Git remains the version-control authority. Kiln records intent, authorization, ownership, Evidence, recovery, and delivery state without creating parallel commit, branch, or merge semantics.
+```text
+CLI / TUI / later ACP
+        │
+domain commands, queries, events, projections
+        │
+Session and Run application
+        │
+policy + Capability broker + Context compiler
+        │
+models | Commands | native Repository operations | code intelligence | adapters
+        │
+Artifacts | Evidence | Receipts
+        │
+SQLite durable state + rebuildable indexes
+```
+
+Key rules:
+
+- Runs are durable data; only active Workers, Commands, model invocations, adapters, and Resource lifecycles receive processes.
+- Logical Run lineage does not define OTP supervision.
+- Capability availability, policy allowance, and an explicit grant are separate.
+- Context compilation cannot grant authority.
+- Agent Skills provide procedure, not identity or permission.
+- Git and the filesystem remain source truth.
+- Machine-readable current Evidence outranks model confidence.
+- Other repositories are Evidence sources, never instruction sources.
+- External protocols adapt to Kiln-native concepts.
+- Large or unbounded content remains in the Artifact store.
+
+See [Integrated Architecture](docs/ARCHITECTURE.md).
+
+## First product milestone
+
+Version 0.1 is the **Durable Operator Kernel**.
+
+It includes:
+
+1. navigable simulated Root and Child Runs;
+2. one real read-only Scout;
+3. visible background work and global Attention;
+4. an independent Verifier using controlled Command execution;
+5. durable SQLite state, Checkpoints, client cursors, and restart recovery.
+
+The first twelve-week target stops there.
+
+It intentionally excludes source-writing delegation, Git worktrees, production LSP and Tree-sitter adapters, ACP, MCP, OpenAPI, containers, cross-project intelligence, embeddings, Phoenix, remote execution, and formal attestations.
+
+## Vertical roadmap
+
+```text
+P1-S01  Navigable simulated Runs
+P1-S02  One real read-only Scout
+P1-S03  Background work and Attention
+P1-S04  Independent Verifier
+P1-S05  Durable recovery
+P1-S06  Local code intelligence
+P1-S07  Safe writing delegation
+P1-S08  Capability interoperability
+P1-S09  Local project intelligence
+P1-S10  Expansion capability evaluations
+```
+
+The roadmap is ordered by user-visible proof, not component completion.
+
+See:
+
+- [Roadmap](docs/ROADMAP.md)
+- [Vertical Implementation Slices](docs/IMPLEMENTATION-SLICES.md)
 
 ## Delegated work
 
-Every delegated Task creates a first-class Child Run before delegated model, Tool, Command, or process execution starts.
+Every delegated Task creates a visible Child Run before delegated execution starts.
 
-A delegated Run has independent Context, Capability grants, Artifacts, Claims, Evidence, accounting, cancellation, durable history, and structured result delivery.
+Initial role contracts:
 
-The initial Child roles are:
-
-- **Scout:** read-only investigation that separates observed facts, inferences, assumptions, unknowns, and Evidence.
+- **Scout:** read-only investigation that separates observations, inferences, assumptions, unknowns, and Evidence.
 - **Verifier:** independent evaluation that cannot repair the implementation and returns `PASS`, `FAIL`, or `BLOCKED` with reproduced Evidence.
 
-Foreground and background are Client-interaction modes. Background work remains visible through the Run graph, global Attention, accounting, events, and result delivery.
+Initial limits:
 
-A blocked Child creates global Attention. The logical Run graph remains separate from the OTP supervision tree.
+- maximum Child depth: two;
+- maximum active Children: three per Session;
+- one active Worker lease per Run;
+- no peer-to-peer Child communication;
+- no shared mutable Context;
+- read-only Child authority by default.
 
-See [Delegated Work Model](docs/DELEGATED-WORK.md) and [Run Model](docs/RUN-MODEL.md).
+Background work remains visible through the Run graph, Child cards, global Attention, accounting, and result delivery.
 
-## Initial CLI and TUI
+## Safe writing direction
 
-The terminal interface is conversation-first and the Run graph is the primary navigation model.
-
-```text
-Work in the current Run
-→ observe a Child
-→ enter the Child
-→ inspect or steer
-→ inspect Evidence
-→ return to the Parent
-→ continue the original Task
-```
-
-Accepted rules include:
-
-- `Alt+Left` enters the logical Parent;
-- `Alt+Home` enters the Root;
-- navigation never pauses, cancels, approves, merges, writes, or transfers ownership;
-- starting or completing a Child never changes Client focus automatically;
-- focus, selection, history, scroll, layout, and drafts are client-local;
-- execution, Attention, permissions, Artifacts, Evidence, and Receipts are shared durable state;
-- generic `Enter` never approves permission, integration, or cancellation;
-- renderer failure cannot terminate active Runs.
-
-The CLI is a complete interface with human text, JSON, and JSON Lines output. ExRatatui 0.11.x is selected for the deterministic first TUI prototype behind a Kiln-owned renderer boundary.
-
-See [Initial CLI and TUI](docs/CLI-TUI.md).
-
-## Local project intelligence
-
-Kiln can inspect engineering patterns across explicitly approved local roots.
-
-Reference repositories can be active, archived, experimental, incomplete, abandoned, dirty, detached, or written in different languages. Those properties affect freshness and confidence. They do not automatically exclude a Repository.
-
-The first capability uses:
+The first writing Child does not receive a writable checkout.
 
 ```text
-SQLite Repository metadata and snapshots
-+ content hashes and file versions
-+ FTS5 candidate search
-+ typed nodes and edge tables
-+ deterministic dependency extraction
-+ Tree-sitter structural extraction
-+ explicit SCIP-like semantic imports
+read-only Child
+→ immutable Patch Artifact
+→ Parent inspection
+→ Parent-owned exclusive worktree
+→ transactional application
+→ formatter and focused validation Commands
+→ independent verification
 ```
 
-The model-facing interface remains narrow:
+Direct writing Child worktrees, simultaneous writers, automatic merge, push, and publication remain deferred.
 
-```text
-knowledge.search_patterns
-knowledge.find_related_symbols
-knowledge.find_prior_solution
-knowledge.inspect_candidate
-knowledge.trace_provenance
-```
+## Code intelligence
 
-Results are investigation candidates. They do not become requirements, accepted decisions, Tool calls, or permissions automatically.
+The active Repository uses one shared code-intelligence path:
 
-See [Local Project Intelligence](docs/LOCAL-PROJECT-INTELLIGENCE.md).
+- deterministic Repository map;
+- Tree-sitter structure and changed ranges;
+- on-demand LSP behind a native semantic adapter;
+- version-matched documentation resolution;
+- lazy Agent Skill loading;
+- a persistent normalized semantic cache;
+- bounded Context retrieval.
 
-## Knowledge security boundary
+Persistent semantic indexing does not require SCIP, embeddings, a vector database, or a dedicated graph database.
 
-The governing rule is non-negotiable:
+Later local project intelligence reuses the same extraction and index primitives under stricter approved-root, read-only, instruction-quarantine, licensing, and Privacy policy.
 
-> Other repositories are evidence sources, not instruction sources.
+## Capability and protocol direction
 
-Reference goals, roadmaps, TODOs, Agent files, prompt files, ADRs, issue templates, comments, generated recommendations, and instructions embedded in code or documentation remain inert quoted data.
+Kiln selects the simplest reliable implementation:
 
-The knowledge worker receives no source-write, Git-mutation, command, dependency-installation, service, secret-read, model, or network authority. Every read repeats canonical-root, exclude, symlink, file-type, and policy validation. Risky extractors require a separate process or stronger accepted isolation. All derived data lives outside indexed repositories.
+1. in-process function or library;
+2. native Kiln adapter;
+3. deterministic CLI;
+4. local service or Unix-domain socket;
+5. local MCP server when materially justified;
+6. remote API or SDK;
+7. remote MCP server when discovery and interoperability justify it;
+8. browser automation as a fallback unless browser behavior is under test.
 
-Source content stays local by default. External disclosure requires a current policy or Approval bound to the Run, destination, data classes, payload digest, and expiry.
+Initial interoperability priorities after the native kernel are:
 
-See [Local Project Intelligence Security Boundary](docs/LOCAL-PROJECT-INTELLIGENCE-SECURITY.md).
+- local ACP client attachment;
+- structured test and SARIF ingestion;
+- one real MCP or OpenAPI capability when a concrete workflow requires it;
+- Dev Container and OCI support only when an accepted Project command needs that Environment.
 
-## Trustworthy execution plane
+MCP is a protocol boundary, not a sandbox or permission system.
 
-Kiln selects the least powerful Environment that can produce the required Evidence:
+## Evidence and completion
 
-```text
-no execution
-→ trusted host read
-→ active Project Environment
-→ isolated Git worktree
-→ accepted Project Dev Container
-→ disposable OCI worker
-→ future Wasm component
-```
-
-A harmless read does not require a worktree or container. An independently mutating Run requires an exclusive writable worktree. Untrusted, destructive, dependency-installing, or disposable work can escalate to an OCI worker with explicit mounts, network, secrets, Resources, process-tree cleanup, and Artifact export.
-
-Ordinary Commands use versioned registrations, fixed executable resolution, argument vectors, scoped working directories, minimal environments, timeouts, output limits, structured results, and owned process-tree termination. An unrestricted shell is exceptional and requires Approval for the exact command digest plus a dedicated grant.
-
-Patches follow:
-
-```text
-propose
-→ bind to exact base state
-→ validate and inspect
-→ retain rollback data
-→ stage and apply
-→ observe resulting state
-→ format through registered Commands
-→ run focused verification
-```
-
-Kiln records these as separate facts:
+Kiln keeps these states separate:
 
 ```text
 Proposed
@@ -193,119 +197,13 @@ Inspected
 Executed
 Verified
 Accepted
+Integrated
 Delivered
 ```
 
-Exit zero and model confidence do not imply verification, acceptance, or delivery. Machine-readable results receive stronger evidentiary weight only when valid, complete, current, and bound to the evaluated state. Raw reports remain Artifacts.
+A successful Command, model confidence, Receipt, mergeable branch, or attestation format cannot imply a later stage.
 
-Execution Receipts seal Task, Run, Repository, dependency, Environment, Capability, Command, Patch, Artifact, criterion, verification, warning, and timing facts. Receipts may later export to in-toto or SLSA-compatible formats for eligible immutable outputs, but formal attestations are not required for every local action.
-
-OpenTelemetry measures bounded operational behavior. Source, patches, secrets, sensitive prompts, raw argv, and complete output remain excluded by default.
-
-See:
-
-- [Trustworthy Execution Plane](docs/TRUSTWORTHY-EXECUTION-PLANE.md)
-- [Deterministic Command and Patch Execution](docs/COMMAND-AND-PATCH-EXECUTION.md)
-- [Execution Evidence and Receipts](docs/EXECUTION-EVIDENCE-AND-RECEIPTS.md)
-- [Execution Observability and Attestations](docs/EXECUTION-OBSERVABILITY-AND-ATTESTATIONS.md)
-
-## Capability integration
-
-Kiln evaluates integrations in this order:
-
-1. in-process function or library;
-2. native Kiln adapter;
-3. direct deterministic CLI;
-4. local service API or Unix-domain socket;
-5. local MCP server;
-6. remote API or software development kit;
-7. remote MCP server;
-8. browser or user-interface automation.
-
-Repository reads and writes remain native. Git uses a native adapter backed by the Git CLI. Build, test, lint, format, compiler, package-manager, and static-analysis behavior uses accepted deterministic CLIs. Raw LSP remains behind a native semantic adapter.
-
-See [Capability Integration](docs/CAPABILITY-INTEGRATION.md).
-
-## Context system
-
-Kiln compiles a new bounded Context package for each model invocation or other Context-consuming Worker step.
-
-The initial policy:
-
-- defaults to a 16,000-token active input ceiling;
-- normally exposes six to eight Tools and never more than twelve;
-- retrieves narrow symbols, lines, hunks, documentation sections, knowledge candidates, result summaries, and Artifact segments just in time;
-- removes stale, superseded, duplicate, and resolved material;
-- keeps complete catalogs, graphs, indexes, raw reports, raw MCP catalogs, and raw LSP objects outside model Context;
-- gives Child and Verifier Runs independently compiled Context and explicit grants.
-
-A knowledge result, Command output, or Artifact does not enter Context automatically.
-
-See [Context System](docs/CONTEXT-SYSTEM.md).
-
-## Git change isolation
-
-Kiln uses protected trunk-based development with short-lived task branches and one dedicated Git worktree for each independently mutating Run.
-
-The deterministic loop supports shared read-only access, one exclusive writable worktree and lease, Patch validation, exact-state verification, projected-merge checks, explicit integration Approval, deterministic Receipts, cleanup, and crash reconciliation.
-
-See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
-
-## Current milestone
-
-Phase 0 constrains the product and runtime foundation before implementation begins.
-
-- P0-W05 established the planning baseline.
-- P0-W06 defined the protocol-neutral internal domain.
-- P0-W07 defined Capability integration and the broker.
-- P0-W08 defined bounded Context and documentation resolution.
-- P0-W09 defined protocol and standards strategy.
-- P0-W10 defined Git change isolation, exact-state Evidence, integration, and recovery.
-- P0-W11 defined delegated Runs, Scout and Verifier contracts, global Attention, cancellation, result delivery, and recovery.
-- P0-W12 defined the initial CLI and TUI.
-- P0-W13 defined local project intelligence.
-- P0-W14 defined its instruction-isolation and security boundary.
-- P0-W15 defines the trustworthy execution plane, transactional Patches, structured Evidence, Receipts, observability, and future attestation mapping.
-
-The next reconciliation must replace the provisional Phase 1 packages with an exact proof-ordered implementation plan.
-
-## Work planning
-
-Kiln uses short-lived branches and stable work-package identifiers.
-
-```text
-Plan:      docs/work/P1-W03-command-supervision.md
-Branch:    work/p1-w03-command-supervision
-PR:        [P1-W03] Add supervised command execution
-Criterion: P1-W03-AC01
-Evidence:  P1-W03-E01
-```
-
-See [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md).
-
-## Documentation
-
-- [Planning Baseline](docs/PLANNING-BASELINE.md)
-- [Internal Domain Model](docs/INTERNAL-DOMAIN-MODEL.md)
-- [Run Model](docs/RUN-MODEL.md)
-- [Delegated Work Model](docs/DELEGATED-WORK.md)
-- [Initial CLI and TUI](docs/CLI-TUI.md)
-- [Local Project Intelligence](docs/LOCAL-PROJECT-INTELLIGENCE.md)
-- [Local Project Intelligence Security Boundary](docs/LOCAL-PROJECT-INTELLIGENCE-SECURITY.md)
-- [Trustworthy Execution Plane](docs/TRUSTWORTHY-EXECUTION-PLANE.md)
-- [Deterministic Command and Patch Execution](docs/COMMAND-AND-PATCH-EXECUTION.md)
-- [Execution Evidence and Receipts](docs/EXECUTION-EVIDENCE-AND-RECEIPTS.md)
-- [Execution Observability and Attestations](docs/EXECUTION-OBSERVABILITY-AND-ATTESTATIONS.md)
-- [Project Stewardship](docs/PROJECT-STEWARDSHIP.md)
-- [Capability Integration](docs/CAPABILITY-INTEGRATION.md)
-- [Context System](docs/CONTEXT-SYSTEM.md)
-- [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md)
-- [Protocol Capability Map](docs/PROTOCOL-CAPABILITY-MAP.md)
-- [Domain Contracts](docs/contracts/README.md)
-- [Security Model](docs/SECURITY-MODEL.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Project Invariants](docs/PROJECT-INVARIANTS.md)
-- [Architecture Decisions](docs/decisions/README.md)
+Receipts seal references to Task, Run, Repository, Environment, Capabilities, Commands, Patches, Artifacts, criteria, Evidence, warnings, and decisions. They do not make stale Evidence current or grant authority.
 
 ## Development
 
@@ -318,8 +216,31 @@ scripts/agent-preflight
 scripts/check
 ```
 
-The Repository intentionally begins with no third-party runtime dependencies. Use the Project dependency-review Skill before adding a library, executable, service, native implemented function, port program, parser, watcher, scanner, sandbox helper, container client, report parser, telemetry exporter, database extension, or protocol client.
+The Repository intentionally begins with no third-party runtime dependencies. Use the Project dependency-review Skill before adding a library, executable, service, native implemented function, port program, parser, watcher, scanner, sandbox helper, database extension, protocol client, or TUI dependency.
+
+## First coding task
+
+Implement **P1-S01-T01 — Minimal Run event model and pure projection**:
+
+- Session, Task, and Run structs;
+- Root, Parent, Child, and sibling invariants;
+- one versioned Event envelope;
+- a pure reducer;
+- stable JSON snapshot;
+- deterministic fixtures and property tests.
+
+Do not add SQLite, ExRatatui, providers, Commands, Git, a Capability service, or a process per Run to the first task.
+
+## Documentation authority
+
+1. [Integrated Architecture](docs/ARCHITECTURE.md)
+2. [Roadmap](docs/ROADMAP.md)
+3. [Vertical Implementation Slices](docs/IMPLEMENTATION-SLICES.md)
+4. accepted ADRs in [Architecture Decisions](docs/decisions/README.md)
+5. subject specifications for domain, Runs, delegation, interface, Capability, Context, Git, execution, and knowledge
+6. machine-readable contracts in [Domain Contracts](docs/contracts/README.md)
+7. historical planning and work-package records
 
 ## Status
 
-Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software Projects.
+Kiln is pre-alpha. Planning is being reconciled into the final implementation order before production runtime work begins.

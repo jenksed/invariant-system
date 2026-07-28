@@ -44,4 +44,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Integrated through pull request 16 |
 | [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Integrated through pull request 17 |
 | [0017: Quarantine reference instructions and technically enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Integrated through pull request 18 |
-| [0018: Use tiered deterministic execution and evidence](0018-use-tiered-deterministic-execution-and-evidence.md) | Accepted | Proposed on P0-W15 |
+| [0018: Use tiered deterministic execution and evidence](0018-use-tiered-deterministic-execution-and-evidence.md) | Accepted | Integrated through pull request 19 |
+| [0019: Implement Kiln through vertical product slices](0019-implement-kiln-through-vertical-product-slices.md) | Accepted | Proposed on P0-W16 |

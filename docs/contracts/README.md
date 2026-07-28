@@ -21,6 +21,24 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 - `kiln-knowledge-security.schema.json`: knowledge security policy, complete candidate provenance, disclosure decision, security audit event, separately authorized reference execution, and sanitized candidate projection.
 - `kiln-execution-plane.schema.json`: Environment profile, Command registration, Command request and result, Patch transaction, precise completion stage, structured result, execution Receipt, telemetry record, and optional attestation export.
 
+## Vertical implementation rule
+
+The schemas define accepted semantic boundaries. They are not one horizontal implementation backlog.
+
+P1-S01 through P1-S10 implement only the contract subset exercised by the current vertical demo. A later slice extends or consolidates the same Kiln-native contracts when its user-visible behavior requires additional fields.
+
+Kiln does not add a `slice` runtime entity or contract family. Slice identifiers belong to work planning, acceptance gates, demos, and Receipts.
+
+Contract existence does not imply:
+
+- a database table;
+- an OTP process;
+- a public Tool;
+- model visibility;
+- Capability availability;
+- permission;
+- implemented runtime support.
+
 ## Rules
 
 1. Kiln generates all core identifiers.
@@ -89,6 +107,12 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 64. Source, Patch content, secrets, sensitive prompts, raw argv, stdout, stderr, and complete result content remain outside telemetry by default.
 65. Optional in-toto or SLSA-shaped export does not create a SLSA-level Claim or cryptographic authenticity.
 66. WASI and WIT remain future component boundaries until a concrete accepted operation justifies them.
+67. A Run does not require a permanent process. Active lifecycle owners receive processes only while needed.
+68. Active code intelligence and local project intelligence share extraction and index primitives but not instruction authority or execution policy.
+69. Persistent semantic records are Kiln-native normalized facts first; SCIP remains a later adapter option.
+70. The first writing Child remains read-only and returns a Patch Artifact to an authorized applying Run.
+71. The P1-W01 through P1-W13 component sequence is superseded by P1-S01 through P1-S10 vertical slices.
+72. Version 0.1 ends after durable read-only recovery in P1-S05.
 
 ## Contract precedence during v0
 
@@ -104,7 +128,7 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 
 A more detailed contract cannot broaden an upper-layer policy or grant.
 
-The generic Run and Attention definitions in `kiln.domain/v0` remain compatible projections. Phase 1 contract consolidation must add `waiting_for_command`, expanded Attention, and accepted interface and execution fields before runtime implementation uses those generic schemas as complete validators.
+P1-S01 begins with a minimal compatible subset of the generic Session, Task, Run, Event, projection, and Receipt contracts. Later slices consolidate accepted fields before those schemas become complete production validators.
 
 ## Validation
 
