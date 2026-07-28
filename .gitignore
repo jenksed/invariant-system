@@ -1,0 +1,23 @@
+# Elixir / Mix
+/_build/
+/deps/
+/doc/
+/cover/
+*.ez
+
+# Test and runtime artifacts
+/erl_crash.dump
+*.log
+/tmp/
+
+# Local environment
+.env
+.env.*
+!.env.example
+.mise.local.toml
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
