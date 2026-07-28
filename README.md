@@ -45,6 +45,7 @@ LLM integration follows only after those semantics are trustworthy.
 - [Architecture](docs/ARCHITECTURE.md)
 - [Session model](docs/SESSION-MODEL.md)
 - [Security model](docs/SECURITY-MODEL.md)
+- [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Architecture decisions](docs/decisions/README.md)
 

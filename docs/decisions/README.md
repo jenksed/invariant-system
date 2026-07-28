@@ -14,3 +14,4 @@ Architecture decision records preserve decisions that constrain future implement
 - [ADR 0001: Elixir and OTP own the initial runtime](0001-elixir-otp-core.md)
 - [ADR 0002: Persist a session journal separate from the transcript](0002-durable-session-journal.md)
 - [ADR 0003: Use a language-neutral external extension boundary](0003-language-neutral-extensions.md)
+- [ADR 0004: Protocols adapt to Kiln](0004-protocols-adapt-to-kiln.md)
