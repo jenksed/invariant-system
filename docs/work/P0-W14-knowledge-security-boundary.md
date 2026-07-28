@@ -1,6 +1,6 @@
 # P0-W14: Knowledge security boundary
 
-- **Status:** Implemented; verification pending
+- **Status:** Implemented and verified; owner review pending
 - **Branch:** `work/p0-w14-knowledge-security-boundary`
 - **Depends on:** P0-W07, P0-W08, P0-W10, P0-W13
 - **Scope:** Planning and contracts only
@@ -20,9 +20,9 @@ The non-negotiable rule is:
 - Context compilation already separates source authority, trust, freshness, sensitivity, and provenance.
 - Capability grants already separate availability from authority.
 - The Security Model already states that active-project instructions remain distinct from reference content and that Privacy policy gates egress.
-- No accepted instruction-quarantine, per-root Privacy-mode, disclosure-decision, license-disposition, security-audit, or future reference-execution contract exists.
-- No accepted technical enforcement matrix says when read-only handles, processes, mounts, containers, or virtual machines are required.
-- No malicious fixture corpus proves that reference instructions remain inert.
+- No accepted instruction-quarantine, per-root Privacy-mode, disclosure-decision, license-disposition, security-audit, or future reference-execution contract existed before this work.
+- No accepted technical enforcement matrix previously said when read-only handles, processes, mounts, containers, or virtual machines were required.
+- No malicious fixture corpus previously proved that reference instructions remain inert.
 
 ## Protected invariants
 
@@ -114,7 +114,7 @@ Contract checks:
 python -m json.tool docs/contracts/kiln-knowledge-security.schema.json
 ```
 
-A Draft 2020-12 validator must validate:
+A Draft 2020-12 validator validated:
 
 - knowledge security policy;
 - complete retrieval provenance;
@@ -123,7 +123,7 @@ A Draft 2020-12 validator must validate:
 - reference-execution authorization;
 - sanitized candidate.
 
-Negative cases must reject:
+Negative cases rejected:
 
 - active instruction authority;
 - enabled source execution;
@@ -135,16 +135,27 @@ Negative cases must reject:
 - approved disclosure without user or accepted-policy authority;
 - a reference-execution authorization missing its separate Run, grant, Environment, Approval, source snapshot, or Evidence record.
 
+GitHub CI run `30397324970` passed on the design head:
+
+- Vale prose checks;
+- agent preflight behavior;
+- Project agent-asset validation;
+- dependency installation;
+- Elixir formatting;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit tests.
+
 ## Evidence
 
-- **P0-W14-E01:** The specification covers every required output.
+- **P0-W14-E01:** `docs/LOCAL-PROJECT-INTELLIGENCE-SECURITY.md` covers every required output.
 - **P0-W14-E02:** ADR 0017 records the non-negotiable isolation decision and technical enforcement.
-- **P0-W14-E03:** The security schema parses and validates.
-- **P0-W14-E04:** Representative positive documents and protected negative cases pass.
+- **P0-W14-E03:** `kiln.knowledge.security/v0` parses and passes Draft 2020-12 schema validation.
+- **P0-W14-E04:** Six representative positive documents and protected negative cases pass.
 - **P0-W14-E05:** README, roadmap, ADR index, and contract index link to the security boundary.
 - **P0-W14-E06:** Primary documentation supports the prompt-injection threat, read-only bind mounts, mount-propagation caution, and no-network isolation design.
-- **P0-W14-E07:** The diff contains planning and contracts only.
-- **P0-W14-E08:** Repository CI passes on the final branch head.
+- **P0-W14-E07:** The branch diff contains planning and contracts only.
+- **P0-W14-E08:** GitHub CI run `30397324970` passes on the design head; a final exact-head run follows this status commit.
 
 ## Exclusions
 
