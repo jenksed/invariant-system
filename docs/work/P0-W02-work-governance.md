@@ -1,7 +1,7 @@
 # P0-W02: Work Governance
 
 **Document type:** Reference  
-**Status:** In progress  
+**Status:** Complete  
 **Branch:** `work/p0-w02-work-governance`  
 **Depends on:** P0-W01 repository foundation
 
@@ -13,10 +13,10 @@ Define a branch-linked planning and evidence system that reduces coordination co
 
 | Observation | Evidence | Collected by | Date or commit |
 | --- | --- | --- | --- |
-| Kiln has an accepted proof-ordered roadmap but no branch naming policy. | `docs/ROADMAP.md` at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
-| Kiln requires ADRs for foundational changes but has no ADR template. | `AGENTS.md` lines 65-69 at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
-| The current bootstrap branch predates the proposed naming policy. | Branch `agent/bootstrap-project-foundation` | ChatGPT GitHub connector | 2026-07-28 |
-| CI checks Elixir formatting, compilation, and tests. It does not check prose. | `.github/workflows/ci.yml` at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
+| Kiln had a proof-ordered roadmap but no branch naming policy. | `docs/ROADMAP.md` at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
+| Kiln required ADRs for foundational changes but had no ADR template. | `AGENTS.md` lines 65-69 at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
+| The bootstrap branch predates the branch naming policy. | Branch `agent/bootstrap-project-foundation` | ChatGPT GitHub connector | 2026-07-28 |
+| CI checked Elixir formatting, compilation, and tests but did not check prose. | `.github/workflows/ci.yml` at `5a05c22d11564689df183c90d4794a25a3693896` | ChatGPT GitHub connector | 2026-07-28 |
 
 ## Assumptions and unknowns
 
@@ -28,7 +28,7 @@ Define a branch-linked planning and evidence system that reduces coordination co
 ### Unknowns
 
 - **P0-W02-U01:** Unknown. The useful maximum branch size will be measured during Phase 1 work packages.
-- **P0-W02-U02:** Unknown. The initial Vale rules can produce false positives. Verify by running Vale against the current documentation and adjusting only deterministic rules.
+- **P0-W02-U02:** Unknown. The long-term Vale false-positive rate requires evidence from later documentation changes. Review each reported violation before expanding the rule set.
 
 ## Requirements
 
@@ -58,14 +58,14 @@ Define a branch-linked planning and evidence system that reduces coordination co
 | `docs/BRANCHING-AND-WORK-PLANNING.md` | Add branch and work-package rules. | Added |
 | `docs/ENGINEERING-QUALITY-RULES.md` | Add normative writing, requirements, evidence, and completion rules. | Added |
 | `docs/templates/IMPLEMENTATION-PLAN.md` | Add work-package plan template. | Added |
-| `docs/templates/ADR.md` | Add ADR template. | Proposed |
-| `.github/pull_request_template.md` | Add evidence-centered pull-request template. | Proposed |
-| `.vale.ini` | Configure prose linting. | Proposed |
-| `styles/Kiln/` | Add repository-local Vale rules. | Proposed |
-| `.github/workflows/ci.yml` | Run Vale in CI. | Proposed |
-| `AGENTS.md` | Require the work-package and quality rules. | Proposed |
-| `README.md` | Link the rules. | Proposed |
-| `docs/ROADMAP.md` | Add work identifiers and Phase 1 work-package map. | Proposed |
+| `docs/templates/ADR.md` | Add ADR template. | Added |
+| `.github/pull_request_template.md` | Add evidence-centered pull-request template. | Added |
+| `.vale.ini` | Configure prose linting. | Added |
+| `styles/Kiln/` | Add repository-local Vale rules. | Added |
+| `.github/workflows/ci.yml` | Run Vale in CI. | Updated |
+| `AGENTS.md` | Require the work-package and quality rules. | Updated |
+| `README.md` | Link the rules. | Updated |
+| `docs/ROADMAP.md` | Add work identifiers and Phase 1 work-package map. | Updated |
 
 ## Acceptance criteria
 
@@ -102,7 +102,7 @@ mix compile --warnings-as-errors
 mix test
 ```
 
-Each command must exit with status `0`.
+Each command must exit with status `0` on the final branch head.
 
 ## Required completion evidence
 
@@ -110,7 +110,7 @@ Each command must exit with status `0`.
 | --- | --- | --- |
 | P0-W02-E01 | P0-W02-AC01 | Paths and identifier examples in the branch reference and templates. |
 | P0-W02-E02 | P0-W02-AC02 | Inspection of the implementation-plan template. |
-| P0-W02-E03 | P0-W02-AC03 | Successful Vale CI run plus a local or isolated negative-rule test. |
+| P0-W02-E03 | P0-W02-AC03 | Passing Vale runs plus an isolated negative-rule run. |
 | P0-W02-E04 | P0-W02-AC04 | Phase 1 work-package table in the roadmap. |
 
 ## Explicit exclusions
@@ -125,31 +125,39 @@ Each command must exit with status `0`.
 
 ## Completion record
 
-**Result:** In progress
+**Result:** Complete
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P0-W02-AC01 | In progress | P0-W02-E01 | Branch reference and plan template added. |
-| P0-W02-AC02 | In progress | P0-W02-E02 | Template added; final inspection pending. |
-| P0-W02-AC03 | Not run | P0-W02-E03 | Vale configuration and CI change pending. |
-| P0-W02-AC04 | Not started | P0-W02-E04 | Roadmap update pending. |
+| P0-W02-AC01 | Pass | P0-W02-E01 | `docs/BRANCHING-AND-WORK-PLANNING.md`, the plan template, and the pull-request template use one work-package identifier across artifacts. |
+| P0-W02-AC02 | Pass | P0-W02-E02 | `docs/templates/IMPLEMENTATION-PLAN.md` contains the ten required planning sections and a completion record. |
+| P0-W02-AC03 | Pass | P0-W02-E03 | CI run `30328831549` failed the `prose` job after the branch added only `docs/vale-negative-fixture.md`. CI run `30328877926` passed `prose` after the fixture was removed. |
+| P0-W02-AC04 | Pass | P0-W02-E04 | `docs/ROADMAP.md` maps P1-W01 through P1-W07 to branch names and dependencies. |
 
 ### Verification executed
 
-No verification has run for the current branch.
+| Command or check | Exit status | Evidence location |
+| --- | --- | --- |
+| Vale positive path | 0 | GitHub Actions run `30328877926`, job `prose` |
+| Vale negative path | Nonzero as required | GitHub Actions run `30328831549`, job `prose` |
+| `mix format --check-formatted` | 0 | GitHub Actions run `30328877926`, job `test` |
+| `mix compile --warnings-as-errors` | 0 | GitHub Actions run `30328877926`, job `test` |
+| `mix test` | 0 | GitHub Actions run `30328877926`, job `test` |
 
 ### Failures and warnings
 
-- None observed through execution because verification has not run.
+- CI run `30328831549` contains an intentional prose failure for the negative-rule test.
+- The Vale job has `pull-requests: write` permission so the action can report pull-request annotations.
 
 ### Remaining unknowns and exclusions
 
-- P0-W02-U01 and P0-W02-U02 remain open.
+- P0-W02-U01 and P0-W02-U02 remain open and do not block this work package.
+- The explicit exclusions remain unchanged.
 
 ### Repository state
 
-- Commit: Unknown until the work package is complete.
+- Commit: current head of pull request 3
 - Branch: `work/p0-w02-work-governance`
-- Diff reviewed: No
+- Diff reviewed: Yes
