@@ -21,7 +21,7 @@ Decision status and Repository integration are separate facts.
 - **Proposed on branch:** present on an open branch or pull request but not on `main`.
 - **Superseded on branch:** replaced before integration.
 
-An accepted ADR MUST NOT be reversed without a superseding ADR. An accepted ADR that is not integrated MUST state its integration status in the record.
+An accepted ADR must not be reversed without a superseding ADR. An accepted ADR that is not integrated must state its integration status.
 
 ## Records
 
@@ -39,4 +39,5 @@ An accepted ADR MUST NOT be reversed without a superseding ADR. An accepted ADR 
 | [0010: Compile the smallest sufficient Context](0010-compile-smallest-sufficient-context.md) | Accepted | Integrated |
 | [0011: Resolve documentation by authority and version](0011-resolve-documentation-by-authority-and-version.md) | Accepted | Integrated |
 | [0012: Protocols adapt to Kiln](0012-protocols-adapt-to-kiln.md) | Accepted | Integrated |
-| [0013: Use protected trunk and exclusive writable worktrees](0013-protected-trunk-and-exclusive-worktrees.md) | Accepted | Proposed on P0-W10 |
+| [0013: Use protected trunk and exclusive writable worktrees](0013-protected-trunk-and-exclusive-worktrees.md) | Accepted | Integrated through pull request 14 |
+| [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Proposed on P0-W11 |
