@@ -1,6 +1,6 @@
 # P0-W10: Git change isolation
 
-- **Status:** In progress
+- **Status:** Implemented and verified; review pending
 - **Branch:** `work/p0-w10-git-change-isolation`
 - **Depends on:** P0-W05 through P0-W09
 - **Scope:** Planning and contracts only
@@ -36,7 +36,7 @@ Define how Kiln isolates, coordinates, verifies, integrates, recovers, and expla
 - **P0-W10-R11:** Define initial implementation boundary and later-plan changes.
 - **P0-W10-R12:** Preserve user work during crash recovery and cleanup.
 
-## Proposed changes
+## Changes
 
 - Add `docs/GIT-CHANGE-ISOLATION.md`.
 - Add `docs/contracts/kiln-git-change.schema.json`.
@@ -77,6 +77,16 @@ python -m json.tool docs/contracts/kiln-git-change.schema.json
 ```
 
 A Draft 2020-12 validator MUST validate representative examples for each top-level contract type before P0-W10 is reported as fully verified.
+
+## Verification results
+
+- GitHub CI run 30387828212 passed on the final branch head.
+- CI covered Vale, agent preflight behavior, agent-asset validation, Elixir formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
+- The Git contract parsed as JSON.
+- Draft 2020-12 meta-schema validation passed.
+- Ten representative valid documents passed. They cover every top-level contract type and both committed and dirty verification bindings.
+- Four negative cases were rejected as required: branchless independent mode, verification without a state binding, dirty state without a fingerprint, and Patch Artifact mode with a writable worktree.
+- The branch diff contains documentation and JSON contracts only.
 
 ## Required Evidence
 
