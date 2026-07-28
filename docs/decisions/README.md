@@ -2,7 +2,7 @@
 
 **Document type:** Reference
 
-Architecture decision records (ADRs) preserve decisions that constrain future implementation.
+Architecture decision records preserve decisions that constrain future implementation.
 
 Use `docs/templates/ADR.md` for new records. Follow `docs/ENGINEERING-QUALITY-RULES.md`.
 
@@ -43,4 +43,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Integrated through pull request 15 |
 | [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Integrated through pull request 16 |
 | [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Integrated through pull request 17 |
-| [0017: Quarantine reference instructions and technically enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Proposed on P0-W14 |
+| [0017: Quarantine reference instructions and technically enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Integrated through pull request 18 |
+| [0018: Use tiered deterministic execution and evidence](0018-use-tiered-deterministic-execution-and-evidence.md) | Accepted | Proposed on P0-W15 |
