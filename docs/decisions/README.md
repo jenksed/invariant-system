@@ -41,4 +41,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0012: Protocols adapt to Kiln](0012-protocols-adapt-to-kiln.md) | Accepted | Integrated |
 | [0013: Use protected trunk and exclusive writable worktrees](0013-protected-trunk-and-exclusive-worktrees.md) | Accepted | Integrated through pull request 14 |
 | [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Integrated through pull request 15 |
-| [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Proposed on P0-W12 |
+| [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Integrated through pull request 16 |
+| [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Proposed on P0-W13 |
