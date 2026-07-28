@@ -34,6 +34,9 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 - **External integration:** adapters map protocols and mature tools to Kiln domain commands, events, and schemas
 - **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
 - **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
+- **Context compilation:** compile the smallest sufficient package for the next decision or action; do not fill a larger model window
+- **Context continuity:** replace stale and resolved material with immutable manifests and compact Checkpoints rather than append forever
+- **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
 - **Objective boundary:** one durable Session
 - **Desired-work boundary:** one bounded Task
 - **Execution model:** one Root Run and a navigable Run graph
@@ -83,6 +86,42 @@ The full Capability catalog remains outside model Context. A Run receives a smal
 
 See [Capability integration](docs/CAPABILITY-INTEGRATION.md).
 
+## Context system
+
+Kiln compiles a new bounded Context package for each model invocation or other Context-consuming Worker step.
+
+The package is built for one immediate purpose from current intent, accepted requirements, Task and Run state, Repository state, Evidence, assumptions, unknowns, the active Skill, phase-relevant Tools, permissions, model characteristics, remaining token budget, and compact Checkpoints.
+
+The initial policy:
+
+- defaults to a 16,000-token active input ceiling even when the provider supports more;
+- uses lower phase targets;
+- normally exposes six to eight Tools and never more than twelve;
+- uses a 2,500-token default Tool-schema budget and a 4,000-token absolute ceiling;
+- retrieves symbols, relevant lines, changed hunks, documentation sections, and Artifact segments just in time;
+- removes stale, superseded, duplicate, and resolved material from the next package;
+- keeps complete logs, test streams, documentation pages, DOM snapshots, database results, and large output in Artifacts when a digest and reference are sufficient;
+- keeps complete MCP catalogs and raw LSP objects outside model Context;
+- loads Skills and additional Tools lazily;
+- treats prompt caching as an optimization rather than correctness or memory;
+- gives Child Runs and Verifier Runs independently compiled Context and explicit grants.
+
+For Elixir Projects, documentation resolution prefers:
+
+1. active Repository documentation;
+2. accepted ADRs and specifications;
+3. dependency-authored usage rules;
+4. version-locked local ExDoc;
+5. running-Project documentation through a native adapter;
+6. Context7;
+7. official external documentation;
+8. general web research;
+9. model memory.
+
+Context7 remains supported, but it cannot override Repository-local or exact version-matched documentation.
+
+See [Context system](docs/CONTEXT-SYSTEM.md).
+
 ## Project Steward
 
 The Project Steward uses Kiln's Run graph, Tasks, specifications, Repository observations, Capability policy, Evidence, and completion gates to coordinate work.
@@ -108,14 +147,18 @@ P0-W06 defines the [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md), JSON 
 
 P0-W07 defines the [Capability integration](docs/CAPABILITY-INTEGRATION.md) hierarchy, deterministic broker, compact model-facing Tools, result normalization, duplicate policy, and initial non-MCP boundary.
 
+P0-W08 defines the [Context system](docs/CONTEXT-SYSTEM.md), bounded package contract, token policy, progressive disclosure, documentation resolver, independent Child and Verifier Context, and Context observability.
+
 The later roadmap reconciliation must align Phase 1 with:
 
 - Workspace, Project, Repository, and Environment identity;
 - Session, Task, Run, and event identity;
 - minimum Context, Capability, Claim, Evidence, Receipt, and Checkpoint primitives;
+- Context compile requests, manifests, packages, budgets, invalidation, and observability;
 - native Repository and Git behavior;
-- Capability registration, availability, selection, permission, and normalization;
-- fake navigable Child Runs;
+- just-in-time file, symbol, line, documentation, and Artifact retrieval;
+- Capability registration, availability, selection, permission, normalization, and phase-specific Tool exposure;
+- fake navigable Child Runs with independent Context;
 - Client-local focus;
 - attention routing;
 - Project Steward projection;
@@ -123,11 +166,12 @@ The later roadmap reconciliation must align Phase 1 with:
 - Repository observation and trust policy;
 - provider-backed Root Runs;
 - read-only Child Runs;
-- independent verification.
+- independent verification;
+- authoritative version-matched documentation resolution.
 
 See [Plan reconciliation](docs/PLAN-RECONCILIATION.md).
 
-Provider and protocol experiments may run on isolated spike branches. They must not bypass the internal domain, integration hierarchy, execution-kernel, policy, privacy, output, Artifact, and Evidence gates.
+Provider and protocol experiments may run on isolated spike branches. They must not bypass the internal domain, integration hierarchy, execution-kernel, policy, privacy, Context, output, Artifact, and Evidence gates.
 
 ## Work planning
 
@@ -173,6 +217,7 @@ The main coding agent remains the default writer and owns final implementation d
 - [Planning baseline](docs/PLANNING-BASELINE.md)
 - [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md)
 - [Capability integration](docs/CAPABILITY-INTEGRATION.md)
+- [Context system](docs/CONTEXT-SYSTEM.md)
 - [Domain contracts](docs/contracts/README.md)
 - [Project provenance](docs/PROJECT-PROVENANCE.md)
 - [Architecture](docs/ARCHITECTURE.md)

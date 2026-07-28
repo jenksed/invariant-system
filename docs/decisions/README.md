@@ -36,3 +36,5 @@ An accepted ADR MUST NOT be reversed without a superseding ADR. An accepted ADR 
 | [0007: Use Run as the primary execution unit](0007-run-primary-execution-unit.md) | Accepted | Proposed on P0-W06 |
 | [0008: Select the simplest reliable capability integration](0008-simplest-reliable-capability-integration.md) | Accepted | Proposed on P0-W07 |
 | [0009: Broker capabilities behind intent-level Tools](0009-broker-intent-level-capabilities.md) | Accepted | Proposed on P0-W07 |
+| [0010: Compile the smallest sufficient Context](0010-compile-smallest-sufficient-context.md) | Accepted | Proposed on P0-W08 |
+| [0011: Resolve documentation by authority and version](0011-resolve-documentation-by-authority-and-version.md) | Accepted | Proposed on P0-W08 |

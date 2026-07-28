@@ -1,0 +1,850 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiln.local/schemas/kiln-context.schema.json",
+  "title": "Kiln Context Contracts",
+  "description": "Protocol-neutral contracts for Context compilation, manifests, packages, documentation resolution, and observability.",
+  "type": "object",
+  "oneOf": [
+    { "$ref": "#/$defs/context_compile_request" },
+    { "$ref": "#/$defs/context_manifest" },
+    { "$ref": "#/$defs/context_package" },
+    { "$ref": "#/$defs/documentation_resolution" },
+    { "$ref": "#/$defs/context_observation" }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "digest": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 256
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "workflow_phase": {
+      "type": "string",
+      "enum": [
+        "orientation",
+        "investigation",
+        "change",
+        "verification",
+        "reconciliation",
+        "recovery"
+      ]
+    },
+    "source_authority": {
+      "type": "string",
+      "enum": [
+        "current_user_intent",
+        "accepted_requirement",
+        "active_project_instruction",
+        "accepted_project_decision",
+        "current_task_run_state",
+        "observed_repository_state",
+        "observed_runtime_state",
+        "current_evidence",
+        "dependency_authoritative",
+        "official_external",
+        "external_reference",
+        "user_supplied_unverified",
+        "model_inference",
+        "model_memory"
+      ]
+    },
+    "trust_label": {
+      "type": "string",
+      "enum": [
+        "authoritative_instruction",
+        "accepted_project_decision",
+        "observed_repository_state",
+        "observed_runtime_state",
+        "current_evidence",
+        "dependency_authoritative",
+        "official_external_reference",
+        "external_reference",
+        "user_supplied_unverified",
+        "reference_repository_untrusted",
+        "model_generated_claim",
+        "model_memory_unverified"
+      ]
+    },
+    "sensitivity": {
+      "type": "string",
+      "enum": [
+        "public",
+        "project_internal",
+        "confidential",
+        "secret_derived",
+        "restricted"
+      ]
+    },
+    "freshness_state": {
+      "type": "string",
+      "enum": [
+        "current",
+        "stale",
+        "superseded",
+        "unknown",
+        "not_applicable"
+      ]
+    },
+    "context_item_kind": {
+      "type": "string",
+      "enum": [
+        "stable_instruction",
+        "user_intent",
+        "accepted_requirement",
+        "task_state",
+        "run_state",
+        "phase_state",
+        "permission_summary",
+        "skill_excerpt",
+        "tool_schema",
+        "repository_map",
+        "changed_hunk",
+        "symbol_excerpt",
+        "line_excerpt",
+        "documentation_excerpt",
+        "runtime_observation",
+        "evidence_summary",
+        "hypothesis",
+        "assumption",
+        "unknown",
+        "checkpoint_summary",
+        "artifact_reference",
+        "retrieval_handle",
+        "output_contract"
+      ]
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method",
+        "input_digest",
+        "output_digest",
+        "complete_for_scope",
+        "model_assisted"
+      ],
+      "properties": {
+        "method": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "exact_excerpt",
+            "symbol_extract",
+            "line_select",
+            "structured_projection",
+            "deterministic_summary",
+            "model_summary",
+            "redaction",
+            "pagination",
+            "artifact_externalization",
+            "deduplication"
+          ]
+        },
+        "input_digest": { "$ref": "#/$defs/digest" },
+        "output_digest": { "$ref": "#/$defs/digest" },
+        "complete_for_scope": { "type": "boolean" },
+        "model_assisted": { "type": "boolean" },
+        "omitted_description": { "type": "string", "maxLength": 2000 }
+      }
+    },
+    "state_binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository_fingerprint": { "$ref": "#/$defs/digest" },
+        "commit": { "type": "string" },
+        "branch": { "type": "string" },
+        "dirty_state_digest": { "$ref": "#/$defs/digest" },
+        "changed_files_digest": { "$ref": "#/$defs/digest" },
+        "environment_fingerprint": { "$ref": "#/$defs/digest" },
+        "dependency_lock_digest": { "$ref": "#/$defs/digest" },
+        "accepted_requirements_revision": { "$ref": "#/$defs/id" },
+        "policy_digest": { "$ref": "#/$defs/digest" },
+        "skill_digest": { "$ref": "#/$defs/digest" },
+        "agent_digest": { "$ref": "#/$defs/digest" },
+        "capability_availability_digest": { "$ref": "#/$defs/digest" },
+        "effective_authority_digest": { "$ref": "#/$defs/digest" }
+      },
+      "minProperties": 1
+    },
+    "retrieval_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "retrieval_id",
+        "method",
+        "source_ref",
+        "retrieved_at"
+      ],
+      "properties": {
+        "retrieval_id": { "$ref": "#/$defs/id" },
+        "method": {
+          "type": "string",
+          "enum": [
+            "native_repository",
+            "semantic_adapter",
+            "artifact_store",
+            "runtime_adapter",
+            "local_documentation",
+            "context7",
+            "official_external",
+            "general_web",
+            "user_input",
+            "prior_manifest"
+          ]
+        },
+        "source_ref": { "$ref": "#/$defs/id" },
+        "query_digest": { "$ref": "#/$defs/digest" },
+        "source_digest": { "$ref": "#/$defs/digest" },
+        "retrieved_at": { "$ref": "#/$defs/timestamp" },
+        "cursor": { "type": "string", "maxLength": 2000 },
+        "complete_for_scope": { "type": "boolean" },
+        "latency_ms": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "artifact_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "content_digest",
+        "media_type",
+        "size_bytes",
+        "summary",
+        "trust_label",
+        "sensitivity",
+        "freshness_state",
+        "retention_class"
+      ],
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/id" },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "media_type": { "type": "string", "minLength": 1 },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "producer": { "$ref": "#/$defs/id" },
+        "source_ref": { "$ref": "#/$defs/id" },
+        "summary": { "type": "string", "maxLength": 4000 },
+        "bounded_excerpt": { "type": "string", "maxLength": 12000 },
+        "trust_label": { "$ref": "#/$defs/trust_label" },
+        "sensitivity": { "$ref": "#/$defs/sensitivity" },
+        "freshness_state": { "$ref": "#/$defs/freshness_state" },
+        "state_binding": { "$ref": "#/$defs/state_binding" },
+        "available_segments": {
+          "type": "array",
+          "maxItems": 200,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "continuation_cursor": { "type": "string", "maxLength": 2000 },
+        "retention_class": { "type": "string", "minLength": 1 },
+        "retrieval_provenance": { "$ref": "#/$defs/retrieval_provenance" }
+      }
+    },
+    "context_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_item_id",
+        "kind",
+        "source_ref",
+        "source_type",
+        "source_authority",
+        "trust_label",
+        "sensitivity",
+        "freshness_state",
+        "source_digest",
+        "content_digest",
+        "selection_reason",
+        "relevance_score",
+        "confidence",
+        "estimated_tokens",
+        "transformation_history",
+        "retrieval_provenance"
+      ],
+      "properties": {
+        "context_item_id": { "$ref": "#/$defs/id" },
+        "kind": { "$ref": "#/$defs/context_item_kind" },
+        "source_ref": { "$ref": "#/$defs/id" },
+        "source_type": { "type": "string", "minLength": 1 },
+        "source_authority": { "$ref": "#/$defs/source_authority" },
+        "trust_label": { "$ref": "#/$defs/trust_label" },
+        "sensitivity": { "$ref": "#/$defs/sensitivity" },
+        "freshness_state": { "$ref": "#/$defs/freshness_state" },
+        "state_binding": { "$ref": "#/$defs/state_binding" },
+        "source_digest": { "$ref": "#/$defs/digest" },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "selection_reason": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "relevance_score": { "type": "number", "minimum": 0, "maximum": 1 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "estimated_tokens": { "type": "integer", "minimum": 0 },
+        "transformation_history": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/transformation" }
+        },
+        "retrieval_provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/retrieval_provenance" }
+        },
+        "inline_content": { "type": "string", "maxLength": 50000 },
+        "artifact_reference": { "$ref": "#/$defs/artifact_reference" },
+        "expires_when": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 1000 }
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["inline_content"],
+          "not": { "required": ["artifact_reference"] }
+        },
+        {
+          "required": ["artifact_reference"],
+          "not": { "required": ["inline_content"] }
+        }
+      ]
+    },
+    "tool_projection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool_key",
+        "tool_version",
+        "purpose",
+        "schema_digest",
+        "estimated_schema_tokens",
+        "required_capabilities",
+        "phase_relevance"
+      ],
+      "properties": {
+        "tool_key": { "$ref": "#/$defs/id" },
+        "tool_version": { "type": "string", "minLength": 1 },
+        "purpose": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "schema_digest": { "$ref": "#/$defs/digest" },
+        "estimated_schema_tokens": { "type": "integer", "minimum": 0, "maximum": 4000 },
+        "required_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "phase_relevance": { "type": "number", "minimum": 0, "maximum": 1 },
+        "lazy_discovered": { "type": "boolean" }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_ceiling_tokens",
+        "phase_target_tokens",
+        "allowed_burst_tokens",
+        "model_safe_input_tokens",
+        "reserved_output_tokens",
+        "transport_margin_tokens",
+        "usable_input_tokens",
+        "estimated_package_tokens",
+        "category_usage",
+        "tool_schema_tokens"
+      ],
+      "properties": {
+        "run_ceiling_tokens": { "type": "integer", "minimum": 1 },
+        "phase_target_tokens": { "type": "integer", "minimum": 1 },
+        "allowed_burst_tokens": { "type": "integer", "minimum": 0 },
+        "burst_reason": { "type": "string", "maxLength": 2000 },
+        "model_safe_input_tokens": { "type": "integer", "minimum": 1 },
+        "reserved_output_tokens": { "type": "integer", "minimum": 0 },
+        "transport_margin_tokens": { "type": "integer", "minimum": 0 },
+        "usable_input_tokens": { "type": "integer", "minimum": 1 },
+        "estimated_package_tokens": { "type": "integer", "minimum": 0 },
+        "category_usage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "tool_schema_tokens": { "type": "integer", "minimum": 0, "maximum": 4000 },
+        "unallocated_tokens": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "exclusion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_ref",
+        "reason",
+        "estimated_tokens_saved"
+      ],
+      "properties": {
+        "candidate_ref": { "$ref": "#/$defs/id" },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "duplicate",
+            "stale",
+            "superseded",
+            "low_relevance",
+            "low_confidence",
+            "unauthorized",
+            "privacy_blocked",
+            "externalized",
+            "budget",
+            "phase_irrelevant"
+          ]
+        },
+        "estimated_tokens_saved": { "type": "integer", "minimum": 0 },
+        "replacement_ref": { "$ref": "#/$defs/id" }
+      }
+    },
+    "invalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "context_item_id",
+        "reason",
+        "observed_at"
+      ],
+      "properties": {
+        "context_item_id": { "$ref": "#/$defs/id" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "previous_binding": { "$ref": "#/$defs/state_binding" },
+        "current_binding": { "$ref": "#/$defs/state_binding" },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "cache_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "segment_key",
+        "content_digest",
+        "estimated_tokens",
+        "cacheable"
+      ],
+      "properties": {
+        "segment_key": { "$ref": "#/$defs/id" },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "estimated_tokens": { "type": "integer", "minimum": 0 },
+        "cacheable": { "type": "boolean" },
+        "cache_hint": { "type": "string" },
+        "observed_hit": { "type": "boolean" }
+      }
+    },
+    "context_compile_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "request_id",
+        "project_id",
+        "session_id",
+        "task_id",
+        "run_id",
+        "purpose",
+        "workflow_phase",
+        "accepted_requirements_revision",
+        "repository_state",
+        "permission_profile_ref",
+        "model_profile_ref",
+        "remaining_token_budget",
+        "requested_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.context/v0" },
+        "request_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "session_id": { "$ref": "#/$defs/id" },
+        "task_id": { "$ref": "#/$defs/id" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "purpose": { "type": "string", "minLength": 1, "maxLength": 10000 },
+        "workflow_phase": { "$ref": "#/$defs/workflow_phase" },
+        "accepted_requirements_revision": { "$ref": "#/$defs/id" },
+        "repository_state": { "$ref": "#/$defs/state_binding" },
+        "changed_files": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "relevant_symbols": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "current_hypothesis": { "type": "string", "maxLength": 10000 },
+        "observed_evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        },
+        "active_skill_ref": { "$ref": "#/$defs/id" },
+        "available_capability_digest": { "$ref": "#/$defs/digest" },
+        "permission_profile_ref": { "$ref": "#/$defs/id" },
+        "model_profile_ref": { "$ref": "#/$defs/id" },
+        "remaining_token_budget": { "type": "integer", "minimum": 1 },
+        "prior_checkpoint_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "output_contract_ref": { "$ref": "#/$defs/id" },
+        "requested_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "context_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "manifest_id",
+        "package_id",
+        "project_id",
+        "session_id",
+        "task_id",
+        "run_id",
+        "compiler_version",
+        "compiled_at",
+        "purpose",
+        "workflow_phase",
+        "source_state",
+        "ordered_item_ids",
+        "items",
+        "tools",
+        "budget",
+        "cache_segments",
+        "exclusions",
+        "invalidations",
+        "package_digest"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.context/v0" },
+        "manifest_id": { "$ref": "#/$defs/id" },
+        "package_id": { "$ref": "#/$defs/id" },
+        "project_id": { "$ref": "#/$defs/id" },
+        "session_id": { "$ref": "#/$defs/id" },
+        "task_id": { "$ref": "#/$defs/id" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "model_invocation_id": { "$ref": "#/$defs/id" },
+        "compiler_version": { "type": "string", "minLength": 1 },
+        "compiled_at": { "$ref": "#/$defs/timestamp" },
+        "purpose": { "type": "string", "minLength": 1 },
+        "workflow_phase": { "$ref": "#/$defs/workflow_phase" },
+        "source_state": { "$ref": "#/$defs/state_binding" },
+        "ordered_item_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/tool_projection" }
+        },
+        "budget": { "$ref": "#/$defs/budget" },
+        "cache_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/cache_segment" }
+        },
+        "exclusions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/exclusion" }
+        },
+        "invalidations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/invalidation" }
+        },
+        "prior_manifest_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/id" }
+        },
+        "package_digest": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "context_package": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "package_id",
+        "manifest_id",
+        "purpose",
+        "workflow_phase",
+        "stable_prefix",
+        "control",
+        "permission_profile",
+        "tools",
+        "working_set",
+        "reasoning_state",
+        "artifact_references",
+        "budget",
+        "integrity"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.context/v0" },
+        "package_id": { "$ref": "#/$defs/id" },
+        "manifest_id": { "$ref": "#/$defs/id" },
+        "purpose": { "type": "string", "minLength": 1 },
+        "workflow_phase": { "$ref": "#/$defs/workflow_phase" },
+        "stable_prefix": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "control": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "permission_profile": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "active_skill": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 12,
+          "items": { "$ref": "#/$defs/tool_projection" }
+        },
+        "working_set": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "reasoning_state": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "checkpoint_continuity": {
+          "type": "array",
+          "maxItems": 1,
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "artifact_references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/artifact_reference" }
+        },
+        "retrieval_handles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/context_item" }
+        },
+        "budget": { "$ref": "#/$defs/budget" },
+        "integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "package_digest",
+            "manifest_digest",
+            "compiler_version"
+          ],
+          "properties": {
+            "package_digest": { "$ref": "#/$defs/digest" },
+            "manifest_digest": { "$ref": "#/$defs/digest" },
+            "compiler_version": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "documentation_source": {
+      "type": "string",
+      "enum": [
+        "active_repository_documentation",
+        "accepted_adr_or_specification",
+        "dependency_authored_usage_rule",
+        "version_locked_local_exdoc",
+        "running_project_documentation",
+        "context7",
+        "official_external_documentation",
+        "general_web_research",
+        "model_memory"
+      ]
+    },
+    "documentation_resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "resolution_id",
+        "run_id",
+        "query",
+        "selected_source_class",
+        "source_ref",
+        "source_version",
+        "requested_version",
+        "compatibility",
+        "authority_rank",
+        "trust_label",
+        "summary",
+        "excerpt",
+        "source_digest",
+        "retrieval_provenance",
+        "resolved_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.context/v0" },
+        "resolution_id": { "$ref": "#/$defs/id" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "query": { "type": "string", "minLength": 1, "maxLength": 10000 },
+        "selected_source_class": { "$ref": "#/$defs/documentation_source" },
+        "source_ref": { "$ref": "#/$defs/id" },
+        "source_version": { "type": "string", "minLength": 1 },
+        "requested_version": { "type": "string", "minLength": 1 },
+        "compatibility": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "compatible",
+            "unknown",
+            "mismatched"
+          ]
+        },
+        "authority_rank": { "type": "integer", "minimum": 1, "maximum": 9 },
+        "trust_label": { "$ref": "#/$defs/trust_label" },
+        "summary": { "type": "string", "maxLength": 4000 },
+        "excerpt": { "type": "string", "maxLength": 12000 },
+        "heading_or_symbol": { "type": "string", "maxLength": 2000 },
+        "source_digest": { "$ref": "#/$defs/digest" },
+        "conflicts": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 4000 }
+        },
+        "artifact_reference": { "$ref": "#/$defs/artifact_reference" },
+        "retrieval_provenance": { "$ref": "#/$defs/retrieval_provenance" },
+        "resolved_at": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "context_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "observation_id",
+        "run_id",
+        "manifest_id",
+        "package_id",
+        "observed_at",
+        "model_input_tokens",
+        "model_output_tokens",
+        "tool_schema_tokens",
+        "retained_tool_result_tokens",
+        "active_tool_count",
+        "cache_hits",
+        "repeated_file_reads",
+        "repeated_commands",
+        "context_compactions",
+        "retrieval_sources",
+        "largest_retained_artifacts",
+        "context_compilation_latency_ms",
+        "candidate_item_count",
+        "included_item_count",
+        "excluded_item_count",
+        "deduplicated_tokens",
+        "stale_removed_tokens",
+        "externalized_tokens",
+        "token_cost_by_run"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.context/v0" },
+        "observation_id": { "$ref": "#/$defs/id" },
+        "run_id": { "$ref": "#/$defs/id" },
+        "manifest_id": { "$ref": "#/$defs/id" },
+        "package_id": { "$ref": "#/$defs/id" },
+        "change_set_id": { "$ref": "#/$defs/id" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "model_input_tokens": { "type": "integer", "minimum": 0 },
+        "model_output_tokens": { "type": "integer", "minimum": 0 },
+        "tool_schema_tokens": { "type": "integer", "minimum": 0 },
+        "retained_tool_result_tokens": { "type": "integer", "minimum": 0 },
+        "active_tool_count": { "type": "integer", "minimum": 0, "maximum": 12 },
+        "cache_hits": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "repeated_file_reads": { "type": "integer", "minimum": 0 },
+        "repeated_commands": { "type": "integer", "minimum": 0 },
+        "context_compactions": { "type": "integer", "minimum": 0 },
+        "retrieval_sources": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "largest_retained_artifacts": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["artifact_id", "size_bytes", "media_type"],
+            "properties": {
+              "artifact_id": { "$ref": "#/$defs/id" },
+              "size_bytes": { "type": "integer", "minimum": 0 },
+              "media_type": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "context_compilation_latency_ms": { "type": "integer", "minimum": 0 },
+        "retrieval_latency_ms": { "type": "integer", "minimum": 0 },
+        "candidate_item_count": { "type": "integer", "minimum": 0 },
+        "included_item_count": { "type": "integer", "minimum": 0 },
+        "excluded_item_count": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "deduplicated_tokens": { "type": "integer", "minimum": 0 },
+        "stale_removed_tokens": { "type": "integer", "minimum": 0 },
+        "externalized_tokens": { "type": "integer", "minimum": 0 },
+        "category_token_usage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "skill_tokens_loaded": { "type": "integer", "minimum": 0 },
+        "tool_discovery_additions": { "type": "integer", "minimum": 0 },
+        "tool_discovery_removals": { "type": "integer", "minimum": 0 },
+        "child_context_overlap_tokens": { "type": "integer", "minimum": 0 },
+        "verifier_context_overlap_tokens": { "type": "integer", "minimum": 0 },
+        "token_cost_by_run": { "type": "integer", "minimum": 0 },
+        "token_cost_by_accepted_change": { "type": "integer", "minimum": 0 },
+        "accepted_change_attribution": {
+          "type": "string",
+          "enum": [
+            "direct",
+            "shared",
+            "unallocated",
+            "not_applicable"
+          ]
+        }
+      }
+    }
+  }
+}
