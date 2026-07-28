@@ -1,7 +1,7 @@
 # ADR 0019: Implement Kiln through vertical product slices
 
 - **Decision status:** Accepted
-- **Integration status:** Proposed on P0-W16
+- **Integration status:** Integrated through pull request 20
 - **Date:** 2026-07-28
 
 ## Context
