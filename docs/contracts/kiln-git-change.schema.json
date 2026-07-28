@@ -1,0 +1,574 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiln.local/schemas/kiln-git-change.schema.json",
+  "title": "Kiln Git Change Contracts",
+  "description": "Protocol-neutral contracts for Git change isolation, ownership, state binding, patch application, verification, and integration.",
+  "oneOf": [
+    { "$ref": "#/$defs/branchContract" },
+    { "$ref": "#/$defs/worktreeLease" },
+    { "$ref": "#/$defs/changeSet" },
+    { "$ref": "#/$defs/patchArtifact" },
+    { "$ref": "#/$defs/repositoryState" },
+    { "$ref": "#/$defs/verificationBinding" },
+    { "$ref": "#/$defs/integrationReceipt" }
+  ],
+  "$defs": {
+    "kilnId": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9_-]+$"
+    },
+    "gitCommit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{7,64}$"
+    },
+    "gitRef": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "pattern": "^(?!/|.*(?:\\.\\.|//|@\\{|\\\\|[ ~^:?*\\[]|\\.$|/\\.|\\.lock(?:/|$))).+$"
+    },
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*\\u0000).+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9+._-]*:[A-Fa-f0-9]{16,}$"
+    },
+    "repositoryState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "repository_id",
+        "observed_at",
+        "head_commit",
+        "dirty",
+        "changed_paths",
+        "ahead_count",
+        "behind_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "repository_state" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "observed_at": { "$ref": "#/$defs/timestamp" },
+        "branch": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitRef" },
+            { "type": "null" }
+          ]
+        },
+        "head_commit": { "$ref": "#/$defs/gitCommit" },
+        "base_commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        },
+        "merge_base_commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        },
+        "dirty": { "type": "boolean" },
+        "dirty_tree_fingerprint": {
+          "anyOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        },
+        "changed_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" },
+          "uniqueItems": true
+        },
+        "dependency_fingerprint": {
+          "anyOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        },
+        "worktree_path_ref": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "upstream_ref": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitRef" },
+            { "type": "null" }
+          ]
+        },
+        "ahead_count": { "type": "integer", "minimum": 0 },
+        "behind_count": { "type": "integer", "minimum": 0 },
+        "incomplete_operation": {
+          "type": "string",
+          "enum": ["none", "merge", "rebase", "cherry_pick", "revert", "apply", "bisect", "unknown"]
+        },
+        "external_mutation_detected": { "type": "boolean", "default": false }
+      }
+    },
+    "branchContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "branch_contract_id",
+        "repository_id",
+        "task_id",
+        "authoring_run_id",
+        "change_set_id",
+        "mode",
+        "base_branch",
+        "base_commit",
+        "allowed_paths",
+        "forbidden_operations",
+        "required_checks",
+        "policy_snapshot_id",
+        "state",
+        "created_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "branch_contract" },
+        "branch_contract_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "task_id": { "$ref": "#/$defs/kilnId" },
+        "authoring_run_id": { "$ref": "#/$defs/kilnId" },
+        "change_set_id": { "$ref": "#/$defs/kilnId" },
+        "mode": {
+          "type": "string",
+          "enum": ["independent", "stacked", "candidate", "timeboxed_integration", "patch_artifact"]
+        },
+        "branch": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitRef" },
+            { "type": "null" }
+          ]
+        },
+        "base_branch": { "$ref": "#/$defs/gitRef" },
+        "base_commit": { "$ref": "#/$defs/gitCommit" },
+        "parent_branch": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitRef" },
+            { "type": "null" }
+          ]
+        },
+        "parent_commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        },
+        "parent_change_set_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "candidate_group_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "integration_owner_run_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "worktree_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "workspace_path_ref": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "mutation_owner_run_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "allowed_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" },
+          "uniqueItems": true
+        },
+        "forbidden_operations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "dependency_upgrade",
+              "force_push",
+              "branch_protection_change",
+              "remote_reconfigure",
+              "hook_change",
+              "submodule_change",
+              "binary_patch",
+              "history_rewrite"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "required_checks": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 512 },
+          "uniqueItems": true
+        },
+        "policy_snapshot_id": { "$ref": "#/$defs/kilnId" },
+        "state": {
+          "type": "string",
+          "enum": [
+            "requested",
+            "authorized",
+            "provisioning",
+            "ready",
+            "active",
+            "dirty",
+            "awaiting_verification",
+            "verification_failed",
+            "verification_passed",
+            "awaiting_integration",
+            "integrating",
+            "merged",
+            "rejected",
+            "canceled",
+            "abandoned",
+            "stale",
+            "orphaned",
+            "cleanup_pending",
+            "removed"
+          ]
+        },
+        "created_at": { "$ref": "#/$defs/timestamp" },
+        "expires_at": {
+          "anyOf": [
+            { "$ref": "#/$defs/timestamp" },
+            { "type": "null" }
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/kilnId" },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "stacked" } } },
+          "then": { "required": ["branch", "parent_branch", "parent_commit", "parent_change_set_id"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "candidate" } } },
+          "then": { "required": ["branch", "candidate_group_id"] }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "patch_artifact" } } },
+          "then": {
+            "properties": {
+              "branch": { "type": "null" },
+              "worktree_id": { "type": "null" },
+              "mutation_owner_run_id": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "worktreeLease": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "lease_id",
+        "repository_id",
+        "worktree_id",
+        "branch_contract_id",
+        "branch",
+        "owning_run_id",
+        "permission_profile_id",
+        "allowed_paths",
+        "state",
+        "acquired_at",
+        "last_activity_at",
+        "expires_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "worktree_lease" },
+        "lease_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "worktree_id": { "$ref": "#/$defs/kilnId" },
+        "branch_contract_id": { "$ref": "#/$defs/kilnId" },
+        "branch": { "$ref": "#/$defs/gitRef" },
+        "owning_run_id": { "$ref": "#/$defs/kilnId" },
+        "permission_profile_id": { "$ref": "#/$defs/kilnId" },
+        "allowed_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" },
+          "uniqueItems": true
+        },
+        "state": {
+          "type": "string",
+          "enum": ["requested", "active", "expired", "released", "orphaned", "revoked"]
+        },
+        "acquired_at": { "$ref": "#/$defs/timestamp" },
+        "last_activity_at": { "$ref": "#/$defs/timestamp" },
+        "expires_at": { "$ref": "#/$defs/timestamp" },
+        "active_worker_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "recovery_record_id": { "$ref": "#/$defs/kilnId" },
+        "last_repository_state": { "$ref": "#/$defs/repositoryState" }
+      }
+    },
+    "changeSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "change_set_id",
+        "repository_id",
+        "authoring_run_id",
+        "source_kind",
+        "base_state",
+        "changed_paths",
+        "content_digest",
+        "status"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "change_set" },
+        "change_set_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "authoring_run_id": { "$ref": "#/$defs/kilnId" },
+        "branch_contract_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "source_kind": { "type": "string", "enum": ["worktree", "patch_artifact", "external"] },
+        "patch_artifact_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "base_state": { "$ref": "#/$defs/repositoryState" },
+        "changed_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" },
+          "uniqueItems": true
+        },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "status": {
+          "type": "string",
+          "enum": ["proposed", "reviewed", "applied", "rejected", "conflicted", "superseded", "stale", "integrated"]
+        },
+        "resulting_state": {
+          "anyOf": [
+            { "$ref": "#/$defs/repositoryState" },
+            { "type": "null" }
+          ]
+        },
+        "commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "patchArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "artifact_id",
+        "change_set_id",
+        "producing_run_id",
+        "repository_id",
+        "base_commit",
+        "format",
+        "content_digest",
+        "expected_file_hashes",
+        "allowed_paths",
+        "binary_policy"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "patch_artifact" },
+        "artifact_id": { "$ref": "#/$defs/kilnId" },
+        "change_set_id": { "$ref": "#/$defs/kilnId" },
+        "producing_run_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "base_commit": { "$ref": "#/$defs/gitCommit" },
+        "format": { "type": "string", "enum": ["unified_git_diff", "git_format_patch"] },
+        "content_digest": { "$ref": "#/$defs/digest" },
+        "expected_file_hashes": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/relativePath" },
+          "additionalProperties": { "$ref": "#/$defs/digest" }
+        },
+        "allowed_paths": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/relativePath" },
+          "uniqueItems": true
+        },
+        "rename_pairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["from", "to"],
+            "properties": {
+              "from": { "$ref": "#/$defs/relativePath" },
+              "to": { "$ref": "#/$defs/relativePath" }
+            }
+          },
+          "default": []
+        },
+        "binary_policy": { "const": "reject" }
+      }
+    },
+    "verificationBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "evidence_id",
+        "repository_id",
+        "check_id",
+        "base_commit",
+        "head_commit",
+        "result",
+        "observed_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "verification_binding" },
+        "evidence_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "check_id": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "base_commit": { "$ref": "#/$defs/gitCommit" },
+        "head_commit": { "$ref": "#/$defs/gitCommit" },
+        "tested_commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        },
+        "dirty_tree_fingerprint": {
+          "anyOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        },
+        "dependency_fingerprint": {
+          "anyOf": [
+            { "$ref": "#/$defs/digest" },
+            { "type": "null" }
+          ]
+        },
+        "projected_merge_commit": {
+          "anyOf": [
+            { "$ref": "#/$defs/gitCommit" },
+            { "type": "null" }
+          ]
+        },
+        "verifier_run_id": {
+          "anyOf": [
+            { "$ref": "#/$defs/kilnId" },
+            { "type": "null" }
+          ]
+        },
+        "result": { "type": "string", "enum": ["passed", "failed", "inconclusive", "canceled", "error"] },
+        "observed_at": { "$ref": "#/$defs/timestamp" }
+      },
+      "anyOf": [
+        { "required": ["tested_commit"] },
+        { "required": ["dirty_tree_fingerprint"] }
+      ]
+    },
+    "integrationReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_type",
+        "receipt_id",
+        "repository_id",
+        "change_set_id",
+        "source_commit",
+        "projected_merge_commit",
+        "accepted_trunk_commit",
+        "policy_decision_id",
+        "verification_evidence_ids",
+        "merge_method",
+        "result",
+        "integration_actor_id",
+        "recorded_at"
+      ],
+      "properties": {
+        "schema_version": { "const": "kiln.git/v0" },
+        "contract_type": { "const": "integration_receipt" },
+        "receipt_id": { "$ref": "#/$defs/kilnId" },
+        "repository_id": { "$ref": "#/$defs/kilnId" },
+        "change_set_id": { "$ref": "#/$defs/kilnId" },
+        "source_commit": { "$ref": "#/$defs/gitCommit" },
+        "projected_merge_commit": { "$ref": "#/$defs/gitCommit" },
+        "accepted_trunk_commit": { "$ref": "#/$defs/gitCommit" },
+        "policy_decision_id": { "$ref": "#/$defs/kilnId" },
+        "verification_evidence_ids": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/kilnId" },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "merge_method": { "type": "string", "enum": ["squash", "merge_commit", "fast_forward", "rebase_merge"] },
+        "result": { "type": "string", "enum": ["merged", "blocked", "failed", "canceled"] },
+        "integration_actor_id": { "$ref": "#/$defs/kilnId" },
+        "recorded_at": { "$ref": "#/$defs/timestamp" },
+        "warnings": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        },
+        "unknowns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": []
+        }
+      }
+    }
+  }
+}
