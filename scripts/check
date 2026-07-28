@@ -17,6 +17,7 @@ run() {
   "$@"
 }
 
+run scripts/test-agent-preflight
 run scripts/validate-agent-assets
 run vale .
 run mix format --check-formatted
