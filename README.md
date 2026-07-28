@@ -2,7 +2,7 @@
 
 Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
 
-Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, or protocol catalog. It is the durable runtime around model-driven Repository work: execution, state, Context, permissions, Runs, delegated work, change isolation, interruption, recovery, and verification.
+Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, protocol catalog, or permanent monitoring dashboard. It is the durable runtime around Repository work: execution, state, Context, permissions, Runs, delegated work, terminal interaction, change isolation, interruption, recovery, and verification.
 
 ## Project thesis
 
@@ -23,15 +23,15 @@ Workspace: local operating and trust boundary
             └── Root Run: Project Steward responsibility
 ```
 
-The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Git branches, worktrees, and external protocols operate within or beneath Runs without becoming Run identity.
+The Session owns the objective. Tasks state desired work. Runs are the primary execution units. Agent definitions, Workers, model invocations, Tools, Commands, Git branches, worktrees, interfaces, and external protocols operate within or beneath Runs without becoming Run identity.
 
-Kiln supports bounded Child Runs without turning the product into an artificial organization of agents.
+Kiln supports bounded Child Runs without turning the product into an artificial organization of Agents.
 
 ## Foundational direction
 
 - **Runtime:** Elixir and OTP
 - **Internal model:** Kiln-native and protocol-neutral
-- **Primary execution unit:** Run, not an Agent persona, branch, process, Tool call, or model invocation
+- **Primary execution unit:** Run, not an Agent persona, branch, process, Tool call, interface, or model invocation
 - **Objective boundary:** one durable Session
 - **Desired-work boundary:** one bounded Task
 - **Delivery coordination:** Project Steward responsibility on the Root Run
@@ -39,13 +39,14 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 - **Initial Child roles:** read-only Scout and independent non-mutating Verifier
 - **Delegation limits:** depth two, three active Children per Session, no peer messaging, and no shared mutable Context
 - **Attention:** global Session routing; Run depth cannot hide a blocker
+- **Initial terminal interface:** complete CLI plus conversation-first TUI
+- **Terminal navigation:** Run-first, keyboard-complete, event-projected, and renderer-independent
 - **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
 - **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
 - **Context:** compile the smallest sufficient package and replace stale or resolved material
 - **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
 - **Git change isolation:** protected trunk, short-lived task branches, and one exclusive writable worktree per independently mutating Run
 - **Restricted mutation:** Patch Artifacts when a later accepted writing Child must not own a writable checkout
-- **Initial interface:** command-line interface
 - **Durable state:** SQLite and an append-oriented event journal
 - **Source truth:** Git and the filesystem
 - **Authority:** explicit Capabilities, policy, scoped grants, and separate authoring and integration authority
@@ -87,6 +88,43 @@ A blocked Child creates global Attention. The user can answer, enter the origina
 The logical Run graph remains separate from the OTP supervision tree.
 
 See [Delegated Work Model](docs/DELEGATED-WORK.md) and [Run Model](docs/RUN-MODEL.md).
+
+## Initial CLI and TUI
+
+The Run graph is the primary navigation model for delegated work. It is not a secondary jobs panel.
+
+The terminal interface is conversation-first:
+
+```text
+Work in the current Run
+→ observe a Child
+→ enter the Child
+→ inspect or steer
+→ inspect Evidence
+→ return to the Parent
+→ continue the original Task
+```
+
+The accepted interaction rules are:
+
+- the current Run transcript and composer remain central;
+- the Run tree and Attention inbox use progressive disclosure;
+- `Alt+Left` always enters the logical Parent;
+- `Alt+Home` always enters the Root;
+- navigation never pauses, cancels, approves, merges, writes, or transfers ownership;
+- starting or completing a Child never changes Client focus automatically;
+- focus, selection, history, scroll, layout, and drafts are client-local;
+- Run execution, Attention, permissions, events, Artifacts, Evidence, and Receipts are shared durable state;
+- generic `Enter` never approves permission, integration, or cancellation;
+- status never depends on color;
+- high-volume output becomes bounded summaries and Artifacts;
+- renderer failure cannot terminate active Runs.
+
+The CLI is a complete interface with human text, JSON, and JSON Lines output. It is not only a TUI launcher.
+
+ExRatatui 0.11.x is selected for the deterministic first TUI prototype behind a Kiln-owned renderer boundary. No dependency is added until the implementation work package completes dependency, NIF, platform, and headless-test review.
+
+See [Initial CLI and TUI](docs/CLI-TUI.md).
 
 ## Capability integration
 
@@ -186,9 +224,10 @@ Phase 0 constrains the Repository and runtime foundation before implementation b
 - P0-W08 defined bounded Context and documentation resolution.
 - P0-W09 defined protocol and standards strategy.
 - P0-W10 defined Git change isolation, exact-state Evidence, integration, and recovery.
-- P0-W11 defines delegated Runs, Scout and Verifier contracts, state transitions, global Attention, cancellation, timeout, result delivery, and orphan recovery.
+- P0-W11 defined delegated Runs, Scout and Verifier contracts, state transitions, global Attention, cancellation, timeout, result delivery, and orphan recovery.
+- P0-W12 defines the initial CLI and TUI, terminal navigation, public interface projections, ExRatatui boundary, and deterministic interaction prototype.
 
-The next reconciliation must turn these accepted contracts into a proof-ordered Phase 1 implementation plan.
+The next reconciliation must turn the accepted contracts into a proof-ordered Phase 1 implementation plan.
 
 ## Work planning
 
@@ -206,7 +245,7 @@ See [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md).
 
 ## Agent-ready development
 
-Project-local Skills, prompts, and specialist agents support construction and review of Kiln. They are development controls, not evidence that Kiln runtime Runs are implemented.
+Project-local Skills, prompts, and specialist agents support construction and review of Kiln. They are development controls, not Evidence that Kiln runtime Runs are implemented.
 
 ```bash
 scripts/agent-preflight
@@ -221,6 +260,7 @@ The main coding agent remains the default writer. Optional specialist developmen
 - [Internal Domain Model](docs/INTERNAL-DOMAIN-MODEL.md)
 - [Run Model](docs/RUN-MODEL.md)
 - [Delegated Work Model](docs/DELEGATED-WORK.md)
+- [Initial CLI and TUI](docs/CLI-TUI.md)
 - [Project Stewardship](docs/PROJECT-STEWARDSHIP.md)
 - [Capability Integration](docs/CAPABILITY-INTEGRATION.md)
 - [Context System](docs/CONTEXT-SYSTEM.md)
@@ -247,4 +287,4 @@ The Repository intentionally begins with no third-party runtime dependencies. Us
 
 ## Status
 
-Kiln is pre-alpha. The architecture is being constrained before implementation and will be tested through dogfooding on real software Projects.
+Kiln is pre-alpha. The architecture and interaction model are being constrained before production implementation and will be tested through deterministic prototypes and dogfooding on real software Projects.
