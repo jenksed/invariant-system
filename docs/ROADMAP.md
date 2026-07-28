@@ -4,7 +4,7 @@
 
 The roadmap is ordered by proof, not platform ambition.
 
-P0-W05 established the planning baseline. P0-W06 established the protocol-neutral domain. P0-W07 established Capability integration. P0-W08 established bounded Context. P0-W09 established protocol strategy. P0-W10 established Git change isolation. P0-W11 establishes delegated Runs, Scout and Verifier contracts, state transitions, global Attention, cancellation, timeout, result delivery, and recovery.
+P0-W05 established the planning baseline. P0-W06 established the protocol-neutral domain. P0-W07 established Capability integration. P0-W08 established bounded Context. P0-W09 established protocol strategy. P0-W10 established Git change isolation. P0-W11 established delegated Runs, Scout and Verifier contracts, global Attention, cancellation, timeout, result delivery, and recovery. P0-W12 establishes the initial CLI and TUI, terminal navigation, public interface projections, and deterministic interaction prototype.
 
 Read these authorities before Phase 1 planning:
 
@@ -12,6 +12,7 @@ Read these authorities before Phase 1 planning:
 - `docs/INTERNAL-DOMAIN-MODEL.md`
 - `docs/RUN-MODEL.md`
 - `docs/DELEGATED-WORK.md`
+- `docs/CLI-TUI.md`
 - `docs/PROJECT-STEWARDSHIP.md`
 - `docs/CAPABILITY-INTEGRATION.md`
 - `docs/CONTEXT-SYSTEM.md`
@@ -29,10 +30,10 @@ P1-X01      Phase 1 experiment 1
 
 Each work package follows `docs/BRANCHING-AND-WORK-PLANNING.md`.
 
-## Phase 0 — Repository foundation
+## Phase 0 — Repository and product foundation
 
 **ID:** P0  
-**Goal:** establish Project identity, constraints, documentation, Elixir structure, CI, work governance, agent-ready controls, stable domain semantics, Capability integration, bounded Context, protocol strategy, Git isolation, and delegated-work contracts before production implementation.
+**Goal:** establish Project identity, constraints, documentation, Elixir structure, CI, work governance, domain semantics, Capability integration, bounded Context, protocol strategy, Git isolation, delegated-work contracts, and the initial terminal interaction before production implementation.
 
 ### Work packages
 
@@ -48,38 +49,43 @@ Each work package follows `docs/BRANCHING-AND-WORK-PLANNING.md`.
 | P0-W08 | Define bounded Context compilation, documentation resolution, token budgets, progressive disclosure, and observability. | `work/p0-w08-context-system` | Integrated through the approved planning stack |
 | P0-W09 | Define and rank protocol and standards support behind adapters. | `work/p0-w09-protocol-strategy` | Integrated through pull request 13 and the planning-stack integration |
 | P0-W10 | Define Git change isolation, worktree leases, exact-state Evidence, integration, security, and recovery. | `work/p0-w10-git-change-isolation` | Integrated through pull request 14 |
-| P0-W11 | Define delegated Runs, Scout and Verifier roles, state machine, Attention, cancellation, timeouts, result delivery, and orphan recovery. | `work/p0-w11-delegated-work-model` | In progress |
+| P0-W11 | Define delegated Runs, Scout and Verifier roles, state machine, Attention, cancellation, timeouts, result delivery, and orphan recovery. | `work/p0-w11-delegated-work-model` | Integrated through pull request 15 |
+| P0-W12 | Define the initial CLI and TUI, Run-first navigation, interface projections, ExRatatui boundary, and deterministic prototype. | `work/p0-w12-cli-tui-design` | In progress |
 
 ### Phase 0 exit
 
 A new coding Session can identify:
 
 - Project purpose, non-goals, accepted decisions, and invariants;
-- Workspace, Project, Repository, Environment, Session, Task, Run, Agent, Worker, invocation, Capability, Context, Change set, Evidence, Receipt, Git, delegation, Attention, cancellation, and recovery boundaries;
-- the Root, Parent, Child, Scout, and Verifier contracts;
+- Workspace, Project, Repository, Environment, Session, Task, Run, Agent, Worker, invocation, Capability, Context, Change set, Evidence, Receipt, Git, delegation, Attention, cancellation, interface, and recovery boundaries;
+- Root, Parent, Child, Scout, Verifier, CLI, TUI, and Client-state contracts;
+- shared durable state and client-local state;
 - the next work package, mutation boundary, acceptance criteria, and required Evidence;
 - one preflight command and one complete quality command.
 
-Phase 0 exits after P0-W11 is accepted and Phase 1 work-package order is reconciled.
+Phase 0 exits after P0-W12 is accepted and the Phase 1 work-package order is reconciled.
 
-## Phase 1 — Deterministic local execution and delegated-work kernel
+## Phase 1 — Deterministic local execution and interaction kernel
 
 **ID:** P1  
-**Goal:** prove durable supervised local work, deterministic Capability selection, bounded Context, visible delegated Runs, isolated Repository mutation, exact-state Evidence, global Attention, and restart recovery before an accepted live model loop.
+**Goal:** prove durable supervised local work, deterministic Capability selection, bounded Context, visible delegated Runs, global Attention, isolated Repository mutation, exact-state Evidence, CLI and TUI control, and restart recovery before an accepted live model loop.
 
 ### Required behavior
 
-Kiln must:
-
 #### Domain and persistence
+
+Kiln must:
 
 - register one Workspace, Project, primary Repository, trust policy, and Environment;
 - create one Session, accepted objective, root Task, and Root Run;
 - create Tasks and Child Runs with durable identity and lineage;
-- persist domain, Capability, Context, execution, delegation, Attention, Git coordination, Evidence, and lifecycle events in SQLite;
-- reconstruct accepted state and projections after restart.
+- persist domain, Capability, Context, execution, delegation, Attention, Git coordination, Evidence, interface, and lifecycle events in SQLite;
+- reconstruct accepted state and projections after restart;
+- consolidate `waiting_for_command`, expanded Attention, and `kiln.interface/v0` into Phase 1 validators.
 
 #### Context and Capability
+
+Kiln must:
 
 - create immutable Context manifests without a live provider;
 - enforce Run and phase Context budgets;
@@ -93,18 +99,23 @@ Kiln must:
 
 #### Command execution
 
+Kiln must:
+
 - start, stream, time out, interrupt, cancel, and accurately terminate one supervised Command;
 - enter and leave `waiting_for_command` through durable transitions;
 - store large output as an Artifact and retain bounded references;
-- distinguish clean cancellation from unknown effects.
+- distinguish clean cancellation from unknown effects;
+- expose bounded Command summaries to the CLI and TUI.
 
 #### Delegated work
+
+Kiln must:
 
 - create every delegated Task as a Child Run before delegated execution;
 - support Root, Parent, Child, sibling, and depth-two nested Run projections;
 - enforce depth two and three active Children per Session;
 - keep queued Children visible;
-- support foreground and background delegation without automatic client-focus changes;
+- support foreground and background delegation without automatic Client-focus changes;
 - compile independent Child Context;
 - issue independent read-only Child grants;
 - account for tokens, cost, time, Commands, Artifacts, and Resources per Run;
@@ -114,12 +125,16 @@ Kiln must:
 
 #### Scout proof
 
+Kiln must:
+
 - execute one deterministic or fixture Scout Run;
 - inspect source or documentation through read-only Capabilities;
 - reject source, dependency, Git, and configuration mutation attempts;
 - return observed facts, inferences, assumptions, unknowns, scope notes, and Evidence references.
 
 #### Verifier proof
+
+Kiln must:
 
 - execute one independent deterministic or fixture Verifier Run;
 - compile Context without the author's confidence narrative or write Tools;
@@ -131,16 +146,21 @@ Kiln must:
 
 #### Attention and control
 
+Kiln must:
+
 - maintain one global Session Attention index independent of Run depth;
-- route questions, permission requests, conflicts, failures, verification blockers, merge blockers, Resource limits, and stale Evidence;
-- support answer, enter Run, route to Parent, deny, pause, and cancel actions;
+- route questions, permission requests, conflicts, failures, verification blockers, merge blockers, Resource limits, stale Evidence, and orphan recovery;
+- support answer, enter Run, route to Parent, deny, pause, cancel, acknowledge, and inspect actions;
 - prohibit `waiting_for_user` or `waiting_for_permission` without an Attention item in the same transaction;
-- escalate blocking Attention without auto-answering or auto-granting it;
+- escalate blocking Attention without auto-answering or auto-granting;
 - pause, resume, and cancel one Child independently;
 - cancel active descendants when the Root Run is canceled;
-- preserve partial Artifacts and Evidence after cancellation.
+- preserve partial Artifacts and Evidence after cancellation;
+- resolve concurrent Client actions through expected revisions and idempotency.
 
 #### Git and Evidence
+
+Kiln must:
 
 - capture Git state and Repository fingerprint;
 - create one short-lived task branch and one exclusive writable worktree for a deterministic mutating Run;
@@ -155,37 +175,128 @@ Kiln must:
 - issue one final Receipt;
 - clean one safe worktree and preserve one dirty or uncertain worktree during recovery.
 
+#### Interface projections
+
+Kiln must:
+
+- expose public `kiln.interface/v0` event, snapshot, Client-state, input-intent, and CLI-result contracts;
+- build pure projection reducers from durable events;
+- create one shared interface-facing projection service;
+- provide a local runtime endpoint that survives Client disconnect;
+- support snapshot plus event replay;
+- deduplicate replayed events;
+- detect event gaps and stale Client cursors;
+- apply backpressure without dropping lifecycle, Attention, permission, cancellation, Evidence invalidation, result, or recovery events;
+- externalize complete logs and large output;
+- separate focused Run from selected Run;
+- keep focus, selection, navigation history, scroll, layout, and drafts client-local;
+- keep Run execution, Attention, permissions, transcripts, Artifacts, Evidence, Receipts, and Git ownership shared;
+- prevent renderer failure from terminating active Runs.
+
+#### CLI proof
+
+Kiln must support deterministic versions of:
+
+```text
+kiln
+kiln start
+kiln resume
+kiln runs
+kiln run show
+kiln run enter
+kiln run pause
+kiln run resume
+kiln run cancel
+kiln attention
+kiln answer
+kiln approve
+kiln deny
+kiln artifacts
+kiln evidence
+kiln receipts
+kiln status
+```
+
+The CLI must:
+
+- work without terminal cursor control;
+- produce text, JSON, and JSON Lines;
+- use stable exit codes;
+- enforce explicit destructive confirmation;
+- support expected revisions and idempotency;
+- avoid exposing persistence schemas.
+
+#### TUI proof
+
+The deterministic terminal prototype must include:
+
+- one Root Run;
+- at least two Child Runs;
+- one running Scout;
+- one blocked Child;
+- one completed Verifier;
+- one depth-two Child;
+- conversation-first main view;
+- breadcrumb;
+- Child cards;
+- Run-tree overlay;
+- global Attention inbox;
+- keyboard-complete navigation;
+- basic mouse;
+- explicit composer target;
+- simulated streaming output;
+- simulated Command activity;
+- one permission request;
+- one Artifact;
+- one Evidence item;
+- one Receipt;
+- one stale-Evidence transition;
+- pause, resume, and cancel;
+- wide, standard, narrow, and constrained layouts;
+- renderer restart;
+- durable projection reconstruction;
+- headless tests.
+
+ExRatatui can be added only after dependency review. It remains behind a renderer behaviour.
+
 #### Crash and orphan recovery
+
+Kiln must:
 
 - recover after Root or Parent process crash without losing Child state;
 - recover one Child Worker crash when retry is safe;
 - prevent duplicate Child creation and duplicate result delivery;
 - mark unknown external effects as `orphaned`;
 - block orphaned Runs from reporting success, satisfying Tasks, or authorizing integration;
+- recover Client focus to the nearest surviving ancestor;
+- preserve dirty or uncertain worktrees;
 - create one compact Checkpoint;
-- expose all proof state through a basic CLI projection.
+- expose all proof state through CLI and TUI projections.
 
 ### Provisional work packages
 
-The post-P0-W11 reconciliation can replace these boundaries.
+The post-P0-W12 reconciliation can replace these boundaries.
 
 | ID | Purpose | Branch | Depends on | Status |
 | --- | --- | --- | --- | --- |
-| P1-W01 | Define minimum domain, delegation, policy, Context, Capability, Evidence, Git, Attention, cancellation, timeout, and event types. | `work/p1-w01-kernel-domain` | P0 | Replacement plan required |
-| P1-W02 | Persist the append-oriented journal and reconstruct Session, Task, Run graph, delivery, and control projections. | `work/p1-w02-event-journal` | P1-W01 | Replacement plan required |
+| P1-W01 | Consolidate minimum domain, delegation, interface, policy, Context, Capability, Evidence, Git, Attention, cancellation, timeout, and event contracts. | `work/p1-w01-kernel-contracts` | P0 | Replacement plan required |
+| P1-W02 | Persist the append-oriented journal and rebuild Session, Run graph, Attention, delivery, and interface projections. | `work/p1-w02-event-journal-projections` | P1-W01 | Replacement plan required |
 | P1-W03 | Supervise Commands, bounded output, waiting states, timeouts, cancellation, and termination. | `work/p1-w03-command-supervision` | P1-W01, P1-W02 | Reconciliation required |
-| P1-W04 | Implement deterministic Run scheduling, Worker leases, global Attention, Child result delivery, and crash recovery. | `work/p1-w04-run-control` | P1-W01 through P1-W03 | New package proposed |
-| P1-W05 | Observe Git, manage one isolated task worktree and lease, bind Evidence, and reconcile external changes. | `work/p1-w05-git-isolation` | P1-W01 through P1-W04 | New or major expansion required |
+| P1-W04 | Implement deterministic scheduling, Worker leases, global Attention, Child result delivery, and crash recovery. | `work/p1-w04-run-control` | P1-W01 through P1-W03 | New package proposed |
+| P1-W05 | Observe Git, manage one isolated worktree and lease, bind Evidence, and reconcile external changes. | `work/p1-w05-git-isolation` | P1-W01 through P1-W04 | New or major expansion required |
 | P1-W06 | Compile bounded Context and select compact Capability projections for Root, Scout, and Verifier fixtures. | `work/p1-w06-context-capability-proof` | P1-W01 through P1-W05 | New package proposed |
-| P1-W07 | Expose CLI state and recover interrupted Session, Run, Command, Attention, delivery, cancellation, lease, and worktree state. | `work/p1-w07-cli-recovery` | P1-W02 through P1-W06 | Replacement required |
-| P1-W08 | Execute the complete Phase 1 acceptance scenario, independent verification, projected merge, approval, integration, Receipt, cleanup, and restart proof. | `work/p1-w08-phase-proof` | P1-W06, P1-W07 | Replacement scenario required |
+| P1-W07 | Implement public CLI commands, structured output, revision checks, local runtime attach, and recovery. | `work/p1-w07-cli-control` | P1-W02 through P1-W06 | Replacement required |
+| P1-W08 | Implement the ExRatatui-backed deterministic TUI prototype, projection replay, navigation, Attention, inspection, and headless tests. | `work/p1-w08-tui-prototype` | P1-W02, P1-W04, P1-W07 | New package proposed |
+| P1-W09 | Execute the complete Phase 1 acceptance scenario, projected merge, approval, integration, Receipt, cleanup, Client restart, and runtime restart proof. | `work/p1-w09-phase-proof` | P1-W06 through P1-W08 | Replacement scenario required |
 
 ### Phase 1 reconciliation decisions
 
 Before P1-W01 implementation begins, decide exact work-package ownership for:
 
-- domain and event schemas;
+- domain and event schema consolidation;
 - SQLite projections and transaction boundaries;
+- local runtime endpoint and service launch;
+- projection service and event bus;
 - Run scheduler and active-Child limit;
 - Worker lease and heartbeat logic;
 - state-transition validation;
@@ -198,45 +309,49 @@ Before P1-W01 implementation begins, decide exact work-package ownership for:
 - Repository and Git adapter behavior;
 - worktree isolation and reconciliation;
 - exact-state Evidence;
-- CLI navigation and control;
+- public CLI envelopes and exit codes;
+- ExRatatui dependency review and renderer boundary;
+- TUI navigation, composer, layouts, inspection, and headless tests;
+- Client-local state persistence;
 - Phase 1 restart and completion proof.
 
 Each accepted implementation work package requires a plan.
 
 ### Phase 1 exit
 
-Kiln can create, execute, delegate, inspect, interrupt, cancel, isolate, verify, integrate, restart, reconstruct, navigate, authorize, compile, retrieve, invalidate, externalize, and accurately report one manual Project, Session, Root Run, Scout Run, Verifier Run, nested Child fixture, global Attention flow, supervised Command, isolated mutation, Change set, Evidence set, projected merge, integration decision, Receipt, and Checkpoint scenario without a live model, MCP server, remote API, Context7, browser automation, or remote hosting provider.
+Kiln can create, execute, delegate, inspect, interrupt, cancel, isolate, verify, integrate, restart, reconstruct, navigate, authorize, compile, retrieve, invalidate, externalize, and accurately report one manual Project, Session, Root Run, Scout Run, Verifier Run, nested Child fixture, global Attention flow, supervised Command, isolated mutation, Change set, Evidence set, projected merge, integration decision, Receipt, Checkpoint, CLI flow, and TUI flow without a live model, MCP server, remote API, Context7, browser automation, Phoenix, ACP, AG-UI, or remote hosting provider.
 
 ## Phase 2 — Provider and model loop
 
 **ID:** P2
 
-### Required behavior
+Required:
 
 - one Kiln-native provider-neutral model-invocation contract;
 - one direct provider adapter;
 - streamed normalized invocation events;
 - one provider-backed Root Run;
 - versioned Agent binding;
-- one model-backed Scout Run and one model-backed Verifier Run after deterministic delegated-work semantics pass;
+- one model-backed Scout and one model-backed Verifier after deterministic delegated-work and interface semantics pass;
 - independent Child Context and grants;
 - compact phase-relevant Tool projection and lazy Skill loading;
-- persistent model, Tool, Attention, and delivery events;
+- persistent model, Tool, Attention, delivery, and interface events;
 - token, cost, Context, and per-Run accounting;
 - Privacy-policy evaluation before egress;
 - interruption and cancellation;
 - Project Steward projection;
+- CLI and TUI model-stream presentation;
 - Claims and completion summary without unsupported completion.
 
 The first direct provider target is MiniMax because the Project owner has an active Token Plan.
 
-Kimi and Codex require separate managed-client adapter evaluation because platform sign-in is owned by their official clients.
+Kimi and Codex require separate managed-client adapter evaluation because platform sign-in is owned by their official Clients.
 
 Provider experiments can begin on isolated `spike/` branches. Experimental adapters do not satisfy Phase 2 until Phase 1 exits.
 
 ### Phase 2 exit
 
-Kiln completes one small Repository change through a provider-backed Root Run, uses a bounded Scout and independent Verifier, preserves Run lineage and Git isolation, resumes after restart, and reports current Evidence, provenance, accounting, failures, warnings, and unresolved work.
+Kiln completes one small Repository change through a provider-backed Root Run, uses a bounded Scout and independent Verifier, preserves Run lineage and Git isolation, survives Client reconnect, and reports current Evidence, provenance, accounting, failures, warnings, and unresolved work through the CLI and TUI.
 
 ## Phase 3 — Evidence-backed completion
 
@@ -247,16 +362,17 @@ Required:
 - exact commit, dirty-state, and dependency binding;
 - Evidence freshness and invalidation;
 - deterministic Receipts;
-- Capability, Context, delegation, Git, and integration provenance;
+- Capability, Context, delegation, Git, interface, and integration provenance;
 - independent Verifier Runs for material Claims;
 - projected-merge Evidence;
 - unresolved-failure and blocker reporting;
 - completion readiness;
+- precise proposed, applied, executed, verified, accepted, integrated, and delivered interface labels;
 - token cost by accepted Change set.
 
 ### Phase 3 exit
 
-A passing test becomes stale after a relevant change, and Kiln refuses to treat it as current. A final Receipt identifies the tested state, Verifier result and reproduced Evidence, integration decision, delegated-work provenance, and unresolved proof gaps.
+A passing test becomes stale after a relevant change, and Kiln refuses to treat it as current. A final Receipt identifies the tested state, Verifier result and reproduced Evidence, integration decision, delegated-work provenance, and unresolved proof gaps. CLI and TUI projections agree.
 
 ## Phase 4 — Context and recovery
 
@@ -269,8 +385,9 @@ Required:
 - authoritative version-matched documentation resolution;
 - independent Root, Scout, and Verifier Context;
 - Repository-state and worktree binding;
-- token cost by Run and accepted Change set;
-- Checkpoints, compaction, and recovery of Run graph, Attention, delivery, cancellation, Git ownership, policy, Context, Claims, Evidence, and Steward state.
+- token and Context observability;
+- Checkpoints, interruption summaries, and traceable compaction;
+- recovery of Git ownership, policy, Capability, Context, Claims, Evidence, Steward state, interface snapshots, and Client cursors.
 
 ## Phase 5 — Extension and adapter boundary
 
@@ -278,81 +395,105 @@ Required:
 
 - supervised external processes;
 - versioned language-neutral extension protocol;
-- adapter-owned negotiation and identifiers;
-- Kiln-native Tool and Resource registration;
+- adapter-owned negotiation and identifier mapping;
+- Tool and Resource registration through Kiln-native contracts;
+- Capability registration through the accepted hierarchy;
 - progress and cancellation;
-- explicit Capability declarations;
+- Capability declarations without ambient grants;
 - Privacy-policy evaluation;
-- bounded result and Artifact handling;
+- output normalization and Artifact limits;
+- phase-specific Tool projection and schema-budget compatibility;
+- duplicate detection and replacement groups;
 - crash isolation;
-- conformance tests that preserve core semantics;
-- one non-Elixir example adapter.
+- conformance tests that prove adapters do not alter core or interface semantics;
+- one non-Elixir example extension or adapter.
 
-A2A remains reserved for independent external agents. Local Child Runs use Kiln's native delegated-work model.
+MCP evaluation belongs here or later only after a concrete Capability justifies it. MCP is not required for the Phase 5 exit.
 
 ## Phase 6 — Phoenix LiveView
 
 Required:
 
-- Project, Session, Task, and Run graph views;
-- foreground and background Child visibility;
-- global Attention and all user actions;
+- Project, Session, and Workspace views;
+- Task and Run tree navigation;
 - model and Tool streams;
-- Context, Capability, accounting, Artifact, Claim, Evidence, and Receipt views;
-- Git branch, worktree, lease, diff, verification, integration, and cleanup views;
-- interruption, pause, cancellation, and reconnect;
-- Client-local focus.
+- global Attention;
+- Approval and permission prompts;
+- Capability and Context views;
+- Git, Change set, verification, integration, and cleanup views;
+- Claim, Evidence, Receipt, Artifact, and Context views;
+- reconnect without terminating the runtime;
+- Client-local focus;
+- reuse of the accepted public projection and input-intent contracts.
+
+Phoenix must not fork Run, Attention, permission, Evidence, or navigation semantics from the CLI and TUI.
 
 ## Phase 7 — TypeScript SDK
 
 Required:
 
-- typed Tool, Resource, Capability, Context, Git, and delegation contracts;
+- typed Kiln-native Tool and Resource registration;
+- Capability implementation registration;
+- JSON Schema contracts;
+- Capability declarations;
 - cancellation and progress;
-- normalized results and Artifact references;
+- compatibility checks;
 - adapter mapping helpers;
-- compatibility and conformance checks;
-- test helpers and examples.
+- normalized result helpers;
+- bounded Context-result and Artifact-reference helpers;
+- public interface event, snapshot, and CLI-result helpers when justified;
+- test helpers;
+- example extensions and adapters.
 
 ## Pending roadmap reconciliation
 
-P0-W04 through P0-W11 constrain the product but do not finalize implementation proof order.
+P0-W04 through P0-W12 constrain the product but do not finalize the implementation proof order.
 
-The next planning pass must prevent later work from:
+The next planning pass must replace or confirm the provisional Phase 1 packages and must not:
 
-- hiding delegated work inside Tool calls or transcripts;
-- implementing live model Children before deterministic Run control works;
-- treating Parent lineage as OTP supervision;
-- allowing Child authority inheritance or expansion;
-- adding Builder personas before a safe writing-role contract exists;
-- letting Verifiers repair or self-authorize integration;
-- allowing silent blockers or depth-dependent Attention;
-- confusing Verifier completion with `PASS`;
-- treating timeout or process death as clean cancellation;
-- retrying unknown effects without reconciliation;
-- creating writing Children before Git isolation and leases exist;
-- treating passing checks as merge authority;
-- using remote protocols before local deterministic semantics are proven.
+- create writing Child Runs before isolation and a writing role exist;
+- treat Git branches as Run identity;
+- allow Verifiers to repair authored changes;
+- treat passing checks as merge authority;
+- omit projected-merge Evidence;
+- lose Context or Evidence bindings after Repository changes;
+- use remote providers or protocols before deterministic local semantics;
+- implement a TUI before projection reducers and CLI contracts;
+- let ExRatatui types enter domain modules;
+- make renderer state authoritative;
+- couple keypresses directly to domain mutation;
+- omit Client race and stale-projection handling;
+- build stacks, candidate tournaments, or integration branches before independent task mode works.
 
 ## Deferred
 
 - Gleam modules;
 - Rust sandbox helper;
-- ACP, MCP, LSP, A2A, AG-UI, and AHP implementations;
+- ACP adapter implementation;
+- MCP client or server until a concrete Capability justifies it;
+- LSP client and server selection;
+- A2A, AG-UI, and AHP adapters;
+- remote Capability APIs beyond the first accepted provider;
 - Context7 until local documentation resolution is proven;
-- embedding or vector databases until a retrieval case justifies them;
+- embeddings or vector databases until an accepted retrieval case justifies them;
 - browser automation framework;
-- hosted collaboration and remote execution;
-- Builder or other writing Child roles;
-- model-authored Patch Artifacts;
-- deeper or wider delegation limits;
-- peer-to-peer Child communication;
-- shared mutable Context;
-- detached Children;
-- recursive manager hierarchies;
-- automatic permission expansion;
-- remote merge queues and automatic Git publication;
+- hosted collaboration;
+- plugin registry and plugin-defined widgets;
+- browser IDE;
+- remote execution;
+- unlimited delegation depth;
+- remote hosting-provider automation;
+- remote merge queues;
+- automatic Git publication;
+- stacked, candidate, and timeboxed integration runtime modes until independent mode is proven;
 - cross-Repository atomic changes;
 - automatic conflict resolution and force-push;
-- multi-user ownership and distributed locking;
-- Git replacement abstractions.
+- multi-user branch ownership and distributed locking;
+- Git replacement abstractions;
+- SSH TUI;
+- arbitrary pane layouts;
+- full Markdown fidelity;
+- inline terminal images;
+- embedded terminal multiplexing;
+- extensive themes and animation;
+- dozens of concurrent visible Runs.
