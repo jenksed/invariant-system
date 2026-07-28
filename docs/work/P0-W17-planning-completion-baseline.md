@@ -1,31 +1,33 @@
 # P0-W17: Establish the planning-completion baseline
 
 **Document type:** Implementation plan  
-**Status:** In progress  
+**Status:** Implemented and verified on the audit head  
 **Branch:** `work/p0-w17-planning-completion-baseline`  
 **Depends on:** P0-W16 integrated through pull request 20  
-**Scope:** Planning audit and status correction only
+**Scope:** Planning audit and status correction only  
+**Verified audit head:** `d96c68ebec6a1315e7a8e19c4b2138ca2b09d2ca`  
+**GitHub CI:** run `30407773538`, success
 
 ## Objective
 
 Audit current `main` and establish a reliable baseline for the Kiln Planning Completion Sequence.
 
-This pass shall identify current authority, planning conflicts, terminology drift, implementation evidence, bootstrap debt, and build blockers. It shall not redesign Kiln or authorize implementation.
+This pass identifies current authority, planning conflicts, terminology drift, implementation evidence, bootstrap debt, and build blockers. It does not redesign Kiln or authorize implementation.
 
 ## Observed current state and evidence
 
-- `main` is at merge commit `57493016b052e5c1c1390ca0360845940dc56917` from pull request 20.
+- The audited `main` base is merge commit `57493016b052e5c1c1390ca0360845940dc56917` from pull request 20.
 - `README.md`, `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, and `docs/IMPLEMENTATION-SLICES.md` define an integrated product and vertical implementation sequence.
 - Production source contains one Mix project, one empty OTP supervisor, one version function, and one version test.
 - `mix.exs` has no third-party runtime dependencies.
-- JSON Schemas, subject specifications, ADRs, development-agent Skills, prompt templates, and repository checks exist.
+- JSON Schemas, subject specifications, ADRs, development-agent Skills, prompt templates, and Repository checks exist.
 - Contract and planning artifacts do not prove product runtime capability.
-- `scripts/agent-preflight` accepts `P0-WXX` branch names but rejects the accepted `P1-SXX-TXX` ticket grammar.
+- `scripts/agent-preflight` accepts P0 work-package branch names but rejects the accepted `P1-SXX-TXX` ticket grammar.
 - `scripts/agent-preflight` checks headings from the earlier plan template, not the current template.
-- `AGENTS.md` instructs contributors to read the historical `docs/PLANNING-BASELINE.md` as current authority.
-- Several integrated documents and ADR 0019 still state that integration is proposed.
-- `docs/RUN-MODEL.md` contains a process-per-active-Run supervision example that conflicts with the integrated architecture.
-- Draft pull request 21 contains a verification closeout for P0-W16. It is not part of `main` at this branch base.
+- `AGENTS.md` routes contributors through the historical baseline. The historical file now directs them to the current audit.
+- Several integrated subject documents still retain branch-era integration labels.
+- `docs/RUN-MODEL.md` contains a process-per-active-Run example that conflicts with the integrated architecture.
+- Draft pull request 21 contains a P0-W16 verification closeout that is not part of the audited `main` base.
 
 ## Assumptions and unknowns
 
@@ -33,105 +35,111 @@ This pass shall identify current authority, planning conflicts, terminology drif
 
 - **P0-W17-A01:** The Planning Completion Sequence supplied by the owner governs this pass.
 - **P0-W17-A02:** Pull request 20 is the latest integrated architecture change at the audited base commit.
-- **P0-W17-A03:** Prompt 2 will validate and reconcile product, scope, and architecture after this baseline passes.
+- **P0-W17-A03:** Prompt 2 will challenge and reconcile the existing product, scope, and architecture rather than create a competing architecture.
 
 ### Unknowns
 
-- **P0-W17-U01:** Unknown. Prompt 3 must determine which planning-conformance scripts and schemas should be retained, repaired, replaced, or removed.
+- **P0-W17-U01:** Unknown. Prompt 3 must determine which planning-conformance scripts and Schemas should be retained, repaired, replaced, or removed.
 - **P0-W17-U02:** Unknown. Prompt 4 must determine the exact remaining focused planning rounds.
-- **P0-W17-U03:** Unknown. A later adjudication pass must determine whether Kiln receives build authorization.
-- **P0-W17-U04:** Unknown. The current Schema files have historical validation evidence, but the Repository has no accepted recurring Schema-conformance command.
+- **P0-W17-U03:** Unknown. Prompt 8 must determine whether Kiln receives build authorization.
+- **P0-W17-U04:** Unknown. Historical Schema validation exists, but the Repository has no accepted recurring Schema-conformance command.
 - **P0-W17-U05:** Unknown. Prompt 2 must determine the final disposition of overlapping subject specifications and old source-layout guidance.
 
 ## Requirements
 
 - **P0-W17-R01:** The audit shall describe current Kiln state without relying on document titles or earlier completion claims.
-- **P0-W17-R02:** The audit shall separate planning authority, repository integration, implementation, validation, acceptance, and delivery.
+- **P0-W17-R02:** The audit shall separate planning authority, Repository integration, implementation, validation, acceptance, and delivery.
 - **P0-W17-R03:** The audit shall map material artifacts by purpose, authority, relevance, overlap, conflict, implementation implication, and disposition.
 - **P0-W17-R04:** The audit shall identify the current source for product, user, workflow, Run model, architecture, security, implementation status, roadmap, decisions, open questions, and completion criteria.
 - **P0-W17-R05:** The audit shall classify material decisions as accepted, proposed, inferred, unresolved, superseded, rejected, or unsupported.
 - **P0-W17-R06:** The audit shall record terminology conflicts without silently normalizing unresolved terms.
 - **P0-W17-R07:** The audit shall distinguish documentation, experimental scaffolding, conformance scaffolding, partial implementation, implemented but unvalidated work, and validated implementation.
 - **P0-W17-R08:** The audit shall identify planning and bootstrap debt and assign each item to a later pass.
-- **P0-W17-R09:** The pass shall correct only status, authority, reference, and supersession defects permitted by Prompt 1.
+- **P0-W17-R09:** The pass shall correct only status, authority, reference, and supersession defects that do not require product or architecture adjudication.
 - **P0-W17-R10:** The pass shall not redesign product or architecture, change production code, add conformance implementation, or authorize construction.
-- **P0-W17-R11:** The audit shall state the exact next pass and all blockers that prevent implementation.
+- **P0-W17-R11:** The audit shall state the exact next pass and every blocker that prevents implementation.
 
 ## Proposed changes
 
-1. Add one current planning-completion baseline that contains the required artifact, authority, decision, conflict, terminology, implementation-state, and debt maps.
-2. Correct `AGENTS.md` so the required start sequence reads current authorities before historical records.
-3. Correct integration status on the current architecture, roadmap, slice plan, gate plan, and ADR 0019 index entries.
-4. Mark the superseded process-per-Run example in `docs/RUN-MODEL.md` without redesigning the accepted runtime shape.
-5. Correct the README status so it does not say that P0-W16 reconciliation is still pending.
-6. Preserve historical work records and planning rationale.
-7. Record the preflight and template mismatch as a later implementation-reconciliation blocker. Do not repair the scripts in this pass.
+The pass completed these changes:
+
+1. Added one planning-completion baseline with the required artifact, authority, decision, conflict, terminology, implementation-state, debt, disposition, blocker, and next-action maps.
+2. Converted the earlier planning baseline into an explicit historical gateway to the current audit while preserving its durable conclusions.
+3. Corrected ADR 0019 integration status in the ADR and ADR index.
+4. Recorded the preflight, template, Run-process, source-layout, Schema, gate-script, and status-header conflicts for later passes.
+5. Preserved historical work records and planning rationale.
+
+The pass did not mass-edit the architecture, roadmap, slice, gate, Run, README, or AGENTS documents. Those files contain conflicts that require Prompt 2 or Prompt 3 adjudication. A status-only rewrite across those documents would hide the unresolved conflict or cross the Prompt 1 boundary.
 
 ## Files or components expected to change
 
-| Path | Expected change | Status |
+| Path | Actual change | Status |
 | --- | --- | --- |
-| `docs/PLANNING-COMPLETION-BASELINE.md` | Current baseline audit and exact next action | Proposed |
-| `docs/work/P0-W17-planning-completion-baseline.md` | Work record and completion Evidence | In progress |
-| `AGENTS.md` | Current authority start sequence | Proposed |
-| `README.md` | Current planning status | Proposed |
-| `docs/ARCHITECTURE.md` | Integration status only | Proposed |
-| `docs/ROADMAP.md` | Integration and P0-W16 status only | Proposed |
-| `docs/IMPLEMENTATION-SLICES.md` | Integration status only | Proposed |
-| `docs/SLICE-ACCEPTANCE-GATES.md` | Integration status only | Proposed |
-| `docs/decisions/README.md` | ADR 0019 integration status | Proposed |
-| `docs/decisions/0019-implement-kiln-through-vertical-product-slices.md` | Integration status only | Proposed |
-| `docs/RUN-MODEL.md` | Supersession note for obsolete process example | Proposed |
+| `docs/PLANNING-COMPLETION-BASELINE.md` | Added current baseline audit and exact next action | Complete |
+| `docs/work/P0-W17-planning-completion-baseline.md` | Added plan and completion Evidence | Complete |
+| `docs/PLANNING-BASELINE.md` | Preserved as historical gateway to current audit | Complete |
+| `docs/decisions/README.md` | Corrected ADR 0019 integration status | Complete |
+| `docs/decisions/0019-implement-kiln-through-vertical-product-slices.md` | Corrected integration status | Complete |
 
-No production source, tests, dependency manifest, workflow, runtime configuration, Skill, agent, prompt, or Schema shall change.
+No production source, test, dependency manifest, workflow, runtime configuration, Skill, agent, prompt, or Schema changed.
 
 ## Acceptance criteria
 
-- **P0-W17-AC01:** The baseline identifies one current authority for every required subject or states that authority is unresolved.
-- **P0-W17-AC02:** The artifact map covers product, architecture, roadmap, subject specifications, ADRs, contracts, historical work records, source, tests, CI, scripts, and development-agent assets.
-- **P0-W17-AC03:** Every material implementation claim is classified by direct source, test, command, or CI Evidence.
-- **P0-W17-AC04:** The baseline identifies the preflight and ticket-grammar mismatch as a blocker without changing the script.
-- **P0-W17-AC05:** The baseline identifies the obsolete Run-supervision example and records the controlling architecture authority.
-- **P0-W17-AC06:** Current integrated documents no longer state that P0-W16 integration is proposed or in progress.
-- **P0-W17-AC07:** Historical planning records remain preserved and cannot override current authority.
-- **P0-W17-AC08:** The baseline identifies documents to retain, narrow, merge, archive, or supersede in later passes.
-- **P0-W17-AC09:** The baseline identifies areas for Prompt 2 and Prompt 3 without executing either pass.
-- **P0-W17-AC10:** The exact next action is Prompt 2 after this baseline is accepted and integrated.
-- **P0-W17-AC11:** The final diff changes planning and status documents only.
-- **P0-W17-AC12:** Repository validation passes on the final branch head.
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| P0-W17-AC01: One current authority is identified for each required subject or the gap is explicit. | Pass | Source-of-truth map in the current baseline |
+| P0-W17-AC02: Material artifact groups have authority, overlap, conflict, implication, and disposition. | Pass | Artifact map A01 through A31 |
+| P0-W17-AC03: Implementation claims are bound to source, test, configuration, or CI Evidence. | Pass | Broad implementation-state map |
+| P0-W17-AC04: The preflight and ticket-grammar mismatch is a blocker without script changes. | Pass | Conflicts C01 and C02; no script diff |
+| P0-W17-AC05: The obsolete Run supervision example and controlling architecture are explicit. | Pass | Artifact A09 and conflict C05 |
+| P0-W17-AC06: Exact ADR 0019 integration status is corrected and remaining branch-era status labels are visible. | Pass | ADR diff and conflict C04 |
+| P0-W17-AC07: Historical planning evidence remains preserved and cannot override current authority. | Pass | Historical baseline gateway and artifact A30 |
+| P0-W17-AC08: Retain, narrow, merge, archive, supersede, and historical dispositions are explicit. | Pass | Canonical, merge, and historical disposition section |
+| P0-W17-AC09: Prompt 2 and Prompt 3 inputs are explicit without executing those passes. | Pass | Later-pass sections |
+| P0-W17-AC10: Prompt 2 is the exact next action after integration. | Pass | Exact next action section |
+| P0-W17-AC11: The diff changes planning and status documents only. | Pass | GitHub compare against `main` |
+| P0-W17-AC12: Repository validation passes on the audit head. | Pass | GitHub CI run `30407773538` |
 
 ## Verification commands
 
+The Repository pipeline represented these checks on audit head `d96c68ebec6a1315e7a8e19c4b2138ca2b09d2ca`:
+
 ```bash
-scripts/agent-preflight
+scripts/test-agent-preflight
 scripts/validate-agent-assets
 vale .
+mix deps.get
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-Planning inspection shall also confirm:
+GitHub CI run `30407773538` passed both jobs and every listed step.
 
-- the baseline contains every required Prompt 1 output;
-- current authority links resolve;
-- the current documents use accurate integration status;
-- the obsolete Run process example is marked as superseded;
-- no runtime or conformance implementation changed;
-- build authorization remains denied.
+The audit also inspected:
+
+- current production source and tests;
+- current planning and subject authorities;
+- ADR and contract indexes;
+- work governance, plan template, preflight, and preflight tests;
+- development-agent Skills, prompts, agents, and validation;
+- open and merged planning pull requests;
+- current branch compare against `main`.
+
+The closeout-only commit that records this result must pass final-head CI before merge.
 
 ## Required completion evidence
 
-| Evidence ID | Acceptance criterion | Required evidence |
+| Evidence ID | Acceptance criterion | Evidence |
 | --- | --- | --- |
-| P0-W17-E01 | P0-W17-AC01 through AC03 | Current planning-completion baseline and cited Repository paths |
-| P0-W17-E02 | P0-W17-AC04 | Preflight script, current branch grammar, and template comparison |
-| P0-W17-E03 | P0-W17-AC05 | Run Model note and integrated architecture reference |
-| P0-W17-E04 | P0-W17-AC06 through AC07 | Status-header and authority-reference diff |
-| P0-W17-E05 | P0-W17-AC08 through AC10 | Disposition, later-pass, blocker, and exact-next-action sections |
-| P0-W17-E06 | P0-W17-AC11 | Final compare against `main` |
-| P0-W17-E07 | P0-W17-AC12 | Final-head GitHub CI run |
+| P0-W17-E01 | P0-W17-AC01 through AC03 | `docs/PLANNING-COMPLETION-BASELINE.md` and cited Repository paths |
+| P0-W17-E02 | P0-W17-AC04 | Preflight script, branch authority, plan template, and negative tests |
+| P0-W17-E03 | P0-W17-AC05 | Run Model process example and integrated architecture rule |
+| P0-W17-E04 | P0-W17-AC06 through AC07 | ADR status diff and historical-baseline gateway |
+| P0-W17-E05 | P0-W17-AC08 through AC10 | Disposition, later-pass, build-blocker, and exact-next-action sections |
+| P0-W17-E06 | P0-W17-AC11 | Documentation-only compare against `main` |
+| P0-W17-E07 | P0-W17-AC12 | GitHub CI run `30407773538` |
 
 ## Explicit exclusions
 
@@ -145,6 +153,7 @@ P0-W17 does not:
 - create P1 implementation tickets;
 - add Schema-conformance tooling;
 - consolidate contracts;
+- rewrite overlapping subject specifications;
 - conduct the final adversarial review;
-- adjudicate open architecture questions;
+- adjudicate architecture conflicts assigned to Prompt 2;
 - authorize construction.
