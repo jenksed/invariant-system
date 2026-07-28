@@ -63,7 +63,7 @@ This work preserves:
 - Add `docs/contracts/kiln-knowledge.schema.json`.
 - Add ADR 0016.
 - Add P0-W13 to the roadmap.
-- Update README, ADR index, contract index, and Project invariants.
+- Update README, ADR index, and contract index.
 - Reconcile Phase 1 and later work with local knowledge proof requirements.
 
 ## Acceptance criteria
@@ -128,7 +128,7 @@ Negative cases must reject:
 - **P0-W13-E02:** Storage comparison supports the SQLite-first decision.
 - **P0-W13-E03:** The knowledge schema parses and validates.
 - **P0-W13-E04:** ADR 0016 records accepted and rejected positions.
-- **P0-W13-E05:** README, roadmap, invariants, ADR index, and contract index link to the capability.
+- **P0-W13-E05:** README, roadmap, ADR index, and contract index link to the capability.
 - **P0-W13-E06:** Primary documentation supports FTS5, bounded recursive traversal, Tree-sitter queries, SCIP imports, and the deferred vector position.
 - **P0-W13-E07:** The diff contains planning and contracts only.
 - **P0-W13-E08:** Repository CI passes on the final branch head.
