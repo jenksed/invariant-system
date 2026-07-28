@@ -356,6 +356,102 @@ Browser automation MAY be primary when browser behavior itself is under test.
 
 **Source:** ADR 0008, `docs/CAPABILITY-INTEGRATION.md`
 
+### KILN-INV-045: Context is the smallest sufficient package
+
+Kiln MUST compile Context for the immediate decision or action under an explicit Run and phase budget.
+
+A provider's larger Context window MUST NOT automatically increase the active Context ceiling or justify loading lower-value material.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-046: Context is replaced, not accumulated forever
+
+Every model invocation or Context-consuming Worker step MUST use one new immutable Context manifest.
+
+The active package MUST remove or replace stale, superseded, duplicate, resolved, and irrelevant material while preserving historical manifests for audit and recovery.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-047: Context retrieval is just in time and progressively disclosed
+
+Kiln MUST prefer the narrowest sufficient symbol, relevant line range, changed hunk, documentation section, structured page, or Artifact segment before loading a complete source.
+
+Deep disclosure MUST NOT permanently enlarge later Context packages.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-048: Context items preserve authority, trust, freshness, and provenance
+
+Every model-visible Context item MUST record source authority, trust, sensitivity, freshness, state binding, selection reason, token estimate, transformation history, and retrieval provenance.
+
+A current observation MUST replace a stale summary of the same state in active Context.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-049: Tool and Skill exposure is bounded and lazy
+
+The model-facing Tool set MUST normally contain six to eight Tools and MUST never exceed twelve.
+
+Tool schemas MUST remain within the accepted budget, and additional Tools and Skill sections MUST be disclosed only when the current phase and intent justify them.
+
+**Source:** ADR 0010, ADR 0009, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-050: Large results remain outside active Context
+
+Complete logs, test output, documentation pages, DOM snapshots, database results, large diffs, binary output, and other unbounded results MUST become Artifacts when a bounded digest, excerpt, and continuation are sufficient.
+
+Truncation and pagination MUST be explicit, and cursors MUST be bound to the source snapshot.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-051: Documentation resolves by authority and version
+
+For Elixir Projects, Kiln MUST prefer active Repository documentation, accepted ADRs and specifications, dependency-authored rules, exact local ExDoc, and running-Project documentation before Context7, official external sources, general web research, or model memory.
+
+Context7 or model memory MUST NOT override a higher-authority version-matched source.
+
+**Source:** ADR 0011, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-052: Prompt caching is an optimization only
+
+A prompt-cache hit MUST NOT restore stale Context, reintroduce removed Tools, expand authority, bypass Privacy policy, or replace generation of a new Context manifest.
+
+Kiln correctness MUST NOT depend on provider cache behavior.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-053: Child Runs inherit no ambient Context
+
+A Child Run MUST receive an independently compiled Context manifest, bounded delegation brief, selected references, explicit output contract, and explicit Capability grants.
+
+A Parent Run MUST NOT transfer its transcript, Tool schemas, Skill body, working set, or hidden context by default.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `KILN-INV-028`
+
+### KILN-INV-054: Verifier Context is independent and bias-reduced
+
+A Verifier Run MUST independently retrieve the acceptance criteria, relevant Change set, source state, verification methods, and current Evidence.
+
+The implementer's conclusion MUST remain a Claim to test, and write Tools MUST be excluded from the first-pass Verifier Context by default.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
+### KILN-INV-055: Context cost and behavior are observable
+
+Kiln MUST measure model input and output tokens, Tool-schema tokens, retained Tool-result tokens, cache behavior, active Tool count, repeated reads and commands, compactions, retrieval sources, retained Artifacts, and token cost by Run and accepted Change set.
+
+Metrics SHOULD retain identifiers, digests, classes, counts, and reasons rather than sensitive raw Context content.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`, `kiln.context/v0`
+
+### KILN-INV-056: Omission is preferred over weak Context
+
+Kiln SHOULD omit low-confidence or low-relevance material when it is not required to disclose a material contradiction or unknown.
+
+Unused Context budget MUST remain unused rather than be filled with weaker content.
+
+**Source:** ADR 0010, `docs/CONTEXT-SYSTEM.md`
+
 ## Review use
 
 A plan MUST list each invariant that constrains the work.
