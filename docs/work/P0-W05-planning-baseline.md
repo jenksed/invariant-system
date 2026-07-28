@@ -166,18 +166,21 @@ Each command must exit with status `0` before this work package is complete.
 | P0-W05-AC02 | Implemented; verification pending | P0-W05-E02 |
 | P0-W05-AC03 | Implemented; verification pending | P0-W05-E03 |
 | P0-W05-AC04 | Implemented; verification pending | P0-W05-E04 |
-| P0-W05-AC05 | In progress | P0-W05-E05 |
-| P0-W05-AC06 | In progress | P0-W05-E06 |
-| P0-W05-AC07 | Verification pending | P0-W05-E07 |
+| P0-W05-AC05 | Implemented; verification pending | P0-W05-E05 |
+| P0-W05-AC06 | Implemented; verification pending | P0-W05-E06 |
+| P0-W05-AC07 | Observed; verification pending | P0-W05-E07 |
 
 ### Verification executed
 
-No verification has run for the final P0-W05 branch head.
+No complete verification has run for the final P0-W05 branch head.
+
+The final diff was inspected through the GitHub commit comparison.
 
 ### Failures and warnings
 
 - The dependency branch has a failing CI run.
 - P0-W05 verification remains pending.
+- Documentation changes can trigger the same asset-validation failure until the validation contract is reconciled.
 
 ### Remaining unknowns and exclusions
 
@@ -189,5 +192,8 @@ No verification has run for the final P0-W05 branch head.
 - Branch: `work/p0-w05-planning-baseline`
 - Base branch: `work/p0-w04-run-graph-stewardship`
 - Base commit: `c5a919f32d422ccc1a5371afd955172a8a0a20c5`
-- Final commit: Pending
-- Diff reviewed: Pending
+- Branch head before this closeout update: `b9d0fd65d54c61e11d284870533d33eb01069a8d`
+- Changed files: `AGENTS.md`, `README.md`, `docs/PLANNING-BASELINE.md`, `docs/ROADMAP.md`, `docs/work/P0-W05-planning-baseline.md`
+- Production source files changed: None
+- Diff reviewed: Yes
+- Complete verification: Pending
