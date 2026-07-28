@@ -17,6 +17,7 @@ run() {
   "$@"
 }
 
+run scripts/validate-agent-assets
 run vale .
 run mix format --check-formatted
 run mix compile --warnings-as-errors
