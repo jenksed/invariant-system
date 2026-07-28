@@ -1,369 +1,297 @@
 # Project Stewardship
 
 **Document type:** Explanation  
-**Status:** Foundational direction
+**Status:** Foundational direction  
+**Delegation authority:** `docs/DELEGATED-WORK.md`
 
-The Project Steward is Kiln's session-level delivery responsibility.
+The Project Steward is Kiln's Session-level delivery responsibility.
 
-The Project Steward uses the run graph, repository evidence, capability policy, accepted specifications, and completion gates to move one repository objective toward a working, verified result.
+The Steward uses the Run graph, Repository Evidence, Capability policy, accepted specifications, Context state, Git ownership, and completion gates to move one objective toward a working, verified result.
 
-The Project Steward is not an artificial manager persona. It is a constrained control role attached to the root run.
+The Steward is not an artificial manager persona. It is a constrained control role attached to the Root Run.
 
 ## Purpose
 
-The Project Steward exists to protect delivery integrity while increasing development leverage.
+Project Stewardship protects delivery integrity while increasing development leverage.
 
-Delivery integrity means that Kiln can show:
+Kiln must be able to show:
 
 - which intent and specifications govern the work;
-- how the work was decomposed;
-- which runs performed each task;
-- which files and artifacts changed;
-- which verification evaluated the current repository state;
-- which risks, failures, and unknowns remain;
-- why the session is or is not ready for completion.
+- how work was decomposed;
+- which Runs performed each Task;
+- which inputs, Context, grants, and limits each delegated Run received;
+- which files and Artifacts changed;
+- which verification evaluated the current Repository state;
+- which risks, failures, blockers, and unknowns remain;
+- why the Session is or is not ready for integration or completion.
 
-The Steward should reduce:
+The Steward should reduce repeated orientation, duplicated investigation, hidden delegation, specification drift, stale verification, silent blockers, unsupported completion claims, and user effort spent reconstructing Session state.
 
-- repeated repository orientation;
-- duplicated investigation;
-- untracked delegation;
-- specification drift;
-- stale verification;
-- hidden blockers;
-- persuasive but unsupported completion claims;
-- user effort spent reconstructing session state.
+## Relationship to the Root Run
 
-## Relationship to the root run
+Each Session has exactly one Root Run.
 
-Each session has one root run.
-
-The root run carries Project Steward responsibility by default.
+The Root Run carries Project Steward responsibility by default.
 
 ```text
 Session objective
-└── Root run: Project Steward responsibility
-    ├── Scout run
-    ├── Builder run
-    ├── Research run
-    └── Verifier run
+└── Root Run: Project Steward responsibility
+    ├── Scout Run
+    ├── Verifier Run
+    └── nested read-only Child Run when justified
 ```
 
-The Steward responsibility can use one model, several bounded model runs, deterministic services, or direct user commands.
-
-The role name describes responsibility. It does not require a fixed prompt persona or one permanent model.
+The role describes responsibility. It does not require one fixed prompt persona or permanent model.
 
 ## Steward authority
 
-The Project Steward may:
+The Steward may:
 
 - maintain the active intent and completion contract;
 - trace requirements to planned and completed work;
-- decompose work into bounded runs;
+- decompose work into bounded Tasks and Runs;
 - choose foreground or background delegation;
-- request capability grants for child runs;
-- assign resource limits;
-- pause or cancel runs;
-- route attention;
+- request Capability grants for Child Runs;
+- assign Resource, token, time, and cost limits;
+- request pause or cancellation;
+- route global Attention;
 - request independent verification;
-- compare implementation state with the accepted specification;
-- identify stale evidence;
+- compare implementation state with accepted specifications;
+- identify stale Context and Evidence;
 - propose the next highest-value action;
-- block a completion recommendation when evidence is missing;
-- produce the final reconciliation report.
+- block integration or completion recommendations when proof is missing;
+- produce final reconciliation.
+
+The Steward cannot grant itself or a Child new authority. Capability and Approval policy remains authoritative.
 
 ## Steward limits
 
-The Project Steward must not:
+The Steward must not:
 
-- override the user's final authority;
+- override user authority;
 - change accepted product intent without disclosure and approval;
-- bypass capability policy;
-- treat BEAM isolation as an operating-system sandbox;
-- modify repository truth through an unrecorded path;
-- mark stale evidence as current;
-- hide failed verification;
-- convert unknown state into a success state;
+- bypass Capability, Repository trust, Privacy, Git ownership, or integration policy;
+- treat BEAM isolation as operating-system containment;
+- modify Repository truth through an unrecorded path;
+- mark stale Evidence as current;
+- hide failed or blocked verification;
+- convert unknown state into success;
 - allow concurrent writers in one checkout;
 - create delegation only to simulate an organization;
-- delegate responsibility for final reconciliation to an opaque child;
-- report completion when the completion contract is not satisfied.
+- delegate final reconciliation to an opaque Child;
+- treat Child count as a product-success metric;
+- report completion while blocking Attention remains unresolved.
 
-Deterministic systems remain authoritative for:
+Deterministic systems remain authoritative for Repository fingerprints, Git state, event ordering, Capability decisions, Context bindings, Evidence freshness, acceptance status, Resource ceilings, cancellation status, and recovery state.
 
-- repository fingerprints;
-- current Git state;
-- event ordering;
-- capability decisions;
-- evidence freshness;
-- acceptance status;
-- resource ceilings;
-- recovery state.
-
-The Steward can interpret these facts. It cannot rewrite them through narrative.
+The Steward can interpret those facts. It cannot rewrite them through narrative.
 
 ## Stewardship loop
-
-The Steward follows this control loop:
 
 ```text
 Understand objective
 → establish specification and completion contract
-→ orient to current repository state
+→ orient to current Repository state
 → identify the next uncertainty or change
-→ execute directly or delegate a bounded run
+→ execute directly or delegate a bounded Run
 → observe results and mutations
 → update risks, unknowns, and traceability
-→ verify the current repository state
-→ reconcile intent, changes, and evidence
-→ continue, block, or recommend completion
+→ independently verify current state
+→ reconcile intent, changes, and Evidence
+→ continue, block, integrate, or recommend completion
 ```
 
-### 1. Establish objective
+### Establish objective
 
-The Steward records:
+Record:
 
-- the requested outcome;
+- requested outcome;
 - accepted constraints;
 - explicit exclusions;
-- applicable architecture decisions;
-- applicable project invariants;
+- applicable ADRs and invariants;
 - completion criteria.
 
-The Steward must identify a material specification gap as `Unknown` rather than inventing a requirement.
+A material specification gap remains an `Unknown`. The Steward must not invent a requirement.
 
-### 2. Orient
+### Orient
 
-The Steward establishes the minimum current repository context required for the next action.
+Establish the smallest sufficient current Context for the next action, including Repository identity, branch, commit, dirty state, governing instructions, relevant specifications, verification entry points, and unresolved prior work.
 
-Orientation must include:
+Orientation facts require freshness and invalidation rules.
 
-- repository identity;
-- branch and commit;
-- dirty state;
-- governing instructions;
-- relevant specifications and architecture decisions;
-- available verification entry points;
-- unresolved prior work.
+### Select work
 
-Orientation facts must have freshness and invalidation rules.
-
-### 3. Select work
-
-The Steward selects work by expected contribution to the objective.
-
-The Steward should prefer:
+Prefer:
 
 - the cheapest reliable test of an unknown;
 - deterministic inspection before model speculation;
-- one bounded change over broad unreviewed mutation;
-- independent verification for material completion claims;
-- direct execution when delegation adds no value.
+- direct execution when delegation adds no value;
+- one bounded change over broad mutation;
+- independent verification for material Claims;
+- Skills for repeated procedures.
 
-### 4. Delegate when useful
+### Delegate when useful
 
-The Steward creates a child run when a task benefits from:
+Create a Child Run when work benefits from:
 
-- isolated context;
+- isolated Context;
 - concurrent read-only investigation;
-- specialized model or tool capability;
+- specialized model or Tool access;
 - independent review;
-- separate evidence;
+- independent Evidence and accounting;
 - user steering;
-- independent cancellation or recovery.
+- separate cancellation or recovery.
 
-The Steward must provide each child with:
+Every delegated Task creates a Child Run before execution.
 
-- one bounded task;
-- required inputs;
-- authority and capability limits;
-- resource limits;
-- expected result structure;
+The Steward provides:
+
+- one accepted Task revision;
+- bounded purpose and required inputs;
+- independent Context policy;
+- explicit Capability requests and grants;
+- Resource and token limits;
+- expected result schema;
+- parent wait, cancellation, crash, and delivery policies;
 - completion or return condition.
 
-A child run must not receive the full session transcript by default.
+A Child does not receive the full Session or Parent transcript by default.
 
-### 5. Maintain the delivery ledger
+### Maintain delivery traceability
 
-The Steward maintains traceability among:
+Maintain this relationship:
 
 ```text
 Intent
-→ specification or requirement
-→ run or deterministic operation
-→ mutation or artifact
+→ requirement
+→ Task and Run
+→ Capability and Context
+→ mutation or Artifact
 → verification
-→ evidence
-→ completion status
+→ Evidence
+→ integration and completion status
 ```
 
-The delivery ledger may be a materialized projection of session and run events.
-
-The ledger should identify:
+The delivery projection identifies:
 
 - unassigned requirements;
-- work in progress;
-- changes without a requirement or approved reason;
-- requirements without current evidence;
+- active and queued Runs;
+- changes without accepted intent;
+- criteria without current Evidence;
 - failed or stale verification;
-- unresolved attention;
+- unresolved Attention;
+- pending Child results;
 - accepted exclusions.
 
-### 6. Control quality
+### Control quality
 
-The Steward protects quality through mechanisms, not adjectives.
+Use narrow mutation boundaries, explicit criteria, deterministic checks, independent verification, final diff inspection, exact-state Evidence, and disclosure of failures and unknowns.
 
-Quality controls include:
+Distinguish implemented, verified, inferred, proposed, blocked, and unknown behavior.
 
-- narrow mutation boundaries;
-- explicit requirements;
-- Given-When-Then acceptance criteria when applicable;
-- tests that evaluate the required behavior;
-- warnings-as-errors compilation;
-- repository-specific static checks;
-- independent verification for material changes;
-- final diff inspection;
-- evidence bound to the current repository fingerprint;
-- disclosure of failures and unknowns.
+### Reconcile
 
-The Steward must distinguish:
+Before integration or completion, compare:
 
-- implemented behavior;
-- verified behavior;
-- inferred behavior;
-- proposed behavior;
-- unknown behavior.
+- current user instruction;
+- accepted specifications and ADRs;
+- completed and active Runs;
+- Repository mutations;
+- current verification Evidence;
+- failures, warnings, blockers, and unknowns;
+- exclusions;
+- unresolved Attention.
 
-### 7. Reconcile
+Explain any divergence.
 
-Before completion, the Steward compares:
+### Recommend completion
 
-- the current user instruction;
-- accepted specifications;
-- accepted architecture decisions;
-- completed runs;
-- repository mutations;
-- current verification evidence;
-- failures and warnings;
-- unresolved unknowns;
-- exclusions.
-
-The Steward must explain any divergence.
-
-### 8. Recommend completion
-
-The Steward may recommend completion only when:
-
-- acceptance criteria are satisfied;
-- required verification has run;
-- evidence remains current;
-- material warnings and failures are disclosed;
-- repository state matches the report;
-- remaining unknowns and exclusions are stated;
-- no blocking attention item remains unresolved.
+Recommend completion only when criteria are satisfied, required verification ran, Evidence remains current, Repository state matches the report, material failures and unknowns are disclosed, and no blocking Attention remains.
 
 The user retains final acceptance authority.
 
-## Delegated run types
+## Initial delegated roles
 
-Run kinds describe bounded responsibilities, not employees.
+Run roles describe bounded responsibility, not employees.
 
 ### Scout
 
-A Scout investigates repository facts and returns evidence, inferences, and unknowns.
+A Scout performs read-only investigation and returns observed facts, inferences, assumptions, unknowns, scope notes, and Evidence references.
 
-Default capability: read-only.
-
-### Builder
-
-A Builder proposes or applies one bounded implementation change.
-
-Default capability: one writer in the active checkout or an isolated worktree.
-
-### Research
-
-A Research run inspects version-matched external documentation or project knowledge.
-
-Default capability: approved network hosts and no repository writes.
+It cannot modify source, install dependencies, mutate Git, change configuration, or expand authority.
 
 ### Verifier
 
-A Verifier evaluates acceptance criteria against the current repository state.
+A Verifier independently evaluates criteria against an exact Repository and Environment state.
 
-The Verifier should receive requirements, diff, and verification entry points. It should not receive the Builder's confidence narrative as evidence.
+It does not receive the author's confidence narrative as proof, cannot repair the implementation, and returns `PASS`, `FAIL`, or `BLOCKED` with reproduced Evidence.
 
-Default capability: read and non-mutating execution.
+These are the only initial Child role contracts.
 
-### Steward
+A repeated procedure normally becomes a Skill. A new durable role contract requires a concrete need and accepted planning work.
 
-A Steward run coordinates delivery, maintains traceability, routes attention, and performs reconciliation.
+## Attention and user control
 
-Default capability: control-plane commands. Repository write capability is separate.
+Every blocker is visible through global Session Attention regardless of Run depth.
 
-## Competitive leverage
+The user can:
 
-The Project Steward is intended to create advantage through concrete operating properties:
+- answer directly;
+- enter the originating Run;
+- route to the Parent;
+- deny the request;
+- pause the Run;
+- cancel the Run.
 
-- several read-only investigations can run concurrently without losing lineage;
-- the user can enter any delegated run and steer it;
-- each run has separate context and resource accounting;
-- repository facts survive interface closure;
-- independent verification is easy to request and inspect;
-- attention reaches the user regardless of run depth;
-- the next action is selected from current objective, risk, and evidence state;
-- the system can resume without reconstructing the entire project from a transcript;
-- completion is tied to specifications and current evidence.
+The user can also inspect active and queued Runs, change priority, restrict grants, reject completion, take direct control, and request reconciliation.
 
-Kiln should measure whether these properties reduce time to verified completion. Kiln should not use the number of agents or child runs as a success metric.
-
-## User interaction
-
-The user must be able to:
-
-- inspect the Steward's current objective and plan;
-- see active and queued runs;
-- enter any run;
-- steer or cancel a run;
-- answer attention items;
-- change priority;
-- restrict or expand capability grants;
-- reject a proposed completion;
-- take direct control of implementation;
-- request a new reconciliation.
-
-The Steward must explain material control decisions in concise operational terms.
+No Child may remain silently blocked.
 
 ## Failure behavior
 
-If the Steward run fails, Kiln must preserve:
+A Root or Parent process crash does not erase durable Run state or automatically cancel Children.
 
-- the session objective;
-- the run graph;
-- active child state;
-- unresolved attention;
-- repository observations;
-- evidence;
-- the last durable stewardship projection.
+Kiln preserves:
 
-A replacement Steward run may reconstruct control state from the event journal and repository truth.
+- Session objective and Task graph;
+- Run graph and Child contracts;
+- active Worker leases and last status;
+- unresolved Attention;
+- Repository and Environment observations;
+- Context and grant references;
+- Artifacts, Evidence, accounting, and pending result delivery;
+- last durable Steward projection.
 
-A Steward restart must not duplicate an active child or repeat a mutation without an idempotency decision.
+A replacement Steward Worker reconstructs control state from the event journal and Repository truth.
+
+It must not create a duplicate Child or repeat an external effect without an idempotency decision.
+
+If the Root Run is canceled, active descendants receive cancellation requests under the accepted policy. Unknown effects produce `orphaned`, not success.
 
 ## Initial limits
 
-The initial Steward should operate under conservative defaults:
-
 ```text
-One root Steward responsibility per session
-Maximum child depth: 2
-Maximum concurrent children: 3
+One Root Steward responsibility per Session
+Maximum Child depth:              2
+Maximum active Children:          3 per Session
+Initial Child roles:              Scout and Verifier
 Read-only delegation by default
+No peer-to-peer Child communication
+No shared mutable Context
+No recursive manager hierarchy
+No initial writing Child role
 One active writer per checkout
-Independent verifier required for material completion claims
+Independent Verifier for material Claims
 No automatic commit, push, merge, or product-direction change
 ```
 
-These limits are provisional until dogfooding produces evidence.
+These limits remain provisional until dogfooding produces Evidence.
+
+## Product measure
+
+Kiln should measure time to a current verified result, useful Evidence returned, Attention latency, duplicated work avoided, orphan recovery, and token cost per accepted Change set.
+
+Kiln should not use the number of Agents or Child Runs as a success metric.
 
 ## Non-goals
 
@@ -371,16 +299,16 @@ Project Stewardship does not mean:
 
 - an autonomous engineering manager;
 - a replacement for user judgment;
-- a hierarchy of manager agents;
+- a hierarchy of manager Agents;
+- delegation for every operation;
 - unlimited background work;
-- delegation for every task;
 - automatic architecture changes;
-- automatic acceptance of model output;
+- automatic acceptance of Scout or Verifier conclusions;
 - hidden modification of specifications;
 - automatic publication to Git.
 
 ## Foundational rule
 
-The Project Steward must use Kiln's state, run graph, policy, evidence, recovery, and interface capabilities to drive one repository objective toward specification-conformant, verified completion.
+The Steward uses Kiln's state, Run graph, policy, Context, Evidence, Git isolation, recovery, and interface capabilities to move one objective toward specification-conformant, verified completion.
 
-The Steward must increase leverage without weakening user control or evidence requirements.
+It increases leverage without weakening user control or proof requirements.

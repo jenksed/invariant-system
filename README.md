@@ -2,7 +2,7 @@
 
 Kiln is a local-first, evidence-driven coding harness built on Elixir and OTP for rapid, lucid AI-assisted software development.
 
-Kiln is not an application scaffolder, an autonomous software company, an agent-management framework, a replacement version-control system, or a catalog of protocol implementations. It is the durable runtime around model-driven Repository work: execution, state, Context, permissions, Runs, change isolation, interruption, recovery, and verification.
+Kiln is not an application scaffolder, autonomous software company, agent-management framework, replacement version-control system, or protocol catalog. It is the durable runtime around model-driven Repository work: execution, state, Context, permissions, Runs, delegated work, change isolation, interruption, recovery, and verification.
 
 ## Project thesis
 
@@ -12,7 +12,7 @@ Kiln moves work through:
 
 > Intent → Orientation → Investigation → Change → Verification → Reconciliation → Completion
 
-Kiln uses these foundational boundaries:
+## Foundational boundaries
 
 ```text
 Workspace: local operating and trust boundary
@@ -31,28 +31,28 @@ Kiln supports bounded Child Runs without turning the product into an artificial 
 
 - **Runtime:** Elixir and OTP
 - **Internal model:** Kiln-native and protocol-neutral
-- **External integration:** adapters map protocols and mature tools to Kiln domain commands, events, and schemas
-- **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
-- **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
-- **Context compilation:** compile the smallest sufficient package for the next decision or action; do not fill a larger model window
-- **Context continuity:** replace stale and resolved material with immutable manifests and compact Checkpoints rather than append forever
-- **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
+- **Primary execution unit:** Run, not an Agent persona, branch, process, Tool call, or model invocation
 - **Objective boundary:** one durable Session
 - **Desired-work boundary:** one bounded Task
-- **Execution model:** one Root Run and a navigable Run graph
-- **Primary execution unit:** Run, not Agent persona, branch, process, or model invocation
 - **Delivery coordination:** Project Steward responsibility on the Root Run
+- **Delegation:** every delegated Task creates a visible, inspectable, interruptible Child Run
+- **Initial Child roles:** read-only Scout and independent non-mutating Verifier
+- **Delegation limits:** depth two, three active Children per Session, no peer messaging, and no shared mutable Context
+- **Attention:** global Session routing; Run depth cannot hide a blocker
+- **Capability selection:** use the simplest reliable integration that satisfies lifecycle, security, interoperability, isolation, and replaceability
+- **Model-facing Tools:** small intent-level operations rather than protocol, server, vendor, or CLI catalogs
+- **Context:** compile the smallest sufficient package and replace stale or resolved material
+- **Documentation:** prefer authoritative, version-matched Project and dependency sources before Context7, web research, or model memory
 - **Git change isolation:** protected trunk, short-lived task branches, and one exclusive writable worktree per independently mutating Run
-- **Read-only work:** no branch or worktree by default unless stable state requires one
-- **Restricted mutation:** Patch Artifacts for Child Runs that should not own a writable checkout
+- **Restricted mutation:** Patch Artifacts when a later accepted writing Child must not own a writable checkout
 - **Initial interface:** command-line interface
 - **Durable state:** SQLite and an append-oriented event journal
 - **Source truth:** Git and the filesystem
 - **Authority:** explicit Capabilities, policy, scoped grants, and separate authoring and integration authority
 - **Evidence:** Claims remain separate from Evidence and Receipts; verification binds to exact Repository state
-- **Web interface:** Phoenix LiveView, after the runtime is proven
-- **Extensions:** language-neutral supervised subprocess protocol
-- **First external software development kit:** TypeScript, after the protocol is proven
+- **Web interface:** Phoenix LiveView after the runtime is proven
+- **Extensions:** versioned language-neutral supervised subprocess protocol
+- **First external SDK:** TypeScript after the extension protocol is proven
 - **Gleam:** deferred until a concrete pure domain component earns it
 
 No external protocol may become Kiln's internal domain model.
@@ -60,6 +60,33 @@ No external protocol may become Kiln's internal domain model.
 MCP is an optional protocol boundary, not Kiln's default integration layer and not a security sandbox.
 
 Git remains the version-control authority. Kiln records intent, authorization, ownership, Evidence, and recovery state without creating parallel commit, branch, or merge semantics.
+
+## Delegated work
+
+Every delegated Task creates a first-class Child Run before delegated model, Tool, Command, or process execution starts.
+
+A delegated Run has independent:
+
+- Context and Capability grants;
+- Artifacts, Claims, and Evidence;
+- token, cost, time, and Resource accounting;
+- status, cancellation, and durable history;
+- structured result delivery.
+
+The initial Child roles are:
+
+- **Scout:** read-only investigation that separates observed facts, inferences, assumptions, unknowns, and Evidence.
+- **Verifier:** independent evaluation that cannot repair the implementation and returns `PASS`, `FAIL`, or `BLOCKED` with reproduced Evidence.
+
+Repeated procedures normally become Skills, not permanent Agent personas.
+
+Foreground and background are client-interaction modes. Background work remains visible through the Run graph, global Attention, accounting, events, and result delivery.
+
+A blocked Child creates global Attention. The user can answer, enter the originating Run, route to the Parent, deny, pause, or cancel.
+
+The logical Run graph remains separate from the OTP supervision tree.
+
+See [Delegated Work Model](docs/DELEGATED-WORK.md) and [Run Model](docs/RUN-MODEL.md).
 
 ## Capability integration
 
@@ -82,20 +109,17 @@ Initial positions:
 - Git uses a native adapter backed by the Git CLI.
 - Build, test, lint, format, compiler, package-manager, and static-analysis behavior uses existing CLIs.
 - Raw LSP remains behind a native semantic adapter.
-- Local MCP requires material lifecycle, state, sharing, replacement, discovery, or existing-implementation value.
-- Remote MCP requires material interoperability and discovery value beyond a narrow API.
+- MCP requires a concrete interoperability or lifecycle benefit.
 - Browser automation is a fallback unless browser behavior is under test.
 - Mature tools are orchestrated rather than rebuilt.
 
-The full Capability catalog remains outside model Context. A Run receives a small phase-relevant Tool projection such as `repo.read`, `code.inspect`, `command.run`, and `verify.run`.
+The complete Capability catalog remains outside model Context. A Run receives a small phase-relevant Tool projection.
 
-See [Capability integration](docs/CAPABILITY-INTEGRATION.md).
+See [Capability Integration](docs/CAPABILITY-INTEGRATION.md).
 
 ## Context system
 
 Kiln compiles a new bounded Context package for each model invocation or other Context-consuming Worker step.
-
-The package is built for one immediate purpose from current intent, accepted requirements, Task and Run state, Repository state, Evidence, assumptions, unknowns, the active Skill, phase-relevant Tools, permissions, model characteristics, remaining token budget, and compact Checkpoints.
 
 The initial policy:
 
@@ -104,43 +128,33 @@ The initial policy:
 - normally exposes six to eight Tools and never more than twelve;
 - uses a 2,500-token default Tool-schema budget and a 4,000-token absolute ceiling;
 - retrieves symbols, relevant lines, changed hunks, documentation sections, and Artifact segments just in time;
-- removes stale, superseded, duplicate, and resolved material from the next package;
-- keeps complete logs, test streams, documentation pages, DOM snapshots, database results, and large output in Artifacts when a digest and reference are sufficient;
+- removes stale, superseded, duplicate, and resolved material from later packages;
+- keeps unbounded output in Artifacts when a digest and reference are sufficient;
 - keeps complete MCP catalogs and raw LSP objects outside model Context;
 - loads Skills and additional Tools lazily;
 - treats prompt caching as an optimization rather than correctness or memory;
-- gives Child Runs and Verifier Runs independently compiled Context and explicit grants.
+- gives Child and Verifier Runs independently compiled Context and explicit grants.
 
-For Elixir Projects, documentation resolution prefers:
-
-1. active Repository documentation;
-2. accepted ADRs and specifications;
-3. dependency-authored usage rules;
-4. version-locked local ExDoc;
-5. running-Project documentation through a native adapter;
-6. Context7;
-7. official external documentation;
-8. general web research;
-9. model memory.
-
-See [Context system](docs/CONTEXT-SYSTEM.md).
+See [Context System](docs/CONTEXT-SYSTEM.md).
 
 ## Git change isolation
 
 Kiln uses protected trunk-based development with short-lived task branches and one dedicated Git worktree for each independently mutating Run.
 
-The initial product loop supports:
+The initial deterministic product loop supports:
 
-- shared read-only access for safe Scout Runs;
+- safe shared read-only Repository access;
 - one exclusive writable worktree and lease for a mutating Run;
-- Patch Artifacts for restricted Child Runs;
+- Patch Artifact validation for restricted mutation workflows;
 - exact commit-bound or dirty-fingerprint-bound verification;
-- a Verifier that does not repair the branch it evaluates;
+- a Verifier that does not repair the evaluated branch;
 - projected-merge checks against current protected trunk;
 - manual user-approved local integration;
 - deterministic Receipts, cleanup, and crash reconciliation.
 
-A Child Run does not inherit its Parent Run's branch or write authority. A branch does not require a permanent OTP process. The authoring Run does not authorize its own merge.
+A Child does not inherit its Parent's branch or write authority. A branch does not require a permanent OTP process. The authoring Run does not authorize its own merge.
+
+The initial Scout and Verifier roles remain read-only. A later work package must accept a writing Child role before model-backed Child mutation is enabled.
 
 See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
 
@@ -148,61 +162,33 @@ See [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md).
 
 Kiln ranks protocols by direct product value and keeps each behind a replaceable adapter.
 
-Accepted positions include:
+Accepted positions include ACP as the primary future coding-client interface after the native event model, MCP client support before optional server support, normalized LSP, internal Tree-sitter infrastructure, AG-UI projections from native events, A2A only for independent external agents, first-class Agent Skills, and OpenTelemetry for runtime observation.
 
-- ACP as the primary future editor and coding-client interface after the native event model;
-- MCP client support before optional server support;
-- normalized LSP and internal Tree-sitter infrastructure;
-- AG-UI projections from the same native event stream;
-- A2A only for independent external agents;
-- Agent Skills as first-class procedural packages;
-- OpenTelemetry for operational observation without replacing the event journal.
-
-See [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md).
+See [Protocol Capability Map](docs/PROTOCOL-CAPABILITY-MAP.md).
 
 ## Project Steward
 
-The Project Steward uses Kiln's Run graph, Tasks, specifications, Repository observations, Capability policy, Context state, Git ownership, Evidence, and completion gates to coordinate work.
+The Project Steward uses the Run graph, Tasks, specifications, Repository observations, Capability policy, Context, Git ownership, Evidence, Attention, and completion gates to coordinate work.
 
-The Steward can:
+The Steward can decompose work, request bounded delegation, route Attention, request independent verification, track traceability, and recommend continuation, blocking, integration, or completion.
 
-- decompose work into bounded Tasks and Runs;
-- route attention;
-- request independent verification;
-- track requirements, mutations, Evidence, risks, and unknowns;
-- reconcile Repository state against the accepted specification;
-- recommend continuation, blocking, integration, or completion.
+It cannot override user authority, policy, Repository truth, Evidence freshness, Git ownership, or completion gates.
 
-The Steward cannot override user authority, policy, Repository truth, Evidence freshness, Git ownership, or completion gates.
+See [Project Stewardship](docs/PROJECT-STEWARDSHIP.md).
 
 ## Current milestone
 
-Phase 0 defines the Repository and runtime foundation before implementation begins.
+Phase 0 constrains the Repository and runtime foundation before implementation begins.
 
 - P0-W05 established the planning baseline.
-- P0-W06 defined the protocol-neutral internal domain model.
+- P0-W06 defined the protocol-neutral internal domain.
 - P0-W07 defined Capability integration and the broker.
-- P0-W08 defined the bounded Context system and documentation resolver.
-- P0-W09 defined the protocol and standards strategy.
-- P0-W10 defines Git change isolation, worktree ownership, Evidence staleness, integration, and recovery.
+- P0-W08 defined bounded Context and documentation resolution.
+- P0-W09 defined protocol and standards strategy.
+- P0-W10 defined Git change isolation, exact-state Evidence, integration, and recovery.
+- P0-W11 defines delegated Runs, Scout and Verifier contracts, state transitions, global Attention, cancellation, timeout, result delivery, and orphan recovery.
 
-The next roadmap reconciliation must align Phase 1 with:
-
-- Workspace, Project, Repository, Environment, Session, Task, Run, and event identity;
-- minimum Context, Capability, Claim, Evidence, Receipt, Checkpoint, branch-contract, worktree, lease, and Git-operation state;
-- Repository observation and trust policy;
-- controlled native Repository and Git adapters;
-- Repository-scoped Git mutation serialization;
-- exact-state Context and Evidence binding;
-- one isolated mutating Run and one restricted Patch Artifact path;
-- independent read-only verification;
-- projected-merge verification and manual integration approval;
-- cleanup and restart reconciliation;
-- fake navigable Child Runs with independent Context;
-- Client-local focus, attention routing, and Project Steward projection;
-- provider-backed Root Runs after the deterministic kernel is proven.
-
-See [Roadmap](docs/ROADMAP.md) and [Plan reconciliation](docs/PLAN-RECONCILIATION.md).
+The next reconciliation must turn these accepted contracts into a proof-ordered Phase 1 implementation plan.
 
 ## Work planning
 
@@ -216,56 +202,35 @@ Criterion: P1-W03-AC01
 Evidence:  P1-W03-E01
 ```
 
-See [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md) before planned implementation.
+See [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md).
 
 ## Agent-ready development
 
-Project-local Skills, prompts, and specialist agents support the coding agent that builds Kiln. They are development controls. They are not Kiln runtime Runs, Agent definitions, or Workers.
-
-The default workflow is:
+Project-local Skills, prompts, and specialist agents support construction and review of Kiln. They are development controls, not evidence that Kiln runtime Runs are implemented.
 
 ```bash
 scripts/agent-preflight
 scripts/check
 ```
 
-Project-local Skills live under `.agents/skills/`:
-
-- `kiln-work-package`
-- `kiln-elixir-otp`
-- `kiln-dependency-review`
-- `kiln-integrity-review`
-- `kiln-evidence-closeout`
-
-Optional Pi specialist agents live under `.pi/agents/`. The OTP and integrity agents are read-only. The verifier can run non-mutating checks but cannot edit files.
-
-The main coding agent remains the default writer and owns final implementation decisions.
+The main coding agent remains the default writer. Optional specialist development agents are read-only or non-mutating verifiers.
 
 ## Documentation
 
-- [Planning baseline](docs/PLANNING-BASELINE.md)
-- [Internal domain model](docs/INTERNAL-DOMAIN-MODEL.md)
-- [Capability integration](docs/CAPABILITY-INTEGRATION.md)
-- [Context system](docs/CONTEXT-SYSTEM.md)
-- [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md)
-- [Protocol capability map](docs/PROTOCOL-CAPABILITY-MAP.md)
-- [Domain contracts](docs/contracts/README.md)
-- [Project provenance](docs/PROJECT-PROVENANCE.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Session model](docs/SESSION-MODEL.md)
-- [Run model](docs/RUN-MODEL.md)
+- [Planning Baseline](docs/PLANNING-BASELINE.md)
+- [Internal Domain Model](docs/INTERNAL-DOMAIN-MODEL.md)
+- [Run Model](docs/RUN-MODEL.md)
+- [Delegated Work Model](docs/DELEGATED-WORK.md)
 - [Project Stewardship](docs/PROJECT-STEWARDSHIP.md)
-- [Security model](docs/SECURITY-MODEL.md)
+- [Capability Integration](docs/CAPABILITY-INTEGRATION.md)
+- [Context System](docs/CONTEXT-SYSTEM.md)
+- [Git Change Isolation](docs/GIT-CHANGE-ISOLATION.md)
+- [Protocol Capability Map](docs/PROTOCOL-CAPABILITY-MAP.md)
+- [Domain Contracts](docs/contracts/README.md)
+- [Security Model](docs/SECURITY-MODEL.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Plan reconciliation](docs/PLAN-RECONCILIATION.md)
-- [Project invariants](docs/PROJECT-INVARIANTS.md)
-- [Agent-friendly codebase rules](docs/AGENT-FRIENDLY-CODEBASE.md)
-- [Elixir and OTP engineering guide](docs/ELIXIR-OTP-ENGINEERING.md)
-- [Branching and Work Planning](docs/BRANCHING-AND-WORK-PLANNING.md)
-- [Engineering quality rules](docs/ENGINEERING-QUALITY-RULES.md)
-- [Architecture decisions](docs/decisions/README.md)
-- [Implementation plan template](docs/templates/IMPLEMENTATION-PLAN.md)
-- [ADR template](docs/templates/ADR.md)
+- [Project Invariants](docs/PROJECT-INVARIANTS.md)
+- [Architecture Decisions](docs/decisions/README.md)
 
 ## Development
 
