@@ -40,4 +40,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0011: Resolve documentation by authority and version](0011-resolve-documentation-by-authority-and-version.md) | Accepted | Integrated |
 | [0012: Protocols adapt to Kiln](0012-protocols-adapt-to-kiln.md) | Accepted | Integrated |
 | [0013: Use protected trunk and exclusive writable worktrees](0013-protected-trunk-and-exclusive-worktrees.md) | Accepted | Integrated through pull request 14 |
-| [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Proposed on P0-W11 |
+| [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Integrated through pull request 15 |
+| [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Proposed on P0-W12 |

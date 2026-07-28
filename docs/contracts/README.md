@@ -1,11 +1,11 @@
 # Kiln Domain Contracts
 
 **Status:** Foundational contract direction; not implemented  
-**Contract families:** `kiln.domain/v0`, `kiln.capability/v0`, `kiln.context/v0`, `kiln.git/v0`, `kiln.delegation/v0`
+**Contract families:** `kiln.domain/v0`, `kiln.capability/v0`, `kiln.context/v0`, `kiln.git/v0`, `kiln.delegation/v0`, `kiln.interface/v0`
 
-These JSON Schemas express Kiln-native domain, Capability, Context, Git change-coordination, and delegated-work contracts.
+These JSON Schemas express Kiln-native domain, Capability, Context, Git change-coordination, delegated-work, and public terminal-interface contracts.
 
-They do not define external protocol messages. An adapter can translate ACP, MCP, LSP, A2A, AG-UI, AHP, provider, terminal, hosting-provider, or client messages to these contracts.
+They do not define external protocol messages. An adapter can translate ACP, MCP, LSP, A2A, AG-UI, AHP, provider, terminal, hosting-provider, or Client messages to these contracts.
 
 ## Files
 
@@ -16,6 +16,7 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 - `kiln-context.schema.json`: Context compile request, immutable manifest, rendered package, documentation resolution, Artifact reference, budget, cache, invalidation, and Context observability contracts.
 - `kiln-git-change.schema.json`: Repository state, branch contract, worktree lease, Change set, Patch Artifact, verification binding, and integration Receipt.
 - `kiln-delegation.schema.json`: delegation contract, Scout result, Verifier result, Run transition, Attention event, cancellation, timeout, and Child result delivery.
+- `kiln-interface.schema.json`: public interface event, projection snapshot, Client-local state, normalized input intent, and structured CLI result.
 
 ## Rules
 
@@ -49,12 +50,22 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 28. Unknown effects after crash, timeout, or cancellation require `orphaned` state rather than success.
 29. Logical Parent-Child Run lineage does not define OTP supervision.
 30. The delegated-work contract prohibits peer communication, shared mutable Context, and Child permission expansion in the initial version.
+31. Interface events and snapshots are public projections. They do not become a second domain authority.
+32. Focus, selection, navigation history, scroll, layout, and drafts are client-local.
+33. Run execution, Attention, permissions, events, Artifacts, Evidence, Receipts, and Git ownership are shared durable state.
+34. Public CLI output must not expose persistence schemas.
+35. Duplicate, delayed, and replayed interface events must not create false state.
+36. Generic activation must not approve permission, integration, cancellation, or another destructive action.
+37. Renderer or Client failure must not terminate active Runs.
+38. ExRatatui types must remain outside Kiln domain contracts and modules.
 
 ## Contract precedence during v0
 
 `kiln.delegation/v0` is the detailed authority for delegated Run transitions and Attention events introduced by P0-W11.
 
-The generic Run and Attention definitions in `kiln.domain/v0` remain compatible projections. Phase 1 contract consolidation must add `waiting_for_command` and the expanded Attention taxonomy to those generic schemas before runtime implementation uses them as complete validators.
+`kiln.interface/v0` is the public projection and Client-input authority introduced by P0-W12. It does not replace domain events, delegation contracts, or durable storage.
+
+The generic Run and Attention definitions in `kiln.domain/v0` remain compatible projections. Phase 1 contract consolidation must add `waiting_for_command`, the expanded Attention taxonomy, and accepted interface fields before runtime implementation uses those generic schemas as complete validators.
 
 ## Validation
 
@@ -62,6 +73,6 @@ The schemas use JSON Schema Draft 2020-12.
 
 The three domain schemas use stable `urn:kiln:schema:*` cross-file identifiers. A validator registers them in one catalog before resolving cross-file references.
 
-The Capability, Context, Git change, and delegation schemas are self-contained and use provisional `https://kiln.local/schemas/*` identifiers.
+The Capability, Context, Git change, delegation, and interface schemas are self-contained and use provisional `https://kiln.local/schemas/*` identifiers.
 
 A contract change requires parser validation. A foundational contract package also requires representative Draft 2020-12 validation for each top-level document type and negative cases for protected invariants.
