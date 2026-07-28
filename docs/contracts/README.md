@@ -1,9 +1,9 @@
 # Kiln Domain Contracts
 
 **Status:** Foundational contract direction; not implemented  
-**Contract families:** `kiln.domain/v0`, `kiln.capability/v0`, `kiln.context/v0`, `kiln.git/v0`, `kiln.delegation/v0`, `kiln.interface/v0`, `kiln.knowledge/v0`
+**Contract families:** `kiln.domain/v0`, `kiln.capability/v0`, `kiln.context/v0`, `kiln.git/v0`, `kiln.delegation/v0`, `kiln.interface/v0`, `kiln.knowledge/v0`, `kiln.knowledge.security/v0`
 
-These JSON Schemas express Kiln-native domain, Capability, Context, Git change-coordination, delegated-work, public terminal-interface, and local project-intelligence contracts.
+These JSON Schemas express Kiln-native domain, Capability, Context, Git change-coordination, delegated-work, public terminal-interface, local project-intelligence, and knowledge-security contracts.
 
 They do not define external protocol messages. An adapter can translate ACP, MCP, LSP, SCIP, A2A, AG-UI, AHP, provider, terminal, hosting-provider, or Client messages to these contracts.
 
@@ -18,6 +18,7 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 - `kiln-delegation.schema.json`: delegation contract, Scout result, Verifier result, Run transition, Attention event, cancellation, timeout, and Child result delivery.
 - `kiln-interface.schema.json`: public interface event, projection snapshot, Client-local state, normalized input intent, and structured CLI result.
 - `kiln-knowledge.schema.json`: approved-root configuration, Repository snapshot, typed node, typed edge, search result, candidate inspection, provenance trace, and scan result.
+- `kiln-knowledge-security.schema.json`: knowledge security policy, complete candidate provenance, disclosure decision, security audit event, separately authorized reference execution, and sanitized candidate projection.
 
 ## Rules
 
@@ -30,14 +31,14 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 7. Capability availability, effective authority, Evidence freshness, Trace, completion readiness, integration readiness, and most Client state are derived projections.
 8. Process identifiers and runtime handles must not appear in durable contracts.
 9. The complete Capability catalog remains outside model Context.
-10. A model-facing Tool name describes software-development intent, not a protocol, server, CLI, or vendor.
+10. A model-facing Tool name describes software-development intent, not a protocol, server, CLI, vendor, or persistence mechanism.
 11. Availability does not grant permission.
 12. Large and unbounded results use Artifact references rather than model-visible payloads.
 13. A larger provider Context window does not increase the Run Context ceiling automatically.
 14. Every model invocation or Context-consuming Worker step receives a new immutable Context manifest.
 15. Context items preserve authority, trust, sensitivity, freshness, state binding, selection reason, transformation, and retrieval provenance.
 16. Context package and Tool-schema limits are explicit contract fields, not provider defaults.
-17. Context7, external documentation, and model memory cannot override higher-authority version-matched Project sources.
+17. Context7, external documentation, model memory, and reference repositories cannot override higher-authority active Project sources.
 18. Git remains authoritative for commits, refs, worktrees, and Repository content.
 19. Branch contracts and worktree leases record Kiln authorization and coordination. They do not replace Git facts.
 20. One writable worktree has at most one active mutation-owner Run.
@@ -66,6 +67,11 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 43. Embeddings are disabled and no graph or vector database is required by `kiln.knowledge/v0`.
 44. Model-facing knowledge access uses narrow intent-level operations and does not expose SQL or arbitrary graph queries.
 45. Knowledge search results are investigation candidates and cannot become current Project decisions automatically.
+46. Reference instructions, prompts, roadmaps, ADRs, comments, and generated recommendations remain inert quoted data.
+47. Knowledge policy denies source execution, source writes, command authority, network authority, and hosted embeddings in v0.
+48. Every external disclosure is bound to policy, Run, destination, data classes, payload digest, Approval, and expiry.
+49. Every displayed or reusable candidate carries complete source, state, hash, trust, licensing, sanitization, and disclosure provenance.
+50. Future execution against a reference Repository requires a separate Run, grant, Environment, Approval, source snapshot, Evidence record, and audit trail.
 
 ## Contract precedence during v0
 
@@ -75,6 +81,8 @@ They do not define external protocol messages. An adapter can translate ACP, MCP
 
 `kiln.knowledge/v0` is the public configuration, Repository-snapshot, node, edge, result, inspection, provenance, and scan authority introduced by P0-W13. It does not replace Repository trust policy, Context selection, source truth, or active Project instructions.
 
+`kiln.knowledge.security/v0` narrows `kiln.knowledge/v0` with mandatory instruction quarantine, read-only authority, complete provenance, Privacy modes, disclosure decisions, security audit events, and separate reference-execution authorization. A knowledge result that conflicts with the security contract is invalid.
+
 The generic Run and Attention definitions in `kiln.domain/v0` remain compatible projections. Phase 1 contract consolidation must add `waiting_for_command`, the expanded Attention taxonomy, and accepted interface fields before runtime implementation uses those generic schemas as complete validators.
 
 ## Validation
@@ -83,6 +91,6 @@ The schemas use JSON Schema Draft 2020-12.
 
 The three domain schemas use stable `urn:kiln:schema:*` cross-file identifiers. A validator registers them in one catalog before resolving cross-file references.
 
-The Capability, Context, Git change, delegation, interface, and knowledge schemas are self-contained and use provisional `https://kiln.local/schemas/*` identifiers.
+The Capability, Context, Git change, delegation, interface, knowledge, and knowledge-security schemas are self-contained and use provisional `https://kiln.local/schemas/*` identifiers.
 
 A contract change requires parser validation. A foundational contract package also requires representative Draft 2020-12 validation for each top-level document type and negative cases for protected invariants.

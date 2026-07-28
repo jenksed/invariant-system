@@ -42,4 +42,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0013: Use protected trunk and exclusive writable worktrees](0013-protected-trunk-and-exclusive-worktrees.md) | Accepted | Integrated through pull request 14 |
 | [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Integrated through pull request 15 |
 | [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Integrated through pull request 16 |
-| [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Proposed on P0-W13 |
+| [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Integrated through pull request 17 |
+| [0017: Quarantine reference instructions and technically enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Proposed on P0-W14 |
