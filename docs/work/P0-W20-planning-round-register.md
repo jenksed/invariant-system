@@ -1,123 +1,126 @@
 # P0-W20: Define and sequence remaining planning rounds
 
 **Document type:** Planning work package  
-**Status:** Implemented; final verification pending  
+**Status:** Implemented and verified; owner acceptance and integration pending  
 **Branch:** `work/p0-w20-planning-round-register`  
 **Depends on:** P0-W19 integrated through pull request 24  
 **Scope:** Planning-domain classification, focused-round definition, dependency sequencing, and Prompt 5 handoff only
 
 ## Objective
 
-Define the smallest complete set of focused planning rounds that must run before Kiln can become planning-ready for the first-month Single-Run Change Alpha and the twelve-week Trustworthy Delegated CLI.
+Define the smallest complete set of focused planning rounds required before Kiln can become planning-ready for the first-month Single-Run Change Alpha and the twelve-week Trustworthy Delegated CLI.
 
-This work package classifies and sequences unresolved decisions. It does not execute a focused planning round, change implementation, create a prototype, create conformance scaffolding, or issue build authorization.
+P0-W20 classifies and sequences unresolved decisions. It does not execute a focused round, implement product behavior, create a prototype or conformance scaffold, or issue build authorization.
 
 ## Observed current state and evidence
 
-- Pull request 22 integrated the Prompt 1 baseline at `ef487c432a04de705e58ec79569abe5bb51e3d7a`.
-- Pull request 23 integrated Prompt 2 at `33da2a718d8d5305bf89035503ac372f07e80a6e`.
-- Pull request 24 integrated Prompt 3 at `0dba694f2a54ab517a2c43bbbd5c77f526a02e65`.
+- Prompt 1 integrated through pull request 22 at `ef487c432a04de705e58ec79569abe5bb51e3d7a`.
+- Prompt 2 integrated through pull request 23 at `33da2a718d8d5305bf89035503ac372f07e80a6e`.
+- Prompt 3 integrated through pull request 24 at `0dba694f2a54ab517a2c43bbbd5c77f526a02e65`.
 - The Prompt 3 merge was the current `main` head when P0-W20 began.
-- No post-Prompt-3 commit changed the product target, implementation inventory, dispositions, first-month target, twelve-week target, or known planning dependencies.
+- No later commit changed the product target, implementation inventory, dispositions, delivery targets, or planning dependencies.
 - Prompt 3 records 33 implementation units and identifies lifecycle, journal, provider, Context, mutation, Command, Evidence, Receipt, CLI, and Child planning dependencies.
-- Production source remains a dependency-free Mix bootstrap with no implemented product workflow.
-- Current preflight still enforces P0 work-package grammar and obsolete plan headings. P0-W20 preserves those headings without treating the behavior as P1 conformance.
+- Product source remains a dependency-free Mix bootstrap with no implemented product workflow.
+- Current preflight still enforces P0 work grammar and obsolete plan headings. Its passing test is not P1 conformance Evidence.
 
 ## Assumptions and unknowns
 
 ### Assumptions
 
-- The accepted product direction in ADR 0020 remains authoritative.
-- P0-W21 and later P0 work identifiers remain the current focused-planning coordinate because current development process and preflight recognize that convention.
+- ADR 0020 remains the accepted product-order authority.
 - Prompt 5 will run once for each required focused round.
 - Prompt 6, Prompt 7, and Prompt 8 will run separately for the first-month and delegated authorization boundaries.
 
-### Unknowns resolved by this pass
+### Resolved by P0-W20
 
-- Five focused rounds are required before the first-month authorization wave.
-- Two additional rounds are required before the twelve-week delegated target.
+- Five focused rounds precede the first-month authorization wave.
+- Two additional focused rounds precede the delegated twelve-week wave.
+- P0-W21 and P0-W22 are the only safe initial parallel pair.
 - No planning prototype is required.
 - Two owner decisions remain: first provider and disclosure mode; first supported host and architecture.
-- P0-W21 and P0-W22 are the only safe initial parallel pair.
 
-### Unknowns intentionally retained
+### Intentionally unresolved
 
-- Detailed answers owned by P0-W21 through P0-W27.
+- Detailed decisions owned by P0-W21 through P0-W27.
+- Which Prompt 6 candidates will be accepted.
 - Whether Prompt 8 will authorize either bounded implementation wave.
-- Which Prompt 6 candidates will be accepted as conformance scaffolding.
-- Whether implementation Evidence will require a later round to reopen one planning-dependent disposition.
+- Whether later implementation Evidence will require a planning-dependent disposition to reopen.
 
 ## Requirements
 
-- Revalidate the accepted Prompt 1 through Prompt 3 authorities.
-- Inventory every material unresolved planning domain.
-- Convert domains into exact decision questions.
-- Assign one planning classification to every material domain.
+- Revalidate Prompt 1 through Prompt 3 authority.
+- Classify every material unresolved planning domain.
+- Convert each active domain into exact decision questions.
 - Define the smallest sufficient set of focused planning rounds.
-- Use stable P0 work identifiers and provide a complete Prompt 5 invocation bundle for every required round.
-- Define acyclic dependencies, safe parallelism, merge order, and conflict rules.
+- Provide exact authoritative inputs, constraints, non-goals, outputs, completion gates, implementation unlocks and blocks, dependencies, parallelization, blast radius, and Prompt 5 bundles.
+- Define acyclic dependencies and safe merge order.
 - Define first-month and twelve-week planning-readiness gates.
-- Identify deferred domains, owner decisions, prototype dependencies, Prompt 3 dispositions to revisit, and Prompt 6 conformance candidates.
-- Preserve Prompt 7 as the final independent review and Prompt 8 as the only build-authorization pass.
-- Keep all changes planning-only.
+- Identify deferred domains, owner decisions, prototype dependencies, Prompt 3 disposition reviews, and Prompt 6 candidates.
+- Keep Prompt 7 immediately before Prompt 8 and Prompt 8 as the only authorization pass.
+- Keep the diff planning-only.
 
 ## Proposed changes
 
-P0-W20 completed these planning-control changes:
+P0-W20 completed these changes:
 
-1. Added one authoritative Planning Round Register.
-2. Added one exact-path input specification consumed by every Prompt 5 bundle.
-3. Added one planning authority index with Prompt 1 through Prompt 3 integration equivalents and current next action.
-4. Defined five first-month rounds and two delegated rounds.
-5. Defined owner, prototype, deferred, disposition-review, conformance-candidate, risk, reduction, dependency, parallelization, and readiness registers.
-6. Kept existing canonical product and subject authorities unchanged because Prompt 4 did not need to reopen or rewrite them.
-7. Kept build authorization denied.
+1. Added `docs/PLANNING-ROUND-REGISTER.md` as the remaining-planning authority.
+2. Added `docs/PLANNING-ROUND-INPUTS.md` with exact paths for every Prompt 5 bundle.
+3. Added `docs/PLANNING.md` as the planning index and integration ledger.
+4. Defined P0-W21 through P0-W25 before the first-month authorization wave.
+5. Defined P0-W26 and P0-W27 before delegated version 0.1 authorization.
+6. Defined dependency, parallelization, readiness, deferred, prototype, owner, disposition, conformance-candidate, risk, and reduction registers.
+7. Kept existing product and slice authorities unchanged.
+8. Kept build authorization denied.
 
 ## Files or components expected to change
 
 ### Added
 
-- `docs/PLANNING.md` — planning authority index, integration ledger, process, and next action.
-- `docs/PLANNING-ROUND-REGISTER.md` — authoritative Prompt 4 planning control.
-- `docs/PLANNING-ROUND-INPUTS.md` — exact repository paths for each focused round and Prompt 5 bundle.
-- `docs/work/P0-W20-planning-round-register.md` — work record and verification Evidence.
+- `docs/PLANNING.md`
+- `docs/PLANNING-ROUND-REGISTER.md`
+- `docs/PLANNING-ROUND-INPUTS.md`
+- `docs/work/P0-W20-planning-round-register.md`
 
 ### Deliberately unchanged
 
-- `docs/ROADMAP.md` remains product slice and implementation-order authority.
-- Prompt 2 product, architecture, Run, Session, slice, and gate authorities remain accepted inputs.
-- Prompt 3 implementation inventory and dispositions remain accepted inputs.
-- Stale branch-era headers in earlier integrated documents are recorded by the planning index and do not alter the accepted current target. A later bounded status-normalization pass may correct them without changing decisions.
+- production source and tests;
+- JSON Schemas;
+- dependencies and runtime configuration;
+- CI workflows and scripts;
+- preflight behavior;
+- Skills, prompts, and specialist agents;
+- executable gates and conformance scaffolding;
+- accepted product, architecture, Roadmap, and slice behavior.
 
-No production source, test, JSON Schema, dependency, runtime configuration, CI workflow, script, preflight behavior, Skill, prompt, specialist-agent definition, prototype, gate script, or executable scaffold changed.
+Earlier integrated authorities retain some branch-era status headers. `docs/PLANNING.md` records their integrated equivalents. New focused-round documents must not copy the stale status wording.
 
 ## Acceptance criteria
 
-| Criterion | Status before final CI | Evidence |
+| Criterion | Status | Evidence |
 | --- | --- | --- |
-| Prompt 1 through Prompt 3 integrated equivalents recorded | Pass | `docs/PLANNING.md`; PR and compare Evidence |
+| Prompt 1 through Prompt 3 integration recorded | Pass | `docs/PLANNING.md` and merge Evidence |
 | Every material unresolved domain classified | Pass | Planning Round Register section 6 |
 | Every first-month blocker has an owner | Pass | P0-W21 through P0-W25 and OD-01/OD-02 |
-| Every twelve-week dependency visible | Pass | P0-W26, P0-W27, dependency graph, readiness gate |
-| Every round has exact questions and complete required fields | Pass | seven round entries |
-| Every round has exact authoritative paths | Pass | `docs/PLANNING-ROUND-INPUTS.md` |
+| Every twelve-week dependency is visible | Pass | P0-W26, P0-W27, dependency graph, readiness gate |
+| Seven complete round entries exist | Pass | P0-W21 through P0-W27 |
+| Exact authoritative paths exist for every round | Pass | `docs/PLANNING-ROUND-INPUTS.md` |
 | Every round has a completion gate | Pass | seven targeted matches |
 | Every round has a Prompt 5 bundle | Pass | seven targeted matches |
-| Dependency graph is valid and acyclic | Pass | register section 9 |
-| Safe and unsafe parallelism is explicit | Pass | register section 10 |
-| Deferred domains are outside first-month prerequisites | Pass | sections 6, 9, 11, and 14 |
-| Prototype register complete | Pass | no planning prototype required |
-| Owner register complete | Pass | OD-01 and OD-02 |
-| Prompt 3 dispositions mapped to rounds | Pass | section 17 |
-| Prompt 6 candidates identified but not created | Pass | section 18 |
-| Prompt 7 remains immediately before Prompt 8 | Pass | sections 1, 9, 11, 12, and 21 |
-| Documentation-only diff | Pass | GitHub compare against `main` |
-| Design-head Repository validation | Pass | CI run `30416045818` |
-| Exact final-head Repository validation | Pending | final closeout-head CI required |
+| Dependencies are valid and acyclic | Pass | register section 9 |
+| Parallel and sequential rules are explicit | Pass | register section 10 |
+| Deferred domains are not first-month prerequisites | Pass | sections 6, 9, 11, and 14 |
+| Prototype and owner registers are complete | Pass | sections 15 and 16 |
+| Prompt 3 dispositions map to rounds | Pass | section 17 |
+| Prompt 6 candidates are identified but absent | Pass | section 18 and final diff |
+| Prompt 7 immediately precedes Prompt 8 | Pass | sections 1, 9, 11, 12, and 21 |
+| Diff is planning-only | Pass | GitHub compare against `main` |
+| Design-head CI | Pass | run `30416045818` |
+| Closeout-head CI before this status commit | Pass | run `30416135802` |
+| Exact final status-head CI | Pending | required because this record changed the head |
 
 ## Verification commands
 
-Current CI ran the Repository-equivalent checks on design head `3e2f555c899c91360696fb12fde1fe63d32f6fec`:
+Current CI runs:
 
 ```bash
 scripts/test-agent-preflight
@@ -130,51 +133,46 @@ mix test
 vale .
 ```
 
-CI run `30416045818` passed:
+Design head `3e2f555c899c91360696fb12fde1fe63d32f6fec` passed CI run `30416045818`.
 
-- Vale prose validation;
-- current agent-preflight behavior tests;
-- Project agent-asset validation;
-- dependency installation;
-- formatting;
-- warnings-as-errors compilation;
-- compile-connected cycle detection;
-- ExUnit.
+Closeout head `72b04547c9136f6d7036664b89ec257a53a3fd22` passed CI run `30416135802`.
 
-The preflight result proves the current obsolete P0 behavior still passes. It does not prove P1 branch or plan compatibility.
+Both runs passed prose, preflight behavior tests, agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
 
-Targeted validation also proved:
+Targeted validation proved:
 
 - seven required round identities;
-- seven completion-gate headings;
-- seven Prompt 5 invocation-bundle headings;
+- seven completion gates;
+- seven Prompt 5 invocation bundles;
 - exact input paths for every round;
 - one acyclic dependency graph;
 - one safe initial parallel pair;
-- no deferred domain in the first-month dependency path;
-- P0-W21 through P0-W25 own every active first-month decision family;
-- Prompt 7 immediately precedes Prompt 8 in both authorization waves.
+- no deferred first-month prerequisite;
+- one owner for every active first-month decision family;
+- Prompt 7 immediately before Prompt 8 in both waves.
+
+The current preflight pass remains Evidence for obsolete P0 behavior only.
 
 ## Required completion evidence
 
 | Evidence ID | Scope | Evidence |
 | --- | --- | --- |
 | P0-W20-E01 | Entry gate | PR 22, PR 23, PR 24 merge commits; Prompt 3 merge identical to starting `main` |
-| P0-W20-E02 | Domain and question inventory | Planning Round Register sections 5 and 6 and seven decision-question sets |
-| P0-W20-E03 | Complete focused rounds | P0-W21 through P0-W27 entries and Prompt 5 bundles |
-| P0-W20-E04 | Dependencies and parallelization | register sections 9 and 10 |
-| P0-W20-E05 | Supporting registers | deferred, prototype, owner, dispositions, candidates, risks, and reduction sections |
-| P0-W20-E06 | Readiness boundaries | first-month, twelve-week, and broad readiness sections |
-| P0-W20-E07 | Change boundary | GitHub compare: four added Markdown files, no executable or machine-readable changes |
-| P0-W20-E08 | Design verification | CI run `30416045818` on design head `3e2f555c899c91360696fb12fde1fe63d32f6fec` |
-| P0-W20-E09 | Final verification | exact closeout-head CI pending |
+| P0-W20-E02 | Domain and question inventory | register sections 5 and 6 and seven question sets |
+| P0-W20-E03 | Focused rounds | P0-W21 through P0-W27 and seven Prompt 5 bundles |
+| P0-W20-E04 | Dependency and parallelization | register sections 9 and 10 |
+| P0-W20-E05 | Supporting registers | sections 14 through 20 |
+| P0-W20-E06 | Readiness boundaries | sections 11 through 13 |
+| P0-W20-E07 | Change boundary | four added Markdown files; no executable or machine-readable changes |
+| P0-W20-E08 | Design verification | CI `30416045818` |
+| P0-W20-E09 | Closeout verification | CI `30416135802` |
+| P0-W20-E10 | Final status-head verification | pending exact-head CI |
 
 ## Failures and warnings
 
-- Current preflight remains incompatible with accepted P1 ticket grammar and current plan-template headings.
-- Current CI still proves obsolete positive preflight behavior.
-- Current CI does not validate complete Schema compatibility or documentation references.
-- Earlier integrated Prompt 2 and Prompt 3 documents retain some branch-era status headers. The new planning index records their integrated equivalents. These stale headers do not change the accepted target but should not be copied into new focused-round documents.
+- Current preflight rejects accepted P1 ticket grammar and checks obsolete plan headings.
+- Current CI proves obsolete positive preflight behavior and does not validate complete Schema compatibility or documentation references.
+- Earlier integrated documents retain some stale branch-era status headers.
 - P0-W22 cannot complete until OD-01 is answered.
 - P0-W24 and P0-W25 cannot complete until OD-02 is answered.
 - P0-W26 and P0-W27 require integrated Single-Run Alpha Evidence before final acceptance.
@@ -185,7 +183,7 @@ Targeted validation also proved:
 P0-W20 does not:
 
 - execute Prompt 5;
-- answer a focused round's detailed design questions;
+- answer focused-round design questions;
 - select or add dependencies;
 - create or run prototypes;
 - modify source, tests, Schemas, CI, scripts, preflight, Skills, prompts, or agents;
@@ -196,7 +194,7 @@ P0-W20 does not:
 
 ## Exact next action
 
-After exact final-head CI, owner review, acceptance, and integration, run Prompt 5 for:
+After exact final status-head CI, owner review, acceptance, and integration, run Prompt 5 for:
 
 ```text
 P0-W21 — Root Run lifecycle and durable journal
