@@ -30,8 +30,12 @@ defmodule Kiln.Domain.IdTest do
   end
 
   test "rejects unsupported kinds and malformed entropy" do
-    assert {:error, %{code: :unsupported_identifier_kind}} = Id.generate(:provider, fn 16 -> @entropy end)
-    assert {:error, %{code: :invalid_entropy}} = Id.generate(:session, fn 16 -> <<1, 2>> end)
+    assert {:error, %{code: :unsupported_identifier_kind}} =
+             Id.generate(:provider, fn 16 -> @entropy end)
+
+    assert {:error, %{code: :invalid_entropy}} =
+             Id.generate(:session, fn 16 -> <<1, 2>> end)
+
     refute Id.valid?(:session, "ses_not-hex")
   end
 end
