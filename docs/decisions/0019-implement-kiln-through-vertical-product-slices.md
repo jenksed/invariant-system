@@ -84,7 +84,7 @@ ADR 0020 becomes binding only after owner acceptance and integration.
 
 ## Historical consequences
 
-ADR 0019 successfully:
+ADR 0019:
 
 - replaced a horizontal component backlog with product slices;
 - rejected a process or table for every domain noun;
