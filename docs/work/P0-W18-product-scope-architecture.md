@@ -1,8 +1,9 @@
 # P0-W18: Reconcile product, scope, and minimum architecture
 
 **Document type:** Planning work package  
-**Status:** Implemented and verified; not integrated  
+**Status:** Implemented, verified, accepted, and integrated  
 **Branch:** `work/p0-w18-product-scope-architecture`  
+**Integrated through:** Pull request 23 at merge commit `33da2a718d8d5305bf89035503ac372f07e80a6e`  
 **Depends on:** P0-W17 integrated through pull request 22  
 **Scope:** Product, scope, and architecture planning only
 
@@ -10,21 +11,21 @@
 
 Reconcile Kiln's product boundary, smallest useful workflow, Run model, minimum architecture, capability sequence, delivery targets, and remaining planning domains.
 
-This pass updates current planning authorities. It does not implement or repair runtime, tests, CI, development-agent scripts, JSON Schemas, Skills, prompts, agents, dependencies, or gate scripts.
+This pass updated planning authorities. It did not implement or repair runtime, tests, CI, development-agent scripts, JSON Schemas, Skills, prompts, agents, dependencies, or gate scripts.
 
 ## Observed current state and Evidence
 
 | Observation | Evidence | Date or commit |
 | --- | --- | --- |
-| Prompt 1 is integrated | Pull request 22 merged at `ef487c432a04de705e58ec79569abe5bb51e3d7a` | 2026-07-28 |
-| P0-W16 closeout is integrated | Pull request 21 merged immediately before pull request 22 | 2026-07-28 |
-| Prompt 1 baseline exists | `docs/PLANNING-COMPLETION-BASELINE.md` | Branch base |
-| Product source remains an early Mix bootstrap | `mix.exs`, `lib/kiln.ex`, `lib/kiln/application.ex`, `test/kiln_test.exs` | Branch base |
-| No P1 slice is implemented | No accepted source, demo, aggregate gate, or Receipt | Branch base |
-| Existing Schemas are conformance scaffolding | `docs/contracts/README.md` and current Schema files | Branch base |
-| Earlier roadmap begins with simulated Runs and TUI | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
-| Earlier version 0.1 is read-only | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
-| Run Model contained process-per-active-Run example | Pre-P0-W18 `docs/RUN-MODEL.md` | Branch base |
+| Prompt 1 was integrated | Pull request 22 merged at `ef487c432a04de705e58ec79569abe5bb51e3d7a` | 2026-07-28 |
+| P0-W16 closeout was integrated | Pull request 21 merged immediately before pull request 22 | 2026-07-28 |
+| Prompt 1 baseline existed | `docs/PLANNING-COMPLETION-BASELINE.md` | Branch base |
+| Product source remained an early Mix bootstrap | `mix.exs`, `lib/kiln.ex`, `lib/kiln/application.ex`, `test/kiln_test.exs` | Branch base |
+| No P1 slice was implemented | No source, demo, aggregate gate, or Receipt | Branch base |
+| Existing Schemas were conformance scaffolding | `docs/contracts/README.md` and Schema files | Branch base |
+| Earlier roadmap began with simulated Runs and TUI | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
+| Earlier version 0.1 was read-only | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
+| Run Model contained a process-per-active-Run example | Pre-P0-W18 `docs/RUN-MODEL.md` | Branch base |
 | Source guide pre-created broad subsystem directories | Pre-P0-W18 `docs/AGENT-FRIENDLY-CODEBASE.md` | Branch base |
 
 ## Material baseline change after P0-W17
@@ -40,19 +41,19 @@ No post-baseline production change invalidated the Prompt 1 product or implement
 - **P0-W18-A01:** One developer remains the initial and primary user.
 - **P0-W18-A02:** One local active Repository is sufficient for the first useful workflow.
 - **P0-W18-A03:** A coding harness must complete a narrow change and verification loop to be meaningfully better than a generic model wrapper.
-- **P0-W18-A04:** Owner integration of this pass will accept its proposed roadmap and architecture changes.
+- **P0-W18-A04:** Owner integration accepts the roadmap and architecture changes.
 
-### Unknowns
+### Unknowns retained for later planning
 
-- **P0-W18-U01:** Exact SQLite library, schema, migration, and transaction implementation.
-- **P0-W18-U02:** Exact provider authentication, streaming, cancellation, and rate-limit implementation.
-- **P0-W18-U03:** Exact primary-platform process-tree termination mechanism and later portability.
-- **P0-W18-U04:** Exact Patch format, write algorithm, and rollback implementation.
-- **P0-W18-U05:** Exact retention periods for Artifacts, raw output, and historical Context packages.
-- **P0-W18-U06:** Exact deferred TUI library and headless behavior.
-- **P0-W18-U07:** Whether managed worktrees are required after the single-writer alpha proves value.
+- exact SQLite library, schema, migration, and transaction implementation;
+- exact provider authentication, streaming, cancellation, and rate-limit implementation;
+- exact primary-platform process-tree termination mechanism and later portability;
+- exact Patch format, write algorithm, and rollback implementation;
+- exact retention periods for Artifacts, raw output, and historical Context packages;
+- exact deferred TUI library and headless behavior;
+- whether managed worktrees are required after the single-writer alpha proves value.
 
-Prompt 4 must evaluate these planning domains. P0-W18 does not invent implementation answers.
+Prompt 4 must evaluate these planning domains. P0-W18 did not invent implementation answers.
 
 ## Requirements
 
@@ -69,25 +70,23 @@ Prompt 4 must evaluate these planning domains. P0-W18 does not invent implementa
 - **P0-W18-R11:** Identify remaining planning domains for Prompt 4.
 - **P0-W18-R12:** Do not issue build authorization.
 
-## Implemented changes
-
-P0-W18 proposes these decisive corrections:
+## Accepted changes
 
 1. Kiln is a local-first coding execution ledger and control plane for one developer.
 2. The first useful product is one durable CLI Root Run that completes a real source change.
-3. Version 0.1 includes one read-only Scout Child and one independent Verifier Child after the Root workflow works.
+3. Version 0.1 adds one read-only Scout Child and one independent Verifier Child after the Root workflow works.
 4. Maximum Child depth is one and maximum active Child count is one through version 0.1.
 5. A separate Root Task is not required initially.
 6. No process exists merely because a Run or another domain record exists.
-7. SQLite journaling is limited to concrete recovery, audit, replay, duplicate prevention, and unknown-effect requirements.
+7. SQLite journaling is limited to recovery, audit, replay, duplicate prevention, and unknown-effect requirements.
 8. One selected writable checkout and one mutation owner precede managed worktrees.
 9. The CLI is complete and permanent. The TUI is deferred beyond twelve weeks.
 10. At most four Tool schemas enter a first-month model invocation.
-11. A general Capability broker, model router, Context retrieval framework, Skills, code intelligence, protocols, telemetry, and local project intelligence are deferred.
+11. General brokerage, routing, retrieval frameworks, runtime Skills, code intelligence, protocols, telemetry, and local project intelligence are deferred.
 12. One real source change is the first-month milestone.
 13. A trustworthy delegated CLI is the twelve-week version 0.1 milestone.
-14. Existing JSON Schemas remain unchanged and become Prompt 3 disposition targets.
-15. ADR 0020 proposes partial supersession of ADR 0019's order and milestone while retaining vertical-slice discipline.
+14. Existing JSON Schemas remain conformance assets for Prompt 3 disposition.
+15. ADR 0020 partially supersedes ADR 0019's order and milestone while retaining vertical-slice discipline.
 
 ## Authoritative files changed
 
@@ -120,15 +119,11 @@ P0-W18 proposes these decisive corrections:
 
 ### Unchanged executable and machine-readable areas
 
-- production source;
-- production tests;
-- CI workflows;
-- development scripts;
+- production source and tests;
+- CI workflows and development scripts;
 - JSON Schema files;
 - dependencies and runtime configuration;
-- development Skills;
-- prompt templates;
-- specialist-agent definitions;
+- development Skills, prompts, and specialist agents;
 - planned gate script paths.
 
 ## Acceptance criteria
@@ -147,13 +142,13 @@ P0-W18 proposes these decisive corrections:
 | P0-W18-AC10 Context, security, Evidence boundaries | Pass | Product-scope specification and Architecture |
 | P0-W18-AC11 delivery targets | Pass | Roadmap and Implementation Slices |
 | P0-W18-AC12 remaining planning domains | Pass | Product-scope assessment |
-| P0-W18-AC13 coherent Prompt 3 target | Pass | Contract index, affected-scaffolding register, and current authorities |
+| P0-W18-AC13 coherent Prompt 3 target | Pass | Contract index and affected-scaffolding register |
 | P0-W18-AC14 documentation-only diff | Pass | Compare against `main`: 21 documentation files |
-| P0-W18-AC15 Repository validation | Pass | GitHub CI run `30411615027` on design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` |
+| P0-W18-AC15 Repository validation | Pass | Final-head GitHub CI run `30411722838` |
 
 ## Verification executed
 
-The design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` passed GitHub CI run `30411615027`:
+Final review head `6dbc2bab231b22bd50fcb5c9c57b2b3ca4390c9f` passed GitHub CI run `30411722838`:
 
 - Vale;
 - agent preflight behavior;
@@ -164,11 +159,11 @@ The design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` passed GitHub CI run 
 - compile-connected cycle detection;
 - ExUnit.
 
-An earlier head passed every executable test step but failed Vale on two uses of a forbidden marketing word. P0-W18 corrected the text and did not weaken the rule.
+Design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` also passed CI run `30411615027` before the closeout-only update.
 
-A passing preflight test proves that obsolete P0 behavior still passes. It does not prove current P1 slice-ticket support.
+An earlier head passed every executable test step but failed Vale on two forbidden marketing words. P0-W18 corrected the text and did not weaken the rule.
 
-This closeout commit requires one final exact-head CI run before integration.
+A passing preflight test proved only that obsolete P0 behavior still passed. It did not prove P1 slice-ticket support.
 
 ## Required completion Evidence
 
@@ -180,33 +175,34 @@ This closeout commit requires one final exact-head CI run before integration.
 | P0-W18-E04 | AC09 | Earned namespace and deferred namespace rules |
 | P0-W18-E05 | AC10 | Context, Tool, security, Evidence, Artifact, Receipt, and completion sections |
 | P0-W18-E06 | AC11 | Roadmap, slice definitions, and planned aggregate gates |
-| P0-W18-E07 | AC12–AC13 | Remaining planning-domain assessment and Prompt 3 affected-scaffolding register |
+| P0-W18-E07 | AC12–AC13 | Remaining planning-domain assessment and Prompt 3 inputs |
 | P0-W18-E08 | AC14 | GitHub compare against `main` |
-| P0-W18-E09 | AC15 | GitHub CI run `30411615027`; final closeout-head run pending |
+| P0-W18-E09 | AC15 | GitHub CI run `30411722838` on final review head |
+| P0-W18-E10 | Integration | Pull request 23 merge commit `33da2a718d8d5305bf89035503ac372f07e80a6e` |
 
 ## Failures and warnings
 
-- Current preflight and its tests remain intentionally obsolete and unchanged.
-- Current Schema files remain intentionally unchanged and may conflict with the reconciled minimum subset.
-- Existing accepted invariants describe some broader long-term maxima. P0-W18 narrows version 0.1 timing and limits through proposed ADR 0020 without renumbering the stable register.
-- Exact dependency, persistence, Patch, process-control, provider, retention, and later TUI decisions remain unresolved.
-- Build authorization remains denied.
+- Preflight and its tests remained obsolete and unchanged for Prompt 3 disposition.
+- Schema files remained unchanged and required Prompt 3 classification.
+- Some long-term invariants describe broader maxima than version 0.1.
+- Exact persistence, Patch, Command, provider, Context, retention, and later TUI decisions remained unresolved.
+- Build authorization remained denied.
 
 ## Explicit exclusions
 
-P0-W18 does not:
+P0-W18 did not:
 
 - implement any product capability;
 - repair preflight, CI, Skills, prompts, agents, or gate scripts;
 - change JSON Schemas;
 - select runtime dependencies;
-- design every transition or retention rule;
+- define every transition or retention rule;
 - define the final Planning Round Register;
 - perform the final adversarial review;
 - authorize implementation.
 
-## Exact next action
+## Successor
 
-After final closeout-head validation, owner review, acceptance, and integration, run **Prompt 3 — Reconcile scaffolded, partial, and completed-looking implementation** against current `main`.
+P0-W19 performs Prompt 3 against the integrated P0-W18 baseline.
 
-Do not begin Prompt 4 or implementation before Prompt 3 passes.
+Do not begin Prompt 4 or implementation until P0-W19 passes, is reviewed, accepted, and integrated.
