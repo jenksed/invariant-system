@@ -7,8 +7,11 @@ defmodule Kiln.Store.MigrationsTest do
     dir = Path.join(System.tmp_dir!(), "kiln-mig-#{System.unique_integer([:positive])}")
     File.mkdir_p!(dir)
     on_exit(fn -> File.rm_rf!(dir) end)
+
     {:ok, conn} = Connection.start_link(path: Path.join(dir, "state.sqlite3"))
-    {:ok, conn: conn}
+    on_exit(fn -> stop(conn) end)
+
+    {:ok, conn: conn, dir: dir}
   end
 
   test "applies the initial migration on a fresh store", %{conn: conn} do
@@ -44,6 +47,21 @@ defmodule Kiln.Store.MigrationsTest do
     assert {:ok, %{version: 1, applied_now: []}} = Migrations.migrate(conn)
   end
 
+  test "blocks when the bundled migration set is absent", %{conn: conn, dir: dir} do
+    missing = Path.join(dir, "missing-migrations")
+
+    assert {:error, %{class: :migration, code: :missing_migrations}} =
+             Migrations.migrate(conn, dir: missing)
+
+    assert Migrations.current_version(conn) == 0
+
+    assert [] =
+             Connection.query!(
+               conn,
+               "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'journal_entries'"
+             )
+  end
+
   test "blocks a modified applied migration", %{conn: conn} do
     {:ok, _} = Migrations.migrate(conn)
 
@@ -65,5 +83,12 @@ defmodule Kiln.Store.MigrationsTest do
 
     assert {:error, %{class: :future_version, code: :unknown_applied_migration}} =
              Migrations.migrate(conn)
+  end
+
+  defp stop(conn) do
+    if Process.alive?(conn), do: GenServer.stop(conn)
+    :ok
+  catch
+    :exit, _reason -> :ok
   end
 end
