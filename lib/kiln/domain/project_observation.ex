@@ -18,7 +18,9 @@ defmodule Kiln.Domain.ProjectObservation do
         }
 
   @spec new(map(), Id.entropy_source()) :: {:ok, t()} | {:error, Error.t()}
-  def new(attrs, entropy_source \\ &:crypto.strong_rand_bytes/1) when is_map(attrs) do
+  def new(attrs, entropy_source \\ &:crypto.strong_rand_bytes/1)
+
+  def new(attrs, entropy_source) when is_map(attrs) do
     with {:ok, id} <- Id.generate(:project_observation, entropy_source),
          {:ok, repository_root} <- nonempty_string(attrs, :repository_root),
          {:ok, repository_fingerprint} <- digest(attrs, :repository_fingerprint),
