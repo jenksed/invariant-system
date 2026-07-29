@@ -1,9 +1,9 @@
 # ADR 0020: Prove a single-Run change loop before delegated orchestration
 
-- **Decision status:** Proposed
-- **Integration status:** Proposed on P0-W18
+- **Decision status:** Accepted
+- **Integration status:** Integrated through pull request 23
 - **Date:** 2026-07-28
-- **Supersedes if accepted:** ADR 0019 implementation order and version 0.1 milestone only
+- **Partially supersedes:** ADR 0019 implementation order and version 0.1 milestone only
 
 ## Context
 
@@ -68,7 +68,7 @@ Rejected because Kiln would not own the durable work contract, exact authority d
 
 Implement one complete CLI workflow with exact Repository state, one model, bounded Context and Tools, explicit Patch Approval, registered verification, current Evidence, user acceptance, and restart recovery. Add bounded Child Runs after that workflow works.
 
-Accepted by this proposed decision.
+Accepted.
 
 ## Decision
 
@@ -167,7 +167,7 @@ This ADR does not reject these ADR 0019 principles:
 - use Patch Artifacts for later writing Child proposals;
 - keep protocols outside the native domain and behind concrete entry gates.
 
-Only ADR 0019's slice order, first coding target, and read-only version 0.1 boundary are proposed for supersession.
+Only ADR 0019's slice order, first coding target, and read-only version 0.1 boundary are superseded.
 
 ## Rejected positions
 
@@ -186,10 +186,10 @@ Only ADR 0019's slice order, first coding target, and read-only version 0.1 boun
 ### Evidence
 
 - P0-W17 establishes that current source is only an early Mix bootstrap.
-- Current P1-S01 is a simulated Run and TUI slice.
-- Current P1-S05 defines a read-only version 0.1.
-- Current Run planning contains depth-two, three-active-Child, and process-per-active-Run implications.
-- Current accepted architecture already rejects process identity, protocol-owned domain semantics, worktrees for harmless reads, and generalized infrastructure before user value.
+- The pre-P0-W18 P1-S01 was a simulated Run and TUI slice.
+- The pre-P0-W18 P1-S05 defined a read-only version 0.1.
+- Earlier Run planning contained depth-two, three-active-Child, and process-per-active-Run implications.
+- The accepted architecture already rejects process identity, protocol-owned domain semantics, worktrees for harmless reads, and generalized infrastructure before user value.
 
 ### Assumptions
 
