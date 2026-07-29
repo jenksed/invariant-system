@@ -37,10 +37,15 @@ defmodule Kiln.Domain.TransitionTest do
 
   test "rejects unsupported states, terminal escape, and direct orphan completion" do
     assert {:error, %{code: :unsupported_run_state}} = Transition.validate_run(:created, :ready)
-    assert {:error, %{code: :invalid_run_transition}} = Transition.validate_run(:completed, :ready)
+
+    assert {:error, %{code: :invalid_run_transition}} =
+             Transition.validate_run(:completed, :ready)
+
     assert {:error, %{code: :invalid_run_transition}} = Transition.validate_run(:failed, :running)
     assert {:error, %{code: :invalid_run_transition}} = Transition.validate_run(:canceled, :ready)
-    assert {:error, %{code: :invalid_run_transition}} = Transition.validate_run(:orphaned, :completed)
+
+    assert {:error, %{code: :invalid_run_transition}} =
+             Transition.validate_run(:orphaned, :completed)
   end
 
   test "Run transitions keep decision and operation references separate from state" do
