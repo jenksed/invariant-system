@@ -8,62 +8,62 @@
 
 | Pass or decision | Integrated equivalent |
 | --- | --- |
-| Prompt 1 | PR 22, `ef487c432a04de705e58ec79569abe5bb51e3d7a` |
-| Prompt 2 | PR 23, `33da2a718d8d5305bf89035503ac372f07e80a6e` |
-| Prompt 3 | PR 24, `0dba694f2a54ab517a2c43bbbd5c77f526a02e65` |
-| Prompt 4 | PR 25, `45acc2ed575957c53a8c57195d99c82965e9d48e` |
-| OD-01 | PR 26, `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1` |
+| Prompt 1 | PR 22 |
+| Prompt 2 | PR 23 |
+| Prompt 3 | PR 24 |
+| Prompt 4 | PR 25 |
+| OD-01 | PR 26 |
 | P0-W21 | PR 27 and closeout PR 28 |
-| P0-W22 | PR 29, `abbded1af773981c40e0810c19ce043b9485daeb` |
-| P0-W23 | PR 30, `58720bcfba815d77c6d815e0ca004e0546cb9a6e` |
-| OD-02 | PR 31, `5174fd42650711da0e064766a6c44abfbaf57bf2` |
+| P0-W22 | PR 29 |
+| P0-W23 | PR 30 |
+| OD-02 | PR 31 |
+| P0-W24 | PR 32, `4e9fe904c31c57a4c76a3569319db4504e08d682` |
 
 ## Current authorities
 
 Use, in order:
 
-1. planning baseline, product scope, disposition register, planning-round register, and owner decisions;
+1. planning baseline, product scope, dispositions, round register, and owner decisions;
 2. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md);
 3. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md);
 4. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md);
-5. [Command, Evidence, and Acceptance](COMMAND-EVIDENCE-AND-ACCEPTANCE.md), proposed by P0-W24;
-6. Roadmap, implementation slices, and slice acceptance gates.
+5. [Command, Evidence, and Acceptance](COMMAND-EVIDENCE-AND-ACCEPTANCE.md);
+6. [CLI and Local Delivery Contract](CLI-AND-LOCAL-DELIVERY-CONTRACT.md), proposed by P0-W25;
+7. Roadmap, implementation slices, and slice gates.
 
-Earlier Architecture, Run, Session, execution, and Schema documents cannot broaden or replace the focused first-month authorities.
+Earlier Architecture, Run, Session, execution, interface, and Schema documents cannot broaden or replace the focused first-month authorities.
 
 ## Integrated authority
 
-- **P0-W21:** lifecycle, operation, persistence, restart, orphan, and completion transaction.
+- **P0-W21:** lifecycle, operations, persistence, restart, orphan, and completion transaction.
 - **P0-W22:** MiniMax M3, fake provider, sealed Context, four Tools, Repository reads, disclosure, and secrets.
 - **P0-W23:** exact complete-text Patch, Approval, one mutation owner, rollback, and base/target/unknown recovery.
+- **P0-W24:** registered non-shell Commands, macOS process-group cleanup, Artifacts, criterion Evidence, aggregate proof, user acceptance, completion input, Receipt, and delivery.
 - **OD-02:** Apple Silicon macOS 15.0 or later, local APFS, one local user, owner's M1 Pro primary validation host, other hosts unsupported.
 
-## Proposed P0-W24 authority
+## Proposed P0-W25 authority
 
-P0-W24 proposes:
+P0-W25 proposes:
 
-- versioned registered non-shell Commands with absolute executable and argv schema;
-- minimal constructed environment and explicit secret references;
-- one active Command and a bundled macOS process-group helper;
-- TERM, five-second grace, KILL, five-second grace, and group absence proof;
-- unknown operation when descendant cleanup cannot be proved;
-- bounded stdout and stderr plus immutable content-addressed Artifacts;
-- no automatic Artifact deletion in the first product;
-- criterion-bound Evidence with status, freshness, completeness, contradiction, and exact state binding;
-- deterministic criterion and aggregate completion evaluation;
-- user acceptance bound to the current aggregate evaluation;
-- P0-W21 atomic finalization as the sole completion authority;
-- post-completion Receipt sealing and separate delivery state;
-- no claim that exit zero, model confidence, a summary, or a Receipt proves completion.
+- one permanent CLI named `kiln` with no daemon;
+- text and versioned JSON output;
+- stable exit codes and safe next actions;
+- Project, policy, Command registration, Session, Context, investigation, Patch, verification, Evidence, acceptance, Receipt, cancellation, and recovery commands;
+- no `--yes`, auto-Approval, or auto-acceptance;
+- default `$KILN_HOME` at `~/Library/Application Support/Kiln`;
+- explicit host diagnostics and credential-reference status;
+- one arm64 macOS Mix release containing ERTS, Exqlite, and the command-host helper;
+- user-local side-by-side installation with checksum and build manifest;
+- no root, daemon, Homebrew, public installer, auto-update, or cross-platform binary claim;
+- version derived from application and release metadata rather than a separate literal.
 
-ADR-0026 owns the proposed macOS registered process-group Command path.
+ADR-0027 owns the proposed arm64 macOS Mix-release delivery boundary.
 
 ## Wave A
 
 ```text
-P0-W21 → P0-W22 → P0-W23 → OD-02
-→ validate and integrate P0-W24
-→ P0-W25
+P0-W21 → P0-W22 → P0-W23 → OD-02 → P0-W24
+→ validate and integrate P0-W25
 → Prompt 6-A
 → Prompt 7-A
 → Prompt 8-A
@@ -77,4 +77,4 @@ P0-W26 and P0-W27 remain blocked until an authorized Single-Run Alpha provides a
 
 ## Current next action
 
-Complete P0-W24 review and exact-head validation. Integrate it, then run P0-W25.
+Complete P0-W25 review and exact-head validation. Integrate it, then run Prompt 6-A.
