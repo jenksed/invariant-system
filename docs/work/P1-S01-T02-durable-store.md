@@ -205,44 +205,83 @@ P1-S01-D01 durable-state prerequisite: create a Session action transaction, stop
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Complete
+
+All six acceptance criteria pass, the full deterministic verification gate ran green at the exact branch head, and the owner-machine diagnostic was executed on the OD-02 acceptance host. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T02-AC01 | Pending | P1-S01-T02-E01 | pending |
-| P1-S01-T02-AC02 | Pending | P1-S01-T02-E02 | pending |
-| P1-S01-T02-AC03 | Pending | P1-S01-T02-E03 | pending |
-| P1-S01-T02-AC04 | Pending | P1-S01-T02-E04 | pending |
-| P1-S01-T02-AC05 | Pending | P1-S01-T02-E05 | pending |
-| P1-S01-T02-AC06 | Pending | P1-S01-T02-E06 | pending |
+| P1-S01-T02-AC01 | Pass | P1-S01-T02-E01 | `Kiln.Store.start/1` on an empty directory creates the schema, records the 0001 checksum, verifies WAL / `synchronous=FULL` / foreign keys / 2s busy timeout, and reports SQLite 3.53.3 |
+| P1-S01-T02-AC02 | Pass | P1-S01-T02-E02 | `Kiln.Store.Journal.commit/4` atomically appends the entry, advances the Session revision, and writes the idempotency result; direct row assertions confirm all three |
+| P1-S01-T02-AC03 | Pass | P1-S01-T02-E03 | stale revision → `:revision` with current; duplicate identical → replayed prior result, no new entry; duplicate conflicting → `:idempotency_conflict`; injected fault → no partial journal, revision, or idempotency state |
+| P1-S01-T02-AC04 | Pass | P1-S01-T02-E04 | fresh store migrates once; modified applied checksum → `migration_blocked`; store from a newer binary → `version_blocked`; corrupt fixture → `integrity_blocked` with the file preserved |
+| P1-S01-T02-AC05 | Pass | P1-S01-T02-E05 | source uses one outer `BEGIN IMMEDIATE` per action (no savepoints); a protected test shows SQLite rejects a nested transaction |
+| P1-S01-T02-AC06 | Pass | P1-S01-T02-E06 | full deterministic gate exits zero at exact head `4a9846e`; no unauthorized external effect (no Repository read, provider, shell, or network) |
+
+Owner-machine gate (E07): `scripts/diagnostics/p1-s01-store-host` executed on the OD-02 acceptance host (this M1 Pro).
 
 ### Verification executed
 
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `4a9846e1b03a37fcd300ee2943cf364d341024ed`.
+
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/test-agent-preflight` | 0 | `pass` |
+| `python3 scripts/validate_first_month_contracts.py` | 0 | `pass`; 10 positive, 11 protected-negative |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | `pass`; jsonschema 4.26.0 |
+| `scripts/validate-agent-assets` | 0 | `pass` |
+| `mix deps.get` | 0 | exqlite 0.39.0 + db_connection, elixir_make, cc_precompiler, telemetry |
+| `mix format --check-formatted` | 0 | no output |
+| `mix compile --warnings-as-errors` | 0 | clean |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | `No cycles found` |
+| `mix test test/kiln/store` | 0 | 18 passed |
+| `mix test` | 0 | 44 passed |
+| `scripts/check` (aggregate) | 0 | `check: pass`; commit `68e4db0` (pre-doc), re-run clean at tip |
+| `scripts/diagnostics/p1-s01-store-host` | 0 | `pass` (see owner-machine evidence below) |
+
+Owner-machine diagnostic output (OD-02 host):
+
+```text
+macos_product_version: 26.5.2
+macos_build_version: 25F84
+architecture: arm64
+filesystem_personality: APFS
+device_location: Internal
+erlang_otp: 28
+elixir: 1.20.2
+git: 2.50.1
+exqlite: 0.39.0
+embedded_sqlite: 3.53.3
+store_format: kiln-state/v1
+store_version: 1
+journal_mode: wal  synchronous: 2  foreign_keys: 1  busy_timeout: 2000  quick_check: ok
+startup: ready
+```
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
+- Ticket demo contribution: Exercised in `Kiln.Store.JournalTest` and `Kiln.StoreTest` — a Session action transaction commits, and a fresh `Kiln.Store.start/1` restores the journal, revision, and projection from disk for T03 replay
 - Parent slice gate affected: P1-S01-G03 and G04
 - Slice verification manifest updated: No
 - Slice completion claimed: No
 
 ### Failures and warnings
 
-- Owner-machine checks are required before merge.
+- None. All verification commands exited zero at the exact head.
+- The busy fixture (`@tag :slow`) logs an expected Exqlite "database is locked" disconnect while the contending writer holds the WAL lock; the append is classified `:busy` and the test passes. No product source is affected.
+- Environment note: verification used the repo-pinned mise Elixir 1.20.2 / OTP 28 toolchain and a virtualenv holding `jsonschema==4.26.0`; adding the first `deps/` required scoping the `scripts/check` Vale run to exclude `deps/` and `_build/`. No product source, dependency, or store behavior was changed to make the gate pass.
 
 ### Remaining unknowns and exclusions
 
-- Projection rebuild and restart are T03.
+- Deterministic replay (startup step 9), projection rebuild, and nonterminal-operation orphan scanning (steps 10-11) are T03; startup currently reaches `:ready` for fresh and migrated stores.
+- U01 (exact Exqlite release) resolved to 0.39.0 / SQLite 3.53.3. U02 (macOS APFS sync observations) recorded via the diagnostic; `synchronous=FULL` retained, no `fullfsync` change. U03 (corruption repair) remains later work: a corrupt store blocks and preserves files, with no automatic repair.
 
 ### Repository state
 
-- Commit: pending
+- Commit: `4a9846e1b03a37fcd300ee2943cf364d341024ed`
 - Branch: `work/p1-s01-t02-durable-store`
-- Diff reviewed: No
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Diff reviewed: Yes; `mix.exs`/`mix.lock`, ten `lib/kiln/store/*` and `lib/kiln/store.ex`/`application.ex` modules, `priv/store/migrations/0001_initial_state.sql`, the store test suite, and the OD-02 diagnostic (1984 insertions, 5 deletions versus `main`)
+- Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
+- Parent slice status after merge: durable records exist; deterministic replay, current projections, and the CLI remain T03 and later
