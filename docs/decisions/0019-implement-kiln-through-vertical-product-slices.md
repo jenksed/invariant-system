@@ -3,26 +3,46 @@
 - **Decision status:** Accepted
 - **Integration status:** Integrated through pull request 20
 - **Date:** 2026-07-28
+- **Supersession status:** Slice order, first coding target, and read-only version 0.1 boundary are proposed for supersession by ADR 0020
 
 ## Context
 
-Kiln completed a sequence of architecture passes covering the internal domain, Runs, delegation, CLI and TUI, Capability integration, Context, protocols, Git isolation, local project intelligence, knowledge security, and trustworthy execution.
+Kiln completed architecture planning across domain, Runs, delegation, interfaces, Capability integration, Context, protocols, Git isolation, local project intelligence, security, and trustworthy execution.
 
-The resulting architecture is coherent, but the provisional Phase 1 roadmap remained component-shaped. It proposed completing contract consolidation, persistence, Command supervision, Run control, Git isolation, Context, interfaces, knowledge, security, observability, and a phase proof as separate horizontal packages.
+The earlier Phase 1 plan was component-shaped. It proposed completing contracts, persistence, execution, Run control, Git isolation, Context, interfaces, knowledge, observability, and a phase proof as horizontal packages.
 
-That sequence carried three risks:
+That order risked building internal infrastructure before product-shaped behavior and pulling every planned subsystem into the first implementation phase.
 
-1. Kiln could spend months building internal infrastructure before proving its Run-centered interaction model.
-2. Every accepted future subsystem could enter the early backlog merely because the final architecture included it.
-3. Duplicated paths could emerge for active code intelligence, cross-project intelligence, external protocols, execution, and interface state.
+## Accepted decision that remains active
 
-The Project needs one implementation order that preserves the accepted security and Evidence boundaries while delivering product-shaped proof as early as possible.
+Kiln is implemented through vertical product slices.
 
-## Decision
+Every slice must include:
 
-Kiln will be implemented through vertical product slices.
+- user-visible value;
+- the minimum domain and runtime concepts required by its workflow;
+- explicit dependencies and security boundary;
+- deterministic tests;
+- an aggregate acceptance gate;
+- a demo;
+- a bounded Receipt;
+- explicit exclusions.
 
-The accepted default order is:
+A slice does not complete an entire subsystem unless its workflow requires that subsystem.
+
+## Accepted architecture decisions that remain active
+
+1. **Runs remain durable data.** Kiln does not create one permanent process per Run. Processes exist only for live Worker leases, Commands, model invocations, adapters, subscriptions, timing, cancellation, or managed Resources.
+2. **One code-intelligence path can serve active and reference use.** When that capability enters scope, Tree-sitter, selected LSP operations, documentation resolution, and normalized semantic facts can share extraction and index infrastructure while reference repositories retain stricter trust and no-execution policy.
+3. **Persistent semantics remain Kiln-native first.** SCIP, embeddings, a vector database, and a graph database are not default requirements.
+4. **Later writing delegation uses Patch Artifacts.** A writing Child remains read-only and returns an immutable Patch proposal. An authorized applying Run owns mutation and verification.
+5. **Protocol seams do not imply protocol-first implementation.** ACP, MCP, OpenAPI, Dev Containers, OCI, and later standards require a concrete workflow and entry gate.
+6. **Subject specifications cannot reorder delivery.** Detailed planning remains bounded by the current Roadmap.
+7. **Historical component identifiers do not define implementation order.** P1-W01 through P1-W13 remain historical.
+
+## Historical order
+
+ADR 0019 originally accepted:
 
 ```text
 P1-S01  Navigable simulated Runs
@@ -37,80 +57,67 @@ P1-S09  Local project intelligence
 P1-S10  Expansion capability evaluations
 ```
 
-Each slice must include:
+It also defined a read-only version 0.1 through P1-S05 and placed the TUI before persistence, provider execution, and source mutation.
 
-- user-visible value;
-- the minimum domain and runtime concepts it needs;
-- explicit dependencies and security boundary;
-- deterministic tests;
-- an acceptance gate;
-- a demo script;
-- a Receipt;
-- explicit exclusions.
+## Proposed partial supersession
 
-A slice does not complete an entire subsystem unless the demo requires it.
+ADR 0020 proposes a new order:
 
-### Minimal architecture decisions
+```text
+P1-S01  Durable single-Run CLI
+P1-S02  Evidence-backed single-Run change loop
+P1-S03  Interruption and unknown-effect recovery
+P1-S04  One bounded Scout Child
+P1-S05  Independent Verifier Child
+```
 
-P0-W16 also accepts these integration decisions:
+Under ADR 0020:
 
-1. **Runs remain durable data.** Kiln does not create one permanent process per Run. Processes exist only for active Worker leases, Commands, model invocations, adapters, subscriptions, timing, cancellation, or managed Resources.
-2. **One code-intelligence path serves active and reference use.** Tree-sitter, on-demand LSP, documentation resolution, and normalized semantic facts share extraction and index infrastructure. Reference repositories receive stricter trust, Privacy, instruction-quarantine, and no-execution policy.
-3. **Persistent semantic indexing is Kiln-native first.** Store normalized structural and selected semantic observations keyed by exact state and tool versions. Do not require automatic SCIP generation, embeddings, a vector database, or a graph database.
-4. **Initial writing delegation uses Patch Artifacts.** A writing Child remains read-only and returns an immutable Patch proposal. The authorized Parent owns one exclusive writable worktree and applies the selected Patch transactionally.
-5. **Protocol seams do not imply protocol-first implementation.** ACP, MCP, OpenAPI, Dev Containers, OCI, and later standards enter only after the native Run, authority, execution, Evidence, and recovery loop exists and a concrete workflow justifies them.
-6. **Version 0.1 is read-only.** The first release milestone ends after durable recovery of navigable Runs, one real Scout, background Attention, and an independent Verifier.
+- the first month completes one real source change;
+- SQLite durability begins with the first product slice;
+- provider, Patch, Command, Artifact, Evidence, and completion support enter in narrow form during the first month;
+- Child Runs are earned after the Root workflow works;
+- version 0.1 supports maximum depth one and one active Child;
+- the TUI and all later expansion capabilities move beyond version 0.1.
 
-### Version 0.1 boundary
+ADR 0020 becomes binding only after owner acceptance and integration.
 
-Version 0.1 is the Durable Operator Kernel through P1-S05.
+## Historical consequences
 
-It includes:
+ADR 0019 successfully:
 
-- navigable Root and Child Runs;
-- one real read-only Scout;
-- background concurrency and global Attention;
-- independent controlled verification;
-- minimal Artifacts, Evidence, and Receipts;
-- SQLite durability, Checkpoints, client cursors, and restart recovery.
+- replaced a horizontal component backlog with product slices;
+- rejected a process or table for every domain noun;
+- preserved protocol-neutral native semantics;
+- prevented every planned adapter or index from entering Phase 1 automatically;
+- preserved one shared future code-intelligence path;
+- established explicit slice gates, demos, Receipts, and exclusions.
 
-It excludes source mutation, worktrees, production LSP and Tree-sitter adapters, external protocols, containers, local project intelligence, embeddings, Phoenix, remote execution, and formal attestations.
+Its original sequence did not prove a complete coding workflow early enough. P0-W18 challenges that order without discarding the vertical-slice discipline.
 
-## Consequences
+## Rejected positions that remain rejected
 
-- The first implementation task is a pure Run event reducer, not a database or service framework.
-- The TUI interaction model is tested before persistence and providers.
-- One real model-backed Scout appears early, but broad model routing does not.
-- The minimum Command runner enters with the Verifier rather than as an isolated execution package.
-- Persistence arrives after Run, Attention, and verification semantics are demonstrated.
-- Source mutation is delayed until the read-only product is durable and independently verified.
-- Subject specifications remain architecture constraints but do not independently add early roadmap scope.
-- Protocol and expansion candidates can remain deferred without weakening the native architecture.
-- Historical P1-W01 through P1-W13 identifiers no longer define implementation order.
-
-## Rejected positions
-
-- Building every internal component before the first navigable product demo.
-- Treating every foundational protocol seam as a Phase 1 implementation requirement.
-- Creating a permanent process, service, or table for every domain noun.
-- Implementing separate active-code and local-project parser and index stacks.
-- Treating persistent semantic indexing as an automatic SCIP or graph-database requirement.
-- Giving the first writing Child a shared writable checkout.
-- Requiring containers or worktrees for harmless reads.
-- Moving embeddings, graph databases, remote execution, Phoenix, AG-UI, or formal attestations into the first release.
-- Preserving the old component roadmap beside the vertical roadmap.
+- building every internal component before user-visible proof;
+- treating protocol seams as implementation requirements;
+- creating a permanent process, service, or table for every noun;
+- separate active-code and reference-code parser stacks by default;
+- requiring SCIP, embeddings, a graph database, or vector database;
+- giving a writing Child a shared writable checkout;
+- requiring containers or worktrees for harmless reads;
+- moving remote execution, Phoenix, AG-UI, or formal attestations into version 0.1;
+- preserving competing implementation roadmaps.
 
 ## Review triggers
 
-Review this decision when:
+Review vertical-slice structure when:
 
-- a slice cannot deliver its user-visible demo without a missing horizontal prerequisite;
-- the in-memory-to-SQLite transition would require changing accepted domain semantics;
-- Patch Artifact mode prevents a measured high-value writing workflow;
-- one code-intelligence path cannot satisfy both active and reference Repository security boundaries;
-- a protocol is required by a concrete user workflow earlier than planned;
-- the twelve-week target repeatedly fails despite active scope pruning;
-- dogfooding shows that version 0.1 lacks a minimum capability needed to evaluate the product;
+- a slice cannot deliver usable behavior without a missing horizontal prerequisite;
+- accepted durable semantics cannot migrate safely between slices;
+- one selected checkout cannot satisfy a measured mutation workflow;
+- one code-intelligence path cannot preserve active and reference trust separation;
+- a protocol is required earlier by a concrete workflow;
+- the twelve-week target repeatedly fails despite scope reduction;
+- dogfooding shows version 0.1 lacks a minimum capability needed to evaluate Kiln;
 - implementation Evidence justifies splitting, merging, or reordering a slice.
 
 A review must state what scope is removed as well as what is added.
