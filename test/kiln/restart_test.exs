@@ -103,6 +103,62 @@ defmodule Kiln.RestartTest do
     assert {:error, %{block: %{code: :corrupt_payload}}} = Restart.reconstruct(store.conn)
   end
 
+  test "blocks, not empty, when an action commit has no journal rows", %{path: path} do
+    store = JB.store(path)
+    on_exit(fn -> stop(store.conn) end)
+    d = JB.domain()
+    {:ok, _} = JB.commit_start(store, d)
+
+    # Remove the journal rows but keep the action commit: incomplete durable state.
+    Connection.query!(store.conn, "DELETE FROM journal_entries WHERE session_id = ?1", [
+      d.session.id
+    ])
+
+    result = Restart.reconstruct(store.conn)
+    refute match?({:ok, :empty}, result)
+    assert {:error, %{block: %{code: :missing_journal_rows}}} = result
+  end
+
+  test "blocks with multiple sessions when one is action-commit-only", %{path: path} do
+    store = JB.store(path)
+    on_exit(fn -> stop(store.conn) end)
+
+    d1 = JB.domain(1)
+    {:ok, _} = JB.commit_start(store, d1)
+
+    d2 = JB.domain(9)
+
+    JB.insert_action_commit(store.conn, %{
+      action_id: JB.id(:action, 50),
+      session_id: d2.session.id,
+      idempotency_key: JB.id(:idempotency, 50),
+      request_digest: JB.digest(50),
+      expected_session_revision: 0,
+      first_sequence: 900,
+      last_sequence: 900
+    })
+
+    assert {:error, %{code: :multiple_sessions, detail: %{count: 2}}} =
+             Restart.reconstruct(store.conn)
+  end
+
+  test "a projection-cache-only row is not a Session candidate", %{path: path} do
+    store = JB.store(path)
+    on_exit(fn -> stop(store.conn) end)
+
+    # A cache row with no journal or action-commit rows must not be authoritative.
+    Connection.query!(
+      store.conn,
+      """
+      INSERT INTO session_projections
+        (session_id, projection_schema, session_revision, last_sequence, projection, projection_digest, updated_at)
+      VALUES ('ses_ghost', 'session_projection/v1', 0, 0, '{}', 'x', '2026-07-29T00:00:00Z')
+      """
+    )
+
+    assert {:ok, :empty} = Restart.reconstruct(store.conn)
+  end
+
   defp count(conn, table) do
     [[n]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
     n
