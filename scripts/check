@@ -22,7 +22,7 @@ run scripts/test-agent-preflight
 run python3 scripts/validate_first_month_contracts.py
 run python3 scripts/validate_json_schema_contracts.py
 run scripts/validate-agent-assets
-run vale .
+run vale --glob='!{deps,_build}/**' .
 run mix format --check-formatted
 run mix compile --warnings-as-errors
 run mix xref graph --format cycles --label compile-connected --fail-above 0

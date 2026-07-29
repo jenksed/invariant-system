@@ -19,7 +19,13 @@ defmodule Kiln.MixProject do
     ]
   end
 
-  defp deps, do: []
+  defp deps do
+    [
+      # Direct SQLite state store per ADR-0022. The 0.39 line bundles SQLite
+      # 3.53.3, which contains the WAL-reset corruption fix from 3.51.3.
+      {:exqlite, "~> 0.39"}
+    ]
+  end
 
   defp aliases do
     [
