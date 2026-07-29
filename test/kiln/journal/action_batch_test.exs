@@ -93,6 +93,17 @@ defmodule Kiln.Journal.ActionBatchTest do
     assert {:error, %{code: :revision_discontinuity, boundary: 2}} = rebuild(store.conn, d)
   end
 
+  test "blocks a corrupt huge last sequence without materializing the range", %{conn: conn, d: d} do
+    # A corrupt enormous last_sequence must return a bounded error, not allocate
+    # a range of that size.
+    exec(
+      conn,
+      "UPDATE action_commits SET last_sequence = 9223372036854775800 WHERE first_sequence = 2"
+    )
+
+    assert {:error, %{code: :action_boundary_mismatch, boundary: 2}} = rebuild(conn, d)
+  end
+
   defp rebuild(conn, d), do: Replay.rebuild(conn, d.session.id)
   defp exec(conn, sql), do: Connection.query!(conn, sql)
 

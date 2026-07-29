@@ -158,45 +158,62 @@ defmodule Kiln.Journal.Replay do
   defp validate_batch(commit, rows) do
     sequences = Enum.map(rows, & &1.sequence)
     revisions = Enum.map(rows, & &1.revision)
-    expected_sequences = Enum.to_list(commit.first_sequence..commit.last_sequence)
+    first = commit.first_sequence
+    last = commit.last_sequence
 
     cond do
-      List.first(sequences) != commit.first_sequence or
-          List.last(sequences) != commit.last_sequence ->
-        block(:action_boundary_mismatch, commit.first_sequence, %{
-          declared: {commit.first_sequence, commit.last_sequence},
+      # Validate the declared bounds arithmetically. An untrusted range is never
+      # materialized, so a corrupt last_sequence cannot allocate a huge list.
+      not (is_integer(first) and is_integer(last)) or first > last ->
+        block(:action_boundary_mismatch, first, %{
+          declared: {first, last},
+          reason: :invalid_bounds
+        })
+
+      length(rows) != last - first + 1 ->
+        block(:action_boundary_mismatch, first, %{
+          declared: {first, last},
+          row_count: length(rows)
+        })
+
+      List.first(sequences) != first or List.last(sequences) != last ->
+        block(:action_boundary_mismatch, first, %{
+          declared: {first, last},
           actual: {List.first(sequences), List.last(sequences)}
         })
 
-      sequences != expected_sequences ->
-        block(:noncontiguous_sequence, commit.first_sequence, %{sequences: sequences})
+      not contiguous_from?(sequences, first) ->
+        block(:noncontiguous_sequence, first, %{sequences: sequences})
 
       Enum.any?(rows, &(&1.idempotency_key != commit.idempotency_key)) ->
-        block(:idempotency_key_mismatch, commit.first_sequence, %{action_id: commit.action_id})
+        block(:idempotency_key_mismatch, first, %{action_id: commit.action_id})
 
       Enum.any?(rows, &(&1.request_digest != commit.request_digest)) ->
-        block(:request_digest_mismatch, commit.first_sequence, %{action_id: commit.action_id})
+        block(:request_digest_mismatch, first, %{action_id: commit.action_id})
 
-      not contiguous?(revisions) ->
-        block(:revision_discontinuity, commit.first_sequence, %{revisions: revisions})
+      not contiguous_from?(revisions, List.first(revisions)) ->
+        block(:revision_discontinuity, first, %{revisions: revisions})
 
       true ->
         {:ok,
          %{
            commit: commit,
            entries: rows,
-           first_sequence: commit.first_sequence,
-           last_sequence: commit.last_sequence,
+           first_sequence: first,
+           last_sequence: last,
            first_revision: List.first(revisions),
            last_revision: List.last(revisions)
          }}
     end
   end
 
-  defp contiguous?([]), do: false
+  # Each value equals the first value plus its index. Bounded by the row count,
+  # so it never materializes an untrusted range.
+  defp contiguous_from?([], _first), do: false
 
-  defp contiguous?([first | _] = list),
-    do: list == Enum.to_list(first..(first + length(list) - 1))
+  defp contiguous_from?(values, first) do
+    values |> Enum.with_index() |> Enum.all?(fn {value, index} -> value == first + index end)
+  end
 
   # -- application --
 
@@ -213,14 +230,15 @@ defmodule Kiln.Journal.Replay do
     }
 
     batches
-    |> Enum.reduce_while({:ok, initial}, &apply_batch/2)
+    |> Enum.reduce_while({:ok, initial}, fn batch, acc -> apply_batch(session_id, batch, acc) end)
     |> finish(session_id)
   end
 
-  defp apply_batch(batch, {:ok, acc}) do
+  defp apply_batch(session_id, batch, {:ok, acc}) do
     with :ok <- check_batch_revision(batch, acc.prev_revision),
          :ok <- check_batch_sequence(batch, acc.prev_sequence),
-         {:ok, projection, head} <- reduce_batch(acc.projection, batch.entries, acc.head) do
+         {:ok, projection, head} <-
+           reduce_batch(session_id, acc.projection, batch.entries, acc.head) do
       {:cont,
        {:ok,
         %{
@@ -285,9 +303,9 @@ defmodule Kiln.Journal.Replay do
     end
   end
 
-  defp reduce_batch(projection, entries, head) do
+  defp reduce_batch(session_id, projection, entries, head) do
     Enum.reduce_while(entries, {:ok, projection, head}, fn row, {:ok, acc, acc_head} ->
-      case apply_entry(acc, row) do
+      case apply_entry(session_id, acc, row) do
         {:ok, next} -> {:cont, {:ok, next, [row.payload_digest | acc_head]}}
         {:error, _} = error -> {:halt, error}
       end
@@ -298,11 +316,12 @@ defmodule Kiln.Journal.Replay do
     end
   end
 
-  defp apply_entry(projection, row) do
+  defp apply_entry(session_id, projection, row) do
     with {:ok, payload} <- decode(row.payload_text, row.sequence),
          :ok <- verify_digest(row.payload_schema, payload, row.payload_digest, row.sequence),
          {:ok, decoded} <- decode_entry(row.type, payload, row.sequence),
-         {:ok, next} <- reduce(projection, decoded, row.sequence) do
+         {:ok, next} <-
+           reduce(projection, Map.put(decoded, :session_id, session_id), row.sequence) do
       {:ok, next}
     end
   end
