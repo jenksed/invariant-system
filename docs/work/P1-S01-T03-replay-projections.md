@@ -188,44 +188,61 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Complete
+
+All six acceptance criteria pass and the full deterministic gate ran green at the exact branch head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T03-AC01 | Pending | P1-S01-T03-E01 | pending |
-| P1-S01-T03-AC02 | Pending | P1-S01-T03-E02 | pending |
-| P1-S01-T03-AC03 | Pending | P1-S01-T03-E03 | pending |
-| P1-S01-T03-AC04 | Pending | P1-S01-T03-E04 | pending |
-| P1-S01-T03-AC05 | Pending | P1-S01-T03-E05 | pending |
-| P1-S01-T03-AC06 | Pending | P1-S01-T03-E06 | pending |
+| P1-S01-T03-AC01 | Pass | P1-S01-T03-E01 | `Kiln.Journal.Replay.rebuild/2` reproduces the committed projection byte-for-byte (digest equals the stored cache and the commit-time result) and the exact revision |
+| P1-S01-T03-AC02 | Pass | P1-S01-T03-E02 | duplicate identical → no extra effect; conflicting duplicate, revision discontinuity, corrupt payload, and invalid transition each block at the exact sequence boundary |
+| P1-S01-T03-AC03 | Pass | P1-S01-T03-E03 | transcript records leave the projection digest unchanged and retain their own ordering |
+| P1-S01-T03-AC04 | Pass | P1-S01-T03-E04 | a nonterminal operation intent reconstructs as an unknown operation and an `orphaned` Run, appending nothing and dispatching no effect |
+| P1-S01-T03-AC05 | Pass | P1-S01-T03-E05 | missing and stale caches rebuild from the journal; a matching cache is accepted; a corrupt journal blocks and preserves the cache |
+| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `9d57307`; no excluded capability is reachable |
 
 ### Verification executed
 
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `9d573070`.
+
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/test-agent-preflight` | 0 | `pass` |
+| `python3 scripts/validate_first_month_contracts.py` | 0 | `pass`; 10 positive, 11 protected-negative |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | `pass`; jsonschema 4.26.0 |
+| `scripts/validate-agent-assets` | 0 | `pass` |
+| `mix format --check-formatted` | 0 | no output |
+| `mix compile --warnings-as-errors` | 0 | clean |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | `No cycles found` |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 20 passed |
+| `mix test` | 0 | 67 passed |
+| `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
+- Ticket demo contribution: Exercised in `Kiln.RestartTest` — the application stops, restarts, and reconstructs the exact objective revision, criteria revision, Task, Root Run, workflow step, pending decision, operation state, unknowns, and revision from the journal
 - Parent slice gate affected: P1-S01-G04 through G07
 - Slice verification manifest updated: No
 - Slice completion claimed: No
 
 ### Failures and warnings
 
-- None recorded before implementation.
+- None. All verification commands exited zero at the exact head.
+- Environment note: verification used the repo-pinned mise Elixir 1.20.2 / OTP 28 toolchain and a virtualenv holding `jsonschema==4.26.0`. No product source was changed to make the gate pass.
+- This ticket consolidated the interim `Kiln.Store.Projection` (added in T02) into one authoritative `Kiln.Journal.Reducer`, so the append path and the replay rebuild cannot diverge. All T02 store tests continue to pass.
 
 ### Remaining unknowns and exclusions
 
-- User interaction is T04.
+- U01 (replay batching) resolved to a single ordered fold; correctness does not depend on batch size. U02 (corrupt repair) resolved to blocking at the first invalid boundary and preserving the database, with no repair.
+- User interaction (the foundation CLI) is T04. Restart reconstruction is exposed through application APIs and tests only.
+- Persisting an orphan-classification journal fact at restart is left to the workflow layer; reconstruction is read-only and never dispatches or appends.
 
 ### Repository state
 
-- Commit: pending
+- Commit: `9d573070`
 - Branch: `work/p1-s01-t03-replay-projections`
-- Diff reviewed: No
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Diff reviewed: Yes; adds `lib/kiln/journal/*`, `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, and restart test suites with a deterministic journal builder (1237 insertions, 90 deletions versus `main`)
+- Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
+- Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04
