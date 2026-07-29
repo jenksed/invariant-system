@@ -4,7 +4,8 @@ defmodule Kiln.Store.Canonical do
 
   Object keys are emitted in sorted order with no insignificant whitespace, so
   the same logical value always produces the same bytes and the same SHA-256
-  digest. Values are limited to JSON scalars, lists, and string-keyed maps;
+  digest. Values are limited to JSON scalars, lists, and atom- or string-keyed
+  maps whose keys remain unique after atom keys are normalized to strings;
   anything else raises, because domain payloads must be bounded plain data.
   """
 
@@ -28,6 +29,7 @@ defmodule Kiln.Store.Canonical do
   defp encode_value(nil), do: "null"
   defp encode_value(value) when is_boolean(value), do: JSON.encode!(value)
   defp encode_value(value) when is_integer(value), do: Integer.to_string(value)
+  defp encode_value(value) when is_float(value), do: JSON.encode!(value)
   defp encode_value(value) when is_binary(value), do: JSON.encode!(value)
 
   defp encode_value(value) when is_list(value) do
@@ -35,20 +37,39 @@ defmodule Kiln.Store.Canonical do
   end
 
   defp encode_value(value) when is_map(value) do
-    pairs =
-      value
-      |> Enum.map(fn {k, v} -> {to_key(k), v} end)
-      |> Enum.sort_by(&elem(&1, 0))
-      |> Enum.map(fn {k, v} -> [JSON.encode!(k), ":", encode_value(v)] end)
-      |> Enum.intersperse(",")
+    pairs = Enum.map(value, fn {key, child} -> {to_key(key), child} end)
 
-    ["{", pairs, "}"]
+    case duplicate_key(pairs) do
+      nil ->
+        pairs
+        |> Enum.sort_by(&elem(&1, 0))
+        |> Enum.map(fn {key, child} -> [JSON.encode!(key), ":", encode_value(child)] end)
+        |> Enum.intersperse(",")
+        |> then(&["{", &1, "}"])
+
+      key ->
+        raise ArgumentError,
+              "canonical JSON contains duplicate normalized key #{inspect(key)}"
+    end
   end
 
   defp encode_value(other) do
     raise ArgumentError, "canonical JSON does not accept #{inspect(other)}"
   end
 
+  defp duplicate_key(pairs) do
+    pairs
+    |> Enum.frequencies_by(&elem(&1, 0))
+    |> Enum.find_value(fn
+      {key, count} when count > 1 -> key
+      _entry -> nil
+    end)
+  end
+
   defp to_key(key) when is_binary(key), do: key
   defp to_key(key) when is_atom(key), do: Atom.to_string(key)
+
+  defp to_key(key) do
+    raise ArgumentError, "canonical JSON keys must be atoms or strings, got: #{inspect(key)}"
+  end
 end
