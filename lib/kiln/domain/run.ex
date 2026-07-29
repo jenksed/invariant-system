@@ -6,7 +6,16 @@ defmodule Kiln.Domain.Run do
   alias Kiln.Domain.{Error, Id, Transition}
 
   @states [:ready, :running, :waiting_for_user, :orphaned, :completed, :failed, :canceled]
-  @workflow_steps [:intent, :investigation, :proposal, :approval, :application, :verification, :acceptance, :reconciliation]
+  @workflow_steps [
+    :intent,
+    :investigation,
+    :proposal,
+    :approval,
+    :application,
+    :verification,
+    :acceptance,
+    :reconciliation
+  ]
 
   @enforce_keys [
     :id,
@@ -31,7 +40,8 @@ defmodule Kiln.Domain.Run do
     :created_at
   ]
 
-  @type state :: :ready | :running | :waiting_for_user | :orphaned | :completed | :failed | :canceled
+  @type state ::
+          :ready | :running | :waiting_for_user | :orphaned | :completed | :failed | :canceled
   @type workflow_step ::
           :intent
           | :investigation
@@ -77,7 +87,8 @@ defmodule Kiln.Domain.Run do
     end
   end
 
-  def new_root(_attrs), do: {:error, Error.new(:invalid_attributes, "run attributes must be a map")}
+  def new_root(_attrs),
+    do: {:error, Error.new(:invalid_attributes, "run attributes must be a map")}
 
   @spec transition(t(), state(), keyword()) :: {:ok, t()} | {:error, Error.t()}
   def transition(%__MODULE__{} = run, next_state, opts \\ []) do
@@ -119,19 +130,32 @@ defmodule Kiln.Domain.Run do
 
   defp validate_state_references(:waiting_for_user, nil, _operation_id) do
     {:error,
-     Error.new(:missing_pending_decision, "waiting_for_user requires a pending decision", :pending_decision_id)}
+     Error.new(
+       :missing_pending_decision,
+       "waiting_for_user requires a pending decision",
+       :pending_decision_id
+     )}
   end
 
   defp validate_state_references(state, decision_id, _operation_id)
        when state != :waiting_for_user and not is_nil(decision_id) do
     {:error,
-     Error.new(:unexpected_pending_decision, "pending decision requires waiting_for_user", :pending_decision_id)}
+     Error.new(
+       :unexpected_pending_decision,
+       "pending decision requires waiting_for_user",
+       :pending_decision_id
+     )}
   end
 
   defp validate_state_references(state, _decision_id, operation_id)
-       when state in [:ready, :waiting_for_user, :completed, :failed, :canceled] and not is_nil(operation_id) do
+       when state in [:ready, :waiting_for_user, :completed, :failed, :canceled] and
+              not is_nil(operation_id) do
     {:error,
-     Error.new(:unexpected_active_operation, "run state cannot retain an active operation", :active_operation_id)}
+     Error.new(
+       :unexpected_active_operation,
+       "run state cannot retain an active operation",
+       :active_operation_id
+     )}
   end
 
   defp validate_state_references(_state, _decision_id, _operation_id), do: :ok
