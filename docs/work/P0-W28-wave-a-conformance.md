@@ -1,10 +1,12 @@
 # P0-W28: Wave A conformance scaffolding
 
-**Document type:** Implementation plan  
-**Status:** In progress  
-**Parent slice:** None  
+**Document type:** Implementation plan and closeout record  
+**Status:** Complete, verified, accepted, and integrated  
 **Branch:** `work/p0-w28-wave-a-conformance`  
-**Depends on:** P0-W21 through P0-W25 integrated
+**Final branch head:** `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`  
+**Integrated through:** Pull request 34, merge commit `57a5790d2266cf1ab59f107d0b429c31c618e0ae`  
+**Depends on:** P0-W21 through P0-W25 integrated  
+**Build authorization:** Not issued
 
 ## Objective
 
@@ -12,197 +14,169 @@ Create only the executable and machine-readable rails justified by the integrate
 
 ## Observed current state
 
-| Observation | Evidence | Collected by | Date or commit |
-| --- | --- | --- | --- |
-| P0-W21 through P0-W25 are integrated | PRs 27–33 | Repository history | `aabfc49a9b0ba294b4e0f6558fbe8fed38263784` |
-| Production still contains only application bootstrap and literal version | `lib/`, `mix.exs` | Repository inspection | current base |
-| Preflight accepts only P0 work-package branches and obsolete headings | `scripts/agent-preflight` | Repository inspection | current base |
-| CI proves obsolete preflight behavior | `scripts/test-agent-preflight`, CI | Repository inspection | current base |
-| Broad historical Schemas force deferred concepts | `docs/contracts/README.md` and Prompt 3 dispositions | planning Evidence | integrated |
+At entry, P0-W21 through P0-W25 were integrated, production still contained only bootstrap behavior, preflight used obsolete work grammar, and broad historical Schemas were not an accepted first-month contract set.
 
 ## Assumptions and unknowns
 
 ### Assumptions
 
-- **P0-W28-A01:** Standard Python 3 is available in GitHub Actions and on the supported development host for dependency-free fixture validation.
-- **P0-W28-A02:** Contract constants and behaviours can live under `Kiln.Conformance` without becoming runtime product APIs.
+- Standard Python 3 was available for dependency-free semantic validation.
+- Conformance constants and external-boundary behaviours could be added without implementing product runtime.
 
 ### Unknowns
 
-- **P0-W28-U01:** Unknown. Prompt 8-A will determine which scaffold units become authorized implementation dependencies.
-- **P0-W28-U02:** Unknown. Later implementation Evidence can require a contract revision, but cannot silently widen scope.
+- Prompt 8-A remained responsible for deciding which scaffolds should be retained, revised, removed, or deferred.
+- Later implementation Evidence could require bounded contract revision but could not silently widen scope.
 
 ## Requirements
 
-- **P0-W28-R01:** The Repository shall accept P0 work-package and P1 slice-ticket branch grammar through preflight.
-- **P0-W28-R02:** The preflight shall enforce the current implementation-plan headings and ticket-specific slice/security/demo headings.
-- **P0-W28-R03:** The Repository shall expose exact first-month lifecycle, Tool, Patch, Evidence, and CLI constants through conformance-only Elixir modules.
-- **P0-W28-R04:** The Repository shall define provider and macOS Command-host behaviours without implementations.
-- **P0-W28-R05:** The Repository shall contain one first-month JSON Schema and positive and negative fixtures.
-- **P0-W28-R06:** A dependency-free validation command shall reject deferred states, excess Tools, unsupported Patch operations, Receipt authority, and invalid CLI outcomes.
-- **P0-W28-R07:** Tests shall prove runtime Session, Store, provider, mutation, Command, CLI, and Receipt modules remain absent.
-- **P0-W28-R08:** CI and `scripts/check` shall run the new conformance validation.
-- **P0-W28-R09:** No scaffold shall return fake product success or perform an external effect.
+P0-W28 required:
+
+- current P0 and P1 branch and plan grammar;
+- accepted lifecycle, Tool, Patch, Evidence, and CLI constants;
+- provider and macOS Command-host behaviour declarations;
+- one first-month JSON Schema;
+- positive and protected negative fixtures;
+- recurring semantic validation;
+- CI and local validation wiring;
+- no fake success or external effect.
 
 ## Security boundary
 
-Allowed:
+The work permitted static constants, pure transition checks, behaviour declarations, fixture parsing, deterministic semantic validation, preflight, and CI changes.
 
-- static constants and types;
-- pure transition-shape checks;
-- behaviour declarations;
-- fixture parsing and deterministic validation;
-- preflight and CI changes.
+It denied provider calls, source mutation, SQLite state creation, Command execution, credential reads, product CLI actions, fallback, Child Runs, and Wave B scaffolding.
 
-Denied:
+## Changes integrated
 
-- provider network calls;
-- source mutation;
-- SQLite state creation;
-- Command execution;
-- credential reads;
-- runtime CLI actions;
-- permissive fallback;
-- Child Runs or Wave B scaffolding.
+Prompt 6-A integrated:
 
-A failed or incomplete contract returns a validation error. No placeholder can report a successful workflow.
+- repaired P0 work-package and P1 slice-ticket preflight grammar;
+- preflight behavior tests;
+- `Kiln.Conformance.FirstMonth` accepted constants and transition shapes;
+- `Kiln.Conformance.Provider` callback boundary;
+- `Kiln.Conformance.CommandHost` callback boundary;
+- first-month conformance tests;
+- `docs/contracts/kiln-first-month.schema.json`;
+- ten positive fixtures;
+- eleven protected negative fixtures;
+- `scripts/validate_first_month_contracts.py` semantic validation;
+- CI and `scripts/check` wiring;
+- contract-authority documentation and integrated planning status updates.
 
-## Proposed changes
+Pull request 34 changed 20 files with 1,729 additions and 254 deletions.
 
-1. Repair agent preflight and its tests.
-2. Add `Kiln.Conformance.FirstMonth`, `Kiln.Conformance.Provider`, and `Kiln.Conformance.CommandHost`.
-3. Add tests for exact accepted constants, transition shapes, behaviours, and missing runtime modules.
-4. Add one first-month Schema, fixtures, and dependency-free validator.
-5. Wire validation into CI and `scripts/check`.
-6. Mark broad historical Schemas deferred outside the first-month required set.
-7. Record exact completion Evidence.
+It added no product Store, Session workflow, provider adapter, Context builder, Repository reader, Patch engine, mutation Worker, Command runner, native helper, Artifact store, Evidence evaluator, product CLI, release, installer, or Receipt sealer.
 
 ## Expected files or components
 
-| Path or component | Expected change | Status |
-| --- | --- | --- |
-| `scripts/agent-preflight` | current branch and plan grammar | Proposed |
-| `scripts/test-agent-preflight` | P0 and P1 fixtures and protected negatives | Proposed |
-| `lib/kiln/conformance/` | constants and behaviours only | Proposed |
-| `test/kiln/conformance/` | exact contract and incompleteness tests | Proposed |
-| `docs/contracts/kiln-first-month.schema.json` | canonical first-month Schema | Proposed |
-| `test/fixtures/conformance/` | positive and negative fixtures | Proposed |
-| `scripts/validate_first_month_contracts.py` | dependency-free validator | Proposed |
-| `.github/workflows/ci.yml` | recurring validation | Proposed |
-| `scripts/check` | local validation | Proposed |
-| `docs/contracts/README.md` | current authority status | Proposed |
+All planned P0-W28 components were integrated. No future implementation file was reserved or created.
 
 ## Acceptance criteria
 
-- **P0-W28-AC01**
-  - **Given** a P1 ticket branch and current plan fixture
-  - **When** preflight runs
-  - **Then** it passes, while protected branches and invalid grammar fail
-  - **Evidence:** `scripts/test-agent-preflight`
-- **P0-W28-AC02**
-  - **Given** the integrated first-month decisions
-  - **When** Elixir conformance tests run
-  - **Then** exact states, Tools, Patch operations, proof results, exits, and behaviour callbacks match
-  - **Evidence:** `mix test`
-- **P0-W28-AC03**
-  - **Given** positive and protected negative fixtures
-  - **When** the Python validator runs
-  - **Then** positives pass and negatives are rejected for the expected reason
-  - **Evidence:** `python3 scripts/validate_first_month_contracts.py`
-- **P0-W28-AC04**
-  - **Given** the scaffold branch
-  - **When** incompleteness tests run
-  - **Then** runtime external-effect modules remain absent
-  - **Evidence:** `mix test`
-- **P0-W28-AC05**
-  - **Given** the exact final head
-  - **When** CI runs
-  - **Then** all existing and new checks pass
-  - **Evidence:** exact CI run
+- **P0-W28-AC01:** Pass. P0 and P1 preflight fixtures pass; protected branches and malformed grammar fail.
+- **P0-W28-AC02:** Pass. Elixir tests protect accepted states, transitions, Tools, Patch operations, proof results, limits, CLI exits, and behaviour callbacks.
+- **P0-W28-AC03:** Pass for semantic validation. Positive fixtures pass and protected negative fixtures fail for their expected semantic reason.
+- **P0-W28-AC04:** Pass at integration time. No external-effect runtime implementation was added.
+- **P0-W28-AC05:** Pass. Exact final-head CI succeeded.
+
+Prompt 8-A later revised the AC04 test mechanism because an explicit list of absent future module names created unnecessary namespace lock-in. The underlying no-runtime-implementation fact remains true.
 
 ## Deterministic verification
+
+The final head passed:
 
 ```bash
 scripts/test-agent-preflight
 python3 scripts/validate_first_month_contracts.py
 scripts/validate-agent-assets
+vale .
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-Every command must exit zero. Negative fixtures must be rejected inside their harness rather than by failing the overall command.
+GitHub Actions CI run `30425270052` completed successfully on exact head `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`.
 
 ## Demo contribution
 
-```text
-No product demo. This work enables Prompt 7-A to review executable planning rails without implying Single-Run behavior exists.
-```
+No product demo was claimed. P0-W28 supplied executable planning rails for independent review.
 
 ## Required completion Evidence
 
-| Evidence ID | Acceptance criterion | Required Evidence |
+| Evidence ID | Criterion | Result |
 | --- | --- | --- |
-| P0-W28-E01 | P0-W28-AC01 | preflight test output |
-| P0-W28-E02 | P0-W28-AC02 | ExUnit output and module paths |
-| P0-W28-E03 | P0-W28-AC03 | fixture validator output |
-| P0-W28-E04 | P0-W28-AC04 | incompleteness test output |
-| P0-W28-E05 | P0-W28-AC05 | exact final CI run and compare |
+| P0-W28-E01 | P0-W28-AC01 | preflight behavior passed in CI |
+| P0-W28-E02 | P0-W28-AC02 | ExUnit conformance tests passed |
+| P0-W28-E03 | P0-W28-AC03 | semantic fixture validator passed |
+| P0-W28-E04 | P0-W28-AC04 | exact PR compare contained conformance work only |
+| P0-W28-E05 | P0-W28-AC05 | CI `30425270052` succeeded |
 
 ### Slice gate contribution
 
-| Slice gate or Receipt | Contribution |
-| --- | --- |
-| First-month Prompt 8-A review | contract and negative-fixture Evidence only |
-| P1 slice gate | None until Prompt 8-A authorizes implementation |
+P0-W28 contributes conformance Evidence to Prompt 8-A only. It does not satisfy a P1 slice gate.
 
 ## Explicit exclusions
 
-- No runtime Session, Store, MiniMax adapter, Context builder, Repository reader, Patch engine, mutation Worker, Command runner, helper binary, Artifact store, Evidence evaluator, CLI, release, installer, or Receipt sealer.
-- No Exqlite, HTTP, JSON, CLI, or process dependency.
-- No migration, release configuration, real gate script, or successful end-to-end fixture.
-- No P0-W26, P0-W27, Child, Scout, Verifier, Attention, or Wave B contract.
+Prompt 6-A did not:
+
+- implement the product;
+- add Exqlite or HTTP runtime dependencies;
+- create migrations or state;
+- invoke MiniMax;
+- disclose Repository source;
+- mutate files;
+- run external Commands;
+- create a native helper;
+- evaluate completion Evidence;
+- seal a product Receipt;
+- create a release or installer;
+- add Child, Scout, Verifier, Attention, TUI, or Wave B behavior;
+- issue build authorization.
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Complete and verified
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P0-W28-AC01 | Pending | P0-W28-E01 | pending |
-| P0-W28-AC02 | Pending | P0-W28-E02 | pending |
-| P0-W28-AC03 | Pending | P0-W28-E03 | pending |
-| P0-W28-AC04 | Pending | P0-W28-E04 | pending |
-| P0-W28-AC05 | Pending | P0-W28-E05 | pending |
+| P0-W28-AC01 | Pass | P0-W28-E01 | current work grammar is enforced |
+| P0-W28-AC02 | Pass | P0-W28-E02 | accepted constants and callbacks are protected |
+| P0-W28-AC03 | Pass | P0-W28-E03 | semantic fixtures passed |
+| P0-W28-AC04 | Pass | P0-W28-E04 | no product runtime entered |
+| P0-W28-AC05 | Pass | P0-W28-E05 | exact final-head CI passed |
 
 ### Verification executed
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| full CI workflow | 0 | GitHub Actions run `30425270052` |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
-- Parent slice gate affected: first-month Prompt 8-A only
-- Aggregate Receipt updated: Not applicable
+- Ticket demo contribution: Pass for conformance review only
+- Parent slice gate affected: none
+- Slice verification manifest updated: not applicable
 - Slice completion claimed: No
 
 ### Failures and warnings
 
-- Build authorization remains denied.
+- Prompt 6-A's Python validator is a semantic validator, not a complete Draft 2020-12 implementation. Prompt 8-A adds separate pinned Schema validation.
+- Prompt 6-A issued no build authorization.
 
 ### Remaining unknowns and exclusions
 
-- Prompt 7-A and Prompt 8-A remain required.
+- External-effect behavior remained unimplemented at merge.
+- Prompt 8-A controls development authorization.
 
 ### Repository state
 
-- Commit: pending
+- Commit: `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`
+- Merge commit: `57a5790d2266cf1ab59f107d0b429c31c618e0ae`
 - Branch: `work/p0-w28-wave-a-conformance`
-- Diff reviewed: No
-- Exact CI run: pending
+- Diff reviewed: Yes
+- Exact CI run: `30425270052`
 - Parent slice status after merge: unchanged
