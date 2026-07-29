@@ -1,7 +1,7 @@
 # P0-W25: CLI product contract and local delivery
 
 **Document type:** Focused planning work package  
-**Status:** In progress  
+**Status:** Implemented and verified on branch  
 **Branch:** `work/p0-w25-cli-local-delivery`  
 **Depends on:** P0-W21 through P0-W24 and OD-01/OD-02 integrated  
 **Scope:** Complete first-month CLI, structured output, configuration, diagnostics, restart interaction, arm64 macOS packaging, installation, versioning, and support expectations only  
@@ -11,20 +11,26 @@
 
 Assemble the accepted lifecycle, provider, Context, Patch, Command, Evidence, acceptance, and Receipt decisions into one complete CLI-first product contract for Apple Silicon macOS.
 
-## Requirements
+## Accepted planning decisions
 
-- Map every user action to an accepted application command or query.
-- Define objective and criteria input, Session start, status, investigation, Context inspection, Patch review, Approval, application, verification, Evidence inspection, acceptance, Receipt, cancellation, and recovery.
-- Define interactive and noninteractive behavior without bypass flags.
-- Define one stable structured output envelope and exit-code set.
-- Define configuration, credential references, `$KILN_HOME`, Project records, and diagnostic output.
-- Define errors, safe next actions, restart reconstruction, orphan interaction, and receipt delivery failures.
-- Define Apple Silicon macOS installation and Mix-release packaging.
-- Define version and build manifests and disposition `Kiln.version/0`.
-- Preserve all semantic authorities from P0-W21 through P0-W24.
-- Keep TUI, daemon, background service, auto-update, Homebrew, cross-platform packaging, implementation, and Wave B out.
+P0-W25 proposes:
 
-## Expected files
+1. One foreground CLI named `kiln`; no daemon.
+2. Text output by default and one versioned JSON result envelope.
+3. Stable exits for usage, denied, blocked, stale, failed, unknown, store, unsupported host, and Receipt delivery failure.
+4. Project, disclosure, Command-registration, Session, status, Context, investigation, Patch, verification, Evidence, acceptance, Receipt, cancellation, and recovery commands.
+5. No `--yes`, auto-Approval, auto-acceptance, or configuration bypass.
+6. Digest-bound interactive and noninteractive Approval and acceptance.
+7. Default `$KILN_HOME` at `~/Library/Application Support/Kiln`.
+8. Explicit host, store, helper, runtime, credential-reference, and unsupported-control diagnostics.
+9. One arm64 macOS Mix release containing ERTS, Kiln, Exqlite, and the command-host helper.
+10. `.tar.gz`, SHA-256, and canonical build manifest.
+11. User-local side-by-side installation and explicit upgrade; no auto-update.
+12. No root, daemon, Homebrew, public installer, notarization claim, universal binary, or cross-platform support claim.
+13. `Kiln.version/0` derives from application or release metadata rather than a separate literal.
+14. The CLI exposes accepted operations and does not own their semantics.
+
+## Files changed
 
 - `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md`
 - `docs/decisions/0027-ship-an-arm64-macos-mix-release-first.md`
@@ -33,28 +39,45 @@ Assemble the accepted lifecycle, provider, Context, Patch, Command, Evidence, ac
 - `docs/work/P0-W24-command-evidence-acceptance.md`
 - `docs/work/P0-W25-cli-local-delivery.md`
 
-## Acceptance criteria
+Review-head compare against `main`:
 
-- Every first-month action and failure has one CLI command or explicit automatic startup behavior.
-- Text and JSON output are explicit.
-- Approval and acceptance cannot be bypassed by `--yes`, environment, model output, or configuration.
-- Stable exit codes and error envelopes exist.
-- Startup, doctor, configuration, secrets, supported host, state path, logging, and recovery are explicit.
-- Mix release, target triple, package layout, checksum, install, upgrade, rollback limitation, version, and build manifest are explicit.
-- No CLI command redesigns lifecycle, persistence, provider, Patch, Command, Evidence, acceptance, or Receipt semantics.
-- No TUI, daemon, broad installer ecosystem, auto-update, implementation, or Wave B scope enters.
-- Exact final-head CI passes.
+- six Markdown files;
+- 999 additions and 97 deletions;
+- no source, tests, dependency, configuration, release files, installer, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or scaffolding.
 
-## Required completion evidence
+## Acceptance evidence
 
-- P0-W25-E01: upstream authorities and OD-02 Evidence.
-- P0-W25-E02: complete CLI command and workflow map.
-- P0-W25-E03: text, JSON, error, exit, and interactive contract.
-- P0-W25-E04: configuration, secret, diagnostic, restart, and recovery contract.
-- P0-W25-E05: Mix-release packaging and local delivery contract.
-- P0-W25-E06: upstream ownership audit.
-- P0-W25-E07: planning-only compare and exact final-head CI.
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| Every first-month action and failure maps to CLI or startup | Pass | command and workflow sections |
+| Text and JSON output explicit | Pass | output section |
+| Approval and acceptance cannot be bypassed | Pass | Patch and completion sections |
+| Stable exit and error envelopes | Pass | output and error sections |
+| Startup, doctor, config, secrets, host, paths, logging, recovery | Pass | startup, config, diagnostics, logging, recovery sections |
+| Mix release, target, package, checksum, install, upgrade, version, manifest | Pass | packaging and version sections |
+| Upstream semantics unchanged | Pass | ownership audit |
+| No TUI, daemon, broad installer, implementation, or Wave B | Pass | authority and exclusions |
+| Review-head validation | Pass | CI `30422848272` on `b8c5425f7dddee600c0574b020ff5255d2efbbd5` |
+| Exact closeout-head validation | Pending | final CI after this update |
 
-## Explicit exclusions
+## External evidence
 
-P0-W25 does not implement a CLI or package; add dependencies, source, tests, config, release files, installer scripts, Schemas, CI, preflight, Skills, prompts, or agents; create a TUI, daemon, service, web UI, Homebrew formula, notarized public distribution, auto-update, remote access, or Wave B scope; or issue build authorization.
+Official Mix documentation supports a self-contained release and requires matching target architecture, operating system/vendor, and ABI for ERTS and native dependencies. That supports one arm64 macOS package and rejects a cross-platform claim.
+
+## Verification
+
+Review head `b8c5425f7dddee600c0574b020ff5255d2efbbd5` passed GitHub CI run `30422848272`.
+
+The run passed Vale, current preflight behavior tests, Project agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, cycle detection, and ExUnit.
+
+The current preflight result proves obsolete P0 mechanics only. It does not prove P1 ticket compatibility.
+
+## Gate verdict
+
+P0-W25 passes on this branch after exact closeout-head CI.
+
+Owner acceptance and integration remain required.
+
+## Exact next action
+
+After final CI passes, merge P0-W25 and run Prompt 6-A against the integrated first-month planning state.
