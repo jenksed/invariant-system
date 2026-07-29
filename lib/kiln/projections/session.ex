@@ -42,4 +42,98 @@ defmodule Kiln.Projections.Session do
     |> Map.put("session_revision", session_revision)
     |> Map.put("last_sequence", last_sequence)
   end
+
+  @nonterminal_operation_states ["intent_recorded", "started"]
+
+  @doc """
+  Validate the complete internal invariants of a reduced projection.
+
+  Applied after every successful reduction, in both commit and replay, so an
+  accepted projection can never hold contradictory durable facts: a pending
+  decision only while `waiting_for_user`, a nonterminal operation only while
+  `running`, terminal Run state coordinated with Task and Session state, and a
+  first-month Root Run whose id equals its root run id. Returns a deterministic
+  error naming the conflicting field.
+  """
+  @spec validate(t()) :: :ok | {:error, %{code: atom(), detail: map()}}
+  def validate(projection) do
+    with :ok <- validate_identity(projection),
+         :ok <- validate_decision(projection),
+         :ok <- validate_operation(projection) do
+      validate_coordination(projection)
+    end
+  end
+
+  defp validate_identity(projection) do
+    run = projection["run"]
+
+    if run["id"] == run["root_run_id"] do
+      :ok
+    else
+      invalid(:run_identity_mismatch, %{id: run["id"], root_run_id: run["root_run_id"]})
+    end
+  end
+
+  defp validate_decision(projection) do
+    run_state = projection["run"]["state"]
+    decision = projection["pending_decision"]
+
+    case {run_state, decision} do
+      {"waiting_for_user", nil} -> invalid(:missing_pending_decision, %{run_state: run_state})
+      {"waiting_for_user", _decision} -> :ok
+      {_state, nil} -> :ok
+      {state, _decision} -> invalid(:unexpected_pending_decision, %{run_state: state})
+    end
+  end
+
+  defp validate_operation(projection) do
+    run_state = projection["run"]["state"]
+    operation = projection["operation"]
+
+    cond do
+      is_nil(operation) ->
+        :ok
+
+      nonterminal_operation?(operation) and run_state == "running" ->
+        :ok
+
+      nonterminal_operation?(operation) ->
+        invalid(:unexpected_active_operation, %{run_state: run_state})
+
+      true ->
+        :ok
+    end
+  end
+
+  defp nonterminal_operation?(%{"state" => state}), do: state in @nonterminal_operation_states
+  defp nonterminal_operation?(_), do: false
+
+  # The first-month contract couples Run, Task, and Session state.
+  defp validate_coordination(projection) do
+    run_state = projection["run"]["state"]
+    task_state = projection["task"]["state"]
+    session_state = projection["session"]["state"]
+
+    expected =
+      case run_state do
+        "completed" -> {"satisfied", "completed"}
+        "failed" -> {"abandoned", "abandoned"}
+        "canceled" -> {"abandoned", "abandoned"}
+        _active_or_uncertain -> {"in_progress", "active"}
+      end
+
+    if {task_state, session_state} == expected do
+      :ok
+    else
+      invalid(:uncoordinated_terminal_state, %{
+        run: run_state,
+        task: task_state,
+        session: session_state,
+        expected_task: elem(expected, 0),
+        expected_session: elem(expected, 1)
+      })
+    end
+  end
+
+  defp invalid(code, detail), do: {:error, %{code: code, detail: detail}}
 end

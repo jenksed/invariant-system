@@ -4,13 +4,16 @@ defmodule Kiln.Journal.Reducer do
 
   It never touches SQLite, the Repository, a provider, or the transcript. Given
   the current projection (or `nil` before the first entry) and one decoded entry,
-  it validates the entry kind and payload shape, enforces the accepted Run
-  transition table, and returns the next projection or a deterministic error
-  (P1-S01-T03-R01, R03). Sequence and revision bookkeeping belong to the caller;
-  this stays a pure function of domain facts.
+  it validates the entry kind, payload shape, and state correspondence, enforces
+  the accepted Run transition and operation-state progressions, coordinates
+  terminal Run, Task, and Session state, and validates the complete projection
+  invariants after every reduction. It returns the next projection or a
+  deterministic error (P1-S01-T03-R01, R03). Commit and replay share this one
+  reducer, so an accepted projection is always internally valid.
   """
 
   alias Kiln.Domain.Transition
+  alias Kiln.Projections.Session
 
   @run_states %{
     "ready" => :ready,
@@ -22,7 +25,15 @@ defmodule Kiln.Journal.Reducer do
     "canceled" => :canceled
   }
 
-  @type projection :: Kiln.Projections.Session.t()
+  # Accepted operation-state progressions. Terminal states have no successor.
+  @operation_progression %{
+    "intent_recorded" => ["started", "succeeded", "failed", "canceled", "unknown"],
+    "started" => ["succeeded", "failed", "canceled", "unknown"]
+  }
+
+  @nonterminal_operation_states ["intent_recorded", "started"]
+
+  @type projection :: Session.t()
   @type entry :: %{type: String.t(), payload: map()}
   @type error :: %{code: atom(), detail: map()}
 
@@ -51,9 +62,23 @@ defmodule Kiln.Journal.Reducer do
     end)
   end
 
-  @doc "Apply one entry to the projection."
+  @doc """
+  Apply one entry, then validate the complete projection invariants.
+
+  A successful reduction whose projection is internally impossible returns the
+  invariant error rather than the projection.
+  """
   @spec reduce(projection() | nil, entry()) :: {:ok, projection()} | {:error, error()}
-  def reduce(nil, %{type: "session_started/v1", payload: payload} = entry) do
+  def reduce(projection, entry) do
+    with {:ok, next} <- do_reduce(projection, entry),
+         :ok <- Session.validate(next) do
+      {:ok, next}
+    end
+  end
+
+  # -- per-entry reduction --
+
+  defp do_reduce(nil, %{type: "session_started/v1", payload: payload} = entry) do
     with :ok <- require_keys(payload, ["session", "task", "run", "workflow_step"]),
          :ok <- enforce_start_contract(payload),
          :ok <- bind_session_id(entry, payload) do
@@ -78,33 +103,32 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  def reduce(nil, %{type: type}) do
+  defp do_reduce(nil, %{type: type}) do
     {:error, %{code: :missing_session_start, detail: %{type: type}}}
   end
 
-  def reduce(_projection, %{type: "session_started/v1"}) do
+  defp do_reduce(_projection, %{type: "session_started/v1"}) do
     {:error, %{code: :session_already_started, detail: %{}}}
   end
 
-  def reduce(projection, %{type: "criteria_revised/v1", payload: payload}) do
+  defp do_reduce(projection, %{type: "criteria_revised/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["criteria_revision"]) do
       {:ok, Map.put(projection, "criteria_revision", payload["criteria_revision"])}
     end
   end
 
-  def reduce(projection, %{type: "run_transitioned/v1", payload: payload}) do
+  defp do_reduce(projection, %{type: "run_transitioned/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["run"]),
          :ok <- match_current_run(projection, payload["run"]["from"]),
-         {:ok, to} <- transition_run(projection, payload["run"]["to"]) do
-      {:ok,
-       projection
-       |> put_run_state(to)
-       |> maybe_put_step(payload["workflow_step"])}
+         {:ok, to} <- transition_run(projection, payload["run"]["to"]),
+         {:ok, coordinated} <- coordinate_terminal(put_run_state(projection, to), to) do
+      {:ok, maybe_put_step(coordinated, payload["workflow_step"])}
     end
   end
 
-  def reduce(projection, %{type: "pending_decision_recorded/v1", payload: payload}) do
+  defp do_reduce(projection, %{type: "pending_decision_recorded/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["decision"]),
+         :ok <- no_active_operation(projection),
          {:ok, _to} <- transition_run(projection, "waiting_for_user") do
       {:ok,
        projection
@@ -114,8 +138,9 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  def reduce(projection, %{type: "user_decision_recorded/v1", payload: payload}) do
-    with :ok <- match_current_decision(projection, payload["decision_id"]),
+  defp do_reduce(projection, %{type: "user_decision_recorded/v1", payload: payload}) do
+    with {:ok, decision} <- current_decision(projection, payload["decision_id"]),
+         :ok <- response_permitted(decision, payload["response"]),
          {:ok, _to} <- transition_run(projection, "ready") do
       {:ok,
        projection
@@ -125,7 +150,7 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  def reduce(projection, %{type: "external_operation_intent_recorded/v1", payload: payload}) do
+  defp do_reduce(projection, %{type: "external_operation_intent_recorded/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["operation"]),
          :ok <- no_current_operation(projection),
          {:ok, _to} <- transition_run(projection, "running") do
@@ -143,26 +168,82 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  def reduce(projection, %{type: "external_operation_observed/v1", payload: payload}) do
+  defp do_reduce(projection, %{type: "external_operation_observed/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["operation", "run"]),
-         {:ok, current} <- match_current_operation(projection, payload["operation"]["id"]),
-         {:ok, to} <- transition_run(projection, payload["run"]["to"]) do
-      # Preserve the operation identity and class; only advance its state.
-      operation = Map.put(current, "state", payload["operation"]["state"])
-
-      {:ok,
-       projection
-       |> put_run_state(to)
-       |> Map.put("operation", operation)
-       |> maybe_put_step(payload["workflow_step"])}
+         {:ok, current} <- current_operation(projection, payload["operation"]["id"]),
+         {:ok, next_state} <- operation_progress(current["state"], payload["operation"]["state"]),
+         {:ok, observed} <- observe(projection, current, next_state, payload) do
+      {:ok, maybe_put_step(observed, payload["workflow_step"])}
     end
   end
 
-  def reduce(_projection, %{type: type}) do
+  defp do_reduce(_projection, %{type: type}) do
     {:error, %{code: :unknown_entry_type, detail: %{type: type}}}
   end
 
-  # -- internals --
+  # -- operation observation --
+
+  # `started` is an operation-state update, not a Run transition: the Run stays
+  # running while dispatch crosses the live boundary.
+  defp observe(projection, current, "started", payload) do
+    if payload["run"]["to"] == "running" and projection["run"]["state"] == "running" do
+      {:ok, Map.put(projection, "operation", Map.put(current, "state", "started"))}
+    else
+      {:error, %{code: :started_requires_running, detail: %{run_to: payload["run"]["to"]}}}
+    end
+  end
+
+  # A terminal observation advances the operation and transitions the Run,
+  # preserving the operation identity and class.
+  defp observe(projection, current, terminal_state, payload) do
+    with {:ok, to} <- transition_run(projection, payload["run"]["to"]),
+         {:ok, coordinated} <- coordinate_terminal(put_run_state(projection, to), to) do
+      {:ok, Map.put(coordinated, "operation", Map.put(current, "state", terminal_state))}
+    end
+  end
+
+  defp operation_progress(from, to) do
+    if to in Map.get(@operation_progression, from, []) do
+      {:ok, to}
+    else
+      {:error, %{code: :operation_state_regression, detail: %{from: from, to: to}}}
+    end
+  end
+
+  # -- terminal coordination --
+
+  defp coordinate_terminal(projection, "completed") do
+    cond do
+      projection["pending_decision"] != nil ->
+        {:error, %{code: :completion_pending_decision, detail: %{}}}
+
+      unresolved_operation?(projection["operation"]) ->
+        {:error,
+         %{code: :completion_unresolved_operation, detail: %{operation: projection["operation"]}}}
+
+      true ->
+        {:ok, coordinate(projection, "satisfied", "completed")}
+    end
+  end
+
+  defp coordinate_terminal(projection, terminal) when terminal in ["failed", "canceled"] do
+    {:ok, coordinate(projection, "abandoned", "abandoned")}
+  end
+
+  defp coordinate_terminal(projection, _nonterminal), do: {:ok, projection}
+
+  defp coordinate(projection, task_state, session_state) do
+    projection
+    |> Map.update!("task", &Map.put(&1, "state", task_state))
+    |> Map.update!("session", &Map.put(&1, "state", session_state))
+  end
+
+  defp unresolved_operation?(nil), do: false
+
+  defp unresolved_operation?(%{"state" => state}),
+    do: state in @nonterminal_operation_states or state == "unknown"
+
+  # -- transitions and correspondence --
 
   defp transition_run(projection, to_string_state) do
     from_string = projection["run"]["state"]
@@ -180,8 +261,6 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  # The recorded prior Run state must equal the projection's current Run state,
-  # even when the current state could legally transition to the destination.
   defp match_current_run(projection, recorded_from) do
     current = projection["run"]["state"]
 
@@ -192,16 +271,40 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  defp match_current_decision(projection, decision_id) do
+  defp current_decision(projection, decision_id) do
     case projection["pending_decision"] do
-      %{"id" => ^decision_id} ->
-        :ok
+      %{"id" => ^decision_id} = decision ->
+        {:ok, decision}
 
       nil ->
         {:error, %{code: :no_current_decision, detail: %{decision_id: decision_id}}}
 
       %{"id" => current} ->
         {:error, %{code: :decision_mismatch, detail: %{recorded: decision_id, current: current}}}
+    end
+  end
+
+  defp response_permitted(decision, response) do
+    permitted = decision["permitted_responses"] || []
+
+    if is_binary(response) and response != "" and response in permitted do
+      :ok
+    else
+      {:error,
+       %{
+         code: :decision_response_not_permitted,
+         detail: %{decision_id: decision["id"], response: response, permitted: permitted}
+       }}
+    end
+  end
+
+  defp no_active_operation(projection) do
+    case projection["operation"] do
+      %{"state" => state} when state in @nonterminal_operation_states ->
+        {:error, %{code: :operation_active, detail: %{operation: projection["operation"]}}}
+
+      _ ->
+        :ok
     end
   end
 
@@ -215,7 +318,7 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  defp match_current_operation(projection, operation_id) do
+  defp current_operation(projection, operation_id) do
     case projection["operation"] do
       %{"id" => ^operation_id} = operation ->
         {:ok, operation}
@@ -250,8 +353,6 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
-  # Session start is atomic and fixed: exactly one active Session, in_progress
-  # Task, ready Root Run, and intent workflow step (P0-W21 section 5.1).
   @start_contract [
     {["session", "state"], "active"},
     {["task", "state"], "in_progress"},
@@ -278,8 +379,6 @@ defmodule Kiln.Journal.Reducer do
     end)
   end
 
-  # Bind the payload Session identity to the envelope Session id when the caller
-  # supplies it, so a projection cannot claim a different Session.
   defp bind_session_id(entry, payload) do
     case Map.get(entry, :session_id) do
       nil ->
