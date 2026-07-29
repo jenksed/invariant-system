@@ -49,4 +49,5 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0020: Prove a single-Run change loop before delegated orchestration](0020-prove-single-run-change-loop-before-delegation.md) | Accepted | Integrated through pull request 23 |
 | [0021: Use MiniMax as the only initial provider](0021-use-minimax-as-the-only-initial-provider.md) | Accepted | Integrated through pull request 26 |
 | [0022: Use direct Exqlite for the first state store](0022-use-exqlite-for-the-first-state-store.md) | Accepted | Integrated through pull request 27 |
-| [0023: Use the MiniMax M3 OpenAI-compatible API](0023-use-minimax-m3-openai-compatible-api.md) | Accepted | Proposed on `work/p0-w22-model-context-repository-boundary-reconciled` |
+| [0023: Use the MiniMax M3 OpenAI-compatible API](0023-use-minimax-m3-openai-compatible-api.md) | Accepted | Integrated through pull request 29 |
+| [0024: Use complete text after-images for first Patches](0024-use-complete-text-after-images-for-first-patches.md) | Accepted | Proposed on `work/p0-w23-patch-approval-mutation` |
