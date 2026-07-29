@@ -1,7 +1,7 @@
 # P0-W18: Reconcile product, scope, and minimum architecture
 
 **Document type:** Planning work package  
-**Status:** Implemented; final verification pending  
+**Status:** Implemented and verified; not integrated  
 **Branch:** `work/p0-w18-product-scope-architecture`  
 **Depends on:** P0-W17 integrated through pull request 22  
 **Scope:** Product, scope, and architecture planning only
@@ -133,7 +133,7 @@ P0-W18 proposes these decisive corrections:
 
 ## Acceptance criteria
 
-| Criterion | Status before final CI | Evidence |
+| Criterion | Status | Evidence |
 | --- | --- | --- |
 | P0-W18-AC01 product definition | Pass | README and product-scope specification |
 | P0-W18-AC02 enforceable non-goals | Pass | Product-scope specification and README |
@@ -149,23 +149,26 @@ P0-W18 proposes these decisive corrections:
 | P0-W18-AC12 remaining planning domains | Pass | Product-scope assessment |
 | P0-W18-AC13 coherent Prompt 3 target | Pass | Contract index, affected-scaffolding register, and current authorities |
 | P0-W18-AC14 documentation-only diff | Pass | Compare against `main`: 21 documentation files |
-| P0-W18-AC15 final Repository validation | Pending | Final-head GitHub CI required |
+| P0-W18-AC15 Repository validation | Pass | GitHub CI run `30411615027` on design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` |
 
-## Deterministic verification
+## Verification executed
 
-```bash
-scripts/agent-preflight
-scripts/validate-agent-assets
-vale .
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix xref graph --format cycles --label compile-connected --fail-above 0
-mix test
-```
+The design head `3f2d2eadd611ba0dca1f5512bc89872ec37d6eb3` passed GitHub CI run `30411615027`:
 
-The current CI runs the equivalent Repository checks.
+- Vale;
+- agent preflight behavior;
+- Project agent-asset validation;
+- dependency installation;
+- Elixir formatting;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit.
 
-A passing preflight test proves the obsolete P0 behavior still passes. It does not prove current P1 slice-ticket support.
+An earlier head passed every executable test step but failed Vale on two uses of a forbidden marketing word. P0-W18 corrected the text and did not weaken the rule.
+
+A passing preflight test proves that obsolete P0 behavior still passes. It does not prove current P1 slice-ticket support.
+
+This closeout commit requires one final exact-head CI run before integration.
 
 ## Required completion Evidence
 
@@ -179,11 +182,10 @@ A passing preflight test proves the obsolete P0 behavior still passes. It does n
 | P0-W18-E06 | AC11 | Roadmap, slice definitions, and planned aggregate gates |
 | P0-W18-E07 | AC12–AC13 | Remaining planning-domain assessment and Prompt 3 affected-scaffolding register |
 | P0-W18-E08 | AC14 | GitHub compare against `main` |
-| P0-W18-E09 | AC15 | Final-head GitHub CI run |
+| P0-W18-E09 | AC15 | GitHub CI run `30411615027`; final closeout-head run pending |
 
 ## Failures and warnings
 
-- Final-head CI has not run yet.
 - Current preflight and its tests remain intentionally obsolete and unchanged.
 - Current Schema files remain intentionally unchanged and may conflict with the reconciled minimum subset.
 - Existing accepted invariants describe some broader long-term maxima. P0-W18 narrows version 0.1 timing and limits through proposed ADR 0020 without renumbering the stable register.
@@ -205,6 +207,6 @@ P0-W18 does not:
 
 ## Exact next action
 
-After final validation, owner review, acceptance, and integration, run **Prompt 3 — Reconcile scaffolded, partial, and completed-looking implementation** against current `main`.
+After final closeout-head validation, owner review, acceptance, and integration, run **Prompt 3 — Reconcile scaffolded, partial, and completed-looking implementation** against current `main`.
 
 Do not begin Prompt 4 or implementation before Prompt 3 passes.
