@@ -104,6 +104,39 @@ defmodule Kiln.Journal.ActionBatchTest do
     assert {:error, %{code: :action_boundary_mismatch, boundary: 2}} = rebuild(conn, d)
   end
 
+  test "blocks a text revision without raising", %{conn: conn, d: d} do
+    exec(conn, "UPDATE journal_entries SET session_revision = 'zero' WHERE session_revision = 1")
+    assert {:error, %{code: :corrupt_revision}} = rebuild(conn, d)
+  end
+
+  test "blocks a negative revision without raising", %{conn: conn, d: d} do
+    exec(conn, "UPDATE journal_entries SET session_revision = -1 WHERE session_revision = 1")
+    assert {:error, %{code: :corrupt_revision}} = rebuild(conn, d)
+  end
+
+  test "blocks a non-integer expected revision", %{conn: conn, d: d} do
+    exec(
+      conn,
+      "UPDATE action_commits SET expected_session_revision = 'later' WHERE first_sequence = 2"
+    )
+
+    assert {:error, %{code: :corrupt_action_bounds}} = rebuild(conn, d)
+  end
+
+  test "blocks an unsupported entry schema", %{conn: conn, d: d} do
+    exec(conn, "UPDATE journal_entries SET entry_schema = 'journal_entry/v9' WHERE sequence = 2")
+    assert {:error, %{code: :unsupported_entry_schema, boundary: 2}} = rebuild(conn, d)
+  end
+
+  test "blocks a payload schema that mismatches the entry type", %{conn: conn, d: d} do
+    exec(
+      conn,
+      "UPDATE journal_entries SET payload_schema = 'criteria_revised/v1' WHERE sequence = 2"
+    )
+
+    assert {:error, %{code: :payload_schema_mismatch, boundary: 2}} = rebuild(conn, d)
+  end
+
   defp rebuild(conn, d), do: Replay.rebuild(conn, d.session.id)
   defp exec(conn, sql), do: Connection.query!(conn, sql)
 

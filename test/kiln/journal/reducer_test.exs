@@ -57,6 +57,134 @@ defmodule Kiln.Journal.ReducerTest do
              Reducer.reduce(projection, %{type: "criteria_revised/v1", payload: %{}})
   end
 
+  test "a terminal Run transition coordinates Task and Session state" do
+    {:ok, projection} = Reducer.reduce(nil, session_started())
+
+    assert {:ok, completed} = transition(projection, "ready", "completed")
+    assert completed["run"]["state"] == "completed"
+    assert completed["task"]["state"] == "satisfied"
+    assert completed["session"]["state"] == "completed"
+
+    {:ok, fresh} = Reducer.reduce(nil, session_started())
+    assert {:ok, failed} = transition(fresh, "ready", "failed")
+    assert failed["task"]["state"] == "abandoned"
+    assert failed["session"]["state"] == "abandoned"
+  end
+
+  test "a raw transition cannot leave a pending decision attached to ready" do
+    {:ok, waiting} = to_waiting()
+
+    assert {:error, %{code: :unexpected_pending_decision}} =
+             transition(waiting, "waiting_for_user", "ready")
+  end
+
+  test "a raw transition cannot leave a nonterminal operation attached to ready" do
+    {:ok, running} = with_operation()
+
+    assert {:error, %{code: :unexpected_active_operation}} =
+             transition(running, "running", "ready")
+  end
+
+  test "recording a pending decision while an operation is active blocks" do
+    {:ok, running} = with_operation()
+
+    assert {:error, %{code: :operation_active}} =
+             Reducer.reduce(running, %{
+               type: "pending_decision_recorded/v1",
+               payload: %{"decision" => decision()}
+             })
+  end
+
+  test "an unpermitted decision response blocks" do
+    {:ok, waiting} = to_waiting()
+
+    assert {:error, %{code: :decision_response_not_permitted}} =
+             Reducer.reduce(waiting, %{
+               type: "user_decision_recorded/v1",
+               payload: %{"decision_id" => "dec_1", "response" => "banana"}
+             })
+
+    assert {:ok, ready} =
+             Reducer.reduce(waiting, %{
+               type: "user_decision_recorded/v1",
+               payload: %{"decision_id" => "dec_1", "response" => "approve"}
+             })
+
+    assert ready["run"]["state"] == "ready"
+    assert ready["pending_decision"] == nil
+  end
+
+  test "a started observation keeps the Run running; a regression blocks" do
+    {:ok, running} = with_operation()
+
+    assert {:ok, started} =
+             Reducer.reduce(running, %{
+               type: "external_operation_observed/v1",
+               payload: %{
+                 "operation" => %{"id" => "opn_1", "state" => "started"},
+                 "run" => %{"to" => "running"}
+               }
+             })
+
+    assert started["run"]["state"] == "running"
+    assert started["operation"]["state"] == "started"
+
+    {:ok, succeeded} =
+      Reducer.reduce(started, %{
+        type: "external_operation_observed/v1",
+        payload: %{
+          "operation" => %{"id" => "opn_1", "state" => "succeeded"},
+          "run" => %{"to" => "ready"}
+        }
+      })
+
+    assert {:error, %{code: :operation_state_regression}} =
+             Reducer.reduce(succeeded, %{
+               type: "external_operation_observed/v1",
+               payload: %{
+                 "operation" => %{"id" => "opn_1", "state" => "started"},
+                 "run" => %{"to" => "running"}
+               }
+             })
+  end
+
+  defp transition(projection, from, to) do
+    Reducer.reduce(projection, %{
+      type: "run_transitioned/v1",
+      payload: %{"run" => %{"from" => from, "to" => to}}
+    })
+  end
+
+  defp to_waiting do
+    with {:ok, projection} <- Reducer.reduce(nil, session_started()),
+         {:ok, running} <- transition(projection, "ready", "running") do
+      Reducer.reduce(running, %{
+        type: "pending_decision_recorded/v1",
+        payload: %{"decision" => decision()}
+      })
+    end
+  end
+
+  defp with_operation do
+    with {:ok, projection} <- Reducer.reduce(nil, session_started()) do
+      Reducer.reduce(projection, %{
+        type: "external_operation_intent_recorded/v1",
+        payload: %{"operation" => %{"id" => "opn_1", "class" => "command_execution"}}
+      })
+    end
+  end
+
+  defp decision do
+    %{
+      "id" => "dec_1",
+      "subject_kind" => "run",
+      "subject_id" => "run_1",
+      "subject_revision" => 0,
+      "requested_actor" => "local_user",
+      "permitted_responses" => ["approve", "deny"]
+    }
+  end
+
   defp session_started do
     %{
       type: "session_started/v1",

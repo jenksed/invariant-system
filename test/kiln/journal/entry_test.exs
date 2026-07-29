@@ -45,12 +45,12 @@ defmodule Kiln.Journal.EntryTest do
     test "rejects an invalid operation class and state" do
       assert {:error, %{code: :invalid_payload, detail: %{field: "class"}}} =
                Entry.decode("external_operation_intent_recorded/v1", %{
-                 "operation" => %{"id" => "opn_1", "class" => "mining"}
+                 "operation" => %{"id" => gid(:operation, 1), "class" => "mining"}
                })
 
       assert {:error, %{code: :invalid_payload, detail: %{field: "state"}}} =
                Entry.decode("external_operation_observed/v1", %{
-                 "operation" => %{"id" => "opn_1", "state" => "vibing"},
+                 "operation" => %{"id" => gid(:operation, 1), "state" => "vibing"},
                  "run" => %{"to" => "ready"}
                })
     end
@@ -65,7 +65,7 @@ defmodule Kiln.Journal.EntryTest do
 
     test "rejects a malformed permitted-responses list and unexpected null" do
       decision = %{
-        "id" => "dec_1",
+        "id" => gid(:decision, 1),
         "subject_kind" => "run",
         "subject_id" => "run_1",
         "subject_revision" => 0,
@@ -78,7 +78,7 @@ defmodule Kiln.Journal.EntryTest do
 
       assert {:error, %{code: :invalid_payload, detail: %{field: "response"}}} =
                Entry.decode("user_decision_recorded/v1", %{
-                 "decision_id" => "dec_1",
+                 "decision_id" => gid(:decision, 1),
                  "response" => nil
                })
     end
@@ -111,7 +111,7 @@ defmodule Kiln.Journal.EntryTest do
       assert {:error, %{code: :no_current_decision}} =
                Reducer.reduce(projection, %{
                  type: "user_decision_recorded/v1",
-                 payload: %{"decision_id" => "dec_1", "response" => "approve"}
+                 payload: %{"decision_id" => gid(:decision, 1), "response" => "approve"}
                })
     end
 
@@ -141,7 +141,7 @@ defmodule Kiln.Journal.EntryTest do
                Reducer.reduce(nil, %{
                  type: "session_started/v1",
                  payload: payload,
-                 session_id: "ses_1"
+                 session_id: payload["session"]["id"]
                })
     end
 
@@ -151,14 +151,14 @@ defmodule Kiln.Journal.EntryTest do
       {:ok, running} =
         Reducer.reduce(projection, %{
           type: "external_operation_intent_recorded/v1",
-          payload: %{"operation" => %{"id" => "opn_1", "class" => "command_execution"}}
+          payload: %{"operation" => %{"id" => gid(:operation, 1), "class" => "command_execution"}}
         })
 
       assert {:error, %{code: :operation_mismatch}} =
                Reducer.reduce(running, %{
                  type: "external_operation_observed/v1",
                  payload: %{
-                   "operation" => %{"id" => "opn_OTHER", "state" => "succeeded"},
+                   "operation" => %{"id" => gid(:operation, 2), "state" => "succeeded"},
                    "run" => %{"to" => "ready"}
                  }
                })
@@ -167,9 +167,9 @@ defmodule Kiln.Journal.EntryTest do
 
   defp session_started_payload do
     %{
-      "session" => %{"id" => "ses_1", "state" => "active"},
-      "task" => %{"id" => "tsk_1", "state" => "in_progress"},
-      "run" => %{"id" => "run_1", "state" => "ready", "root_run_id" => "run_1"},
+      "session" => %{"id" => gid(:session, 1), "state" => "active"},
+      "task" => %{"id" => gid(:task, 1), "state" => "in_progress"},
+      "run" => %{"id" => gid(:run, 1), "state" => "ready", "root_run_id" => gid(:run, 1)},
       "workflow_step" => "intent",
       "objective_revision" => 0,
       "criteria_revision" => 0,
@@ -179,5 +179,10 @@ defmodule Kiln.Journal.EntryTest do
 
   defp started do
     %{type: "session_started/v1", payload: session_started_payload()}
+  end
+
+  defp gid(kind, byte) do
+    {:ok, value} = Kiln.Domain.Id.generate(kind, fn 16 -> :binary.copy(<<byte>>, 16) end)
+    value
   end
 end

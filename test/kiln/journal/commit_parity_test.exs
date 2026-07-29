@@ -146,6 +146,93 @@ defmodule Kiln.Journal.CommitParityTest do
     assert count(store.conn, "action_commits") == 1
   end
 
+  test "a malformed opaque identifier blocks the commit", %{store: store, d: d} do
+    bad_start =
+      JB.entry("session_started/v1", %{
+        "session" => %{"id" => "ses_bad", "state" => "active"},
+        "task" => %{"id" => d.task.id, "state" => "in_progress"},
+        "run" => %{"id" => d.run.id, "state" => "ready", "root_run_id" => d.run.root_run_id},
+        "workflow_step" => "intent",
+        "objective_revision" => 0,
+        "criteria_revision" => 0,
+        "references" => %{}
+      })
+
+    assert {:error, %{code: :invalid_entry}} =
+             JB.commit_entries(store, d, :start_session, 0, 2, [bad_start])
+
+    assert count(store.conn, "journal_entries") == 0
+  end
+
+  test "an empty entry batch writes nothing", %{store: store, d: d} do
+    assert {:error, %{code: :empty_entry_batch}} =
+             JB.commit_entries(store, d, :start_session, 0, 2, [])
+
+    assert count(store.conn, "journal_entries") == 0
+    assert count(store.conn, "action_commits") == 0
+  end
+
+  test "malformed entry input returns a stable error", %{store: store, d: d} do
+    action = JB.action(d, :start_session, :local_user, "user:local", 0, 2, [])
+
+    assert {:error, %{code: :invalid_entry, details: %{reason: :missing_type}}} =
+             Kiln.Store.Journal.commit(store.conn, action, [%{payload: %{}}],
+               now: "2026-07-29T13:30:00Z"
+             )
+
+    assert {:error, %{code: :invalid_entry, details: %{reason: :entry_not_a_map}}} =
+             Kiln.Store.Journal.commit(store.conn, action, ["not a map"],
+               now: "2026-07-29T13:30:00Z"
+             )
+
+    assert count(store.conn, "journal_entries") == 0
+  end
+
+  test "a corrupt stored idempotency result blocks without crashing", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+
+    Connection.query!(
+      store.conn,
+      "UPDATE action_commits SET result = 'not json' WHERE session_id = ?1",
+      [d.session.id]
+    )
+
+    duplicate = JB.action(d, :start_session, :local_user, "user:local", 0, 2, [])
+
+    assert {:error, %{class: :integrity, code: :corrupt_result}} =
+             Kiln.Store.Journal.commit(store.conn, duplicate, [JB.start_entry(d)],
+               now: "2026-07-29T13:30:00Z"
+             )
+  end
+
+  test "a corrupt cache during a new commit blocks with no durable change", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+
+    Connection.query!(
+      store.conn,
+      "UPDATE session_projections SET projection = 'not json' WHERE session_id = ?1",
+      [d.session.id]
+    )
+
+    before_entries = count(store.conn, "journal_entries")
+
+    assert {:error, %{class: :integrity, code: :cache_corrupt}} =
+             JB.commit_transition(store, d, "ready", "running", 0, 3)
+
+    assert count(store.conn, "journal_entries") == before_entries
+  end
+
+  test "a rich committed journal replays to the identical projection", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+    {:ok, _} = JB.commit_operation_intent(store, d, 0, 4)
+    {:ok, last} = JB.commit_operation_observe(store, d, 1, 5, "succeeded", "ready")
+
+    assert {:ok, report} = Replay.rebuild(store.conn, d.session.id)
+    assert Session.digest(report.projection) == Session.digest(last.projection)
+    assert report.projection["operation"]["state"] == "succeeded"
+    assert report.projection["run"]["state"] == "ready"
+  end
+
   defp count(conn, table) do
     [[n]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
     n
