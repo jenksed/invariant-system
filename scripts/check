@@ -11,6 +11,7 @@ cd "$root"
 
 command -v vale >/dev/null 2>&1 || fail "Vale is not installed or not available on PATH"
 command -v mix >/dev/null 2>&1 || fail "Mix is not installed or not available on PATH"
+command -v python3 >/dev/null 2>&1 || fail "Python 3 is not installed or not available on PATH"
 
 run() {
   printf '\n==> %s\n' "$*"
@@ -18,6 +19,7 @@ run() {
 }
 
 run scripts/test-agent-preflight
+run python3 scripts/validate_first_month_contracts.py
 run scripts/validate-agent-assets
 run vale .
 run mix format --check-formatted
