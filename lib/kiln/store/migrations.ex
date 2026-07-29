@@ -30,7 +30,9 @@ defmodule Kiln.Store.Migrations do
   @doc """
   Discover migration files under `dir`, ordered by version.
 
-  Returns `{:error, ...}` when a filename is malformed or a version repeats.
+  Returns `{:error, ...}` when no migration bundle exists, a filename is
+  malformed, or a version repeats. A binary without its bundled migrations must
+  never expose a fresh version-zero store as ready.
   """
   @spec discover(String.t()) :: {:ok, [migration()]} | {:error, Error.t()}
   def discover(dir \\ default_dir()) do
@@ -45,8 +47,14 @@ defmodule Kiln.Store.Migrations do
       end
     end)
     |> case do
-      {:ok, migrations} -> ensure_unique_versions(Enum.reverse(migrations))
-      {:error, _} = error -> error
+      {:ok, migrations} ->
+        migrations
+        |> Enum.reverse()
+        |> ensure_unique_versions()
+        |> ensure_present()
+
+      {:error, _} = error ->
+        error
     end
   end
 
@@ -58,8 +66,8 @@ defmodule Kiln.Store.Migrations do
 
     * `:future_version` when the store has an applied version this binary does
       not know (startup `version_blocked`);
-    * `:migration` when an applied checksum differs or a migration statement
-      fails (startup `migration_blocked`).
+    * `:migration` when the migration bundle is missing, an applied checksum
+      differs, or a migration statement fails (startup `migration_blocked`).
 
   `opts[:dir]` overrides the migrations directory; `opts[:now]` supplies the
   applied timestamp as an ISO 8601 string.
@@ -245,6 +253,13 @@ defmodule Kiln.Store.Migrations do
          })}
     end
   end
+
+  defp ensure_present({:ok, []}) do
+    {:error,
+     Error.new(:migration, :missing_migrations, "the bundled migration set is missing", %{})}
+  end
+
+  defp ensure_present(result), do: result
 
   # Split a migration file into individual statements. Line comments are
   # stripped; statements are separated by semicolons. Migration SQL must not
