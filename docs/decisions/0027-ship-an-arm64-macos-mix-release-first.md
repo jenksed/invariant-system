@@ -2,7 +2,7 @@
 
 **Document type:** Explanation  
 **Status:** Accepted  
-**Integration status:** Proposed on `work/p0-w25-cli-local-delivery`  
+**Integration status:** Integrated through pull request 33  
 **Date:** 2026-07-28  
 **Work package:** P0-W25  
 **Depends on:** OD-02 and ADR-0022/0026

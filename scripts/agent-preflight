@@ -39,12 +39,36 @@ done
 
 plan=""
 work_id=""
+work_kind=""
 
 if [[ "$branch" =~ ^work/(p[0-9]+-w[0-9]{2})-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
   work_id=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:lower:]' '[:upper:]')
+  work_kind="planning"
+elif [[ "$branch" =~ ^work/(p[0-9]+-s[0-9]{2}-t[0-9]{2})-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  work_id=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:lower:]' '[:upper:]')
+  work_kind="ticket"
+elif [[ "$branch" =~ ^work/(p[0-9]+-s[0-9]{2})-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
+  work_id=$(printf '%s' "${BASH_REMATCH[1]}" | tr '[:lower:]' '[:upper:]')
+  work_kind="slice"
+elif [[ "$branch" == work/* ]]; then
+  fail "work branch '$branch' must match work/p<phase>-w<two-digits>-<purpose>, work/p<phase>-s<two-digits>-t<two-digits>-<purpose>, or work/p<phase>-s<two-digits>-<purpose>"
+fi
+
+if [[ -n "$work_id" ]]; then
   shopt -s nullglob
-  plans=(docs/work/"${work_id}"-*.md)
+  candidates=(docs/work/"${work_id}"-*.md)
   shopt -u nullglob
+  plans=()
+
+  for candidate in "${candidates[@]}"; do
+    basename=$(basename "$candidate")
+
+    if [[ "$work_kind" == "slice" && "$basename" =~ ^${work_id}-T[0-9]{2}- ]]; then
+      continue
+    fi
+
+    plans+=("$candidate")
+  done
 
   [[ ${#plans[@]} -eq 1 ]] || fail "expected one plan for $work_id; found ${#plans[@]}"
   plan=${plans[0]}
@@ -53,22 +77,29 @@ if [[ "$branch" =~ ^work/(p[0-9]+-w[0-9]{2})-[a-z0-9]+(-[a-z0-9]+)*$ ]]; then
 
   required_headings=(
     "Objective"
-    "Observed current state and evidence"
+    "Observed current state"
     "Assumptions and unknowns"
     "Requirements"
     "Proposed changes"
-    "Files or components expected to change"
+    "Expected files or components"
     "Acceptance criteria"
-    "Verification commands"
-    "Required completion evidence"
+    "Deterministic verification"
+    "Required completion Evidence"
     "Explicit exclusions"
+    "Completion record"
   )
+
+  if [[ "$work_kind" == "ticket" ]]; then
+    required_headings+=(
+      "Slice contribution"
+      "Security boundary"
+      "Demo contribution"
+    )
+  fi
 
   for heading in "${required_headings[@]}"; do
     grep -Fqx "## $heading" "$plan" || fail "$plan is missing heading: $heading"
   done
-elif [[ "$branch" == work/* ]]; then
-  fail "work branch '$branch' does not match work/p<phase>-w<two-digits>-<purpose>"
 fi
 
 printf 'agent-preflight: pass\n'
@@ -77,6 +108,7 @@ printf 'branch: %s\n' "$branch"
 printf 'commit: %s\n' "$(git rev-parse HEAD)"
 
 if [[ -n "$plan" ]]; then
+  printf 'work kind: %s\n' "$work_kind"
   printf 'work package: %s\n' "$work_id"
   printf 'plan: %s\n' "$plan"
 fi

@@ -53,6 +53,9 @@ jobs:
       - name: Test agent preflight behavior
         run: scripts/test-agent-preflight
 
+      - name: Validate first-month contracts
+        run: python3 scripts/validate_first_month_contracts.py
+
       - name: Validate project agent assets
         run: scripts/validate-agent-assets
 
