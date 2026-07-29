@@ -188,11 +188,18 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after two PR #39 review rounds
+**Result:** Complete after three PR #39 review rounds
 
-Two review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5 below); review `4812134584` found three more (D6 to D8). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Three review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
-### Final review corrections (review 4812134584)
+### Third review corrections (review 4812387784)
+
+- **D9 Session start could store contradictory facts.** The decoder accepted any known states and the reducer copied them, so a start entry could record a completed Session with an orphaned Run, and the payload Session id was not bound to the envelope. Fix: the reducer enforces the atomic start contract (active Session, in_progress Task, ready Root Run, intent step) and binds the payload Session id to the envelope Session id. A start-contract violation at commit rolls back cleanly as `:invalid_entry`.
+- **D10 Validation order regressed idempotent replay.** Entry decoding ran before the idempotency check, so a valid duplicate with regenerated entries could fail instead of replaying. Fix: decode entries only after `existing_commit/2` returns `:none`; a duplicate replays its stored result first.
+- **D11 Corrupt sequence bounds could exhaust memory.** Replay built `Enum.to_list(first..last)` from database values. Fix: validate the bounds arithmetically (integer, `first <= last`, row count, per-index sequence) and never materialize an untrusted range.
+- **D12 Restart digest did not describe the returned projection.** For a nonterminal operation the returned projection changed but the digest stayed the journal digest. Fix: expose `journal_projection_digest` and `reconstructed_projection_digest`; the reconstructed digest matches the returned projection.
+
+### Second review corrections (review 4812134584)
 
 - **D6 Commit and replay did not share entry validation.** Replay decoded entries; `Kiln.Store.Journal.commit/4` inserted and reduced raw entries. An entry could commit and then fail on restart replay. Fix: `commit/4` now decodes every entry with `Kiln.Journal.Entry.decode/2` before the transaction opens; an invalid entry writes no journal row, no action commit, and no projection. Commit and replay share one decoder and reducer. The invariant holds: if an entry can commit, it can replay.
 - **D7 Wrong workflow-step authority.** `Kiln.Journal.Entry` accepted invented steps (`execution`, `completion`) and omitted accepted ones. Fix: the journal steps are derived from `Kiln.Domain.Run.workflow_steps/0` and converted to strings at the decoding boundary, so commit-time and replay-time validation cannot drift.
@@ -230,11 +237,11 @@ Two review rounds corrected defects the green test suite did not catch. Review `
 | P1-S01-T03-AC03 | Pass | P1-S01-T03-E03 | transcript records leave the projection digest unchanged and keep their own ordering |
 | P1-S01-T03-AC04 | Pass | P1-S01-T03-E04 | a nonterminal operation reconstructs as unknown operation and `orphaned` Run, appends nothing, dispatches nothing, and is idempotent on repeat |
 | P1-S01-T03-AC05 | Pass | P1-S01-T03-E05 | missing, malformed, metadata-mismatched, and stale caches are replaced after full journal validation; a matching cache is kept; a corrupt journal blocks and preserves the cache |
-| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `b613c2c`; no excluded capability is reachable |
+| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `dd129cf`; no excluded capability is reachable |
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `b613c2c8`.
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `dd129cf2`.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
@@ -249,8 +256,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 | `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures |
 | `mix test test/kiln/projections` | 0 | cache classification and rebuild |
 | `mix test test/kiln/restart_test.exs` | 0 | restart, orphan, multiple-Session, idempotence |
-| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 50 passed |
-| `mix test` | 0 | 97 passed |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 55 passed |
+| `mix test` | 0 | 102 passed |
 | `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### New protected tests
@@ -283,8 +290,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 
 ### Repository state
 
-- Commit: `b613c2c8d0c8644a212d8bba42d954fe3677e6a1`
+- Commit: `dd129cf2abd387fd859e04febb88550c0823cf71`
 - Branch: `work/p1-s01-t03-replay-projections`
-- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (2453 insertions, 106 deletions versus `main`)
+- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (2670 insertions, 123 deletions versus `main`)
 - Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
 - Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04
