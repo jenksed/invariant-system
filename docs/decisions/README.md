@@ -53,4 +53,4 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0024: Use complete text after-images for first Patches](0024-use-complete-text-after-images-for-first-patches.md) | Accepted | Integrated through pull request 30 |
 | [0025: Support Apple Silicon macOS first](0025-support-apple-silicon-macos-first.md) | Accepted | Integrated through pull request 31 |
 | [0026: Use registered process-group Commands on macOS](0026-use-registered-process-group-commands-on-macos.md) | Accepted | Integrated through pull request 32 |
-| [0027: Ship an arm64 macOS Mix release first](0027-ship-an-arm64-macos-mix-release-first.md) | Accepted | Proposed on `work/p0-w25-cli-local-delivery` |
+| [0027: Ship an arm64 macOS Mix release first](0027-ship-an-arm64-macos-mix-release-first.md) | Accepted | Integrated through pull request 33 |
