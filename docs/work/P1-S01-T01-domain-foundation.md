@@ -185,43 +185,59 @@ P1-S01-D01 steps 2 and 3: construct and display the accepted Session, initial Ta
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Complete
+
+All required acceptance criteria pass and the full deterministic verification gate ran at the exact branch head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T01-AC01 | Pending | P1-S01-T01-E01 | pending |
-| P1-S01-T01-AC02 | Pending | P1-S01-T01-E02 | pending |
-| P1-S01-T01-AC03 | Pending | P1-S01-T01-E03 | pending |
-| P1-S01-T01-AC04 | Pending | P1-S01-T01-E04 | pending |
-| P1-S01-T01-AC05 | Pending | P1-S01-T01-E05 | pending |
+| P1-S01-T01-AC01 | Pass | P1-S01-T01-E01 | `Session.start/2` returns one `active` Session, one `in_progress` Task, and one `ready` Root Run with three distinct identifiers and no `root_task_id` |
+| P1-S01-T01-AC02 | Pass | P1-S01-T01-E02 | Complete 7x7 transition matrix accepts only the P0-W21 table; terminal escape, direct `orphaned` completion, and unsupported states return explicit errors |
+| P1-S01-T01-AC03 | Pass | P1-S01-T01-E03 | Decision and Operation constructors validate subject, revision, actor, state, and idempotency fields with no effect dispatched |
+| P1-S01-T01-AC04 | Pass | P1-S01-T01-E04 | Action rejects `pid`, `process_id`, `provider_request_id`, `branch`, `worktree`, `transcript`, `hidden_reasoning`, `artifact_payload`, runtime handles, and tuples in payloads |
+| P1-S01-T01-AC05 | Pass | P1-S01-T01-E05 | Aggregate `scripts/check` exits zero at exact head `3707cf72` with a clean working tree and no external-effect dependency |
 
 ### Verification executed
 
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml` pin); `jsonschema==4.26.0` from `requirements/conformance.txt`. Executed at commit `3707cf724d4906dffdbb8b152420495e2641f570`.
+
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/test-agent-preflight` | 0 | `test-agent-preflight: pass` |
+| `python3 scripts/validate_first_month_contracts.py` | 0 | `pass`; 10 positive, 11 protected-negative fixtures |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | `pass`; jsonschema 4.26.0; 10 positive, 8 schema-rejected, 3 semantic-only negatives |
+| `scripts/validate-agent-assets` | 0 | `pass`; 5 skills, 3 agents, 3 templates |
+| `vale .` | 0 | 0 errors, 0 warnings, 0 suggestions in 120 files |
+| `mix format --check-formatted` | 0 | no output |
+| `mix compile --warnings-as-errors` | 0 | 15 files compiled, `Generated kiln app` |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | `No cycles found` |
+| `mix test test/kiln/domain` | 0 | 14 passed |
+| `mix test` | 0 | 21 passed |
+| `scripts/check` (aggregate) | 0 | `check: pass`; `working tree: clean`; commit `3707cf72` |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
+- Ticket demo contribution: Exercised through `Kiln.Domain.SessionTest`, which constructs and asserts the accepted Session, initial Task, and Root Run without persistence
 - Parent slice gate affected: P1-S01-G01 and G02
 - Slice verification manifest updated: No
 - Slice completion claimed: No
 
 ### Failures and warnings
 
-- None recorded before implementation.
+- None. All verification commands exited zero at the exact head with a clean working tree.
+- Environment note: this host's Homebrew Elixir is 1.19.5 and its system Python is PEP 668 externally managed. Verification used the repo-pinned mise Elixir 1.20.2 / OTP 28 toolchain and a virtualenv holding the pinned `jsonschema==4.26.0`. No source, dependency, or repository state was changed to make the gate pass.
 
 ### Remaining unknowns and exclusions
 
-- Persistence and runtime behavior remain T02 and later work.
+- Persistence and runtime behavior remain T02 and later work. No SQLite, migration, or store work was started.
+- Serialized field names (U01) and time representation (U02) remain adjustable in T02 without changing accepted semantics.
 
 ### Repository state
 
-- Commit: pending
+- Commit: `3707cf724d4906dffdbb8b152420495e2641f570`
 - Branch: `work/p1-s01-t01-domain-foundation`
-- Diff reviewed: No
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Diff reviewed: Yes; only the ten `lib/kiln/domain/*.ex` modules and five `test/kiln/domain/*.exs` tests (1639 insertions, 0 deletions) versus `main`
+- Exact CI run: Full local gate green at exact head; authoritative CI run and owner review pending on the pull request
+- Parent slice status after merge: unchanged (no state persisted, no workflow operational)
