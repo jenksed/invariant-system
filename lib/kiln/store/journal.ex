@@ -61,6 +61,9 @@ defmodule Kiln.Store.Journal do
           {:conflict, _} ->
             DBConnection.rollback(tx, {:idempotency_conflict})
 
+          {:corrupt_result, error} ->
+            DBConnection.rollback(tx, {:corrupt_result, error})
+
           :none ->
             commit_new(tx, action, entries, result_map, result_schema, now, opts)
         end
@@ -71,6 +74,8 @@ defmodule Kiln.Store.Journal do
       {:ok, {:replayed, stored}} -> {:ok, replayed_result(stored)}
       {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
       {:error, {:invalid_entry, error}} -> {:error, error}
+      {:error, {:corrupt_result, error}} -> {:error, error}
+      {:error, {:cache_corrupt, error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
@@ -88,16 +93,63 @@ defmodule Kiln.Store.Journal do
     end
   end
 
+  defp validate_entries([]) do
+    {:error,
+     Error.new(:unknown, :empty_entry_batch, "an action must append at least one entry", %{})}
+  end
+
   defp validate_entries(entries) do
     Enum.reduce_while(entries, :ok, fn entry, :ok ->
-      case Entry.decode(entry.type, entry.payload) do
-        {:ok, _decoded} ->
-          {:cont, :ok}
-
-        {:error, %{code: code, detail: detail}} ->
-          {:halt, {:error, invalid_entry_error(entry.type, code, detail)}}
+      case validate_entry(entry) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
       end
     end)
+  end
+
+  # Make malformed caller input total: the entry must be a map with a string
+  # type, a payload_schema that matches the shared authority, and a map payload
+  # that decodes.
+  defp validate_entry(entry) when is_map(entry) do
+    type = Map.get(entry, :type)
+    payload_schema = Map.get(entry, :payload_schema)
+    payload = Map.get(entry, :payload)
+
+    cond do
+      not is_binary(type) ->
+        {:error, malformed_entry(:missing_type, %{})}
+
+      not is_binary(payload_schema) ->
+        {:error, malformed_entry(:missing_payload_schema, %{type: type})}
+
+      not is_map(payload) ->
+        {:error, malformed_entry(:payload_not_a_map, %{type: type})}
+
+      Entry.payload_schema(type) != payload_schema ->
+        {:error,
+         malformed_entry(:payload_schema_mismatch, %{type: type, payload_schema: payload_schema})}
+
+      true ->
+        decode_entry(type, payload)
+    end
+  end
+
+  defp validate_entry(_entry), do: {:error, malformed_entry(:entry_not_a_map, %{})}
+
+  defp decode_entry(type, payload) do
+    case Entry.decode(type, payload) do
+      {:ok, _decoded} -> :ok
+      {:error, %{code: code, detail: detail}} -> {:error, invalid_entry_error(type, code, detail)}
+    end
+  end
+
+  defp malformed_entry(reason, detail) do
+    Error.new(
+      :unknown,
+      :invalid_entry,
+      "malformed journal entry",
+      Map.put(detail, :reason, reason)
+    )
   end
 
   defp invalid_entry_error(type, code, detail) do
@@ -154,18 +206,36 @@ defmodule Kiln.Store.Journal do
   defp existing_commit(tx, action) do
     case Connection.query!(
            tx,
-           "SELECT request_digest, result_schema, result FROM action_commits WHERE session_id = ?1 AND idempotency_key = ?2",
+           "SELECT request_digest, result_schema, result, result_digest FROM action_commits WHERE session_id = ?1 AND idempotency_key = ?2",
            [action.session_id, action.idempotency_key]
          ) do
       [] ->
         :none
 
-      [[digest, result_schema, result]] ->
-        if digest == action.request_digest do
-          {:replay, %{result_schema: result_schema, result: result}}
-        else
-          {:conflict, digest}
+      [[digest, result_schema, result, result_digest]] ->
+        cond do
+          digest != action.request_digest ->
+            {:conflict, digest}
+
+          not valid_stored_result?(result_schema, result, result_digest) ->
+            {:corrupt_result,
+             Error.new(:integrity, :corrupt_result, "stored idempotency result is corrupt", %{
+               session_id: action.session_id,
+               idempotency_key: action.idempotency_key
+             })}
+
+          true ->
+            {:replay, %{result_schema: result_schema, result: result}}
         end
+    end
+  end
+
+  # A stored idempotency result must decode and match its recorded digest before
+  # it is replayed, so corrupt durable result data cannot crash or mislead.
+  defp valid_stored_result?(result_schema, result, result_digest) do
+    case safe_decode(result) do
+      {:ok, decoded} -> Canonical.digest(result_schema, decoded) == result_digest
+      :error -> false
     end
   end
 
@@ -185,12 +255,37 @@ defmodule Kiln.Store.Journal do
         end
 
       [[current, projection_json]] ->
-        if action.expected_session_revision == current do
-          {current + 1, JSON.decode!(projection_json)}
-        else
-          DBConnection.rollback(tx, {:stale, current})
+        cond do
+          action.expected_session_revision != current ->
+            DBConnection.rollback(tx, {:stale, current})
+
+          true ->
+            {current + 1, current_projection!(tx, projection_json)}
         end
     end
+  end
+
+  # The cached projection is not authoritative. A corrupt cache during commit
+  # blocks with no durable change rather than crashing; restart reconstruction
+  # repairs the cache from the journal.
+  defp current_projection!(tx, projection_json) do
+    case safe_decode(projection_json) do
+      {:ok, projection} ->
+        projection
+
+      :error ->
+        DBConnection.rollback(
+          tx,
+          {:cache_corrupt,
+           Error.new(:integrity, :cache_corrupt, "cached projection is corrupt", %{})}
+        )
+    end
+  end
+
+  defp safe_decode(text) do
+    {:ok, JSON.decode!(text)}
+  rescue
+    _ -> :error
   end
 
   defp append_entries(tx, action, entries, base_next, now) do
