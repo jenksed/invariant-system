@@ -1,163 +1,171 @@
 # Roadmap
 
 **Document type:** Implementation-order authority  
-**Decision status:** Proposed P0-W18 reconciliation; owner acceptance required  
-**Integration status:** Proposed on `work/p0-w18-product-scope-architecture`  
+**Decision status:** Accepted by Prompt 8-A  
+**Integration status:** Authorization becomes effective when the Prompt 8-A pull request merges at an exact green head  
 **Implementation status:** No product slice implemented  
-**Product-scope authority:** `docs/PRODUCT-SCOPE-AND-MINIMUM-ARCHITECTURE.md`
+**Authorization level:** Vertical Slice Authorized for P1-S01 only
 
 ## Roadmap rule
 
-Kiln is implemented through vertical user workflows.
+Kiln is implemented through bounded vertical user workflows.
 
-A slice must produce usable behavior, deterministic tests, an explicit security boundary, a demo, and a bounded Receipt.
+A slice must produce usable behavior, deterministic tests, an explicit security boundary, a demo, and a slice verification manifest. A product Receipt is different: it is sealed only after committed product completion under P0-W24.
 
 A slice does not complete a subsystem merely because the long-term architecture describes it.
 
-Build authorization has not been issued.
+Prompt 8-A is the sole current build-authorization authority. Older roadmap prose, broad Schemas, and planned ticket names do not independently authorize work.
 
-# Product sequence
+## Owner schedule adjudication
 
-```text
-one durable CLI Run
-→ one real evidence-backed change
-→ interruption and unknown-effect recovery
-→ one bounded read-only Scout Child
-→ one independent Verifier Child
-→ optional TUI projection
-→ managed mutation isolation
-→ local code intelligence
-→ evidence-driven interoperability
-→ local project intelligence
-```
+The Single-Run Change Alpha remains an aggressive first-month execution target.
 
-The sequence proves a coding workflow before it proves a Run graph interface, generalized infrastructure, protocols, or indexes.
+The owner accepts uncertainty in that estimate and rejects schedule pessimism as a reason to remove accepted safety, durability, recovery, Evidence, CLI, packaging, or delivery requirements.
 
-# Phase 0 — Planning completion
+Rules:
 
-## Integrated planning
+- implementation remains divided into bounded tickets with exact gates;
+- a missed time target causes replanning;
+- missed timing does not silently weaken behavior;
+- no accepted feature is removed solely because a reviewer predicts a longer schedule.
 
-| ID | Outcome | Status |
-| --- | --- | --- |
-| P0-W01 through P0-W15 | Foundation, domain, Capability, Context, Git, delegation, interface, knowledge, security, and execution planning | Integrated |
-| P0-W16 | Integrated architecture and earlier vertical roadmap | Integrated through pull requests 20 and 21 |
-| P0-W17 | Planning-completion baseline | Integrated through pull request 22 |
-| P0-W18 | Product, scope, and minimum architecture reconciliation | Proposed on current branch |
-
-## Remaining planning-completion sequence
+## Product sequence
 
 ```text
-P0-W18  product, scope, and minimum architecture
-→ Prompt 3  implementation and scaffold reconciliation
-→ Prompt 4  remaining planning-round register
-→ Prompt 5  required focused planning rounds
-→ Prompt 6  justified conformance scaffolding
-→ Prompt 7  independent adversarial review
-→ Prompt 8  adjudication and build authorization
+P1-S01 durable single-Run foundation
+→ P1-S02 evidence-backed Single-Run Change Alpha
+→ accepted runtime Evidence
+→ P0-W26 interruption reconciliation planning
+→ P0-W27 bounded delegation planning
+→ Prompt 6-B
+→ Prompt 7-B
+→ Prompt 8-B
+→ only the delegated work authorized by Prompt 8-B
 ```
 
-## Phase 0 exit
+Later evidence-gated expansion can add TUI projection, managed mutation isolation, code intelligence, interoperability, local project intelligence, telemetry, or remote execution.
 
-Phase 0 exits only after Prompt 8 issues explicit build authorization.
+## Phase 0 — Complete on Prompt 8-A merge
 
-A named first ticket, accepted architecture, passing documentation CI, or existing JSON Schema does not authorize construction.
+Integrated shaping:
 
----
+- Prompts 1 through 4;
+- OD-01;
+- P0-W21 through P0-W25;
+- OD-02;
+- Prompt 6-A;
+- independent Prompt 7-A review;
+- Prompt 8-A adjudication and authorization.
 
-# Phase 1 — Change-loop-first product slices
+Phase 0 exits only when the Prompt 8-A branch merges after exact-head CI succeeds.
 
-## P1-S01 — Durable single-Run CLI
+## Phase 1 — Change-loop-first slices
 
-**Purpose:** establish the smallest durable Kiln work boundary before model or mutation complexity.
+# P1-S01 — Durable single-Run foundation
 
-### User-visible outcome
+**Status:** Authorized after Prompt 8-A merges  
+**Purpose:** establish the smallest durable Kiln work boundary before provider, Repository-source, mutation, Command, or completion complexity.
 
-A developer can open one Repository, record one objective and criteria, create one Session, Task, and Root Run, inspect status through the CLI, restart Kiln, and return to the same work state.
+## User-visible outcome
 
-### Deliver
+A developer can select one Repository, record one objective and criteria, create one Session, initial Task, and Root Run, inspect status through a minimal CLI, stop Kiln, restart it, and return to the same durable work state.
 
-- one active Project and Repository boundary;
-- Session, Task, Root Run, and minimum lifecycle;
-- append-oriented SQLite journal;
-- current projections;
+## Authorized delivery
+
+- accepted identifiers and first-month state types;
+- one active Project and Repository observation boundary;
+- Session, initial Task, and Root Run invariants;
+- exact P0-W21 lifecycle transition validation;
+- direct Exqlite state store;
+- forward migrations and integrity checks;
+- append-oriented journal;
+- expected revision and idempotency behavior;
+- rebuildable current projections;
 - transcript records separate from domain events;
-- CLI start, status, inspect, cancel, and resume actions;
-- restart reconstruction;
-- one bounded slice Receipt.
+- deterministic restart reconstruction;
+- durable user-decision and external-operation intent and terminal-or-unknown record shapes;
+- minimal CLI start, status, inspect, cancel, resume, and structured result surface;
+- aggregate deterministic gate, demo, and slice verification manifest.
 
-### Explicit exclusions
+## Authorized ticket sequence
 
-- provider invocation;
+| Order | Ticket | Branch | Outcome |
+| --- | --- | --- | --- |
+| 1 | P1-S01-T01 | `work/p1-s01-t01-domain-foundation` | identifiers, state types, constructors, invariants, pure lifecycle transitions |
+| 2 | P1-S01-T02 | `work/p1-s01-t02-durable-store` | Exqlite, store startup, migrations, integrity, journal transaction, revision and idempotency boundary |
+| 3 | P1-S01-T03 | `work/p1-s01-t03-replay-projections` | deterministic replay, projections, restart, duplicate and out-of-order handling |
+| 4 | P1-S01-T04 | `work/p1-s01-t04-foundation-cli` | minimal foreground CLI and structured output over implemented P1-S01 actions |
+| 5 | P1-S01-T05 | `work/p1-s01-t05-slice-gate` | aggregate gate, restart demo, corruption fixtures, and P1-S01-V01 verification manifest |
+
+Each ticket begins only after its dependency merges and its exact gate is accepted.
+
+## P1-S01 exclusions
+
+P1-S01 does not authorize:
+
+- real or fake provider execution;
+- Repository source reads or disclosure;
+- Context package construction;
+- model-facing Tools;
 - source mutation;
-- Commands;
+- Patch proposal, Approval, application, or rollback;
+- external Command execution;
+- native macOS helper execution;
+- criterion completion Evidence;
+- user completion acceptance;
+- product Receipt sealing;
+- release packaging or installation;
 - Child Runs;
 - TUI;
-- Capability broker service;
-- code intelligence;
-- protocols.
+- worktrees;
+- protocols;
+- Wave B work.
 
-### Exit
+The deterministic fake provider remains planned for P1-S02 and is not required to prove P1-S01.
 
-The same objective, criteria, Task, Root Run, current status, warnings, and user decisions are reconstructed after restart without treating a transcript summary as state.
+## P1-S01 exit
 
-### Proposed ticket sequence
+P1-S01 passes only when the exact integrated state proves:
 
-| Ticket | Outcome |
-| --- | --- |
-| P1-S01-T01 | Minimal Project subset, Session, Task, Run, Event, identifiers, and pure transition rules |
-| P1-S01-T02 | SQLite journal transaction and migration boundary |
-| P1-S01-T03 | Current Session, Task, and Run projections plus deterministic replay |
-| P1-S01-T04 | CLI start, status, inspect, cancel, and resume actions |
-| P1-S01-T05 | Restart, duplicate-event, invalid-transition, and Receipt fixtures |
+- one Session starts atomically with one `in_progress` Task and one `ready` Root Run;
+- invalid lifecycle transitions fail;
+- expected revision and idempotency prevent false or duplicate state;
+- journal transactions roll back atomically;
+- migrations and integrity checks behave deterministically;
+- projections rebuild from zero;
+- transcript records cannot alter work state;
+- restart reconstructs objective, criteria, Task, Run, decisions, operations, warnings, and revision;
+- the minimal CLI's text and structured outputs describe the same state;
+- no excluded capability is reachable;
+- P1-S01-D01 and P1-S01-V01 bind the exact integrated commit and Evidence.
 
-No ticket plan is accepted until Prompt 8 authorizes implementation.
+# P1-S02 — Evidence-backed Single-Run Change Alpha
 
-## P1-S02 — Evidence-backed single-Run change loop
+**Status:** Planned but not authorized  
+**Entry gate:** P1-S01 must merge and pass its aggregate gate and owner-machine Evidence.
 
-**Purpose:** prove Kiln's complete coding value in one Root Run.
+## Intended outcome
 
-### User-visible outcome
+A developer can ask MiniMax M3 to investigate the active Repository, inspect one exact Patch, approve and apply it, run one registered verification Command, accept completion only when current Evidence passes, and inspect a post-completion product Receipt.
 
-A developer can ask one model to investigate the active Repository, inspect one exact Patch proposal, approve it, apply it, run one registered verification Command, and accept completion only when current Evidence passes.
+## Planned subsystems
 
-### Deliver
+- bounded Repository reads and search;
+- accepted disclosure policy and sealed Context;
+- four-Tool maximum;
+- deterministic fake provider and one real MiniMax M3 adapter;
+- exact complete-text Patch and user Approval;
+- one mutation owner with rollback and uncertain-effect handling;
+- registered non-shell Command and macOS process-group helper;
+- Artifacts, criterion Evidence, aggregate evaluation, user acceptance, atomic completion, and post-completion Receipt;
+- remaining CLI commands;
+- arm64 macOS local release and delivery.
 
-- one provider-neutral behaviour;
-- deterministic fake provider;
-- one configured real provider adapter;
-- explicit Context package and manifest;
-- at most four model-facing Tools;
-- native bounded Repository read and exact search;
-- Claims separated from source observations;
-- exact base-bound Patch proposal;
-- explicit user Approval for the Patch digest;
-- transactional Patch application and rollback reference;
-- one registered non-shell verification Command;
-- transient model and Command Workers;
-- initial Artifact store;
-- criterion Evidence and completion Receipt;
-- recovery without automatic repeat of uncertain effects.
+P1-S02 requires a later authorization confirmation after P1-S01 Evidence. Its current ticket names are planning aids only.
 
-### Explicit exclusions
+## First-month milestone
 
-- Child Runs;
-- background concurrency;
-- TUI;
-- managed worktrees;
-- arbitrary shell;
-- general model router;
-- general Capability broker;
-- Skills;
-- LSP or Tree-sitter;
-- protocols.
-
-### Exit
-
-One real source change moves from accepted intent to user-accepted verified completion. Failed, blocked, stale, contradictory, or orphaned Evidence prevents completion.
-
-### First-month milestone — Single-Run Change Alpha
-
-P1-S01 and P1-S02 form the first-month target.
+The owner retains this aggressive target:
 
 ```text
 open Repository
@@ -169,270 +177,71 @@ open Repository
 → run registered verification
 → inspect current Evidence
 → accept completion
+→ seal and verify the product Receipt
 → restart and restore the record
 ```
 
-## P1-S03 — Interruption and unknown-effect recovery
+Failure to meet the calendar target causes replanning, not scope weakening.
 
-**Purpose:** make model, Patch, Command, and application interruption safe and honest.
+# Wave B — Not authorized
 
-### User-visible outcome
+P0-W26 and P0-W27 do not run until the authorized Single-Run Alpha provides accepted runtime Evidence showing:
 
-The developer can cancel active execution, restart after failure, inspect the last durable boundary, and reconcile uncertain effects without Kiln claiming success or repeating work automatically.
+- one real source change;
+- durable restart behavior;
+- controlled Patch authority;
+- registered verification;
+- criterion-bound Evidence;
+- a valid post-completion Receipt;
+- observed runtime failure or interruption behavior.
 
-### Deliver
+Only then can Wave B plan:
 
-- explicit model and Command cancellation;
-- primary-platform process-tree control;
-- timeout behavior;
-- Patch rollback and partial-failure fixtures;
-- `orphaned` state and reconciliation actions;
-- idempotency keys for external-effect requests;
-- stale Evidence invalidation;
-- retained dirty work and safe cleanup decisions;
-- recovery-focused CLI output.
-
-### Exit
-
-Every interrupted model invocation, Patch, and Command resolves to a known failure, cancellation, rollback, or explicit orphaned state.
-
-## P1-S04 — One bounded Scout Child
-
-**Purpose:** earn the Run graph through one useful delegated investigation.
-
-### User-visible outcome
-
-The Root Run can create one read-only Scout Child, continue or wait, inspect the Child through the CLI, respond to a blocking question, cancel it, and receive one bounded evidence-backed result.
-
-### Deliver
-
-- one depth-one Child Run;
-- maximum one active Child per Session;
-- immutable delegation contract;
-- independent Child Context and narrower grants;
-- one transient Child Worker lease;
-- bounded result delivery;
-- Root-visible Attention for question, permission, failure, and completion;
-- CLI Run list, inspect, enter, return-to-Root, answer, deny, and cancel;
-- no source mutation;
-- no nested delegation.
-
-### Exit
-
-A real Scout Child improves investigation without hidden work, ambient authority, transcript copying, or recursive management.
-
-## P1-S05 — Independent Verifier Child
-
-**Purpose:** separate completion Evidence from author confidence.
-
-### User-visible outcome
-
-The Root Run can create one Verifier Child with independent Context and read-only authority. The Child reproduces required checks and returns `PASS`, `FAIL`, or `BLOCKED` without repairing the evaluated change.
-
-### Deliver
-
-- Verifier role contract;
-- independent criteria and state package;
-- no author-confidence narrative in initial Context;
-- no write or Patch Tool;
-- controlled reuse of registered Commands;
-- structured result and Evidence freshness;
-- bounded Parent delivery;
-- verification Receipt;
-- CLI comparison of Root Claim and Verifier result.
-
-### Exit
-
-Completion can require an independently reproduced result that cannot be converted to `PASS` by the authoring model, a Receipt, or missing tooling.
-
-### Version 0.1 milestone — Trustworthy Delegated CLI
-
-Version 0.1 is complete through P1-S05.
-
-It includes:
-
-- one complete durable source-change loop;
 - one read-only Scout Child;
 - one independent Verifier Child;
-- maximum Child depth one;
+- maximum depth one;
 - maximum one active Child;
-- Root-visible Attention;
-- exact mutation and Command controls;
-- current Evidence and Receipts;
-- restart and orphan recovery;
-- CLI access to all required actions and status.
+- no writing Child;
+- no peer communication;
+- no shared mutable Context;
+- no permission expansion;
+- bounded result delivery and CLI navigation.
 
-It does not include a TUI, nested or concurrent Child graph, writing Child, managed worktree provisioning, code intelligence, protocols, local project intelligence, telemetry export, or remote execution.
-
----
+No P1-S03, P1-S04, or P1-S05 implementation is authorized by Prompt 8-A.
 
 # Phase 2 — Evidence-gated expansion
 
-Phase 2 items do not enter version 0.1 merely because planning exists.
+These items remain deferred until measured need and accepted planning exist:
 
-## P2-S01 — TUI projection
+- TUI projection;
+- managed mutation isolation;
+- delegated Patch proposal;
+- code intelligence;
+- Capability interoperability;
+- local project intelligence;
+- telemetry and attestations;
+- remote execution.
 
-**Entry conditions:**
+## Pause and return-to-planning conditions
 
-- CLI commands and projections are stable;
-- one real Child workflow exists;
-- terminal navigation has actual work to display;
-- the chosen TUI library passes a focused dependency and headless-behavior review.
+Development pauses when:
 
-**Outcome:** a renderer-independent Run-focused TUI consumes existing commands and projections without becoming state authority.
+- an authorized ticket requires an excluded external effect;
+- a focused authority conflict is discovered;
+- store corruption or migration behavior cannot be classified safely;
+- the selected Exqlite/SQLite line cannot meet the accepted durability baseline;
+- implementation would require nested first-month transactions;
+- revision, idempotency, replay, or restart invariants cannot be proved;
+- a ticket would introduce provider, mutation, Command, completion, product Receipt, release, Child, TUI, or Wave B behavior early;
+- deterministic gates cannot reproduce the claimed result;
+- the exact merge head is not green.
 
-## P2-S02 — Managed mutation isolation
+## Exact next action
 
-**Entry conditions:**
+After Prompt 8-A merges, begin only:
 
-- the single selected checkout creates a measured safety or concurrency limitation;
-- Patch application and recovery are stable;
-- worktree lifecycle and cleanup planning is accepted.
-
-**Outcome:** one managed exclusive worktree supports an authorized mutation owner. Writing Children remain separately gated.
-
-## P2-S03 — Safe delegated Patch proposal
-
-**Entry conditions:**
-
-- Scout and Verifier Child boundaries are stable;
-- managed mutation isolation is available when required;
-- Patch proposal quality and review cost justify delegated authoring.
-
-**Outcome:** one read-only Child returns an immutable Patch Artifact. The Root or authorized applying Run owns application and verification.
-
-## P2-S04 — Local code intelligence
-
-**Entry conditions:**
-
-- deterministic source search has measured retrieval, latency, or token failures;
-- one supported language workflow is accepted;
-- parser and language-server lifecycle planning is complete.
-
-**Outcome:** Tree-sitter, selected read-only LSP operations, version-matched documentation, and an optional normalized cache improve bounded active-Repository Context.
-
-## P2-S05 — Capability interoperability
-
-**Entry conditions:**
-
-- native requests, results, policy, Evidence, and recovery are stable;
-- one concrete external Client, capability, service, or Environment exists;
-- simpler function, library, CLI, or API options were evaluated.
-
-**Candidates:**
-
-- ACP Client adapter;
-- one MCP client capability;
-- one OpenAPI capability;
-- one accepted Dev Container or OCI Environment.
-
-No requirement exists to implement every candidate.
-
-## P2-S06 — Local project intelligence
-
-**Entry conditions:**
-
-- active-Repository retrieval is stable and useful;
-- explicit approved roots and no-execution policy exist;
-- instruction quarantine, licensing, secret screening, and disclosure planning is accepted;
-- a measured user workflow justifies cross-project Evidence.
-
-**Outcome:** read-only provenance-bearing pattern retrieval from approved repositories without product-direction or authority contamination.
-
-## Research register
-
-The following remain research or rejected-for-now candidates rather than implementation slices:
-
-- DAP;
-- AG-UI;
-- MCP server;
-- SCIP import or export;
-- AHP;
-- A2A;
-- WASI and WIT;
-- in-toto and SLSA export;
-- OTLP export;
-- embeddings and hosted retrieval.
-
-Prompt 4 determines whether any candidate earns a focused planning round.
-
-# Dependency graph
-
-```mermaid
-flowchart TD
-    S1[P1-S01 Durable single-Run CLI] --> S2[P1-S02 Evidence-backed change loop]
-    S2 --> S3[P1-S03 Interruption recovery]
-    S3 --> S4[P1-S04 Scout Child]
-    S4 --> S5[P1-S05 Verifier Child]
-
-    S5 --> TUI[P2-S01 TUI]
-    S3 --> WT[P2-S02 Managed mutation isolation]
-    S5 --> PATCH[P2-S03 Delegated Patch proposal]
-    WT --> PATCH
-    S5 --> CODE[P2-S04 Local code intelligence]
-    S5 --> INTEROP[P2-S05 Interoperability]
-    CODE --> KNOW[P2-S06 Local project intelligence]
+```text
+work/p1-s01-t01-domain-foundation
 ```
 
-# Delivery targets
-
-## First month
-
-| Weeks | Product outcome |
-| --- | --- |
-| 1–2 | Durable single-Run CLI and restart |
-| 3–4 | Real evidence-backed Patch and verification loop |
-
-The first-month target must produce a real source change. It is not complete if it only renders simulated Runs, validates Schemas, or builds internal services.
-
-## Twelve weeks
-
-| Weeks | Product outcome |
-| --- | --- |
-| 1–4 | Single-Run Change Alpha |
-| 5–6 | Interruption, timeout, rollback, and orphan recovery |
-| 7–9 | One bounded read-only Scout Child and Root-visible Attention |
-| 10–12 | Independent Verifier Child and version 0.1 aggregate proof |
-
-The target supports one active Repository, one Session per CLI process, one Root Run, one active depth-one Child, one provider, and one primary operating-system process-control target.
-
-# First implementation ticket status
-
-No implementation ticket is accepted or authorized.
-
-After Prompt 8 authorizes construction, the expected first ticket is:
-
-**P1-S01-T01 — Define the minimal Project, Session, Task, Run, Event, and transition model.**
-
-It should implement only the pure data and rules required by P1-S01. It must not add provider code, Patch application, Commands, Child Runs, TUI, protocols, or a process per Run.
-
-Prompt 3 must first reconcile current scaffolding and conformance with this target.
-
-# Slice completion
-
-A slice completes only when:
-
-- all accepted tickets are integrated;
-- deterministic tests pass against one exact state;
-- security and failure gates pass;
-- the user-visible demo passes;
-- required Evidence is current;
-- the aggregate Receipt references the exact state;
-- warnings, exclusions, and unknowns remain visible;
-- the owner or accepted policy accepts the milestone when required;
-- roadmap status is updated.
-
-A green obsolete check, model summary, planned gate name, Schema, or collection of merged tickets does not complete a slice.
-
-# Roadmap-change policy
-
-A roadmap change must record:
-
-- the user or dogfood workflow;
-- current blocking Evidence;
-- product, dependency, and security consequences;
-- identifiers and migration effects;
-- new acceptance and demo gates;
-- explicit scope removed as well as added.
-
-Do not append a subsystem without pruning or re-evaluating current scope.
+Use `docs/work/P1-S01-T01-domain-foundation.md` as the accepted ticket plan.
