@@ -1,214 +1,172 @@
 # Slice Acceptance Gates
 
 **Document type:** Verification and integration plan  
-**Decision status:** Owner-directed reconciliation  
-**Integration status:** Proposed on P0-W16  
-**Implementation status:** Not implemented
+**Decision status:** Proposed P0-W18 reconciliation; owner acceptance required  
+**Integration status:** Proposed on `work/p0-w18-product-scope-architecture`  
+**Implementation status:** Gate scripts do not exist  
+**Slice authority:** `docs/IMPLEMENTATION-SLICES.md`
 
 ## Purpose
 
-`docs/IMPLEMENTATION-SLICES.md` defines required behavior for every slice. This document defines the aggregate executable gate that proves those criteria together against one exact Repository state.
+This document defines the aggregate proof required for each reconciled slice.
 
-A criterion is a required behavior. A gate is the deterministic command bundle and Evidence manifest that evaluates a group of criteria. A demo is the user-visible scenario. A Receipt seals references to the gate, demo, state, warnings, and decisions.
+A gate name is a planned executable contract. It is not an implemented command until Repository source and current CI prove that the path exists and passes.
+
+Prompt 3 must classify the existing absent gate scaffolding. Prompt 6 can add only justified conformance work.
 
 ## Gate rules
 
 1. Every gate runs against an exact commit or head plus dirty fingerprint.
-2. A gate uses deterministic fixtures and controlled time.
-3. Optional live provider, language-server, protocol, or container smoke tests remain separate from required CI gates unless an accepted policy later promotes them.
-4. A gate cannot silently skip an unavailable required control.
-5. `BLOCKED` is distinct from `PASS` and `FAIL`.
-6. A gate records command, exit status, duration, structured result, relevant output, Artifacts, warnings, and Environment fingerprint.
-7. A demo cannot substitute for a gate.
-8. A Receipt cannot make a failed, blocked, or stale gate pass.
-9. The final slice gate runs against the projected merged state when trunk interaction can change behavior.
-10. Gate scripts live under `scripts/gates/` and emit human output plus one machine-readable result Artifact.
+2. Deterministic fixtures and controlled time are required.
+3. Required CI gates must not depend on a live provider, public network, protocol server, language server, or container.
+4. Optional live smoke tests remain separately labeled and cannot replace deterministic tests.
+5. A required unavailable control produces `BLOCKED`, not a silent skip or `PASS`.
+6. Gate output records command, exit status, duration, structured result, relevant output, Artifacts, warnings, and Environment fingerprint.
+7. A demo cannot substitute for a deterministic gate.
+8. A Receipt cannot make a failed, blocked, stale, contradictory, or missing gate pass.
+9. Mutation, verification, and completion Evidence bind to exact Repository state.
+10. The final slice gate evaluates projected merged state when trunk interaction can affect behavior.
+11. Planned gate scripts live under `scripts/gates/` and emit human-readable output plus one machine-readable result Artifact.
+12. No gate script is created by P0-W18.
 
-## P1-S01 gates — Navigable simulated Runs
-
-| Gate | Proof |
-| --- | --- |
-| P1-S01-G01 | Session, Task, Run, Root, Parent, Child, sibling, and depth invariants. |
-| P1-S01-G02 | Ordered event reducer, duplicate rejection, and byte-stable snapshot JSON. |
-| P1-S01-G03 | Breadcrumb, Child cards, Run tree, and client-local focus projections. |
-| P1-S01-G04 | Parent, Root, next-sibling, and previous-sibling navigation has no execution or authority side effects. |
-| P1-S01-G05 | Simulated stream ordering and bounded activity summaries under controlled time. |
-| P1-S01-G06 | Headless TUI intents and renderer-independent view models. |
-| P1-S01-G07 | ExRatatui renderer smoke and renderer-crash isolation after dependency acceptance. |
-| P1-S01-G08 | Narrow-terminal and keyboard-complete navigation behavior. |
-| P1-S01-G09 | `P1-S01-D01` demo passes. |
-| P1-S01-G10 | `P1-S01-R01` seals exact state, fixture, snapshot, demo, warnings, and exclusions. |
-
-**Aggregate command:** `scripts/gates/slice-01`
-
-## P1-S02 gates — One real read-only Scout
+# P1-S01 gates — Durable single-Run CLI
 
 | Gate | Proof |
 | --- | --- |
-| P1-S02-G01 | Child exists before invocation and has independent Context, grants, limits, and accounting. |
-| P1-S02-G02 | Native Repository search and reads enforce path, exclude, symlink, size, and trust policy. |
-| P1-S02-G03 | Context manifest ordering, provenance, disclosure, Tool projection, and digest are deterministic. |
-| P1-S02-G04 | Fake-provider streaming, cancellation, timeout, token limit, and step limit. |
-| P1-S02-G05 | Provider/model selection follows fixed accepted policy and cannot be changed by retrieved content. |
-| P1-S02-G06 | Secret canaries and denied paths never enter provider payloads, logs, telemetry, or ordinary Artifacts. |
-| P1-S02-G07 | Scout result distinguishes observations, inferences, assumptions, and unknowns with exact source Evidence. |
-| P1-S02-G08 | Parent delivery is bounded and idempotent; Child transcript remains independent. |
-| P1-S02-G09 | Before/after Repository fingerprints prove no mutation. |
-| P1-S02-G10 | `P1-S02-D01` and `P1-S02-R01` pass; live MiniMax smoke remains separately labeled when executed. |
+| P1-S01-G01 | Project subset, Session, Task, Root Run, identifier, and no-Root-Task invariants |
+| P1-S01-G02 | Minimum Run lifecycle accepts valid transitions and rejects invalid transitions |
+| P1-S01-G03 | Journal append, expected revision, transaction rollback, and migration behavior |
+| P1-S01-G04 | Duplicate and out-of-order events do not create duplicate or false state |
+| P1-S01-G05 | Current projections rebuild deterministically from zero |
+| P1-S01-G06 | Transcript records cannot alter objective, Task, Run, or completion state |
+| P1-S01-G07 | Restart reconstructs objective, criteria, Task, Root Run, current status, warnings, and decisions |
+| P1-S01-G08 | CLI human and structured outputs describe equivalent state and correct exit status |
+| P1-S01-G09 | No process exists merely because a Project, Session, Task, Run, Event, projection, or Receipt exists |
+| P1-S01-G10 | `P1-S01-D01` and `P1-S01-R01` bind exact state, migrations, fixtures, warnings, and exclusions |
 
-**Aggregate command:** `scripts/gates/slice-02`
+**Planned aggregate command:** `scripts/gates/slice-01`
 
-## P1-S03 gates — Background work and Attention
-
-| Gate | Proof |
-| --- | --- |
-| P1-S03-G01 | Worker lease exclusivity, scheduler ordering, and three-active-Child limit. |
-| P1-S03-G02 | Background execution never changes client focus automatically. |
-| P1-S03-G03 | Blocking Run transitions create Attention in the same accepted state transition. |
-| P1-S03-G04 | Global and ancestor Attention projections are independent of Run depth. |
-| P1-S03-G05 | Question and permission responses are explicit, revision-checked, and idempotent. |
-| P1-S03-G06 | Pause and resume preserve the recorded resume state. |
-| P1-S03-G07 | Child cancellation does not cancel Parent or siblings without accepted descendant policy. |
-| P1-S03-G08 | Completion notifications remain informational and deduplicated. |
-| P1-S03-G09 | Concurrent response and cancellation race fixtures remain deterministic. |
-| P1-S03-G10 | `P1-S03-D01` and `P1-S03-R01` pass with no silently blocked Run. |
-
-**Aggregate command:** `scripts/gates/slice-03`
-
-## P1-S04 gates — Independent Verifier
+# P1-S02 gates — Evidence-backed single-Run change loop
 
 | Gate | Proof |
 | --- | --- |
-| P1-S04-G01 | Verifier has independent requirement, diff, Context, Repository, and Environment package. |
-| P1-S04-G02 | Verifier has no write, Patch, Git mutation, install, configuration, or repair authority. |
-| P1-S04-G03 | Command registry rejects unknown executable, argv, cwd, network, secret, and side-effect shapes. |
-| P1-S04-G04 | Supervised Command timeout, cancellation, output limit, and process-tree cleanup are accurate. |
-| P1-S04-G05 | Raw stdout, stderr, and structured test report remain immutable Artifacts. |
-| P1-S04-G06 | Structured result ingestion reports valid, invalid, partial, truncated, stale, and path-mismatched status. |
-| P1-S04-G07 | `PASS`, `FAIL`, and `BLOCKED` remain distinct and every `PASS` criterion has current reproduced Evidence. |
-| P1-S04-G08 | Source fingerprints prove the Verifier made no edit. |
-| P1-S04-G09 | Receipt determinism and missing/stale Evidence rejection. |
-| P1-S04-G10 | `P1-S04-D01` and `P1-S04-R01` pass. |
+| P1-S02-G01 | Repository root, path, exclude, symlink, special-file, size, encoding, and source-state controls |
+| P1-S02-G02 | Context package ordering, provenance, disclosure, digest, budgets, exclusions, and four-Tool maximum |
+| P1-S02-G03 | Fake-provider streaming, timeout, cancellation, limits, malformed results, and optional live-provider separation |
+| P1-S02-G04 | Secret canaries and denied paths never enter provider payloads, normal logs, or unauthorized Artifacts |
+| P1-S02-G05 | Source observations remain distinct from model Claims and bind to exact path, content, and Repository state |
+| P1-S02-G06 | Patch proposal, exact base, preview, Approval digest, path scope, conflict, and dirty-overlap controls |
+| P1-S02-G07 | Patch apply, rollback reference, partial failure, result observation, and unknown-effect state are accurate |
+| P1-S02-G08 | Registered Command executable, argv, cwd, environment, timeout, output, cleanup, and structured result controls |
+| P1-S02-G09 | Criterion `PASS`, `FAIL`, `BLOCKED`, stale, contradictory, and orphaned outcomes control completion correctly |
+| P1-S02-G10 | User acceptance, restart recovery, `P1-S02-D01`, and `P1-S02-R01` prove one complete real change |
 
-**Aggregate command:** `scripts/gates/slice-04`
+**Planned aggregate command:** `scripts/gates/slice-02`
 
-## P1-S05 gates — Durable recovery
-
-| Gate | Proof |
-| --- | --- |
-| P1-S05-G01 | SQLite migrations, event append, expected revision, and transaction rollback. |
-| P1-S05-G02 | Session, Task, Run, transcript, Attention, execution, Evidence, and delivery projections rebuild from zero. |
-| P1-S05-G03 | Checkpoint replay produces an equivalent snapshot to full journal replay. |
-| P1-S05-G04 | Child creation, Command start, Attention response, and result delivery are idempotent across restart. |
-| P1-S05-G05 | Artifact and Receipt metadata retains digest integrity and correct storage boundaries. |
-| P1-S05-G06 | Local runtime snapshot, event replay, cursor resume, gap handling, and duplicate suppression. |
-| P1-S05-G07 | Crash injection during provider, Command, Attention, and delivery produces accurate recovery state. |
-| P1-S05-G08 | Unknown external effects become orphaned; stale Evidence remains stale; dirty work is preserved. |
-| P1-S05-G09 | Pre-crash and post-restart navigable snapshots are semantically equivalent. |
-| P1-S05-G10 | `P1-S05-D01` and `P1-S05-R01` pass. |
-
-**Aggregate command:** `scripts/gates/slice-05`
-
-## P1-S06 gates — Local code intelligence
+# P1-S03 gates — Interruption and unknown-effect recovery
 
 | Gate | Proof |
 | --- | --- |
-| P1-S06-G01 | Deterministic Repository map and language/file classification. |
-| P1-S06-G02 | Tree-sitter extraction, changed ranges, provenance, malformed input, and bounded failure. |
-| P1-S06-G03 | Fake LSP initialization, document sync, definition, references, diagnostics, cancellation, and shutdown. |
-| P1-S06-G04 | Optional real server profile is explicit and cannot auto-install or broaden authority. |
-| P1-S06-G05 | Native semantic cache reuse and invalidation by source, server, extractor, and policy digest. |
-| P1-S06-G06 | Documentation authority and version resolver ordering. |
-| P1-S06-G07 | Skill metadata discovery, schema validation, lazy loading, and no authority effect. |
-| P1-S06-G08 | Context compiler selects bounded symbols, ranges, docs, Skill, and retrieval handles. |
-| P1-S06-G09 | Parser or server failure preserves durable state and reports partial intelligence. |
-| P1-S06-G10 | `P1-S06-D01` and `P1-S06-R01` pass with no source write. |
+| P1-S03-G01 | Model and Command cancellation target the owned live operation |
+| P1-S03-G02 | Primary-platform process-tree timeout and cleanup observations are accurate |
+| P1-S03-G03 | Unsupported process controls are reported as unavailable rather than enforced |
+| P1-S03-G04 | Patch interruption resolves to applied, failed, rolled back, or orphaned based on observation |
+| P1-S03-G05 | External-effect idempotency keys prevent automatic duplicate requests after restart |
+| P1-S03-G06 | Unknown descendants or effects cannot become canceled, verified, or complete |
+| P1-S03-G07 | Repository mutation invalidates affected Evidence and preserves unrelated current Evidence |
+| P1-S03-G08 | Dirty or uncertain work is retained until accepted reconciliation or cleanup |
+| P1-S03-G09 | Crash injection at each effect boundary reconstructs the last durable known state |
+| P1-S03-G10 | `P1-S03-D01` and `P1-S03-R01` prove conservative recovery without hidden repetition |
 
-**Aggregate command:** `scripts/gates/slice-06`
+**Planned aggregate command:** `scripts/gates/slice-03`
 
-## P1-S07 gates — Safe writing delegation
-
-| Gate | Proof |
-| --- | --- |
-| P1-S07-G01 | Writing Child has no filesystem-write or Git-mutation grant and returns one immutable Patch Artifact. |
-| P1-S07-G02 | Parent owns one exclusive writable worktree and mutation lease. |
-| P1-S07-G03 | Exact Patch, create, delete, move, and rename preview produce deterministic bytes and previews. |
-| P1-S07-G04 | Base, hash, path, symlink, dirty state, lease, and scope conflicts block before mutation. |
-| P1-S07-G05 | Multi-file staging, apply, rollback data, and result-state observation. |
-| P1-S07-G06 | Injected failure produces accurately observed applied, rolled back, failed, or orphaned state. |
-| P1-S07-G07 | Formatter and focused validation are separate registered Commands. |
-| P1-S07-G08 | Direct and formatter-expanded changed regions remain distinguishable. |
-| P1-S07-G09 | Two Child proposals cannot write simultaneously or authorize integration. |
-| P1-S07-G10 | `P1-S07-D01` and `P1-S07-R01` pass. |
-
-**Aggregate command:** `scripts/gates/slice-07`
-
-## P1-S08 gates — Capability interoperability
+# P1-S04 gates — One bounded Scout Child
 
 | Gate | Proof |
 | --- | --- |
-| P1-S08-G01 | ACP and TUI project equivalent state from one sequence and reconnect without duplicate effects. |
-| P1-S08-G02 | External Client actions pass native authentication, authorization, revision, and Attention rules. |
-| P1-S08-G03 | JUnit-compatible and SARIF ingestion retains raw Artifact, parser, version, state, and completeness. |
-| P1-S08-G04 | One concrete MCP or OpenAPI capability registers behind the broker and remains hidden until selected and granted. |
-| P1-S08-G05 | Host, credential, schema, output, timeout, cancellation, and Privacy policy remain bounded. |
-| P1-S08-G06 | Dev Container configuration cannot run lifecycle behavior implicitly. |
-| P1-S08-G07 | OCI profile records effective image, mount, user, privilege, network, secret, limit, and cleanup controls. |
-| P1-S08-G08 | Adapter failure cannot corrupt Run state or bypass Command, Patch, Artifact, Evidence, or Receipt paths. |
-| P1-S08-G09 | No protocol object becomes a core domain entity. |
-| P1-S08-G10 | Required `P1-S08-D01` path and `P1-S08-R01` pass; optional increments remain explicitly deferred when not justified. |
+| P1-S04-G01 | Child exists before delegated execution and has one Root, one Parent, depth one, and one bounded purpose |
+| P1-S04-G02 | Maximum one active Child and no nested delegation are enforced |
+| P1-S04-G03 | Child Context, grants, limits, transcript, Artifacts, Evidence, and accounting are independent |
+| P1-S04-G04 | Child authority can only narrow Project, Session, and Root maximums |
+| P1-S04-G05 | No Parent transcript, secrets, write scope, provider cache, sibling state, or ambient Tools transfer |
+| P1-S04-G06 | Background execution does not change CLI focus and remains visible from Root status |
+| P1-S04-G07 | Blocking question, permission, failure, and completion records create Root-visible Attention without silent grant |
+| P1-S04-G08 | Child cancellation does not cancel Root and records cleanup or orphan state accurately |
+| P1-S04-G09 | Result delivery is bounded and idempotent and copies references rather than the Child transcript |
+| P1-S04-G10 | Before and after Repository fingerprints, `P1-S04-D01`, and `P1-S04-R01` prove read-only delegated value |
 
-**Aggregate command:** `scripts/gates/slice-08`
+**Planned aggregate command:** `scripts/gates/slice-04`
 
-## P1-S09 gates — Local project intelligence
-
-| Gate | Proof |
-| --- | --- |
-| P1-S09-G01 | Indexing is disabled without accepted roots and opt-out is honored. |
-| P1-S09-G02 | Canonical root, path, exclude, symlink, special-file, and policy checks repeat before every read. |
-| P1-S09-G03 | Before/after Repository fingerprints prove no source, Git, lockfile, cache, or metadata mutation. |
-| P1-S09-G04 | Derived data stays under Kiln-owned storage and no Command or network canary fires. |
-| P1-S09-G05 | Exact, dependency, structural, text, error, test, migration, and verification queries work without a model. |
-| P1-S09-G06 | Search returns at most eight deterministic compact candidates with complete provenance. |
-| P1-S09-G07 | Inspection revalidates source and reports stale or partial state honestly. |
-| P1-S09-G08 | Instruction quarantine, secret screening, sanitization, licensing, and disclosure policy pass adversarial fixtures. |
-| P1-S09-G09 | Incremental reuse, invalidation, failure atomicity, and last-complete-snapshot recovery. |
-| P1-S09-G10 | `P1-S09-D01` and `P1-S09-R01` pass with embeddings and graph database disabled. |
-
-**Aggregate command:** `scripts/gates/slice-09`
-
-## P1-S10 gates — Expansion evaluations
+# P1-S05 gates — Independent Verifier Child
 
 | Gate | Proof |
 | --- | --- |
-| P1-S10-G01 | Candidate has one concrete workflow and measured limitation in the existing path. |
-| P1-S10-G02 | Candidate has a bounded contract, trust boundary, dependency cost, and removal strategy. |
-| P1-S10-G03 | Spike is time-bounded, isolated, and cannot merge product code by default. |
-| P1-S10-G04 | Deterministic conformance fixtures cover version, mapping, authority, Privacy, cancellation, failure, and cleanup. |
-| P1-S10-G05 | Adopt, defer, or reject decision records Evidence and an ADR when architecture changes. |
-| P1-S10-G06 | Deferred and rejected candidates remain outside production dependencies and model Tool catalogs. |
-| P1-S10-G07 | A2A remains rejected for local Child Runs. |
-| P1-S10-G08 | in-toto or SLSA format compatibility makes no unsupported signing, authenticity, or level Claim. |
-| P1-S10-G09 | WASI/WIT does not become the default Command runtime without measured benefit. |
-| P1-S10-G10 | `P1-S10-R01` seals the decision and cleanup or adopted implementation plan. |
+| P1-S05-G01 | Verifier receives independent criteria, state, Context, grants, limits, and accounting |
+| P1-S05-G02 | Initial Verifier Context excludes author confidence narrative and write, Patch, install, and repair Tools |
+| P1-S05-G03 | Registered Commands run against exact current Repository and Environment state |
+| P1-S05-G04 | `PASS` requires current reproduced Evidence for every required criterion |
+| P1-S05-G05 | `FAIL` identifies reproduced defects and affected criteria |
+| P1-S05-G06 | Missing tool, Environment, state, access, or requirement information produces `BLOCKED` |
+| P1-S05-G07 | Completed Verifier Run can carry `PASS`, `FAIL`, or `BLOCKED` without satisfying the Task automatically |
+| P1-S05-G08 | Source fingerprints prove the Verifier did not repair the evaluated change |
+| P1-S05-G09 | Root recommendation, Verifier result, user acceptance, and Receipt remain separate decisions and facts |
+| P1-S05-G10 | Version 0.1 aggregate restart, Scout, Attention, Verifier, demo, and Receipt proof passes against exact final state |
 
-**Aggregate command:** candidate-specific; there is no command that must implement every expansion candidate.
+**Planned aggregate command:** `scripts/gates/slice-05`
 
-## Slice Receipt manifest
+# Version 0.1 aggregate gate
+
+Version 0.1 requires one aggregate command after all P1-S01 through P1-S05 tickets integrate.
+
+**Planned command:** `scripts/gates/version-0-1`
+
+It shall prove:
+
+- one real source change through the single-Run workflow;
+- explicit Patch Approval and exact application;
+- deterministic verification and completion blocking;
+- cancellation, timeout, rollback, stale Evidence, and orphan recovery;
+- one no-write Scout Child;
+- one independent Verifier Child with `PASS`, `FAIL`, and `BLOCKED` fixtures;
+- maximum depth one and one-active-Child limits;
+- Root-visible Attention;
+- restart reconstruction of Root, Child, Attention, Artifacts, Evidence, Receipts, and decisions;
+- complete CLI action coverage;
+- absence or unreachability of deferred TUI, nested delegation, writing Child, worktree, code-intelligence, protocol, knowledge, telemetry, and remote-execution paths;
+- one aggregate Receipt bound to the exact final state.
+
+# Later-slice gate policy
+
+P2 gates are not numbered or named until an accepted slice plan enters the implementation blast radius.
+
+Entry conditions must be proven before planning an executable gate:
+
+- TUI requires stable CLI commands and one real Child workflow;
+- managed worktrees require a demonstrated isolation need;
+- delegated Patch proposal requires stable Child and mutation boundaries;
+- code intelligence requires measured search or token failures;
+- interoperability requires a concrete external Client, capability, service, or Environment;
+- local project intelligence requires stable active-Repository retrieval and accepted adversarial security controls.
+
+Do not create empty future gate scripts to reserve names.
+
+# Slice Receipt manifest
 
 Every aggregate slice Receipt contains:
 
 ```text
 slice identifier and revision
 exact Repository state
-required ticket and merge references
+required ticket and integration references
 gate command and structured result
-demo script and transcript Artifact
+demo and transcript Artifact
 security and recovery Evidence
 Artifacts and structured reports
-warnings, exclusions, and unsupported paths
+warnings, exclusions, unknowns, and unsupported paths
 acceptance decision when required
 manifest digest and seal time
 ```
 
-A changed gate, fixture, demo, source state, warning, or decision creates a new Receipt rather than mutating the previous one.
+A changed gate, fixture, demo, source state, warning, Evidence item, or decision creates a new Receipt.
+
+A Receipt cannot alter the underlying result or authorize integration.
