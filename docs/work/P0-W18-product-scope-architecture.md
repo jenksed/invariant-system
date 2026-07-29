@@ -1,7 +1,7 @@
 # P0-W18: Reconcile product, scope, and minimum architecture
 
 **Document type:** Planning work package  
-**Status:** In progress  
+**Status:** Implemented; final verification pending  
 **Branch:** `work/p0-w18-product-scope-architecture`  
 **Depends on:** P0-W17 integrated through pull request 22  
 **Scope:** Product, scope, and architecture planning only
@@ -10,27 +10,28 @@
 
 Reconcile Kiln's product boundary, smallest useful workflow, Run model, minimum architecture, capability sequence, delivery targets, and remaining planning domains.
 
-This pass shall update current planning authorities. It shall not implement or repair runtime, tests, CI, development-agent scripts, JSON Schemas, Skills, prompts, agents, or gate scripts.
+This pass updates current planning authorities. It does not implement or repair runtime, tests, CI, development-agent scripts, JSON Schemas, Skills, prompts, agents, dependencies, or gate scripts.
 
-## Observed current state and evidence
+## Observed current state and Evidence
 
-- `main` begins this pass at merge commit `ef487c432a04de705e58ec79569abe5bb51e3d7a`.
-- Pull request 22 integrated the Prompt 1 planning-completion baseline.
-- Pull request 21 integrated the P0-W16 verification closeout immediately before pull request 22.
-- `docs/PLANNING-COMPLETION-BASELINE.md` exists and defines the Prompt 2 inputs.
-- Product source remains one dependency-free Mix project, one empty OTP supervisor, one version function, and one version test.
-- No P1 slice is implemented, demonstrated, validated, or supported by an aggregate Receipt.
-- The current roadmap begins with a simulated Run graph and TUI before a real model-backed workflow.
-- The current version 0.1 target is read-only through P1-S05.
-- The current Run Model contains a process-per-active-Run supervision example that conflicts with the integrated architecture.
-- The current source-layout guide pre-creates broad subsystem directories that do not match the P1-S01 module map.
-- Current JSON Schemas remain planning and conformance scaffolding.
+| Observation | Evidence | Date or commit |
+| --- | --- | --- |
+| Prompt 1 is integrated | Pull request 22 merged at `ef487c432a04de705e58ec79569abe5bb51e3d7a` | 2026-07-28 |
+| P0-W16 closeout is integrated | Pull request 21 merged immediately before pull request 22 | 2026-07-28 |
+| Prompt 1 baseline exists | `docs/PLANNING-COMPLETION-BASELINE.md` | Branch base |
+| Product source remains an early Mix bootstrap | `mix.exs`, `lib/kiln.ex`, `lib/kiln/application.ex`, `test/kiln_test.exs` | Branch base |
+| No P1 slice is implemented | No accepted source, demo, aggregate gate, or Receipt | Branch base |
+| Existing Schemas are conformance scaffolding | `docs/contracts/README.md` and current Schema files | Branch base |
+| Earlier roadmap begins with simulated Runs and TUI | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
+| Earlier version 0.1 is read-only | Historical ADR 0019 and pre-P0-W18 Roadmap | Branch base |
+| Run Model contained process-per-active-Run example | Pre-P0-W18 `docs/RUN-MODEL.md` | Branch base |
+| Source guide pre-created broad subsystem directories | Pre-P0-W18 `docs/AGENT-FRIENDLY-CODEBASE.md` | Branch base |
 
 ## Material baseline change after P0-W17
 
-Pull request 21 merged before pull request 22. Its closeout record resolves the earlier Prompt 1 conflict about P0-W16 verification Evidence being split between `main` and an open pull request.
+Pull request 21 resolved the Prompt 1 finding that P0-W16 verification Evidence was split between `main` and an open pull request.
 
-No other observed post-baseline change alters the Prompt 1 product or implementation findings.
+No post-baseline production change invalidated the Prompt 1 product or implementation findings before P0-W18 began.
 
 ## Assumptions and unknowns
 
@@ -39,85 +40,116 @@ No other observed post-baseline change alters the Prompt 1 product or implementa
 - **P0-W18-A01:** One developer remains the initial and primary user.
 - **P0-W18-A02:** One local active Repository is sufficient for the first useful workflow.
 - **P0-W18-A03:** A coding harness must complete a narrow change and verification loop to be meaningfully better than a generic model wrapper.
-- **P0-W18-A04:** Owner integration of this pass will constitute acceptance of its proposed roadmap and architecture changes.
+- **P0-W18-A04:** Owner integration of this pass will accept its proposed roadmap and architecture changes.
 
 ### Unknowns
 
 - **P0-W18-U01:** Exact SQLite library, schema, migration, and transaction implementation.
 - **P0-W18-U02:** Exact provider authentication, streaming, cancellation, and rate-limit implementation.
-- **P0-W18-U03:** Exact cross-platform process-tree termination mechanism.
-- **P0-W18-U04:** Exact Patch format and rollback implementation.
+- **P0-W18-U03:** Exact primary-platform process-tree termination mechanism and later portability.
+- **P0-W18-U04:** Exact Patch format, write algorithm, and rollback implementation.
 - **P0-W18-U05:** Exact retention periods for Artifacts, raw output, and historical Context packages.
-- **P0-W18-U06:** Exact TUI library acceptance and headless support.
-- **P0-W18-U07:** Whether a managed worktree is required after the single-writer alpha proves value.
+- **P0-W18-U06:** Exact deferred TUI library and headless behavior.
+- **P0-W18-U07:** Whether managed worktrees are required after the single-writer alpha proves value.
 
-These unknowns shall remain visible for Prompt 4. This pass shall not invent implementation answers.
+Prompt 4 must evaluate these planning domains. P0-W18 does not invent implementation answers.
 
 ## Requirements
 
-- **P0-W18-R01:** The pass shall define one primary user problem that is not expressed as agent orchestration or protocol support.
-- **P0-W18-R02:** The pass shall define enforceable non-goals that constrain early architecture and delivery.
-- **P0-W18-R03:** The pass shall identify the smallest complete workflow that is meaningfully better than a generic coding-agent wrapper.
-- **P0-W18-R04:** The pass shall define the minimum Run, Task, Session, and Project relationships required by that workflow.
-- **P0-W18-R05:** The pass shall resolve the process-per-active-Run conflict and justify every near-term process boundary.
-- **P0-W18-R06:** The pass shall classify all material planned capabilities by current necessity.
-- **P0-W18-R07:** The pass shall define a minimum credible architecture and source layout without pre-creating the full roadmap.
-- **P0-W18-R08:** The pass shall preserve protocol neutrality and select integrations through a smallest-reliable-boundary policy.
-- **P0-W18-R09:** The pass shall define inspectable Context, Tool, Skill, security, Evidence, Artifact, Receipt, and completion boundaries.
-- **P0-W18-R10:** The pass shall define credible first-month and twelve-week outcomes for one developer.
-- **P0-W18-R11:** The pass shall identify remaining planning domains for Prompt 4 without sequencing the final register.
-- **P0-W18-R12:** The pass shall not issue build authorization.
+- **P0-W18-R01:** Define one primary user problem that is not Agent orchestration or protocol support.
+- **P0-W18-R02:** Define enforceable non-goals that constrain early architecture and delivery.
+- **P0-W18-R03:** Identify the smallest complete workflow that is meaningfully better than a generic coding-agent wrapper.
+- **P0-W18-R04:** Define the minimum Project, Session, Task, Run, and later Child relationships.
+- **P0-W18-R05:** Resolve process-per-active-Run and justify every near-term process boundary.
+- **P0-W18-R06:** Classify all material planned capabilities by current necessity.
+- **P0-W18-R07:** Define a minimum architecture and earned source layout.
+- **P0-W18-R08:** Preserve protocol neutrality and smallest-reliable integration selection.
+- **P0-W18-R09:** Define inspectable Context, Tool, Skill, security, Evidence, Artifact, Receipt, and completion boundaries.
+- **P0-W18-R10:** Define credible first-month and twelve-week outcomes.
+- **P0-W18-R11:** Identify remaining planning domains for Prompt 4.
+- **P0-W18-R12:** Do not issue build authorization.
 
-## Proposed changes
+## Implemented changes
 
-1. Add one focused product-scope and minimum-architecture specification.
-2. Narrow the README to the reconciled product, smallest useful workflow, and delivery boundary.
-3. Replace the architecture's early component map with the minimum single-Run change-loop architecture plus an adjacent delegated-work expansion.
-4. Replace the current simulated-TUI-first roadmap with a usable CLI-first sequence.
-5. Reconcile implementation slices and acceptance-gate planning with the reduced sequence.
-6. Reconcile the Run Model with no process per Run, one first-month Root Run, and bounded later Child Runs.
-7. Narrow Project Provenance hierarchy and process language.
-8. Replace broad early source-layout scaffolding with an earned-namespace rule and first-target layout.
-9. Add a proposed ADR for the single-Run change-loop-first delivery order.
-10. Update planning and ADR indexes and the P0-W17 baseline status.
+P0-W18 proposes these decisive corrections:
 
-## Expected files or components
+1. Kiln is a local-first coding execution ledger and control plane for one developer.
+2. The first useful product is one durable CLI Root Run that completes a real source change.
+3. Version 0.1 includes one read-only Scout Child and one independent Verifier Child after the Root workflow works.
+4. Maximum Child depth is one and maximum active Child count is one through version 0.1.
+5. A separate Root Task is not required initially.
+6. No process exists merely because a Run or another domain record exists.
+7. SQLite journaling is limited to concrete recovery, audit, replay, duplicate prevention, and unknown-effect requirements.
+8. One selected writable checkout and one mutation owner precede managed worktrees.
+9. The CLI is complete and permanent. The TUI is deferred beyond twelve weeks.
+10. At most four Tool schemas enter a first-month model invocation.
+11. A general Capability broker, model router, Context retrieval framework, Skills, code intelligence, protocols, telemetry, and local project intelligence are deferred.
+12. One real source change is the first-month milestone.
+13. A trustworthy delegated CLI is the twelve-week version 0.1 milestone.
+14. Existing JSON Schemas remain unchanged and become Prompt 3 disposition targets.
+15. ADR 0020 proposes partial supersession of ADR 0019's order and milestone while retaining vertical-slice discipline.
 
-| Path | Expected change | Status |
-| --- | --- | --- |
-| `docs/PRODUCT-SCOPE-AND-MINIMUM-ARCHITECTURE.md` | Focused Prompt 2 authority | Proposed |
-| `README.md` | Reconciled product summary and target | Proposed |
-| `docs/ARCHITECTURE.md` | Minimum architecture and process ownership | Proposed |
-| `docs/ROADMAP.md` | Reduced CLI-first delivery sequence | Proposed |
-| `docs/IMPLEMENTATION-SLICES.md` | Reconciled slices and targets | Proposed |
-| `docs/SLICE-ACCEPTANCE-GATES.md` | Reconciled aggregate proof planning | Proposed |
-| `docs/RUN-MODEL.md` | Minimum Run model and process rule | Proposed |
-| `docs/PROJECT-PROVENANCE.md` | Supporting rationale narrowed to current hierarchy | Proposed |
-| `docs/AGENT-FRIENDLY-CODEBASE.md` | Earned source-layout guidance | Proposed |
-| `docs/decisions/0020-single-run-change-loop-first.md` | Proposed roadmap and architecture decision | Proposed |
-| `docs/decisions/README.md` | ADR index update | Proposed |
-| `docs/PLANNING-COMPLETION-BASELINE.md` | Prompt 1 integration and successor status | Proposed |
-| `docs/work/P0-W18-product-scope-architecture.md` | Completion Evidence | In progress |
+## Authoritative files changed
 
-No production source, test, workflow, script, JSON Schema, Skill, prompt, agent definition, dependency, or runtime configuration shall change.
+### Added
+
+- `docs/PRODUCT-SCOPE-AND-MINIMUM-ARCHITECTURE.md`
+- `docs/decisions/0020-prove-single-run-change-loop-before-delegation.md`
+- `docs/work/P0-W18-product-scope-architecture.md`
+
+### Rewritten or narrowed
+
+- `README.md`
+- `AGENTS.md`
+- `docs/ARCHITECTURE.md`
+- `docs/ROADMAP.md`
+- `docs/IMPLEMENTATION-SLICES.md`
+- `docs/SLICE-ACCEPTANCE-GATES.md`
+- `docs/RUN-MODEL.md`
+- `docs/SESSION-MODEL.md`
+- `docs/DELEGATED-WORK.md`
+- `docs/PROJECT-STEWARDSHIP.md`
+- `docs/PROJECT-PROVENANCE.md`
+- `docs/CLI-TUI.md`
+- `docs/PROTOCOL-CAPABILITY-MAP.md`
+- `docs/AGENT-FRIENDLY-CODEBASE.md`
+- `docs/contracts/README.md`
+- `docs/PLANNING-COMPLETION-BASELINE.md`
+- `docs/decisions/0019-implement-kiln-through-vertical-product-slices.md`
+- `docs/decisions/README.md`
+
+### Unchanged executable and machine-readable areas
+
+- production source;
+- production tests;
+- CI workflows;
+- development scripts;
+- JSON Schema files;
+- dependencies and runtime configuration;
+- development Skills;
+- prompt templates;
+- specialist-agent definitions;
+- planned gate script paths.
 
 ## Acceptance criteria
 
-- **P0-W18-AC01:** Kiln has one concise product definition, primary user, problem, differentiation, constraints, and success standard.
-- **P0-W18-AC02:** Non-goals constrain product, architecture, permissions, and delivery.
-- **P0-W18-AC03:** The smallest useful workflow completes Intent through accepted verified change without requiring Child Runs, a TUI, broad brokerage, protocols, code intelligence, or cross-project retrieval.
-- **P0-W18-AC04:** The Run model uses a single Root Run first, retains Task-versus-Run separation, and defers nested Child Runs.
-- **P0-W18-AC05:** No permanent process exists merely because a Run, Task, Session, Capability, Attention item, Artifact, or Evidence record exists.
-- **P0-W18-AC06:** Every near-term process owns a live resource, concurrency, timing, cancellation, streaming, subscription, or fault-isolation boundary.
-- **P0-W18-AC07:** Event journaling is justified only by restart, replay, audit, synchronization, and unknown-effect recovery requirements.
-- **P0-W18-AC08:** Every material planned capability has an explicit classification and reconsideration trigger.
-- **P0-W18-AC09:** The source-layout conflict is resolved without creating source files.
-- **P0-W18-AC10:** Context, Tool-schema, Skill, local-first, security, Evidence, Artifact, Receipt, and completion boundaries are explicit and inspectable.
-- **P0-W18-AC11:** First-month and twelve-week outcomes are coherent vertical workflows for one developer.
-- **P0-W18-AC12:** Remaining planning domains and build blockers are explicit.
-- **P0-W18-AC13:** Prompt 3 can inspect current implementation and scaffolding against one coherent target.
-- **P0-W18-AC14:** The final diff contains planning and status files only.
-- **P0-W18-AC15:** Repository validation passes on the exact final branch head.
+| Criterion | Status before final CI | Evidence |
+| --- | --- | --- |
+| P0-W18-AC01 product definition | Pass | README and product-scope specification |
+| P0-W18-AC02 enforceable non-goals | Pass | Product-scope specification and README |
+| P0-W18-AC03 complete smallest workflow | Pass | First-month single-Run change loop |
+| P0-W18-AC04 reconciled Run model | Pass | Run and Session Models |
+| P0-W18-AC05 no process per domain noun | Pass | Architecture, Run Model, source-layout rules |
+| P0-W18-AC06 justified near-term processes | Pass | Architecture process ownership table |
+| P0-W18-AC07 bounded journal rationale | Pass | Architecture and product-scope specification |
+| P0-W18-AC08 capability classifications | Pass | Product-scope classification tables |
+| P0-W18-AC09 source-layout conflict | Pass | Agent-Friendly Codebase Rules |
+| P0-W18-AC10 Context, security, Evidence boundaries | Pass | Product-scope specification and Architecture |
+| P0-W18-AC11 delivery targets | Pass | Roadmap and Implementation Slices |
+| P0-W18-AC12 remaining planning domains | Pass | Product-scope assessment |
+| P0-W18-AC13 coherent Prompt 3 target | Pass | Contract index, affected-scaffolding register, and current authorities |
+| P0-W18-AC14 documentation-only diff | Pass | Compare against `main`: 21 documentation files |
+| P0-W18-AC15 final Repository validation | Pending | Final-head GitHub CI required |
 
 ## Deterministic verification
 
@@ -131,39 +163,48 @@ mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-The pass shall also inspect:
+The current CI runs the equivalent Repository checks.
 
-- current file authority and status;
-- product and roadmap consistency;
-- source-layout consistency;
-- Run and process consistency;
-- capability classifications;
-- delivery targets;
-- the final diff against `main`;
-- absence of production, test, workflow, script, Schema, Skill, prompt, agent, dependency, or runtime changes.
+A passing preflight test proves the obsolete P0 behavior still passes. It does not prove current P1 slice-ticket support.
 
 ## Required completion Evidence
 
-| Evidence ID | Acceptance criterion | Required Evidence |
+| Evidence ID | Criteria | Evidence |
 | --- | --- | --- |
-| P0-W18-E01 | AC01 through AC03 | Product specification, README, and workflow sections |
-| P0-W18-E02 | AC04 through AC07 | Run Model, architecture process table, and journal rationale |
-| P0-W18-E03 | AC08 | Capability classification table |
-| P0-W18-E04 | AC09 | Source-layout section and Agent-Friendly Codebase diff |
-| P0-W18-E05 | AC10 | Context, security, and Evidence boundary sections |
-| P0-W18-E06 | AC11 | Roadmap, slices, and gate plan |
-| P0-W18-E07 | AC12 through AC13 | Remaining-domain and blocker register |
-| P0-W18-E08 | AC14 | Final compare against `main` |
+| P0-W18-E01 | AC01–AC03 | Product specification, README, and primary workflow |
+| P0-W18-E02 | AC04–AC07 | Run Model, Session Model, Architecture process and journal sections |
+| P0-W18-E03 | AC08 | Capability classification and reconsideration triggers |
+| P0-W18-E04 | AC09 | Earned namespace and deferred namespace rules |
+| P0-W18-E05 | AC10 | Context, Tool, security, Evidence, Artifact, Receipt, and completion sections |
+| P0-W18-E06 | AC11 | Roadmap, slice definitions, and planned aggregate gates |
+| P0-W18-E07 | AC12–AC13 | Remaining planning-domain assessment and Prompt 3 affected-scaffolding register |
+| P0-W18-E08 | AC14 | GitHub compare against `main` |
 | P0-W18-E09 | AC15 | Final-head GitHub CI run |
+
+## Failures and warnings
+
+- Final-head CI has not run yet.
+- Current preflight and its tests remain intentionally obsolete and unchanged.
+- Current Schema files remain intentionally unchanged and may conflict with the reconciled minimum subset.
+- Existing accepted invariants describe some broader long-term maxima. P0-W18 narrows version 0.1 timing and limits through proposed ADR 0020 without renumbering the stable register.
+- Exact dependency, persistence, Patch, process-control, provider, retention, and later TUI decisions remain unresolved.
+- Build authorization remains denied.
 
 ## Explicit exclusions
 
 P0-W18 does not:
 
-- implement a Run, Session, Task, provider, Context package, Patch, Command, journal, Artifact store, CLI, TUI, broker, or verifier;
+- implement any product capability;
 - repair preflight, CI, Skills, prompts, agents, or gate scripts;
 - change JSON Schemas;
-- select a SQLite, TUI, property-test, telemetry, parser, or process-control dependency;
-- design every lifecycle transition or retention rule;
+- select runtime dependencies;
+- design every transition or retention rule;
 - define the final Planning Round Register;
+- perform the final adversarial review;
 - authorize implementation.
+
+## Exact next action
+
+After final validation, owner review, acceptance, and integration, run **Prompt 3 — Reconcile scaffolded, partial, and completed-looking implementation** against current `main`.
+
+Do not begin Prompt 4 or implementation before Prompt 3 passes.
