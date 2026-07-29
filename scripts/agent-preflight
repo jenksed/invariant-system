@@ -56,8 +56,19 @@ fi
 
 if [[ -n "$work_id" ]]; then
   shopt -s nullglob
-  plans=(docs/work/"${work_id}"-*.md)
+  candidates=(docs/work/"${work_id}"-*.md)
   shopt -u nullglob
+  plans=()
+
+  for candidate in "${candidates[@]}"; do
+    basename=$(basename "$candidate")
+
+    if [[ "$work_kind" == "slice" && "$basename" =~ ^${work_id}-T[0-9]{2}- ]]; then
+      continue
+    fi
+
+    plans+=("$candidate")
+  done
 
   [[ ${#plans[@]} -eq 1 ]] || fail "expected one plan for $work_id; found ${#plans[@]}"
   plan=${plans[0]}
