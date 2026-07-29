@@ -1,6 +1,6 @@
 # Architecture decision records
 
-**Document type:** Reference
+**Document type:** Decision authority index
 
 Architecture decision records preserve decisions that constrain future implementation.
 
@@ -8,9 +8,9 @@ Use `docs/templates/ADR.md` for new records. Follow `docs/ENGINEERING-QUALITY-RU
 
 ## Decision status vocabulary
 
-- **Proposed:** under review and not yet binding.
+- **Proposed:** under review and not binding.
 - **Accepted:** current Project constraint.
-- **Superseded:** replaced by a later ADR.
+- **Superseded:** replaced by a later accepted ADR.
 - **Rejected:** considered and deliberately not chosen.
 
 ## Integration status vocabulary
@@ -43,6 +43,7 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0014: Delegate work through first-class Runs](0014-delegated-work-uses-first-class-runs.md) | Accepted | Integrated through pull request 15 |
 | [0015: Use a Run-first event-projected terminal interface](0015-run-first-event-projected-terminal-interface.md) | Accepted | Integrated through pull request 16 |
 | [0016: Use SQLite-first read-only local project intelligence](0016-use-sqlite-first-read-only-project-intelligence.md) | Accepted | Integrated through pull request 17 |
-| [0017: Quarantine reference instructions and technically enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Integrated through pull request 18 |
-| [0018: Use tiered deterministic execution and evidence](0018-use-tiered-deterministic-execution-and-evidence.md) | Accepted | Integrated through pull request 19 |
-| [0019: Implement Kiln through vertical product slices](0019-implement-kiln-through-vertical-product-slices.md) | Accepted | Integrated through pull request 20 |
+| [0017: Quarantine reference instructions and enforce read-only intelligence](0017-quarantine-reference-instructions-and-enforce-read-only-intelligence.md) | Accepted | Integrated through pull request 18 |
+| [0018: Use tiered deterministic execution and Evidence](0018-use-tiered-deterministic-execution-and-evidence.md) | Accepted | Integrated through pull request 19 |
+| [0019: Implement Kiln through vertical product slices](0019-implement-kiln-through-vertical-product-slices.md) | Accepted | Integrated through pull request 20; implementation order proposed for partial supersession by ADR 0020 |
+| [0020: Prove a single-Run change loop before delegated orchestration](0020-prove-single-run-change-loop-before-delegation.md) | Proposed | Proposed on P0-W18 |
