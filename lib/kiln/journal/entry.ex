@@ -33,12 +33,28 @@ defmodule Kiln.Journal.Entry do
     external_operation_observed/v1
   )
 
+  @entry_schema "journal_entry/v1"
+
   @type decoded :: %{type: String.t(), payload: map()}
   @type block :: %{code: atom(), detail: map()}
 
   @doc "The entry types this reducer version understands."
   @spec known_types() :: [String.t()]
   def known_types, do: @known_types
+
+  @doc "The supported journal envelope schema."
+  @spec entry_schema() :: String.t()
+  def entry_schema, do: @entry_schema
+
+  @doc """
+  The accepted payload schema for `entry_type`, or `nil` when unknown.
+
+  The v1 mapping is the identity mapping; commit and replay share this one
+  authority so a row cannot claim a payload schema that mismatches its type.
+  """
+  @spec payload_schema(String.t()) :: String.t() | nil
+  def payload_schema(type) when type in @known_types, do: type
+  def payload_schema(_type), do: nil
 
   @doc """
   Decode and validate `payload` for `type`.
@@ -117,13 +133,13 @@ defmodule Kiln.Journal.Entry do
 
   # -- nested shapes --
 
-  defp session(s), do: with(:ok <- string(s, "id"), do: member(s, "state", @session_states))
-  defp task(s), do: with(:ok <- string(s, "id"), do: member(s, "state", @task_states))
+  defp session(s), do: with(:ok <- id(s, "id", :session), do: member(s, "state", @session_states))
+  defp task(s), do: with(:ok <- id(s, "id", :task), do: member(s, "state", @task_states))
 
   defp run_identity(r) do
-    with :ok <- string(r, "id"),
+    with :ok <- id(r, "id", :run),
          :ok <- member(r, "state", @run_states),
-         :ok <- string(r, "root_run_id") do
+         :ok <- id(r, "root_run_id", :run) do
       :ok
     end
   end
@@ -134,8 +150,10 @@ defmodule Kiln.Journal.Entry do
 
   defp run_target(r), do: member(r, "to", @run_states)
 
+  # subject_kind and subject_id are free-form references, not opaque Kiln ids in
+  # the accepted v1 schema, so they are validated only as strings.
   defp decision(d) do
-    with :ok <- string(d, "id"),
+    with :ok <- id(d, "id", :decision),
          :ok <- string(d, "subject_kind"),
          :ok <- string(d, "subject_id"),
          :ok <- non_neg_int(d, "subject_revision"),
@@ -146,11 +164,11 @@ defmodule Kiln.Journal.Entry do
   end
 
   defp operation_intent(o) do
-    with :ok <- string(o, "id"), do: member(o, "class", @operation_classes)
+    with :ok <- id(o, "id", :operation), do: member(o, "class", @operation_classes)
   end
 
   defp operation_observation(o) do
-    with :ok <- string(o, "id"), do: member(o, "state", @operation_states)
+    with :ok <- id(o, "id", :operation), do: member(o, "state", @operation_states)
   end
 
   # -- primitives --
@@ -176,6 +194,22 @@ defmodule Kiln.Journal.Entry do
       {:ok, value} when is_binary(value) -> :ok
       {:ok, _} -> invalid(key, :not_a_string)
       :error -> invalid(key, :missing)
+    end
+  end
+
+  defp id(map, key, kind) do
+    case Map.fetch(map, key) do
+      {:ok, value} when is_binary(value) ->
+        case Kiln.Domain.Id.validate(kind, value) do
+          :ok -> :ok
+          {:error, _} -> invalid(key, :invalid_id)
+        end
+
+      {:ok, _} ->
+        invalid(key, :not_a_string)
+
+      :error ->
+        invalid(key, :missing)
     end
   end
 

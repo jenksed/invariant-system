@@ -67,10 +67,57 @@ defmodule Kiln.Journal.Replay do
     entries = load_entries(conn, session_id)
     commits = load_commits(conn, session_id)
 
-    with {:ok, batches} <- build_batches(entries, commits) do
+    with :ok <- validate_numeric(entries, commits),
+         {:ok, batches} <- build_batches(entries, commits) do
       apply_batches(session_id, batches)
     end
   end
+
+  # Every persisted revision and sequence used in arithmetic or ordering must be
+  # a non-negative integer before any calculation. The store is not STRICT, so a
+  # corrupt row may hold a text or float storage class; guard it here rather than
+  # let arithmetic raise (P1-S01-T03-R05).
+  defp validate_numeric(entries, commits) do
+    with :ok <- validate_entry_numbers(entries) do
+      validate_commit_numbers(commits)
+    end
+  end
+
+  defp validate_entry_numbers(entries) do
+    Enum.reduce_while(entries, :ok, fn entry, :ok ->
+      cond do
+        not non_neg_integer?(entry.sequence) ->
+          {:halt, block(:corrupt_sequence, nil, %{value: inspect(entry.sequence)})}
+
+        not non_neg_integer?(entry.revision) ->
+          {:halt, block(:corrupt_revision, entry.sequence, %{value: inspect(entry.revision)})}
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
+  end
+
+  defp validate_commit_numbers(commits) do
+    Enum.reduce_while(commits, :ok, fn commit, :ok ->
+      valid? =
+        non_neg_integer?(commit.expected_session_revision) and
+          non_neg_integer?(commit.first_sequence) and non_neg_integer?(commit.last_sequence)
+
+      if valid? do
+        {:cont, :ok}
+      else
+        {:halt,
+         block(:corrupt_action_bounds, sequence_or_nil(commit.first_sequence), %{
+           action_id: commit.action_id
+         })}
+      end
+    end)
+  end
+
+  defp non_neg_integer?(value), do: is_integer(value) and value >= 0
+
+  defp sequence_or_nil(value), do: if(is_integer(value), do: value, else: nil)
 
   # -- loading --
 
@@ -78,7 +125,7 @@ defmodule Kiln.Journal.Replay do
     conn
     |> Connection.query!(
       """
-      SELECT sequence, entry_type, payload, payload_digest, payload_schema,
+      SELECT sequence, entry_schema, entry_type, payload, payload_digest, payload_schema,
              session_revision, action_id, idempotency_key, request_digest
       FROM journal_entries
       WHERE session_id = ?1
@@ -86,9 +133,10 @@ defmodule Kiln.Journal.Replay do
       """,
       [session_id]
     )
-    |> Enum.map(fn [seq, type, payload, digest, schema, rev, action_id, idem, req] ->
+    |> Enum.map(fn [seq, entry_schema, type, payload, digest, schema, rev, action_id, idem, req] ->
       %{
         sequence: seq,
+        entry_schema: entry_schema,
         type: type,
         payload_text: payload,
         payload_digest: digest,
@@ -317,12 +365,32 @@ defmodule Kiln.Journal.Replay do
   end
 
   defp apply_entry(session_id, projection, row) do
-    with {:ok, payload} <- decode(row.payload_text, row.sequence),
+    with :ok <- check_schemas(row),
+         {:ok, payload} <- decode(row.payload_text, row.sequence),
          :ok <- verify_digest(row.payload_schema, payload, row.payload_digest, row.sequence),
          {:ok, decoded} <- decode_entry(row.type, payload, row.sequence),
          {:ok, next} <-
            reduce(projection, Map.put(decoded, :session_id, session_id), row.sequence) do
       {:ok, next}
+    end
+  end
+
+  # Bind the envelope and payload schemas to the shared authority: the envelope
+  # schema must be supported and the payload schema must match the entry type,
+  # even if the digest was recomputed against the wrong schema.
+  defp check_schemas(row) do
+    cond do
+      row.entry_schema != Entry.entry_schema() ->
+        block(:unsupported_entry_schema, row.sequence, %{entry_schema: row.entry_schema})
+
+      Entry.payload_schema(row.type) != row.payload_schema ->
+        block(:payload_schema_mismatch, row.sequence, %{
+          type: row.type,
+          payload_schema: row.payload_schema
+        })
+
+      true ->
+        :ok
     end
   end
 
