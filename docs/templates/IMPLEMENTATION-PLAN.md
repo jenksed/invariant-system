@@ -12,10 +12,12 @@ When this plan belongs to a vertical slice, state:
 
 - the slice's user-visible outcome;
 - the exact behavior this ticket adds;
-- the slice gate, demo step, and aggregate Receipt that consume this ticket's Evidence;
-- the behavior that remains unreachable, simulated, disabled, or deferred after this ticket merges.
+- the slice gate, demo step, and slice verification manifest that consume this ticket's Evidence;
+- the behavior that remains unreachable, disabled, or deferred after merge.
 
-A ticket does not claim the entire slice complete unless it executes the aggregate gate and demo against the exact tested state.
+A ticket does not claim the entire slice complete unless the aggregate gate and demo pass against the exact tested state.
+
+A ticket closeout record or slice verification manifest is not a product Receipt. A product Receipt is sealed only after committed product completion under P0-W24.
 
 ## Objective
 
@@ -51,7 +53,7 @@ Use Easy Approach to Requirements Syntax-compatible statements when applicable.
 State:
 
 - allowed Resources and paths;
-- denied Capabilities;
+- denied capabilities;
 - authority and policy inputs;
 - network, secret, filesystem, process, and external-disclosure behavior;
 - failure or degraded-isolation behavior;
@@ -80,7 +82,7 @@ Do not invent a path only to complete this table. Write `Unknown` when discovery
   - **Given** <observable initial state>
   - **When** <one action or event>
   - **Then** <observable result>
-  - **Evidence:** <required Command, output, Artifact, Receipt, or runtime observation>
+  - **Evidence:** <required Command, output, Artifact, implementation Evidence manifest, or runtime observation>
 
 ## Deterministic verification
 
@@ -106,14 +108,14 @@ When the ticket has its own focused demo helper, identify it separately. Do not 
 
 | Evidence ID | Acceptance criterion | Required Evidence |
 | --- | --- | --- |
-| <WORK-ID>-E01 | <WORK-ID>-AC01 | <Command output, structured result, path, Artifact, Receipt, or runtime observation> |
+| <WORK-ID>-E01 | <WORK-ID>-AC01 | <Command output, structured result, path, Artifact, implementation Evidence manifest, or runtime observation> |
 
 ### Slice gate contribution
 
-| Slice gate or Receipt | Contribution |
+| Slice gate or verification manifest | Contribution |
 | --- | --- |
 | <P1-SXX-G01> | <Evidence supplied by this ticket> |
-| <P1-SXX-R01> | <manifest items or references supplied by this ticket> |
+| <P1-SXX-V01> | <manifest items or references supplied by this ticket> |
 
 ## Explicit exclusions
 
@@ -137,13 +139,13 @@ Complete this section before merge.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| `<command>` | `<status>` | <PR log, Artifact, or report> |
+| `<command>` | `<status>` | <PR log, Artifact, implementation Evidence manifest, or report> |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Pass | Fail | Blocked | Not yet exercised
 - Parent slice gate affected: `<P1-SXX-GXX>`
-- Aggregate Receipt updated: Yes | No | Not applicable
+- Slice verification manifest updated: Yes | No | Not applicable
 - Slice completion claimed: No | Yes with exact aggregate Evidence
 
 ### Failures and warnings
