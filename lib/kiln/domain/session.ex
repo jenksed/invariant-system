@@ -93,7 +93,11 @@ defmodule Kiln.Domain.Session do
   end
 
   def start(_attrs, _opts) do
-    {:error, Error.new(:invalid_attributes, "Session start attributes must be a map and options must be a list")}
+    {:error,
+     Error.new(
+       :invalid_attributes,
+       "Session start attributes must be a map and options must be a list"
+     )}
   end
 
   @spec states() :: [state()]
@@ -101,8 +105,16 @@ defmodule Kiln.Domain.Session do
 
   defp project_observation(attrs) do
     case Map.fetch(attrs, :project_observation) do
-      {:ok, %ProjectObservation{} = value} -> {:ok, value}
-      _ -> {:error, Error.new(:invalid_field, "project_observation must be a ProjectObservation", :project_observation)}
+      {:ok, %ProjectObservation{} = value} ->
+        {:ok, value}
+
+      _ ->
+        {:error,
+         Error.new(
+           :invalid_field,
+           "project_observation must be a ProjectObservation",
+           :project_observation
+         )}
     end
   end
 
