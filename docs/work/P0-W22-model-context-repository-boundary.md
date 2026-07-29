@@ -1,8 +1,9 @@
 # P0-W22: Provider, Context, Tools, Repository reads, and disclosure
 
 **Document type:** Focused planning work package  
-**Status:** Implemented and verified on branch  
-**Branch:** `work/p0-w22-model-context-repository-boundary-reconciled`  
+**Status:** Implemented, verified, accepted, and integrated  
+**Integrated through:** Pull request 29, merge commit `abbded1af773981c40e0810c19ce043b9485daeb`  
+**Final design head:** `d2f646cee0e8e26b86d0e0ea19f4f2226cdf163f`  
 **Depends on:** P0-W21 integrated through pull request 27 and closeout pull request 28  
 **Scope:** MiniMax provider boundary, sealed Context, bounded Repository reads, fixed Tools, disclosure, and secret screening only  
 **Build authorization:** Not issued
@@ -22,9 +23,9 @@ Define one reproducible MiniMax boundary, one explicit sealed Context package, f
 - The Project owner uses M3 as the MiniMax workhorse.
 - Production source contains no provider, Context, Tool, Repository-read, disclosure, or secret-screening behavior.
 
-## Accepted planning decisions
+## Accepted decisions
 
-P0-W22 proposes these decisions for integration:
+P0-W22 established:
 
 1. MiniMax is the only initial real provider.
 2. Use `MiniMax-M3` through `https://api.minimax.io/v1/chat/completions`.
@@ -45,7 +46,7 @@ P0-W22 proposes these decisions for integration:
 17. Persist normalized manifests, visible results, Tool records, usage, warnings, and digests rather than raw provider streams or complete payloads.
 18. State hosted provider retention honestly and make no local-only or zero-retention claim.
 
-## Files changed
+## Files integrated
 
 - `docs/MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md`
 - `docs/decisions/0023-use-minimax-m3-openai-compatible-api.md`
@@ -53,11 +54,7 @@ P0-W22 proposes these decisions for integration:
 - `docs/PLANNING.md`
 - `docs/work/P0-W22-model-context-repository-boundary.md`
 
-Review-head compare against `main`:
-
-- five Markdown files;
-- 1,398 additions and eight deletions;
-- no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or conformance scaffolding.
+The final branch contained five Markdown files, 1,424 additions, and eight deletions. It changed no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or conformance scaffolding.
 
 ## Acceptance evidence
 
@@ -73,81 +70,41 @@ Review-head compare against `main`:
 | Provider retention and hosted processing are honest | Pass | disclosure and retention sections |
 | No fallback, routing, Skills, retrieval framework, code intelligence, or protocols | Pass | constraints and exclusions |
 | W21 lifecycle and persistence ownership unchanged | Pass | explicit W21 ownership audit |
-| Review-head Repository validation | Pass | CI run `30421013613` on `32dd41ba53e4eee767b947b22c559d7ff51f20b0` |
-| Exact closeout-head validation | Pending | final CI after this update |
+| Review-head Repository validation | Pass | CI `30421013613` on `32dd41ba53e4eee767b947b22c559d7ff51f20b0` |
+| Exact closeout-head validation | Pass | CI `30421128818` on `d2f646cee0e8e26b86d0e0ea19f4f2226cdf163f` |
 
 ## W21 ownership audit
 
-P0-W22 consumes:
+P0-W22 consumes operation identity, durable intent before dispatch, terminal or unknown result classification, expected revision, idempotency, restart, and orphan handling.
 
-- operation identity;
-- durable intent before dispatch;
-- terminal or unknown result classification;
-- expected revision and idempotency;
-- restart and orphan handling.
-
-P0-W22 does not define or modify:
-
-- Session, Task, or Run states;
-- lifecycle transitions or transition authority;
-- journal envelope or action-commit storage;
-- projection ownership or replay;
-- migrations or store startup;
-- terminal Session and Task alignment;
-- completion transaction prerequisites.
+It does not define or modify Session, Task, or Run states; lifecycle transitions; transition authority; journal envelope; action-commit storage; projection ownership; replay; migrations; store startup; terminal alignment; or completion transaction prerequisites.
 
 Any conflict resolves in favor of integrated P0-W21.
 
 ## External evidence
 
-Official MiniMax sources reviewed on 2026-07-28 support:
-
-- the OpenAI-compatible base URL and Chat Completions endpoint;
-- `MiniMax-M3` as the current latest M-series coding and agentic model;
-- Bearer authentication;
-- streaming;
-- Tool definitions;
-- `reasoning_split` and provider-message continuity;
-- usage fields;
-- hosted processing and non-zero-retention risk.
+Official MiniMax sources reviewed on 2026-07-28 support the OpenAI-compatible endpoint, `MiniMax-M3`, Bearer authentication, streaming, Tool definitions, `reasoning_split`, provider-message continuity, usage fields, and hosted processing.
 
 They do not prove provider-side deletion, non-retention, or server-side cancellation.
 
 ## Verification
 
-Review head `32dd41ba53e4eee767b947b22c559d7ff51f20b0` passed GitHub CI run `30421013613`.
+Final head `d2f646cee0e8e26b86d0e0ea19f4f2226cdf163f` passed GitHub CI run `30421128818`.
 
-The run passed:
-
-- Vale;
-- current preflight behavior tests;
-- Project agent-asset validation;
-- dependency installation;
-- formatting;
-- warnings-as-errors compilation;
-- compile-connected cycle detection;
-- ExUnit.
+The run passed Vale, current preflight behavior tests, Project agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
 
 The current preflight result proves obsolete P0 mechanics only. It does not prove P1 ticket compatibility.
 
 ## Explicit exclusions
 
-P0-W22 did not:
-
-- define or change lifecycle or persistence;
-- define Patch representation, Approval, source mutation, or rollback;
-- define registered Command, criterion Evidence, completion, Receipt, or CLI presentation;
-- implement or scaffold behavior;
-- add provider fallback, routing, ensemble, Skills, retrieval framework, reference repositories, code intelligence, protocols, telemetry, remote execution, or attestations;
-- run Wave B work;
-- issue build authorization.
+P0-W22 did not define or change lifecycle or persistence; define Patch representation, Approval, mutation, rollback, Command, Evidence, completion, Receipt, or CLI presentation; implement behavior; add fallback, routing, Skills, retrieval, reference repositories, code intelligence, protocols, telemetry, remote execution, or attestations; run Wave B; or issue build authorization.
 
 ## Gate verdict
 
-P0-W22 passes on this branch after exact closeout-head CI.
+**P0-W22 passed and is integrated.**
 
-Owner acceptance and integration remain required.
+Build authorization remains denied.
 
 ## Exact next action
 
-After exact-head CI passes, merge P0-W22. Then run P0-W23 on current `main`.
+Run P0-W23 on current `main`.
