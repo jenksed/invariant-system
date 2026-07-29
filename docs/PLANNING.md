@@ -14,6 +14,7 @@
 | Prompt 4 | Pull request 25, merge commit `45acc2ed575957c53a8c57195d99c82965e9d48e` |
 | OD-01 | Pull request 26, merge commit `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1` |
 | P0-W21 | Pull request 27, merge commit `ca21d0bbc25ddf5861191f8bde374e0761d86c0a` |
+| P0-W21 closeout | Pull request 28, merge commit `6c80436b9c220a93b0ff37372deacb1f7ec0fd32` |
 
 ## Current authorities
 
@@ -25,14 +26,15 @@ Use these files in this order:
 4. [Planning Round Register](PLANNING-ROUND-REGISTER.md) — unresolved-domain classification, focused rounds, dependencies, Prompt 5 bundles, and readiness gates from Prompt 4.
 5. [Owner Decision Register](OWNER-DECISIONS.md) — accepted and pending owner choices that focused rounds must consume.
 6. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md) — integrated P0-W21 authority for first-month lifecycle, state ownership, journal, transaction, projection, migration, restart, and unknown-effect boundaries.
-7. [Planning Round Authoritative Inputs](PLANNING-ROUND-INPUTS.md) — exact Repository paths consumed by each Prompt 5 bundle.
-8. [Roadmap](ROADMAP.md) — product slice and implementation-order authority.
-9. [Implementation Slices](IMPLEMENTATION-SLICES.md) — slice outcomes, boundaries, tests, demos, and planned Receipts.
-10. [Slice Acceptance Gates](SLICE-ACCEPTANCE-GATES.md) — aggregate proof required when each slice enters implementation.
+7. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md) — proposed P0-W22 authority for MiniMax M3, sealed Context, fixed Tools, active-Repository reads, disclosure, and secret screening.
+8. [Planning Round Authoritative Inputs](PLANNING-ROUND-INPUTS.md) — exact Repository paths consumed by each Prompt 5 bundle.
+9. [Roadmap](ROADMAP.md) — product slice and implementation-order authority.
+10. [Implementation Slices](IMPLEMENTATION-SLICES.md) — slice outcomes, boundaries, tests, demos, and planned Receipts.
+11. [Slice Acceptance Gates](SLICE-ACCEPTANCE-GATES.md) — aggregate proof required when each slice enters implementation.
 
 The [Architecture](ARCHITECTURE.md), [Run Model](RUN-MODEL.md), [Session Model](SESSION-MODEL.md), accepted [ADRs](decisions/README.md), and focused specifications provide subject authority. They cannot broaden the current scope or reorder delivery without an accepted authority change.
 
-The P0-W21 work record and this index control its integration status. Any branch-era status text remaining in the large focused specification is non-authoritative bookkeeping and must not be copied into later work.
+The P0-W21 work record and this index control W21 integration status. Any branch-era status text remaining in its large specification is non-authoritative bookkeeping and must not be copied.
 
 ## Integrated P0-W21 authority
 
@@ -48,13 +50,38 @@ P0-W21 established:
 - one immutable journal and one rebuildable Session projection;
 - direct Exqlite, one supervised connection, one writer, Kiln-owned migrations, WAL, full synchronous durability, and immediate write transactions.
 
-P0-W22 and every later round must consume these decisions. They cannot add Run states or redefine transition, journal, projection, migration, restart, or completion transaction authority.
+P0-W22 and every later round consume these decisions. They cannot add Run states or redefine transition, journal, projection, migration, restart, or completion transaction authority.
+
+## Proposed P0-W22 authority
+
+P0-W22 proposes:
+
+- MiniMax M3 as the only real initial model under OD-01;
+- direct OpenAI-compatible HTTP and JSON mapping behind a Kiln-native provider behaviour;
+- one deterministic fake provider;
+- no fallback or automatic retry after dispatch;
+- one sealed ordered Context package capped at 32,000 estimated input tokens;
+- exactly four possible Tools: `repo.search`, `repo.read`, `artifact.read`, and `change.propose`;
+- fixed workflow-step Tool projection with unused schemas absent;
+- canonical-root, no-symlink, text-only, size, digest, ignore, and stale-source controls;
+- default-denied hosted source disclosure under accepted Project policy;
+- mandatory secret-path and content screening;
+- transient provider-native reasoning that cannot become durable Context, Evidence, or Receipt content;
+- unknown-effect classification through P0-W21 when a dispatched invocation lacks a terminal result.
+
+ADR-0023 owns the proposed concrete MiniMax M3 endpoint and model profile.
+
+## W21 ownership audit
+
+P0-W22 consumes operation identity, intent-before-dispatch, terminal-or-unknown result, expected revision, idempotency, restart, and orphan rules.
+
+P0-W22 does not define or change Session, Task, or Run states; transitions; journal entries; projections; migrations; store startup; terminal alignment; or completion transaction prerequisites. Any conflict resolves in favor of P0-W21.
 
 ## Wave A sequence
 
 ```text
 P0-W21 integrated
-→ reconcile and integrate P0-W22
+→ validate and integrate P0-W22
 → P0-W23
 → record OD-02 before P0-W24 and P0-W25 complete
 → P0-W24
@@ -98,4 +125,4 @@ P0-W26
 
 ## Current next action
 
-Rebuild or rebase P0-W22 on current `main`, which includes P0-W21. Audit P0-W22 for accidental lifecycle or persistence ownership, validate its exact rebased head, and integrate it second.
+Complete P0-W22 review, exact W21 ownership audit, and exact-head validation. Integrate P0-W22 second. Then begin P0-W23.
