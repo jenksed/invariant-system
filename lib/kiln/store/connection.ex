@@ -83,6 +83,59 @@ defmodule Kiln.Store.Connection do
     DBConnection.start_link(Exqlite.Connection, connect_opts)
   end
 
+  @doc """
+  Fast integrity precheck for an existing store file.
+
+  A fresh or empty path passes. An existing file is opened with a short-lived
+  raw connection and `PRAGMA quick_check`; a file that is not a readable
+  database returns an `:integrity` error before the pooled connection starts,
+  so a corrupt store blocks quickly and preserves its files (P0-W21 section
+  10.4).
+  """
+  @spec integrity_precheck(String.t()) :: :ok | {:error, Error.t()}
+  def integrity_precheck(path) do
+    cond do
+      not File.exists?(path) -> :ok
+      File.stat!(path).size == 0 -> :ok
+      true -> raw_quick_check(path)
+    end
+  end
+
+  defp raw_quick_check(path) do
+    case Exqlite.Sqlite3.open(path) do
+      {:ok, db} ->
+        try do
+          scalar_step(db, "PRAGMA quick_check")
+        after
+          Exqlite.Sqlite3.close(db)
+        end
+
+      {:error, reason} ->
+        {:error, integrity_error(to_string(reason))}
+    end
+  end
+
+  defp scalar_step(db, sql) do
+    with {:ok, stmt} <- Exqlite.Sqlite3.prepare(db, sql),
+         {:row, ["ok"]} <- Exqlite.Sqlite3.step(db, stmt) do
+      Exqlite.Sqlite3.release(db, stmt)
+      :ok
+    else
+      {:row, [other]} ->
+        {:error,
+         Error.new(:integrity, :quick_check_failed, "quick_check did not report ok", %{
+           result: other
+         })}
+
+      {:error, reason} ->
+        {:error, integrity_error(to_string(reason))}
+    end
+  end
+
+  defp integrity_error(reason) do
+    Error.new(:integrity, :store_unreadable, "the store could not be read", %{reason: reason})
+  end
+
   @doc false
   def child_spec(opts) do
     %{
@@ -168,6 +221,15 @@ defmodule Kiln.Store.Connection do
            rows: inspect(other)
          })}
     end
+  rescue
+    exception ->
+      # A raised driver error while reading store settings means the file is
+      # not a readable, well-formed database. Preserve it as an integrity block.
+      {:error,
+       Error.new(:integrity, :store_unreadable, "the store could not be read", %{
+         sql: sql,
+         reason: Exception.message(exception)
+       })}
   end
 
   defp expect(_setting, actual, actual), do: :ok

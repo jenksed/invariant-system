@@ -298,9 +298,22 @@ defmodule Kiln.Store.Journal do
   end
 
   defp transaction_error(reason) do
-    Error.new(:unknown, :transaction_failed, "the append transaction did not commit", %{
-      reason: inspect(reason)
-    })
+    text = inspect(reason)
+
+    if busy?(text) do
+      Error.new(:busy, :store_busy, "the writer was busy after the accepted timeout", %{
+        reason: text
+      })
+    else
+      Error.new(:unknown, :transaction_failed, "the append transaction did not commit", %{
+        reason: text
+      })
+    end
+  end
+
+  defp busy?(text) do
+    text = String.downcase(text)
+    String.contains?(text, "busy") or String.contains?(text, "locked")
   end
 
   defp utc_now do

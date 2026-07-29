@@ -48,6 +48,13 @@ defmodule Kiln.Store do
   def start(opts) do
     path = Keyword.fetch!(opts, :path)
 
+    case Connection.integrity_precheck(path) do
+      :ok -> open_and_continue(path, opts)
+      {:error, error} -> {:blocked, :integrity_blocked, error}
+    end
+  end
+
+  defp open_and_continue(path, opts) do
     case Connection.start_link(path: path) do
       {:ok, conn} -> continue(conn, opts)
       {:error, reason} -> {:error, reason}
