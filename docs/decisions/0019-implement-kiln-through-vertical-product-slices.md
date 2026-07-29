@@ -1,9 +1,9 @@
 # ADR 0019: Implement Kiln through vertical product slices
 
-- **Decision status:** Accepted
+- **Decision status:** Partially superseded by ADR 0020
 - **Integration status:** Integrated through pull request 20
 - **Date:** 2026-07-28
-- **Supersession status:** Slice order, first coding target, and read-only version 0.1 boundary are proposed for supersession by ADR 0020
+- **Supersession status:** ADR 0020 supersedes the slice order, first coding target, and read-only version 0.1 boundary
 
 ## Context
 
@@ -59,9 +59,9 @@ P1-S10  Expansion capability evaluations
 
 It also defined a read-only version 0.1 through P1-S05 and placed the TUI before persistence, provider execution, and source mutation.
 
-## Proposed partial supersession
+## Accepted partial supersession
 
-ADR 0020 proposes a new order:
+ADR 0020 defines the current order:
 
 ```text
 P1-S01  Durable single-Run CLI
@@ -80,7 +80,7 @@ Under ADR 0020:
 - version 0.1 supports maximum depth one and one active Child;
 - the TUI and all later expansion capabilities move beyond version 0.1.
 
-ADR 0020 becomes binding only after owner acceptance and integration.
+ADR 0020 is binding after owner acceptance and integration through pull request 23.
 
 ## Historical consequences
 
@@ -93,7 +93,7 @@ ADR 0019:
 - preserved one shared future code-intelligence path;
 - established explicit slice gates, demos, Receipts, and exclusions.
 
-Its original sequence did not prove a complete coding workflow early enough. P0-W18 challenges that order without discarding the vertical-slice discipline.
+Its original sequence did not prove a complete coding workflow early enough. ADR 0020 corrected that order without discarding vertical-slice discipline.
 
 ## Rejected positions that remain rejected
 
