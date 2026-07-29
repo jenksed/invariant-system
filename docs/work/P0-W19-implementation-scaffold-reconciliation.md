@@ -1,7 +1,7 @@
 # P0-W19: Reconcile implementation-like assets
 
 **Document type:** Planning work package  
-**Status:** In progress  
+**Status:** Implemented; final verification pending  
 **Branch:** `work/p0-w19-implementation-scaffold-reconciliation`  
 **Depends on:** P0-W18 integrated through pull request 23  
 **Scope:** Implementation inventory, status, blast radius, disposition, and Prompt 4 inputs only
@@ -15,13 +15,14 @@ This pass does not implement, repair, remove, or reconfigure product source, tes
 ## Observed current state and evidence
 
 - Pull request 23 is integrated into `main` at merge commit `33da2a718d8d5305bf89035503ac372f07e80a6e`.
-- That merge commit is the current `main` head at the start of P0-W19.
+- That merge commit was the current `main` head when P0-W19 began.
 - ADR 0020 and the Prompt 2 delivery sequence are integrated.
 - Production source contains one dependency-free Mix project, one public version function, and one empty application supervisor.
 - Production tests contain one version assertion plus `ExUnit.start/0`.
 - CI validates prose, obsolete preflight behavior, agent-asset shape, dependency installation, formatting, compilation, compile-connected cycles, and ExUnit.
 - Eleven JSON Schema files exist as planning-conformance assets.
 - No product Run, journal, provider, Context, Patch, Command, Evidence, Receipt, CLI, Child, or recovery capability is implemented.
+- `mix.lock`, `config/config.exs`, and `scripts/gates/slice-01` do not exist.
 
 ## Assumptions and unknowns
 
@@ -33,50 +34,84 @@ This pass does not implement, repair, remove, or reconfigure product source, tes
 
 ### Unknowns
 
-- Exact Run transition and recovery rules.
-- SQLite library, migrations, journal transactions, and replay design.
-- Patch format, base binding, rollback, and dirty-state policy.
-- Command registration, process-tree control, cancellation, and unknown-effect behavior.
-- Provider disclosure, Context sealing, and secret screening.
-- Evidence, Artifact, and Receipt retention.
-- Later Child permission derivation and Attention behavior.
+- exact Run transition and recovery rules;
+- SQLite library, migrations, journal transactions, and replay design;
+- Patch format, base binding, rollback, and dirty-state policy;
+- Command registration, process-tree control, cancellation, and unknown-effect behavior;
+- provider disclosure, Context sealing, and secret screening;
+- Evidence, Artifact, and Receipt retention;
+- later Child permission derivation and Attention behavior.
 
 ## Requirements
 
 - Inventory every material production, test, Schema, CI, script, agent-facing, structural, and contract-like asset.
 - Group assets into implementation units rather than treating every file as a separate capability.
 - Assign one current status, blast-radius class, and explicit disposition to every material unit.
-- Separate repository mechanics from product behavior and conformance from implementation.
+- Separate Repository mechanics from product behavior and conformance from implementation.
 - Record active safety issues, near-term hazards, conformance drift, misleading status, and deferred concerns without exaggeration.
 - Provide implementation-grounded Prompt 4 inputs.
 - Do not issue build authorization.
 
-## Proposed changes
+## Implemented planning changes
 
-- Add a detailed implementation inventory and disposition authority.
-- Add a blast-radius and planning-dependency register.
-- Update only planning indexes or status references required to make the new record discoverable.
-- Close this work record with exact final-head Evidence.
+1. Added `docs/IMPLEMENTATION-ASSET-INVENTORY.md` with observed production, test, tooling, script, CI, agent-asset, Schema, structure, contractual-document, and absence Evidence.
+2. Added `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md` with the executive verdict, implementation-unit map, status, blast radius, dispositions, safety findings, CI meaning, and Prompt 4 inputs.
+3. Classified the Mix shell and empty supervisor as validated bootstrap implementation that can remain.
+4. Classified the version surface as partial implementation pending packaging or CLI need.
+5. Classified the preflight concept as valid conformance scaffolding and its current implementation as a build blocker.
+6. Classified preflight tests as superseded implementation because they prove obsolete positive behavior.
+7. Classified `scripts/check`, CI mechanics, and agent-asset validation as validated Repository tooling with narrow claims.
+8. Classified every Schema family separately and identified overlap, retained value, required revision, and deferred triggers.
+9. Confirmed planned gate paths and Receipts are documentation only.
+10. Identified no active runtime safety issue.
+11. Identified conformance drift, misleading green status, and near-term implementation hazards.
+12. Added implementation-grounded planning dependencies for Prompt 4.
+13. Marked ADR 0020 accepted and integrated and ADR 0019 partially superseded.
+14. Closed the P0-W18 work record as accepted and integrated.
+15. Kept build authorization denied.
 
-## Files or components expected to change
+## Files or components changed
 
-- `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md` — new Prompt 3 authority.
-- `docs/work/P0-W19-implementation-scaffold-reconciliation.md` — work record and verification Evidence.
-- A planning index or README link only when required for discoverability.
+### Added
 
-No production source, test, JSON Schema, CI workflow, script, Skill, prompt, specialist-agent definition, dependency, runtime configuration, or executable gate shall change.
+- `docs/IMPLEMENTATION-ASSET-INVENTORY.md`
+- `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md`
+- `docs/work/P0-W19-implementation-scaffold-reconciliation.md`
+
+### Status or decision corrections
+
+- `docs/decisions/0019-implement-kiln-through-vertical-product-slices.md`
+- `docs/decisions/0020-prove-single-run-change-loop-before-delegation.md`
+- `docs/decisions/README.md`
+- `docs/work/P0-W18-product-scope-architecture.md`
+
+### Unchanged executable and machine-readable areas
+
+- production source and tests;
+- JSON Schemas;
+- CI workflows;
+- Repository scripts;
+- dependencies and runtime configuration;
+- Skills, prompts, and specialist agents;
+- executable gate paths.
 
 ## Acceptance criteria
 
-- Every material implementation-like asset is inventoried.
-- Every first-month and cross-cutting unit has an explicit disposition.
-- Every twelve-week unit has a disposition or named planning dependency.
-- Every deferred unit has a review trigger.
-- The Mix shell, empty supervisor, version surface, Schema package, preflight concept and implementation, preflight tests, CI enforcement, planned gates, agent assets, source layout, acceptance gates, and Receipts have explicit dispositions.
-- Current green CI is described precisely without implying product completion.
-- Prompt 4 receives implementation-grounded planning inputs.
-- The final diff is documentation-only.
-- Repository validation passes on the exact final branch head.
+| Criterion | Status before final CI | Evidence |
+| --- | --- | --- |
+| Material implementation-like assets inventoried | Pass | Implementation Asset Inventory |
+| First-month and cross-cutting units have dispositions | Pass | Implementation Disposition Register section 6 |
+| Twelve-week units have dispositions or planning dependencies | Pass | Units IU-17 and related Schema rows |
+| Deferred units have review triggers | Pass | Register section 13 |
+| Mix shell, supervisor, and version surface classified | Pass | Units IU-01 through IU-04 |
+| Schemas classified accurately | Pass | Register section 5 and inventory section 8 |
+| Preflight concept, implementation, tests, and CI classified separately | Pass | Units IU-18 through IU-23 |
+| Planned gates and Receipts classified | Pass | Units IU-29 and IU-30 |
+| Current CI meaning is precise | Pass | Register section 16 |
+| Safety and integrity findings separated | Pass | Register section 15 |
+| Prompt 4 inputs are implementation-grounded | Pass | Register sections 14 and 17 |
+| Documentation-only diff | Pass | GitHub compare against `main` |
+| Exact final-head Repository validation | Pending | GitHub CI required |
 
 ## Verification commands
 
@@ -90,18 +125,43 @@ mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-Targeted inspection must also prove existing modules, tests, Schemas, scripts, workflow steps, agent assets, and absent `scripts/gates/*` commands.
+The current CI runs the equivalent Repository checks and also runs `scripts/test-agent-preflight`.
+
+Targeted GitHub inspection proved:
+
+- four source or test modules plus `test_helper.exs`;
+- no runtime dependency or configuration file;
+- four executable Repository scripts;
+- eleven JSON Schemas;
+- five Skills, three specialist agents, and three required prompts;
+- exact CI workflow steps;
+- absence of `scripts/gates/slice-01` and all discovered `scripts/gates/*` files.
 
 ## Required completion evidence
 
-- Integrated Prompt 2 merge and current-main Evidence.
-- Exact production module and test inventory.
-- Exact script, CI, Schema, and agent-asset inventory.
-- Implementation unit, status, blast-radius, and disposition tables.
-- Safety and integrity findings.
-- Prompt 4 planning inputs.
-- Final compare against `main`.
-- Exact final-head CI run.
+| Evidence ID | Scope | Evidence |
+| --- | --- | --- |
+| P0-W19-E01 | Entry gate | PR 23 merge and current-main commit |
+| P0-W19-E02 | Production and tests | `mix.exs`, `lib/`, and `test/` inventory |
+| P0-W19-E03 | Scripts and CI | four scripts and `.github/workflows/ci.yml` |
+| P0-W19-E04 | Schemas | eleven-file package, conflicts, and validation status |
+| P0-W19-E05 | Agent assets | five Skills, three agents, three prompts, validator behavior |
+| P0-W19-E06 | Status and blast radius | Implementation Disposition Register |
+| P0-W19-E07 | Safety and CI meaning | Register sections 15 and 16 |
+| P0-W19-E08 | Prompt 4 inputs | Register sections 14 and 17 |
+| P0-W19-E09 | Change surface | final compare against `main` |
+| P0-W19-E10 | Repository validation | final-head GitHub CI run |
+
+## Failures and warnings
+
+- Current preflight remains incompatible with accepted P1 ticket branches.
+- Current preflight tests and CI still prove obsolete P0 positive behavior.
+- Current CI has no complete Schema validation or documentation-reference validation.
+- Current Schemas overlap and include deferred capability detail.
+- Detailed planning documents can create implementation pressure, but no runtime code consumes them.
+- Several Prompt 2 authority headers still use branch-era proposed wording. ADR and work-package status are corrected in this pass; remaining header cleanup does not change the accepted target and can occur with the next bounded authority edit.
+- A local clone was unavailable during this pass. GitHub connector file, commit, compare, and CI Evidence are authoritative for the recorded observations.
+- Build authorization remains denied.
 
 ## Explicit exclusions
 
@@ -117,3 +177,9 @@ P0-W19 does not:
 - sequence the final Planning Round Register;
 - begin Prompt 4;
 - issue build authorization.
+
+## Exact next action
+
+After final-head validation, owner review, acceptance, and integration, run **Prompt 4 — Identify and sequence remaining planning rounds** against current `main`.
+
+Do not begin Prompt 4 in this work package.
