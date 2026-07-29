@@ -1,10 +1,10 @@
 # Kiln Planning Control
 
-**Document type:** Planning authority index  
-**Status:** Active  
-**Build authorization:** Not issued
+**Document type:** Planning and authority index  
+**Status:** Wave A adjudicated  
+**Build authorization:** Vertical Slice Authorized for P1-S01 after Prompt 8-A merges
 
-## Integrated first-month shaping
+## Integrated Wave A baseline
 
 | Pass or decision | Integrated equivalent |
 | --- | --- |
@@ -15,62 +15,143 @@
 | P0-W23 | PR 30 |
 | OD-02 | PR 31 |
 | P0-W24 | PR 32 |
-| P0-W25 | PR 33, `aabfc49a9b0ba294b4e0f6558fbe8fed38263784` |
+| P0-W25 | PR 33 |
+| Prompt 6-A | PR 34, final head `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`, merge `57a5790d2266cf1ab59f107d0b429c31c618e0ae`, CI `30425270052` |
+| Provider and SQLite evidence correction | PR 35, merge `d76402a30e178d577d363384750baffd062cf9ef` |
+| Prompt 7-A | independent adversarial review completed |
+| Prompt 8-A | current branch; effective only after exact-head green merge |
 
-## Current authorities
+## Current authority order
 
-Use, in order:
+Use these files in order:
 
-1. planning baseline, product scope, dispositions, round register, and owner decisions;
-2. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md);
-3. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md);
-4. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md);
-5. [Command, Evidence, and Acceptance](COMMAND-EVIDENCE-AND-ACCEPTANCE.md);
-6. [CLI and Local Delivery Contract](CLI-AND-LOCAL-DELIVERY-CONTRACT.md);
-7. [First-month contract index](contracts/README.md) for Prompt 6-A conformance only;
-8. Roadmap, implementation slices, and slice gates.
+1. [Wave A Adjudication and Development Authorization](WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md) — executable authorization and review disposition.
+2. [Owner Decision Register](OWNER-DECISIONS.md) — accepted owner choices.
+3. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md) — lifecycle, journal, migration, restart, orphan, and completion transaction.
+4. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md) — MiniMax M3, sealed Context, four Tools, Repository reads, disclosure, and secrets.
+5. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md) — complete-text Patch, Approval, mutation, rollback, and uncertain effect.
+6. [Command, Evidence, and Acceptance](COMMAND-EVIDENCE-AND-ACCEPTANCE.md) — registered Commands, Artifacts, criterion Evidence, acceptance, atomic completion input, post-completion Receipt, and delivery.
+7. [CLI and Local Delivery Contract](CLI-AND-LOCAL-DELIVERY-CONTRACT.md) — complete product CLI and arm64 macOS delivery target.
+8. [Roadmap](ROADMAP.md), [Implementation Slices](IMPLEMENTATION-SLICES.md), and [Slice Acceptance Gates](SLICE-ACCEPTANCE-GATES.md) — authorized order and gates.
+9. [First-month Contract Index](contracts/README.md) — conformance support only.
+10. Accepted ADRs and integrated work records.
 
-Earlier broad Architecture, Run, Session, execution, interface, and Schema documents cannot broaden or replace the focused first-month authorities.
+## Focused specification status
 
-## Integrated focused authority
+P0-W21 through P0-W25 are accepted and integrated through PRs 27 through 33.
 
-- **P0-W21:** lifecycle, operations, persistence, restart, orphan, and completion transaction.
-- **P0-W22:** MiniMax M3, fake provider, sealed Context, four Tools, Repository reads, disclosure, and secrets.
-- **P0-W23:** exact complete-text Patch, Approval, one mutation owner, rollback, and base/target/unknown recovery.
-- **P0-W24:** registered non-shell Commands, macOS process-group cleanup, Artifacts, criterion Evidence, aggregate proof, user acceptance, Receipt, and delivery.
-- **P0-W25:** foreground CLI, text and JSON output, no-bypass review, recovery commands, arm64 macOS Mix release, user-local installation, and version metadata.
-- **OD-02:** Apple Silicon macOS 15.0 or later, local APFS, one local user, owner's M1 Pro primary validation host, other hosts unsupported.
+Some large focused specification files still contain branch-era header text such as `proposed`, the old work branch, or `owner acceptance required`. That metadata is stale and is superseded by:
 
-## Prompt 6-A conformance boundary
+- this planning index;
+- the final Wave A adjudication;
+- the ADR index;
+- the integrated work records;
+- the merge history.
 
-P0-W28 may add only:
+The detailed decisions inside those focused specifications remain active unless Prompt 8-A explicitly changes them.
 
-- current P0 and P1 preflight grammar;
-- conformance-only constants and transition shapes;
-- provider and Command-host behaviours without implementations;
-- one first-month JSON Schema;
+Do not copy stale branch-era metadata into implementation plans or source documentation.
+
+## Active focused decisions
+
+- **P0-W21:** Session `active|completed|abandoned`; Task `in_progress|satisfied|abandoned`; Run `ready|running|waiting_for_user|orphaned|completed|failed|canceled`; workflow and operation state separate; one append-oriented journal; deterministic replay; conservative unknown effects; P0-W21 atomic completion.
+- **P0-W22:** MiniMax M3 only; deterministic fake for tests; no fallback; sealed Context; four Tool maximum; bounded active-Repository reads; disclosure and secret controls.
+- **P0-W23:** complete-text `add|replace|delete` Patch; exact base and digest; local-user Approval; one mutation owner; rollback data; exact base, target, or unknown recovery.
+- **P0-W24:** registered non-shell Commands; macOS process-group proof; immutable Artifacts; criterion-bound Evidence; user acceptance; atomic completion before product Receipt sealing.
+- **P0-W25:** foreground CLI; text and structured results; no bypass; explicit recovery; arm64 macOS Mix-release target.
+- **OD-02:** Apple Silicon macOS 15.0 or later, local APFS, one interactive local user, owner's M1 Pro validation host.
+
+## Prompt 6-A status and disposition
+
+Prompt 6-A is complete and integrated.
+
+Retained or revised:
+
+- accepted conformance constants and transitions;
+- provider and Command-host temporary behaviour seams;
+- first-month Schema;
 - positive and protected negative fixtures;
-- deterministic validators and CI wiring;
-- explicit tests that runtime external-effect modules remain absent.
+- semantic validator;
+- pinned Draft 2020-12 validator;
+- current preflight;
+- local and CI validation wiring.
 
-It may not add a Store, Session workflow, MiniMax adapter, Context builder, Repository reader, Patch engine, mutation Worker, Command runner, helper binary, Evidence evaluator, CLI, release, installer, successful product demo, or Wave B contract.
+Removed:
 
-No conformance result is build authorization.
+- product-like `scaffold_status/0`;
+- the absent-future-module test that locked implementation namespaces.
 
-## Remaining Wave A
+No conformance scaffold performs a product effect or grants authority.
+
+## Final authorization
+
+Authorization level:
+
+> **Vertical Slice Authorized**
+
+The authorization becomes active only when the Prompt 8-A pull request merges after exact-head CI succeeds and the owner inspects the boundary.
+
+Only these tickets are authorized, in exact order:
 
 ```text
-integrate Prompt 6-A
-→ Prompt 7-A independent adversarial review
-→ Prompt 8-A adjudication and possible bounded authorization
+P1-S01-T01  work/p1-s01-t01-domain-foundation
+→ P1-S01-T02  work/p1-s01-t02-durable-store
+→ P1-S01-T03  work/p1-s01-t03-replay-projections
+→ P1-S01-T04  work/p1-s01-t04-foundation-cli
+→ P1-S01-T05  work/p1-s01-t05-slice-gate
 ```
 
-Prompt 8-A is the only first-month build-authorization pass.
+Use the accepted plans under `docs/work/`.
+
+A later ticket begins only after its predecessor merges, passes exact-head gates, completes its closeout, and receives owner acceptance.
+
+## Prohibited scope
+
+P1-S01 does not authorize:
+
+- provider or fake-provider execution;
+- Repository source read, search, or disclosure;
+- Context packages or model-facing Tools;
+- source mutation;
+- Patch, Approval, application, or rollback;
+- external registered Commands or native helper;
+- criterion completion Evidence;
+- user completion acceptance;
+- product Receipt sealing;
+- release packaging or installation;
+- Child Runs, Scout, Verifier, Attention, or TUI;
+- P0-W26, P0-W27, or Wave B;
+- broad build implementation.
+
+P1-S02 remains planned and unauthorized.
+
+## Owner schedule adjudication
+
+The first-month Single-Run Alpha target remains aggressive.
+
+Schedule uncertainty does not remove accepted product requirements. A missed target causes replanning, not silent weakening of safety, durability, recovery, Evidence, CLI, packaging, or delivery.
 
 ## Wave B gate
 
-P0-W26 and P0-W27 remain blocked until an authorized Single-Run Alpha provides accepted runtime Evidence for a real change, restart, Patch authority, registered verification, criterion proof, Receipt, and observed failure or interruption behavior.
+P0-W26 and P0-W27 remain blocked until the authorized Single-Run Alpha produces accepted runtime Evidence for:
 
-## Current next action
+- one real source change;
+- durable restart;
+- controlled Patch authority;
+- registered verification;
+- criterion-bound Evidence;
+- a valid post-completion product Receipt;
+- observed failure or interruption behavior.
 
-Complete P0-W28 exact validation and integrate Prompt 6-A. Then run Prompt 7-A without authoring corrections during the review pass.
+Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegated implementation.
+
+## Exact next action
+
+After the Prompt 8-A pull request is green, inspected, and merged:
+
+```text
+create work/p1-s01-t01-domain-foundation
+follow docs/work/P1-S01-T01-domain-foundation.md
+```
+
+Do not begin implementation before Prompt 8-A merges.

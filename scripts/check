@@ -20,6 +20,7 @@ run() {
 
 run scripts/test-agent-preflight
 run python3 scripts/validate_first_month_contracts.py
+run python3 scripts/validate_json_schema_contracts.py
 run scripts/validate-agent-assets
 run vale .
 run mix format --check-formatted

@@ -50,11 +50,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-otp-28.4-elixir-1.20.2-
 
+      - name: Install conformance validator
+        run: python3 -m pip install --disable-pip-version-check --requirement requirements/conformance.txt
+
       - name: Test agent preflight behavior
         run: scripts/test-agent-preflight
 
-      - name: Validate first-month contracts
+      - name: Validate first-month semantic contracts
         run: python3 scripts/validate_first_month_contracts.py
+
+      - name: Validate first-month JSON Schema contracts
+        run: python3 scripts/validate_json_schema_contracts.py
 
       - name: Validate project agent assets
         run: scripts/validate-agent-assets

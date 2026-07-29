@@ -115,7 +115,7 @@ defmodule Kiln.Conformance.FirstMonthTest do
            }
   end
 
-  test "provider and command host expose behaviours without implementations" do
+  test "provider and command host expose temporary behaviour boundaries" do
     assert {:stream, 2} in Kiln.Conformance.Provider.behaviour_info(:callbacks)
     assert {:cancel, 1} in Kiln.Conformance.Provider.behaviour_info(:callbacks)
 
@@ -123,29 +123,5 @@ defmodule Kiln.Conformance.FirstMonthTest do
     assert {:launch, 1} in callbacks
     assert {:signal, 1} in callbacks
     assert {:probe, 1} in callbacks
-  end
-
-  test "scaffold cannot be mistaken for product runtime" do
-    assert FirstMonth.scaffold_status() == :contracts_only
-
-    absent_runtime_modules = [
-      Kiln.Store,
-      Kiln.Session,
-      Kiln.Run,
-      Kiln.Provider.MiniMax,
-      Kiln.Context.Builder,
-      Kiln.Repository.Reader,
-      Kiln.Patch,
-      Kiln.Mutation.Worker,
-      Kiln.Command.Worker,
-      Kiln.Evidence,
-      Kiln.Receipt,
-      Kiln.CLI
-    ]
-
-    for module <- absent_runtime_modules do
-      message = "#{inspect(module)} must remain unimplemented in Prompt 6-A"
-      refute Code.ensure_loaded?(module), message
-    end
   end
 end

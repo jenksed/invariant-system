@@ -2,9 +2,10 @@ defmodule Kiln.Conformance.FirstMonth do
   @moduledoc """
   Executable constants for the accepted first-month planning contract.
 
-  This module is conformance scaffolding. It does not start a Session, persist
+  This module is conformance support. It does not start a Session, persist
   state, invoke a provider, read a Repository, apply a Patch, execute a Command,
-  evaluate Evidence, or expose a CLI.
+  evaluate Evidence, or expose a CLI. Product runtime modules must consume the
+  focused authorities directly and must not treat this module as domain state.
   """
 
   @run_states [:ready, :running, :waiting_for_user, :orphaned, :completed, :failed, :canceled]
@@ -103,9 +104,6 @@ defmodule Kiln.Conformance.FirstMonth do
   @type patch_operation :: :add | :replace | :delete
   @type evidence_status :: :pass | :fail | :blocked | :unknown
   @type criterion_result :: :pass | :fail | :blocked | :unknown | :stale | :contradicted
-
-  @spec scaffold_status() :: :contracts_only
-  def scaffold_status, do: :contracts_only
 
   @spec run_states() :: [run_state()]
   def run_states, do: @run_states

@@ -1,57 +1,54 @@
 # Session Model
 
-**Document type:** Session and Task subject authority  
-**Decision status:** Proposed P0-W18 reconciliation; owner acceptance required  
-**Integration status:** Proposed on `work/p0-w18-product-scope-architecture`  
-**Implementation status:** Not implemented  
-**Internal-domain authority:** `docs/INTERNAL-DOMAIN-MODEL.md`  
-**Run authority:** `docs/RUN-MODEL.md`
+**Document type:** Session and Task subject summary  
+**Decision status:** Accepted  
+**Integration status:** Reconciled by Prompt 8-A  
+**Implementation status:** P1-S01 authorized after Prompt 8-A merges  
+**Focused lifecycle authority:** `docs/ROOT-RUN-LIFECYCLE-AND-JOURNAL.md`
 
 ## Definition
 
 A Session is one durable attempt to move one accepted Project objective toward verified and user-accepted completion.
 
-A Session is the objective and continuity boundary. It is not a provider conversation, terminal, protocol session, branch, or process.
+A Session is the objective and continuity boundary. It is not a provider conversation, terminal, protocol session, branch, worktree, or process.
 
-## Initial hierarchy
+This document summarizes the accepted first-month model. P0-W21 controls exact persisted state, transitions, journal, restart, orphan, and completion behavior.
+
+## First useful hierarchy
 
 ```text
 Project
 └── Session: one accepted objective and complete Kiln work history
-    └── Task: one desired outcome with criteria
+    └── initial Task: one desired outcome with criteria
         └── Root Run: one attempt or coordination boundary
 ```
 
-The initial product does not create a separate Root Task.
+The first product does not create a separate Root Task.
 
-The Session's initial Task represents the first accepted executable outcome for the objective. The Root Run attempts or coordinates that Task.
+The user accepts the objective, criteria, constraints, and exclusions before Session creation. The atomic start transaction creates:
 
-A later Session can contain additional Tasks when the accepted objective requires more than one bounded outcome.
+- Session in `active`;
+- initial Task in `in_progress`;
+- Root Run in `ready`.
 
 ## Session ownership
 
-A Session belongs to one Project.
+A first-month Session belongs to one Project and references one active Repository.
 
-The initial Project has one active Repository, accepted instructions, disclosure policy, mutation policy, and one registered verification entry.
+It owns or references:
 
-The Session owns or references:
-
-- accepted objective revisions;
-- criteria and exclusion revisions;
-- Task records and dependencies when later required;
+- accepted objective and criteria revisions;
+- one initial Task;
 - exactly one Root Run;
-- later Child Run relationships;
-- journal sequence;
-- current projections;
-- policy and authority snapshots;
-- Context package manifests;
-- model, Tool, Patch, and Command references;
-- Artifacts, Claims, Evidence, and Receipts;
+- journal sequence and current projection;
 - user decisions;
-- interruption and recovery state;
-- final outcome.
+- external-operation intents and observations;
+- policy and authority snapshots;
+- Context, provider, Tool, Patch, Command, Artifact, and Evidence references only after their subsystems are authorized;
+- interruption, orphan, and recovery state;
+- final outcome and post-completion Receipt reference.
 
-## Session identity
+## Identity
 
 Kiln generates `session_id`.
 
@@ -64,88 +61,76 @@ Session identity must not use:
 - branch or worktree ID;
 - BEAM or operating-system process ID.
 
-## Session lifecycle
-
-The minimum Session lifecycle is:
+## First-month Session states
 
 ```text
-created
-→ active
-→ completed | abandoned
-→ archived
+active
+completed
+abandoned
 ```
 
-Interruption, waiting, cancellation, verification, failure, and orphan state belong primarily to Runs and owned operations.
+### `active`
 
-A Session can remain `active` while its Root Run waits for user input, a Command, or recovery.
+The Session can contain current work, a pending decision, an active or unknown operation, or an orphaned Root Run.
 
-A Session becomes `completed` only when:
+Waiting, verification, interruption, operation, and Evidence facts do not become Session states.
 
-- its accepted objective and required Tasks are satisfied;
-- required current Evidence exists;
-- no unresolved blocking or unknown effect remains;
-- required user acceptance occurs.
+### `completed`
 
-A Session can become `abandoned` without deleting its journal, Artifacts, or Evidence.
+The atomic completion transaction proved:
 
-## Task model
+- the initial Task is satisfied;
+- the Root Run is completed;
+- all required Evidence is current and passing;
+- no unknown effect or blocking decision remains;
+- user acceptance is recorded;
+- the accepted proof reference is current.
 
-A Task states one bounded desired outcome, decision, investigation, change, verification target, or reconciliation action.
+### `abandoned`
 
-A Task records:
+The first-month one-attempt Session will not continue after a terminal failed or canceled Root Run.
 
-- `task_id`;
-- Session identity;
-- statement and revision;
-- criteria;
-- constraints and exclusions;
-- dependencies when present;
-- status;
-- related Runs;
-- satisfaction, rejection, or supersession reason.
+Abandonment does not delete the journal, Artifacts, Evidence, or recovery records.
 
-Minimum Task status:
+`created` and `archived` are not first-month persisted Session states.
+
+## First-month Task states
 
 ```text
-proposed
-→ accepted
-→ in_progress
-→ satisfied | rejected | abandoned | superseded
+in_progress
+satisfied
+abandoned
 ```
 
-Add `ready` and `blocked` only when more than one Task or dependency creates observable scheduling value.
+### `in_progress`
 
-Task status is not Run status.
+The accepted initial Task is active from the Session start transaction.
 
-A completed Run does not automatically satisfy its Task.
+### `satisfied`
 
-## Root Run
+Only the accepted completion transaction can satisfy the Task.
 
-Each Session has exactly one Root Run.
+### `abandoned`
+
+The first-month Session ends without satisfaction after a known terminal failed or canceled Root Run.
+
+Proposed, accepted, ready, blocked, rejected, and superseded are not first-month Task states. A blocked criterion or operation is a workflow or proof fact, not Task status.
+
+A completed Run does not satisfy a Task through status alone.
+
+## Root Run relationship
+
+Each first-month Session has exactly one Root Run.
 
 The Root Run:
 
 - references the initial Task;
 - has no Parent;
 - provides the primary work-control projection;
-- can investigate and coordinate deterministic effects;
-- can later request bounded Child Runs;
-- remains subject to Project policy, explicit grants, user Approvals, and completion gates.
+- remains subject to Project policy, explicit authority, user Approvals, Evidence gates, and completion rules;
+- survives application and Worker restart without changing identity.
 
-Replacing a Worker or restarting the application must not create a new Root Run identity.
-
-## Child Runs
-
-Child Runs are not required for the first useful product.
-
-Version 0.1 can add one active depth-one Child at a time for:
-
-- read-only Scout investigation;
-- independent Verifier evaluation.
-
-The Session records Child relationships, Attention, and result delivery. The hierarchy does not define OTP supervision.
-
-Nested delegation and multiple active Children remain disabled through version 0.1.
+Exact Run states and transitions are defined by P0-W21 and summarized in `docs/RUN-MODEL.md`.
 
 ## Durable state and transcript separation
 
@@ -164,108 +149,92 @@ Transcript records preserve interaction history but do not own:
 
 Kiln reconstructs continuity from durable state and exact Repository observations. It does not ask a model to infer current state from the full transcript.
 
-## Conceptual workflow
+## Workflow
+
+The accepted first-month workflow steps are:
 
 ```text
-Intent
-→ Investigation
-→ Implementation
-→ Verification
-→ Completion
+intent
+investigation
+proposal
+approval
+application
+verification
+acceptance
+reconciliation
 ```
 
-These are workflow stages. They are not Agent personas, mandatory model turns, Session states, or external protocol states.
+These are workflow steps. They are not Session states, Run states, Agent personas, required model turns, or protocol states.
 
-## Project-control projection
+P1-S01 implements only the foundation required for durable intent, status, cancellation, restart, and recovery truth. Later subsystems remain unreachable until separately authorized.
 
-The Session maintains a current projection for the developer and Root Run.
+## Current projection
 
-The projection can include:
+The Session projection can include:
 
 - objective and criteria revision;
-- Task status;
-- Root and later Child Run status;
-- current workflow step;
-- pending user action;
-- Repository state;
-- policy and effective authority;
-- Context package references;
-- Patch proposal and application state;
-- Commands and operation state;
-- Artifacts, Claims, Evidence, and Receipts;
-- failures, warnings, assumptions, unknowns, and exclusions;
-- completion readiness.
+- Session, Task, and Root Run state;
+- workflow step;
+- pending user decision;
+- external-operation state;
+- Repository observation;
+- policy and authority references;
+- Patch and Command state when authorized;
+- Artifact, Evidence, warnings, unknowns, and completion readiness when authorized.
 
-The projection is not source truth for Git, policy, Evidence content, or user decisions. It is rebuilt from authoritative records and current observations.
+The projection is rebuildable. It is not source truth for Git, policy, Evidence content, or user decisions.
 
-## Event journal
+## Journal and restart
 
-The Session uses a bounded append-oriented journal because Kiln requires:
+The append-oriented journal exists for:
 
+- durable sequence and revision;
 - restart recovery;
 - ordered audit;
 - projection rebuild;
 - duplicate-effect prevention;
-- later client resume;
-- honest unknown-effect reconciliation.
+- explicit unknown-effect reconciliation.
 
-The journal does not require:
+It does not record every model token, complete Artifact payload, UI movement, static documentation, or code-index fact.
 
-- a distributed log;
-- one event for every model token;
-- complete Artifact payloads;
-- every UI movement;
-- static documentation records;
-- code-index facts.
+After restart, Kiln reconstructs accepted Session, Task, Root Run, decisions, operations, warnings, and projection state. It re-observes Git and filesystem state before a later mutation, verification, or completion action.
 
-## Recovery
-
-After restart, Kiln reconstructs:
-
-- Session identity and lifecycle;
-- objective and criteria revisions;
-- Task state;
-- Root and later Child relationships;
-- current workflow and Run state;
-- pending user decisions;
-- model, Patch, and Command operation state;
-- Artifacts, Evidence, and Receipts;
-- cancellation and orphan state.
-
-Kiln re-observes Git and filesystem state before mutation, verification, or completion.
-
-Unknown effects remain orphaned until explicit reconciliation.
+Unknown effects remain orphaned until explicit reconciliation. Kiln does not repeat them automatically.
 
 ## Initial limits
 
-Through the first month:
+During the authorized P1-S01 foundation:
 
 - one active Project;
 - one active Repository;
-- one active Session per CLI process;
+- one Session in the foreground CLI action;
 - one initial Task;
 - one Root Run;
+- no provider invocation;
+- no Repository source disclosure;
+- no source mutation;
+- no external Command;
+- no product completion Receipt;
 - no Child Runs;
 - CLI only.
 
-Through version 0.1:
+Wave B can later consider one active depth-one read-only Child only after the Single-Run Alpha produces accepted runtime Evidence and P0-W26 through Prompt 8-B complete.
 
-- one Root Run;
-- maximum Child depth one;
-- maximum one active Child;
-- Scout and Verifier are the only Child roles;
-- no writing Child;
-- no nested delegation;
-- no peer communication;
-- no shared mutable Context.
+## Product Receipt
+
+A product Receipt is not a Session creation or ticket-closeout record.
+
+After the accepted completion transaction, P0-W24 can seal a non-authoritative Receipt from immutable references. Receipt failure affects delivery, not the already committed completion fact.
+
+Implementation-ticket closeout and P1-S01 aggregate proof use an implementation Evidence manifest or slice verification manifest, not a product Receipt.
 
 ## Non-goals
 
-The Session model does not require:
+The first Session model does not require:
 
 - conversation identity as Session identity;
 - a process per Session;
-- one table for every noun;
+- one table per noun;
 - a Root Task concept;
 - a general workflow engine;
 - recursive Agent management;

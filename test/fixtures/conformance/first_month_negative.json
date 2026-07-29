@@ -1,6 +1,10 @@
 [
   {
     "expected_error": "run_state",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "run_projection",
       "session_id": "ses_1",
@@ -13,6 +17,10 @@
   },
   {
     "expected_error": "tool_count",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "context_manifest",
       "provider": "minimax",
@@ -25,6 +33,10 @@
   },
   {
     "expected_error": "fallback",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "context_manifest",
       "provider": "minimax",
@@ -37,6 +49,10 @@
   },
   {
     "expected_error": "patch_operation",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "patch_manifest",
       "patch_id": "pat_1",
@@ -56,6 +72,10 @@
   },
   {
     "expected_error": "patch_path",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "patch_manifest",
       "patch_id": "pat_1",
@@ -75,6 +95,10 @@
   },
   {
     "expected_error": "approval_actor",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "approval",
       "approval_id": "app_1",
@@ -87,6 +111,10 @@
   },
   {
     "expected_error": "shell",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "command_registration",
       "command_id": "cmd_test",
@@ -98,6 +126,10 @@
   },
   {
     "expected_error": "cleanup",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "command_result",
       "command_result_id": "res_1",
@@ -108,6 +140,10 @@
   },
   {
     "expected_error": "passing_evidence",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "evidence",
       "evidence_id": "ev_1",
@@ -122,6 +158,10 @@
   },
   {
     "expected_error": "receipt_authority",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "receipt",
       "receipt_id": "rec_1",
@@ -132,6 +172,10 @@
   },
   {
     "expected_error": "cli_exit",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
     "document": {
       "kind": "cli_result",
       "schema": "kiln.cli.result/v1",
