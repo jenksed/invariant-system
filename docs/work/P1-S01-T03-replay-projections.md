@@ -188,9 +188,28 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after three PR #39 review rounds
+**Result:** Complete after four PR #39 review rounds
 
-Three review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Four review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+
+### Final hardening corrections (review 4813027808)
+
+The central invariant is now established: every accepted journal prefix either deterministically produces one internally valid projection or blocks at a stable, bounded, inspectable boundary. It never produces contradictory state, silently accepts an invalid fact, or crashes on corrupt durable input.
+
+- **D13 Contradictory projections were possible.** The reducer validated individual transitions but could produce an internally impossible projection (a pending decision on a ready Run, a nonterminal operation outside running, a terminal Run without coordinated Task and Session state). Fix: `Kiln.Projections.Session.validate/1`, one pure invariant validator applied after every reduction in both commit and replay. The reducer now enforces the start contract, coordinates terminal Run, Task, and Session state, uses an operation-state progression (`started` keeps the Run running; regression blocks), and rejects a start whose payload Session id or states contradict the contract.
+- **D14 Decision responses were unvalidated.** `user_decision_recorded/v1` checked the decision id but not the response. Fix: the response must be a non-empty string present in the pending decision's `permitted_responses`, else `:decision_response_not_permitted`.
+- **D15 Corrupt durable input could crash or misbehave.** Replay performed arithmetic on unverified revisions and sequences, schemas were unbound, opaque ids unvalidated, and commit could crash on malformed input, a corrupt stored idempotency result, or a corrupt cache. Fix: revisions and sequences are validated as non-negative integers before any arithmetic; envelope and payload schemas bind to one shared authority; opaque ids validate through `Kiln.Domain.Id.validate/2`; and `commit/4` is total for an empty or malformed batch, a corrupt stored result, and a corrupt cache, each returning a stable classified error with no durable change.
+
+### Verified hardening statements
+
+- All accepted journal facts pass the projection-invariant validator.
+- Invalid decision responses block.
+- Durable numeric corruption cannot trigger arithmetic exceptions.
+- Entry and payload schemas are bound to one shared authority.
+- Terminal Run state agrees with Session and Task state.
+- Operation observations follow a defined state progression.
+- Commit and replay remain byte-identical.
+- No external effect is dispatched during replay or restart.
 
 ### Third review corrections (review 4812387784)
 
@@ -237,11 +256,11 @@ Three review rounds corrected defects the green test suite did not catch. Review
 | P1-S01-T03-AC03 | Pass | P1-S01-T03-E03 | transcript records leave the projection digest unchanged and keep their own ordering |
 | P1-S01-T03-AC04 | Pass | P1-S01-T03-E04 | a nonterminal operation reconstructs as unknown operation and `orphaned` Run, appends nothing, dispatches nothing, and is idempotent on repeat |
 | P1-S01-T03-AC05 | Pass | P1-S01-T03-E05 | missing, malformed, metadata-mismatched, and stale caches are replaced after full journal validation; a matching cache is kept; a corrupt journal blocks and preserves the cache |
-| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `dd129cf`; no excluded capability is reachable |
+| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `58c43a4`; no excluded capability is reachable |
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `dd129cf2`.
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `58c43a40`.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
@@ -256,8 +275,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 | `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures |
 | `mix test test/kiln/projections` | 0 | cache classification and rebuild |
 | `mix test test/kiln/restart_test.exs` | 0 | restart, orphan, multiple-Session, idempotence |
-| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 55 passed |
-| `mix test` | 0 | 102 passed |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 78 passed |
+| `mix test` | 0 | 125 passed |
 | `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### New protected tests
@@ -290,8 +309,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 
 ### Repository state
 
-- Commit: `dd129cf2abd387fd859e04febb88550c0823cf71`
+- Commit: `58c43a40a8080119ef827cbf4d081309dacf65bc` (code and tests verified locally; the final PR head is the closeout documentation commit on top, and the authoritative CI run is for that PR head)
 - Branch: `work/p1-s01-t03-replay-projections`
-- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (2670 insertions, 123 deletions versus `main`)
+- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (3404 insertions, 133 deletions versus `main`)
 - Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
 - Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04
