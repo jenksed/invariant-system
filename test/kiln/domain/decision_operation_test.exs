@@ -42,7 +42,9 @@ defmodule Kiln.Domain.DecisionOperationTest do
     }
 
     assert {:error, %{code: :invalid_actor}} = Decision.new(attrs)
-    assert {:error, %{code: :invalid_responses}} = Decision.new(%{attrs | requested_actor: :local_user})
+
+    assert {:error, %{code: :invalid_responses}} =
+             Decision.new(%{attrs | requested_actor: :local_user})
   end
 
   test "records intent and terminal observation without dispatching an effect" do
