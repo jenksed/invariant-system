@@ -18,7 +18,9 @@ defmodule Kiln.Store.Journal do
   """
 
   alias Kiln.Domain.Action
-  alias Kiln.Store.{Canonical, Connection, Error, Projection, Uuid}
+  alias Kiln.Journal.Reducer
+  alias Kiln.Projections.Session
+  alias Kiln.Store.{Canonical, Connection, Error, Uuid}
 
   @entry_schema "journal_entry/v1"
   @default_result_schema "action_result/v1"
@@ -29,7 +31,7 @@ defmodule Kiln.Store.Journal do
           status: :committed | :replayed,
           session_revision: non_neg_integer(),
           last_sequence: non_neg_integer() | nil,
-          projection: Projection.t() | nil,
+          projection: Session.t() | nil,
           result: map()
         }
 
@@ -192,15 +194,12 @@ defmodule Kiln.Store.Journal do
   end
 
   defp build_projection(current, appended, new_revision, last_sequence) do
-    {:ok, reduced} = Projection.reduce_all(current, appended)
-
-    reduced
-    |> Map.put("session_revision", new_revision)
-    |> Map.put("last_sequence", last_sequence)
+    {:ok, reduced} = Reducer.reduce_all(current, appended)
+    Session.stamp(reduced, new_revision, last_sequence)
   end
 
   defp upsert_projection(tx, session_id, projection, now) do
-    digest = Canonical.digest(Projection.schema(), projection)
+    digest = Session.digest(projection)
 
     Connection.query!(
       tx,
@@ -218,7 +217,7 @@ defmodule Kiln.Store.Journal do
       """,
       [
         session_id,
-        Projection.schema(),
+        Session.schema(),
         projection["session_revision"],
         projection["last_sequence"],
         Canonical.encode(projection),
