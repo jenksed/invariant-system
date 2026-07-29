@@ -1,0 +1,3 @@
+# Prompt 8-A conformance-only dependency.
+# This is not an Elixir product runtime dependency.
+jsonschema==4.26.0
