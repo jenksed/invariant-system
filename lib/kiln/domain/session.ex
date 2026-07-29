@@ -47,7 +47,9 @@ defmodule Kiln.Domain.Session do
   @type start_result :: %{session: t(), task: Task.t(), run: Run.t()}
 
   @spec start(map(), keyword()) :: {:ok, start_result()} | {:error, Error.t()}
-  def start(attrs, opts \\ []) when is_map(attrs) and is_list(opts) do
+  def start(attrs, opts \\ [])
+
+  def start(attrs, opts) when is_map(attrs) and is_list(opts) do
     entropy_source = Keyword.get(opts, :entropy_source, &:crypto.strong_rand_bytes/1)
 
     with {:ok, project_observation} <- project_observation(attrs),
