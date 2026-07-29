@@ -207,39 +207,47 @@ P1-S01-D01 durable-state prerequisite: create a Session action transaction, stop
 
 **Result:** Complete
 
-All six acceptance criteria pass, the full deterministic verification gate ran green at the exact branch head, and the owner-machine diagnostic was executed on the OD-02 acceptance host. Review, merge, and slice acceptance remain downstream and are not claimed here.
+All six acceptance criteria pass. The review corrections are included in the exact branch head, GitHub CI is green, and the owner-machine diagnostic remains the OD-02 host Evidence. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T02-AC01 | Pass | P1-S01-T02-E01 | `Kiln.Store.start/1` on an empty directory creates the schema, records the 0001 checksum, verifies WAL / `synchronous=FULL` / foreign keys / 2s busy timeout, and reports SQLite 3.53.3 |
+| P1-S01-T02-AC01 | Pass | P1-S01-T02-E01 | `Kiln.Store.start/1` creates schema version 1, records the 0001 checksum, verifies WAL / `synchronous=FULL` / foreign keys / 2s busy timeout, rejects a missing migration bundle, and reports SQLite 3.53.3 |
 | P1-S01-T02-AC02 | Pass | P1-S01-T02-E02 | `Kiln.Store.Journal.commit/4` atomically appends the entry, advances the Session revision, and writes the idempotency result; direct row assertions confirm all three |
 | P1-S01-T02-AC03 | Pass | P1-S01-T02-E03 | stale revision → `:revision` with current; duplicate identical → replayed prior result, no new entry; duplicate conflicting → `:idempotency_conflict`; injected fault → no partial journal, revision, or idempotency state |
-| P1-S01-T02-AC04 | Pass | P1-S01-T02-E04 | fresh store migrates once; modified applied checksum → `migration_blocked`; store from a newer binary → `version_blocked`; corrupt fixture → `integrity_blocked` with the file preserved |
-| P1-S01-T02-AC05 | Pass | P1-S01-T02-E05 | source uses one outer `BEGIN IMMEDIATE` per action (no savepoints); a protected test shows SQLite rejects a nested transaction |
-| P1-S01-T02-AC06 | Pass | P1-S01-T02-E06 | full deterministic gate exits zero at exact head `4a9846e`; no unauthorized external effect (no Repository read, provider, shell, or network) |
+| P1-S01-T02-AC04 | Pass | P1-S01-T02-E04 | fresh store migrates once; missing bundle and modified checksum → `migration_blocked`; newer binary → `version_blocked`; corrupt fixture → `integrity_blocked`; every blocked post-connect startup closes its rejected connection |
+| P1-S01-T02-AC05 | Pass | P1-S01-T02-E05 | source uses one outer `BEGIN IMMEDIATE` per action with no savepoints; a protected test shows SQLite rejects nested use |
+| P1-S01-T02-AC06 | Pass | P1-S01-T02-E06 | exact-head CI run `30465521870` exits green with no unauthorized Repository, provider, shell, network, TUI, Child, or Wave B behavior |
 
-Owner-machine gate (E07): `scripts/diagnostics/p1-s01-store-host` executed on the OD-02 acceptance host (this M1 Pro).
+Owner-machine gate (E07): `scripts/diagnostics/p1-s01-store-host` ran on the OD-02 acceptance host (the owner's M1 Pro) before the review-only store hardening changes. Those changes do not alter the selected Exqlite version, SQLite build, pragmas, state path, or host profile.
+
+### Review corrections
+
+The final review found and corrected three protected boundary defects before merge:
+
+- a startup that opened SQLite and then blocked could leave the rejected writable connection alive;
+- an absent bundled migration directory could expose a fresh version-zero store as `ready`;
+- canonical JSON omitted valid float payloads accepted by T01 and allowed atom/string keys to collide after normalization.
+
+Deterministic tests now protect all three cases.
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `4a9846e1b03a37fcd300ee2943cf364d341024ed`.
+Exact-head GitHub CI used Elixir 1.20.2 / Erlang OTP 28 and passed:
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| `scripts/test-agent-preflight` | 0 | `pass` |
-| `python3 scripts/validate_first_month_contracts.py` | 0 | `pass`; 10 positive, 11 protected-negative |
-| `python3 scripts/validate_json_schema_contracts.py` | 0 | `pass`; jsonschema 4.26.0 |
-| `scripts/validate-agent-assets` | 0 | `pass` |
-| `mix deps.get` | 0 | exqlite 0.39.0 + db_connection, elixir_make, cc_precompiler, telemetry |
-| `mix format --check-formatted` | 0 | no output |
-| `mix compile --warnings-as-errors` | 0 | clean |
-| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | `No cycles found` |
-| `mix test test/kiln/store` | 0 | 18 passed |
-| `mix test` | 0 | 44 passed |
-| `scripts/check` (aggregate) | 0 | `check: pass`; commit `68e4db0` (pre-doc), re-run clean at tip |
-| `scripts/diagnostics/p1-s01-store-host` | 0 | `pass` (see owner-machine evidence below) |
+| `scripts/test-agent-preflight` | 0 | CI run `30465521870` |
+| `python3 scripts/validate_first_month_contracts.py` | 0 | CI run `30465521870` |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | CI run `30465521870`; `jsonschema==4.26.0` |
+| `scripts/validate-agent-assets` | 0 | CI run `30465521870` |
+| `mix deps.get` | 0 | exqlite 0.39.0 plus pinned transitive dependencies |
+| `mix format --check-formatted` | 0 | CI run `30465521870` |
+| `mix compile --warnings-as-errors` | 0 | CI run `30465521870` |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | CI run `30465521870` |
+| `mix test` | 0 | 47 passed in CI run `30465521870` |
+| `scripts/diagnostics/p1-s01-store-host` | 0 | owner-machine E07 collected before review corrections |
 
 Owner-machine diagnostic output (OD-02 host):
 
@@ -262,26 +270,25 @@ startup: ready
 
 ### Demo and slice status
 
-- Ticket demo contribution: Exercised in `Kiln.Store.JournalTest` and `Kiln.StoreTest` — a Session action transaction commits, and a fresh `Kiln.Store.start/1` restores the journal, revision, and projection from disk for T03 replay
-- Parent slice gate affected: P1-S01-G03 and G04
-- Slice verification manifest updated: No
-- Slice completion claimed: No
+- Ticket demo contribution: Exercised in `Kiln.Store.JournalTest` and `Kiln.StoreTest` — a Session action transaction commits, and a fresh `Kiln.Store.start/1` restores the journal, revision, and projection from disk for T03 replay.
+- Parent slice gate affected: P1-S01-G03 and G04.
+- Slice verification manifest updated: No.
+- Slice completion claimed: No.
 
 ### Failures and warnings
 
-- None. All verification commands exited zero at the exact head.
-- The busy fixture (`@tag :slow`) logs an expected Exqlite "database is locked" disconnect while the contending writer holds the WAL lock; the append is classified `:busy` and the test passes. No product source is affected.
-- Environment note: verification used the repo-pinned mise Elixir 1.20.2 / OTP 28 toolchain and a virtualenv holding `jsonschema==4.26.0`; adding the first `deps/` required scoping the `scripts/check` Vale run to exclude `deps/` and `_build/`. No product source, dependency, or store behavior was changed to make the gate pass.
+- The busy fixture (`@tag :slow`) logs an expected Exqlite "database is locked" disconnect while the contending writer holds the WAL lock; the append is classified `:busy` and the test passes.
+- OD-02 host and APFS acceptance are currently proved by the bounded owner-machine diagnostic. `Kiln.Store.start/1` does not independently discover the filesystem personality; production `$KILN_HOME` resolution and supported-host presentation remain later interface and delivery work. This does not widen the supported-host claim.
 
 ### Remaining unknowns and exclusions
 
-- Deterministic replay (startup step 9), projection rebuild, and nonterminal-operation orphan scanning (steps 10-11) are T03; startup currently reaches `:ready` for fresh and migrated stores.
-- U01 (exact Exqlite release) resolved to 0.39.0 / SQLite 3.53.3. U02 (macOS APFS sync observations) recorded via the diagnostic; `synchronous=FULL` retained, no `fullfsync` change. U03 (corruption repair) remains later work: a corrupt store blocks and preserves files, with no automatic repair.
+- Deterministic replay, projection rebuild, and nonterminal-operation orphan scanning are T03; startup currently reaches `:ready` for fresh and migrated stores.
+- U01 is resolved to Exqlite 0.39.0 / SQLite 3.53.3. U02 is recorded by the owner-machine diagnostic; `synchronous=FULL` remains unchanged and no `fullfsync` setting was added. U03 remains later work: a corrupt store blocks and preserves files without automatic repair.
 
 ### Repository state
 
-- Commit: `4a9846e1b03a37fcd300ee2943cf364d341024ed`
-- Branch: `work/p1-s01-t02-durable-store`
-- Diff reviewed: Yes; `mix.exs`/`mix.lock`, ten `lib/kiln/store/*` and `lib/kiln/store.ex`/`application.ex` modules, `priv/store/migrations/0001_initial_state.sql`, the store test suite, and the OD-02 diagnostic (1984 insertions, 5 deletions versus `main`)
-- Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
-- Parent slice status after merge: durable records exist; deterministic replay, current projections, and the CLI remain T03 and later
+- Commit verified by CI: `b4c7dbf7913938ec1da41ca6ce1169a701332c09`.
+- Branch: `work/p1-s01-t02-durable-store`.
+- Diff reviewed: Yes; all 20 changed files were inspected, and the three review defects above were corrected.
+- Exact CI run: `30465521870`, success, 47 tests passed.
+- Parent slice status after merge: durable records exist; deterministic replay, current projections, and the CLI remain T03 and later.
