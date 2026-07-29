@@ -1,308 +1,328 @@
-# Protocol and Capability Map
+# Protocol and Integration Policy
 
 **Document type:** Adapter and standards strategy  
-**Decision status:** Accepted planning direction  
-**Implementation-order authority:** `docs/ROADMAP.md` and `docs/IMPLEMENTATION-SLICES.md`
+**Decision status:** Proposed P0-W18 reconciliation; owner acceptance required  
+**Integration status:** Proposed on `work/p0-w18-product-scope-architecture`  
+**Implementation status:** No product protocol adapter implemented  
+**Implementation-order authority:** `docs/ROADMAP.md`
 
 ## Purpose
 
 Kiln does not exist to implement protocols.
 
-Kiln uses a protocol, format, or standard only when it improves a concrete workflow, interoperability, recovery, security, Evidence quality, or replacement cost.
+Kiln uses a protocol, standard, or format only when it improves one concrete workflow and is better than a direct function, library, CLI, API, local service, or dedicated adapter.
 
-Kiln's native Session, Task, Run, Event, Capability, policy, Context, Command, Patch, Artifact, Evidence, Receipt, and Attention concepts remain authoritative.
+Kiln-native Project, Session, Task, Run, Event, authority, Context, Patch, Command, Artifact, Evidence, Receipt, and Attention concepts remain authoritative.
 
-A priority or adapter seam in this document does not add the capability to an early slice. The vertical roadmap decides when implementation begins.
+Protocol priority cannot add early roadmap scope.
 
-## Position vocabulary
+## Integration selection order
 
-- **Native foundation:** Kiln requires the semantic boundary, but not an external protocol implementation.
-- **Scheduled:** a roadmap slice has an accepted first use.
-- **Evidence-gated:** implement only when a concrete workflow and entry gate exist.
-- **Watch:** preserve an adapter seam and monitor the standard.
-- **Reject for stated role:** do not use the technology for that responsibility.
+Evaluate options in this order:
 
-## Integrated map
-
-| Capability, protocol, or format | Position | Earliest slice | Kiln role | Initial boundary |
-| --- | --- | --- | --- | --- |
-| JSON Schema | Native foundation | P1-S01 | Validate versioned Kiln packages and adapter boundaries. | Pinned dialect; bounded local references; no implicit network resolution. |
-| CLI and TUI projections | Scheduled | P1-S01 | Native Clients over domain commands, snapshots, events, and intents. | Renderer and Client state are never domain authority. |
-| Direct model-provider API | Scheduled | P1-S02 | One provider-neutral invocation contract; MiniMax first. | Fixed policy routing; bounded disclosure; deterministic fake provider for CI. |
-| Agent Skills-compatible packages | Scheduled | P1-S06, with one fixed built-in procedure earlier when needed | Versioned procedures and knowledge loaded lazily. | Skills declare required Capabilities but cannot grant authority or create Run identity. |
-| JUnit-compatible test reports | Scheduled | P1-S04 | Import structured test Evidence. | Raw report retained as Artifact; exact Command and state binding. |
-| OpenTelemetry API | Scheduled | P1-S05 | Observe stable Task, Run, Context, model, Command, Attention, Artifact, and recovery operations. | Local/no-op or in-memory exporter initially; no source, prompts, secrets, raw argv, or output content. |
-| OTLP | Evidence-gated | P1-S08 or later | Optional exporter to an explicit local collector. | Export failure cannot affect execution; Privacy policy controls egress. |
-| Tree-sitter | Scheduled | P1-S06 | Internal structural parser and invalidation source. | Bounded files and parse time; grammar provenance; no raw tree Tool. |
-| LSP | Scheduled | P1-S06 | On-demand client behind a normalized semantic adapter. | Read-only definition, references, symbols, diagnostics, hover/type, and rename feasibility first; no automatic edits or workspace commands. |
-| Native persistent semantic index | Scheduled | P1-S06 | Store normalized structural facts and selected semantic observations. | Keyed by exact Repository, file, extractor, and server state; rebuildable `index.sqlite3`. |
-| ACP | Scheduled | P1-S08 | Local editor/coding Client adapter over native snapshots, events, intents, permissions, and Artifacts. | Local attach first; reconnect from cursor; no direct persistence writes. |
-| SARIF | Scheduled | P1-S08 | Import static-analysis Evidence. | Raw Artifact, parser version, path mapping, completeness, and source-state binding. |
-| MCP client | Evidence-gated | P1-S08 | Register selected external capabilities behind the broker. | One explicit local server and allowlisted Tool set first; catalog and descriptions are untrusted. |
-| OpenAPI | Evidence-gated | P1-S08 | Import one narrow HTTP operation as a typed capability. | Pinned document and server; credential references; no broad automatic API exposure. |
-| Dev Container Specification | Evidence-gated | P1-S08 | Resolve one accepted Project Environment. | Configuration is data, not authority; lifecycle commands require explicit policy. |
-| OCI image and runtime specifications | Evidence-gated | P1-S08 | Run one allowlisted Command in a disposable isolated Environment. | Pinned image when possible; explicit mounts, user, privileges, network, secrets, limits, cleanup. |
-| Git worktrees | Scheduled | P1-S07 | Isolate one Parent-owned writing environment. | One writable worktree, one mutation owner; harmless reads do not require worktrees. |
-| SCIP import | Evidence-gated | P1-S10 | Consume an existing persistent semantic index through the native semantic interface. | Verify Repository identity, commit, paths, producer, size, and freshness. |
-| SCIP export | Watch | P1-S10 or later | Export only for a proven external consumer. | Native index remains authoritative; no automatic all-language generation. |
-| DAP | Evidence-gated | P1-S10 | Runtime-inspection implementation for a real debugging workflow. | Debug execution, memory, evaluation, and secrets require explicit authority and cleanup. |
-| AG-UI | Watch | P1-S10 or later | Later frontend adapter over the same event and intent surface. | Frontend actions are untrusted; no forked Run or Attention semantics. |
-| MCP server | Watch | P1-S10 or later | Authenticated, allowlisted exposure of selected Kiln resources. | Read-only Session and Evidence resources first if a real host requires them. |
-| AHP | Watch | P1-S10 | Compare authoritative-state, channel, snapshot, and reconnect concepts. | No runtime dependency or protocol commitment. |
-| A2A | Reject for local Child Runs; watch remotely | P1-S10 or later | Future bridge to an independently operated remote agent. | Remote ownership and uncertainty preserved; no recursive delegation chains. |
-| in-toto Statement | Evidence-gated | P1-S10 | Optional export of an eligible Receipt for an immutable subject. | Shape compatibility does not imply signing or authenticity. |
-| SLSA provenance | Evidence-gated | P1-S10 | Optional build or release provenance export. | No SLSA level Claim without all required Evidence and controls. |
-| WASI and WIT | Watch | P1-S10 or later | Experimental bounded component boundary. | Use only when explicit imports, portability, and isolation beat a supervised subprocess. |
-| BSP | Watch | Later | Possible build-semantic provider where Commands are insufficient. | Requires measured value over registered CLIs and structured reports. |
-| Browser automation | Evidence-gated fallback | Later | Bounded UI automation or primary browser-behavior test mechanism. | Use supported libraries, CLIs, APIs, or protocols first unless browser behavior is the subject. |
-
-## Native integration hierarchy
-
-Kiln evaluates implementations in this order:
-
-1. in-process deterministic function or library;
-2. native Kiln adapter;
-3. direct deterministic CLI;
-4. local service API or Unix-domain socket;
-5. local MCP server when separate lifecycle or discovery creates material value;
-6. remote API or SDK;
-7. remote MCP server when interoperability and dynamic discovery justify the additional boundary;
-8. browser or user-interface automation.
+1. direct deterministic function;
+2. mature in-process library;
+3. deterministic CLI;
+4. direct API or software development kit;
+5. local service or Unix-domain socket;
+6. dedicated Kiln adapter;
+7. protocol client;
+8. protocol server;
+9. MCP only when dynamic discovery or replacement creates measured value;
+10. browser or user-interface automation when browser behavior is the subject or no safer boundary exists.
 
 Choose the earliest option that satisfies:
 
 - correct semantics;
-- cancellation and timeout;
 - lifecycle ownership;
+- cancellation and timeout;
 - security and Privacy;
-- output and Artifact policy;
-- Evidence and provenance;
+- bounded Context and output;
+- Artifact and Evidence provenance;
+- deterministic tests;
 - version compatibility;
-- replacement cost;
-- deterministic testing.
+- portability required by the accepted user workflow;
+- replacement and removal cost.
 
 Availability never grants permission.
 
-## Active code intelligence
+## Decision questions
 
-### Tree-sitter first
+Before selecting an integration, answer:
 
-P1-S06 uses Tree-sitter for deterministic structure, source ranges, changed regions, and invalidation.
+1. What exact user workflow requires it?
+2. What current boundary fails?
+3. Can a function or existing library solve it?
+4. Can a mature CLI solve it with controlled argv and output?
+5. Does a direct API or SDK provide a smaller remote boundary?
+6. Does separate process or service lifecycle create material value?
+7. Does dynamic discovery create value greater than schema and Context cost?
+8. What authority, network, secret, path, and disclosure scope is required?
+9. How are timeout, cancellation, cleanup, and unknown effects represented?
+10. What raw and normalized results become Artifacts or Evidence?
+11. How will deterministic CI run without the external implementation?
+12. How is the integration removed or replaced?
 
-Initial supported facts are bounded:
+If the answers do not identify a concrete workflow and failure of simpler options, defer the integration.
 
-- modules or namespaces;
-- declarations and symbols;
-- functions and types;
-- imports and dependencies when syntactically clear;
-- tests and migrations;
-- structural fingerprints.
+# Current classifications
 
-Do not construct a whole-repository graph merely because parse trees exist.
+## Foundational native boundaries
 
-### LSP second and on demand
+| Boundary | Position | Earliest product need | Rule |
+| --- | --- | --- | --- |
+| Kiln-native domain and requests | Foundational | P1-S01 | External types never become core identity, authority, or lifecycle |
+| JSON and stable structured CLI results | Foundational format | P1-S01 | Contract subset only; existing Schemas remain provisional scaffolding |
+| Provider adapter | Foundational adapter | P1-S02 | One provider plus deterministic fake; no general router |
+| Native Repository operations | Foundational | P1-S02 | Path, read, search, Patch, and state observation do not use MCP |
+| Registered Project CLI Commands | Foundational execution boundary | P1-S02 | Fixed executable and argv; no arbitrary shell |
+| SQLite library boundary | Foundational persistence boundary | P1-S01 | One durable local journal; no distributed protocol |
 
-P1-S06 starts one explicitly accepted language server only when a semantic query needs it.
+## Important later adapters
 
-Initial operations are read-only:
+| Capability | Position | Entry condition | Boundary |
+| --- | --- | --- | --- |
+| TUI library | Deferred interface adapter | Stable CLI commands and one real Child workflow | Renderer types remain outside domain |
+| ACP | Deferred Client adapter | Stable native commands, projections, events, and reconnect semantics plus a real Client need | Client identifiers remain adapter metadata |
+| JUnit-compatible report import | Optional structured Evidence adapter | A real registered test Command emits the format | Preserve raw report and parser provenance |
+| SARIF | Deferred Evidence adapter | A real static-analysis workflow enters scope | No automatic fix application |
+| OpenAPI | Deferred capability adapter | One accepted service lacks a better library or SDK boundary | Import one bounded operation, not an entire API |
+| Dev Container specification | Deferred Environment adapter | One accepted Project Command requires that Environment | Configuration is data, not authority |
+| OCI runtime and image formats | Deferred Environment adapter | Stronger disposable isolation is required and platform planning is accepted | Explicit image, mounts, user, privileges, network, secrets, limits, and cleanup |
 
-- definition;
-- references;
-- document and workspace symbols within bounded scope;
-- diagnostics;
-- hover or type summary;
-- call hierarchy when supported;
-- rename feasibility and preview information.
+## Research tracks
 
-The first implementation does **not** apply workspace edits, code actions, or server-proposed Commands. Those remain Patch proposals evaluated through the normal writing path if later accepted.
+| Candidate | Reason for research status | Adoption trigger |
+| --- | --- | --- |
+| MCP client | Can import a selected capability, but catalog and prompt-injection cost can exceed value | One concrete capability is materially better through MCP than library, CLI, API, or adapter |
+| SCIP import | Can reuse an existing semantic index | A real producer exists and Repository identity, freshness, and path mapping can be proven |
+| WASI and WIT | Can define explicit component imports and portability | One plugin operation benefits more than a supervised subprocess |
+| AHP | Emerging harness concepts can inform mapping | Stable specification and concrete interoperability need |
+| DAP | Can support real debugging workflows | A specific runtime-inspection workflow cannot use registered Commands or safer APIs |
 
-Raw LSP messages and server identifiers stay inside the adapter.
+## Rejected for now
 
-### Persistent semantics
+| Candidate | Reason |
+| --- | --- |
+| MCP server | No accepted host or exposure workflow; adds authentication and authority surface |
+| AG-UI | No near-term external Agent UI; must not dictate event semantics |
+| A2A for local Child Runs | Child Runs share one Kiln trust and state domain; remote-Agent semantics add recursive delegation and identity risk |
+| SCIP export | No current consumer |
+| OTLP export | No explicit collector requirement; adds sensitive-data egress |
+| Browser automation as general integration | High-risk and brittle when a library, CLI, API, or protocol can solve the workflow |
+| Formal SLSA level claims | No immutable release subject or complete control Evidence |
+| Protocol coverage as a milestone | Does not provide user value |
 
-Kiln stores native normalized facts first.
+## Historical position
 
-Persistent records preserve:
+The former P1-S08 capability-interoperability slice and P1-S10 expansion-evaluation slice are superseded by evidence-gated Phase 2 entry conditions and a research register.
 
-- Repository and file state;
-- language;
-- structural or semantic kind;
-- location and symbol;
-- extractor or server version;
-- confidence and completeness;
-- provenance and freshness.
+No implementation requirement exists to support every listed standard.
 
-This cache supports restart and token-efficient retrieval. It does not require SCIP, embeddings, a vector database, or a graph database.
+# MCP policy
 
-## Agent Skills
+MCP is a protocol boundary. It is not:
 
-Skill support is semantic and package-oriented, not persona-oriented.
+- a sandbox;
+- a Capability grant;
+- Repository trust policy;
+- Privacy policy;
+- Context authority;
+- Evidence;
+- a completion gate;
+- a reason to expose a full catalog to the model.
 
-Kiln validates:
+A future MCP client integration shall:
 
-- metadata and activation description;
-- version and digest;
-- input and output schema;
-- declared Capability requirements;
-- procedure body;
-- references, resources, tests, and provenance.
+- register only selected allowlisted operations;
+- keep server descriptions, prompts, schemas, and results untrusted;
+- remain behind native authority evaluation;
+- disclose locality, operator, network, credentials, lifecycle, and replacement properties;
+- limit inline output and preserve large results as Artifacts;
+- reauthorize fallback or server change;
+- provide deterministic fake-server fixtures;
+- avoid importing protocol identifiers into core domain records.
 
-Skill metadata is discoverable without loading every procedure into Context. The selected Skill loads lazily.
+Do not use MCP for:
 
-A Skill cannot:
+- Repository reads or writes;
+- Git;
+- Patch application;
+- Command or Terminal lifecycle;
+- journal or Artifact access;
+- Session, Task, or Run state;
+- Context compilation;
+- Evidence or Receipt logic;
+- permission and policy enforcement.
 
-- grant Capabilities;
-- change Task or Project authority;
-- create a Child by itself;
-- bypass the Context compiler;
-- execute a Command merely because its text requests one.
+# Client adapters
 
-## Client adapters
+## CLI
 
-### ACP
+CLI is native and permanent. It is not treated as an external protocol adapter.
 
-ACP is the first external Client adapter because it can expose an already proven durable Session to an editor without changing the core.
+CLI output can include human text and stable structured JSON without exposing SQLite tables or internal event payloads.
 
-The first ACP increment supports:
+## TUI
 
-- local attach to one existing Session;
-- snapshot plus ordered event stream;
-- Run navigation and user input;
-- permission and Attention display;
-- Artifact and diff references;
-- cancellation or pause intents;
-- cursor reconnect.
+The TUI consumes native commands and projections after the runtime is correct.
 
-Remote transport, multi-user editing, protocol-specific planning objects, and broad terminal support remain deferred.
+A TUI renderer:
 
-### AG-UI and other frontends
+- owns client-local focus, selection, layout, scroll, and drafts;
+- does not own Run, Attention, authority, Evidence, or completion state;
+- cannot trigger destructive action through generic activation;
+- remains replaceable behind a Kiln-owned view model.
 
-AG-UI, Phoenix, and later frontends consume the same native projections and intents. They do not receive a separate shared-state authority or model Context.
+## ACP
 
-## Capability adapters
+A future ACP adapter can expose native snapshots, ordered events, intents, permission requests, terminal references, and Artifacts to one local coding Client.
 
-### MCP client
+ACP cannot define:
 
-MCP client support is justified only by one concrete capability where a maintained server, dynamic discovery, or independent lifecycle creates more value than a native adapter or CLI.
+- Session or Run identity;
+- event truth;
+- permission semantics;
+- Evidence or Receipt state;
+- persistence schema.
 
-The first implementation is one explicit local server with:
+ACP requires reconnect and cursor Evidence before adoption.
 
-- pinned executable or endpoint configuration;
-- version negotiation;
-- allowlisted Tools;
-- schema validation;
-- bounded progress and result output;
-- cancellation, timeout, and crash handling;
-- server trust and Capability mapping;
-- full audit and Receipt references.
+## AG-UI and web Clients
 
-Server descriptions, prompts, resources, and results are untrusted input. They cannot change active instructions or grants.
+These remain deferred consumers of a stable native interface surface.
 
-### OpenAPI
+They cannot justify a second event or Attention model.
 
-OpenAPI is often better than MCP for one narrow stable HTTP service.
+# Code-intelligence standards
 
-Import only reviewed operations. Record:
+Basic first-month retrieval uses native bounded source reads and exact search.
 
-- source document and digest;
-- operation identifier;
-- pinned server and method;
-- input and output schemas;
-- credential reference policy;
-- network scope;
-- payload and response limits;
-- error normalization.
+Tree-sitter and LSP are deferred until measured retrieval failures justify them.
 
-Do not import an entire API or generate model Tools for every operation automatically.
+## Tree-sitter
 
-## Execution Environments
+When accepted, Tree-sitter can provide deterministic syntax ranges and structural facts. It remains an internal library or adapter, not a model-facing raw tree Tool.
 
-### Dev Containers
+## LSP
 
-A Dev Container is one Project Environment implementation, not the default for all Commands.
+When accepted, LSP remains behind a native read-only semantic adapter.
 
-Kiln resolves configuration, mounts, features, lifecycle commands, user, network, and secrets. It runs lifecycle behavior only after accepted policy and an explicit Environment transition.
+Initial supported operations can include definition, references, symbols, diagnostics, hover, and rename feasibility.
 
-### OCI workers
+No workspace command, code action, or edit is applied automatically.
 
-Use an OCI worker when disposable isolation is materially required for:
+## SCIP
 
-- untrusted Project execution;
-- dependency installation or destructive setup;
-- disposable databases;
-- stronger network or filesystem boundaries;
-- reproducible build or verification.
+SCIP is not the native persistent semantic model.
 
-Record effective controls rather than assuming a container equals a sandbox.
+Import requires exact Repository identity, commit, paths, producer, version, completeness, and freshness.
 
-## Evidence formats
+Export requires a real consumer.
 
-### JUnit-compatible reports
+# Environment standards
 
-P1-S04 ingests the minimum structured test format required by the Verifier.
+## Dev Containers
 
-Preserve:
+Dev Container configuration can describe one accepted Project Environment.
+
+It cannot:
+
+- grant authority;
+- run lifecycle commands implicitly;
+- widen mount, network, secret, user, or privilege policy;
+- make a container mandatory for harmless reads.
+
+## OCI
+
+A future OCI Worker is one Environment implementation for a Command that needs stronger disposable isolation.
+
+Use a pinned image when practical and report effective controls honestly.
+
+Container presence does not prove sandbox completeness.
+
+## WASI and WIT
+
+WASI and WIT remain research candidates for one bounded component where explicit imports, portability, and startup or isolation characteristics are measurably better than a supervised subprocess.
+
+They are not the default Command runtime or plugin architecture.
+
+# Evidence and attestation formats
+
+## Structured test reports
+
+A report adapter preserves:
 
 - raw report Artifact;
 - producer and version;
-- test suite and case identity;
-- outcome and duration;
-- failure details under sensitivity policy;
-- exact Command, Repository, and Environment binding;
-- completeness and parse status.
+- Command and state binding;
+- parser version;
+- path mapping;
+- completeness and skipped or invalid record counts;
+- normalized criterion Evidence.
 
-### SARIF
+A partial shard cannot prove a full suite passed.
 
-P1-S08 adds SARIF only after the Artifact, Evidence, and state-binding paths are proven.
+## SARIF
 
-SARIF import validates:
+SARIF findings remain tool observations. Severity does not equal accepted risk. SARIF fixes remain proposals.
 
-- version and schema;
-- run and tool metadata;
-- rules and result locations;
-- path mapping and Repository scope;
-- partial, suppressed, baseline, and stale status;
-- secret and content disclosure.
+## In-toto and SLSA
 
-## OpenTelemetry
+A later eligible Receipt can export an in-toto Statement-shaped document for an immutable subject.
 
-OpenTelemetry instrumentation begins in P1-S05 after operation names and durable event semantics are stable enough to observe without driving design.
+SLSA provenance export requires a suitable build or release subject and complete builder, build definition, dependency, parameter, and run Evidence.
 
-Initial instrumentation uses safe local spans and metrics for:
+Format compatibility does not claim signing, authenticity, independent verification, or a SLSA level.
 
-- Task and Run lifecycle;
-- model invocation;
-- Context compilation;
-- Capability selection and Tool call;
-- Command and verification;
-- Attention and Approval;
-- Artifact creation;
-- recovery and reconciliation;
-- unsupported completion attempts.
+# Context and token policy
 
-Initial tests use an in-memory or no-op exporter. OTLP export is optional later.
+Protocol catalogs stay outside ordinary model Context.
 
-Telemetry is not:
+Only the selected normalized Tool projection enters a Context package.
 
-- the event journal;
-- security audit;
-- Evidence;
-- a Receipt;
-- a recovery mechanism.
+A protocol adapter must report:
 
-Source, Patch content, secrets, sensitive prompts, raw argv, stdout, stderr, and complete result content remain excluded by default.
+- schema and description size;
+- selected and excluded operations;
+- inline-result limits;
+- Artifact externalization;
+- truncation and continuation;
+- semantic loss;
+- token cost when measurable.
 
-## Expansion entry gate
+Dynamic discovery is a cost that requires product value. It is not a benefit by default.
 
-A Watch or evidence-gated candidate enters production only when all are true:
+# Security policy
 
-1. a concrete user or dogfood workflow exists;
-2. the current native path has measured failure or material cost;
-3. a bounded contract and security boundary exist;
-4. deterministic conformance fixtures exist;
-5. dependency and lifecycle cost are accepted;
-6. removal or fallback is clear;
-7. an ADR exists when architecture or trust changes;
-8. the roadmap states what earlier or competing scope is removed or deferred.
+Every adapter must declare:
 
-A protocol is not implemented merely to increase standards coverage.
+- operator and trust boundary;
+- locality and network destinations;
+- authentication and credential handling;
+- available operations;
+- required Capabilities;
+- path and Resource scope;
+- Context and data disclosure;
+- output and Artifact policy;
+- cancellation and timeout;
+- cleanup and recovery;
+- version and update behavior;
+- audit and Evidence records.
+
+Unknown properties narrow or disable selection. They do not broaden authority.
+
+# Adoption record
+
+A protocol or standard enters implementation only through:
+
+1. an accepted user workflow;
+2. comparison against earlier integration options;
+3. a bounded planning or experiment record;
+4. explicit security and Context boundaries;
+5. deterministic conformance fixtures;
+6. dependency and removal review;
+7. accepted roadmap placement;
+8. an ADR when architecture changes.
+
+No protocol is required merely because it is popular, emerging, or already described in Kiln planning.
