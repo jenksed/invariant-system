@@ -5,10 +5,11 @@ defmodule Kiln.Store do
   `start/1` opens the supervised connection, verifies the accepted pragmas and
   bundled SQLite version, verifies or initializes the store format metadata, and
   runs pending migrations, following the P0-W21 startup sequence. It yields one
-  startup outcome and never exposes a writable store that failed a check.
+  startup outcome and never leaves a writable connection alive after a blocked
+  or failed startup.
 
-  The atomic application-action transaction (append, revision, idempotency) is
-  added in a later increment; this module currently owns startup only.
+  `Kiln.Store.Journal.commit/4` owns the atomic application-action transaction
+  after startup reaches `:ready`.
   """
 
   alias Kiln.Store.{Connection, Error, Migrations}
@@ -80,9 +81,28 @@ defmodule Kiln.Store do
     connect_opts = [path: path] |> maybe_put(:name, Keyword.get(opts, :name))
 
     case Connection.start_link(connect_opts) do
-      {:ok, conn} -> continue(conn, opts)
+      {:ok, conn} -> continue_or_stop(conn, opts)
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  defp continue_or_stop(conn, opts) do
+    case continue(conn, opts) do
+      {:ready, _store} = ready ->
+        ready
+
+      blocked_or_error ->
+        stop_connection(conn)
+        blocked_or_error
+    end
+  rescue
+    exception ->
+      stop_connection(conn)
+      reraise exception, __STACKTRACE__
+  catch
+    kind, reason ->
+      stop_connection(conn)
+      :erlang.raise(kind, reason, __STACKTRACE__)
   end
 
   @doc "The accepted store format identifier."
@@ -169,6 +189,16 @@ defmodule Kiln.Store do
       {:error, %Error{class: :future_version} = error} -> {:blocked, :version_blocked, error}
       {:error, %Error{} = error} -> {:blocked, :migration_blocked, error}
     end
+  end
+
+  defp stop_connection(conn) do
+    if Process.alive?(conn) do
+      GenServer.stop(conn, :normal, 5_000)
+    end
+
+    :ok
+  catch
+    :exit, _reason -> :ok
   end
 
   defp generate_store_id do
