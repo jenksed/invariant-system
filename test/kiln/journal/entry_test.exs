@@ -115,6 +115,36 @@ defmodule Kiln.Journal.EntryTest do
                })
     end
 
+    test "rejects a session start with contradictory durable states" do
+      payload = put_in(session_started_payload(), ["session", "state"], "completed")
+
+      assert {:error, %{code: :invalid_session_start, detail: %{field: "session.state"}}} =
+               Reducer.reduce(nil, %{type: "session_started/v1", payload: payload})
+
+      run_wrong = put_in(session_started_payload(), ["run", "state"], "orphaned")
+
+      assert {:error, %{code: :invalid_session_start, detail: %{field: "run.state"}}} =
+               Reducer.reduce(nil, %{type: "session_started/v1", payload: run_wrong})
+    end
+
+    test "binds the payload Session id to the envelope Session id" do
+      payload = session_started_payload()
+
+      assert {:error, %{code: :session_id_mismatch}} =
+               Reducer.reduce(nil, %{
+                 type: "session_started/v1",
+                 payload: payload,
+                 session_id: "ses_other"
+               })
+
+      assert {:ok, _} =
+               Reducer.reduce(nil, %{
+                 type: "session_started/v1",
+                 payload: payload,
+                 session_id: "ses_1"
+               })
+    end
+
     test "rejects an operation observation for the wrong current operation" do
       {:ok, projection} = Reducer.reduce(nil, started())
 

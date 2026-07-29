@@ -53,18 +53,20 @@ defmodule Kiln.Journal.Reducer do
 
   @doc "Apply one entry to the projection."
   @spec reduce(projection() | nil, entry()) :: {:ok, projection()} | {:error, error()}
-  def reduce(nil, %{type: "session_started/v1", payload: payload}) do
-    with :ok <- require_keys(payload, ["session", "task", "run", "workflow_step"]) do
+  def reduce(nil, %{type: "session_started/v1", payload: payload} = entry) do
+    with :ok <- require_keys(payload, ["session", "task", "run", "workflow_step"]),
+         :ok <- enforce_start_contract(payload),
+         :ok <- bind_session_id(entry, payload) do
       {:ok,
        %{
-         "session" => %{"id" => payload["session"]["id"], "state" => payload["session"]["state"]},
-         "task" => %{"id" => payload["task"]["id"], "state" => payload["task"]["state"]},
+         "session" => %{"id" => payload["session"]["id"], "state" => "active"},
+         "task" => %{"id" => payload["task"]["id"], "state" => "in_progress"},
          "run" => %{
            "id" => payload["run"]["id"],
-           "state" => payload["run"]["state"],
+           "state" => "ready",
            "root_run_id" => payload["run"]["root_run_id"]
          },
-         "workflow_step" => payload["workflow_step"],
+         "workflow_step" => "intent",
          "objective_revision" => payload["objective_revision"] || 0,
          "criteria_revision" => payload["criteria_revision"] || 0,
          "references" => payload["references"] || %{},
@@ -245,6 +247,54 @@ defmodule Kiln.Journal.Reducer do
     case Enum.find(keys, fn key -> not Map.has_key?(payload, key) end) do
       nil -> :ok
       missing -> {:error, %{code: :invalid_payload, detail: %{missing: missing}}}
+    end
+  end
+
+  # Session start is atomic and fixed: exactly one active Session, in_progress
+  # Task, ready Root Run, and intent workflow step (P0-W21 section 5.1).
+  @start_contract [
+    {["session", "state"], "active"},
+    {["task", "state"], "in_progress"},
+    {["run", "state"], "ready"},
+    {["workflow_step"], "intent"}
+  ]
+
+  defp enforce_start_contract(payload) do
+    Enum.reduce_while(@start_contract, :ok, fn {path, expected}, :ok ->
+      if get_in(payload, path) == expected do
+        {:cont, :ok}
+      else
+        {:halt,
+         {:error,
+          %{
+            code: :invalid_session_start,
+            detail: %{
+              field: Enum.join(path, "."),
+              expected: expected,
+              actual: get_in(payload, path)
+            }
+          }}}
+      end
+    end)
+  end
+
+  # Bind the payload Session identity to the envelope Session id when the caller
+  # supplies it, so a projection cannot claim a different Session.
+  defp bind_session_id(entry, payload) do
+    case Map.get(entry, :session_id) do
+      nil ->
+        :ok
+
+      session_id ->
+        if payload["session"]["id"] == session_id do
+          :ok
+        else
+          {:error,
+           %{
+             code: :session_id_mismatch,
+             detail: %{envelope: session_id, payload: payload["session"]["id"]}
+           }}
+        end
     end
   end
 end

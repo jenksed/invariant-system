@@ -49,14 +49,45 @@ defmodule Kiln.Store.Journal do
     result_map = Keyword.get(opts, :result, %{})
     result_schema = Keyword.get(opts, :result_schema, @default_result_schema)
 
-    with :ok <- validate_entries(entries) do
-      commit_validated(conn, action, entries, now, result_map, result_schema, opts)
+    outcome =
+      Connection.transaction(conn, fn tx ->
+        case existing_commit(tx, action) do
+          {:replay, stored} ->
+            # A truly repeated request replays its stored result before any
+            # entry decoding, so a valid duplicate never fails on regenerated
+            # entries.
+            {:replayed, stored}
+
+          {:conflict, _} ->
+            DBConnection.rollback(tx, {:idempotency_conflict})
+
+          :none ->
+            commit_new(tx, action, entries, result_map, result_schema, now, opts)
+        end
+      end)
+
+    case outcome do
+      {:ok, {:committed, data}} -> {:ok, data}
+      {:ok, {:replayed, stored}} -> {:ok, replayed_result(stored)}
+      {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
+      {:error, {:invalid_entry, error}} -> {:error, error}
+      {:error, {:stale, current}} -> {:error, stale_error(action, current)}
+      {:error, reason} -> {:error, transaction_error(reason)}
+    end
+  rescue
+    exception -> {:error, transaction_error(Exception.message(exception))}
+  end
+
+  # Decode every proposed entry with the shared journal decoder before insertion,
+  # but only for a new action, so an entry that cannot replay cannot commit while
+  # a duplicate still replays. Nothing is inserted on an invalid entry.
+  defp commit_new(tx, action, entries, result_map, result_schema, now, opts) do
+    case validate_entries(entries) do
+      :ok -> do_commit(tx, action, entries, result_map, result_schema, now, opts)
+      {:error, error} -> DBConnection.rollback(tx, {:invalid_entry, error})
     end
   end
 
-  # Decode every proposed entry with the shared journal decoder before the
-  # transaction opens, so an entry that cannot replay cannot commit: nothing is
-  # inserted, no action commit is written, and no projection changes.
   defp validate_entries(entries) do
     Enum.reduce_while(entries, :ok, fn entry, :ok ->
       case Entry.decode(entry.type, entry.payload) do
@@ -77,32 +108,6 @@ defmodule Kiln.Store.Journal do
     })
   end
 
-  defp commit_validated(conn, action, entries, now, result_map, result_schema, opts) do
-    outcome =
-      Connection.transaction(conn, fn tx ->
-        case existing_commit(tx, action) do
-          {:replay, stored} ->
-            {:replayed, stored}
-
-          {:conflict, _} ->
-            DBConnection.rollback(tx, {:idempotency_conflict})
-
-          :none ->
-            do_commit(tx, action, entries, result_map, result_schema, now, opts)
-        end
-      end)
-
-    case outcome do
-      {:ok, {:committed, data}} -> {:ok, data}
-      {:ok, {:replayed, stored}} -> {:ok, replayed_result(stored)}
-      {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
-      {:error, {:stale, current}} -> {:error, stale_error(action, current)}
-      {:error, reason} -> {:error, transaction_error(reason)}
-    end
-  rescue
-    exception -> {:error, transaction_error(Exception.message(exception))}
-  end
-
   # -- transaction body --
 
   defp do_commit(tx, action, entries, result_map, result_schema, now, opts) do
@@ -113,21 +118,37 @@ defmodule Kiln.Store.Journal do
 
     new_revision = base_next + length(entries) - 1
 
-    projection = build_projection(current_projection, appended, new_revision, last_sequence)
-    upsert_projection(tx, action.session_id, projection, now)
+    case build_projection(current_projection, appended, new_revision, last_sequence) do
+      {:ok, projection} ->
+        upsert_projection(tx, action.session_id, projection, now)
 
-    write_action_commit(tx, action, first_sequence, last_sequence, result_map, result_schema, now)
+        write_action_commit(
+          tx,
+          action,
+          first_sequence,
+          last_sequence,
+          result_map,
+          result_schema,
+          now
+        )
 
-    maybe_fault!(opts)
+        maybe_fault!(opts)
 
-    {:committed,
-     %{
-       status: :committed,
-       session_revision: new_revision,
-       last_sequence: last_sequence,
-       projection: projection,
-       result: result_map
-     }}
+        {:committed,
+         %{
+           status: :committed,
+           session_revision: new_revision,
+           last_sequence: last_sequence,
+           projection: projection,
+           result: result_map
+         }}
+
+      {:error, %{code: code, detail: detail}} ->
+        DBConnection.rollback(
+          tx,
+          {:invalid_entry, invalid_entry_error("<reduce>", code, detail)}
+        )
+    end
   end
 
   defp existing_commit(tx, action) do
@@ -179,7 +200,13 @@ defmodule Kiln.Store.Journal do
       |> Enum.map_reduce([], fn {entry, index}, seqs ->
         revision = base_next + index
         sequence = insert_entry(tx, action, entry, revision, now)
-        {Map.put(entry, :session_revision, revision), [sequence | seqs]}
+
+        reduced_entry =
+          entry
+          |> Map.put(:session_revision, revision)
+          |> Map.put(:session_id, action.session_id)
+
+        {reduced_entry, [sequence | seqs]}
       end)
 
     ordered = Enum.reverse(sequences)
@@ -223,8 +250,10 @@ defmodule Kiln.Store.Journal do
   end
 
   defp build_projection(current, appended, new_revision, last_sequence) do
-    {:ok, reduced} = Reducer.reduce_all(current, appended)
-    Session.stamp(reduced, new_revision, last_sequence)
+    case Reducer.reduce_all(current, appended) do
+      {:ok, reduced} -> {:ok, Session.stamp(reduced, new_revision, last_sequence)}
+      {:error, _} = error -> error
+    end
   end
 
   defp upsert_projection(tx, session_id, projection, now) do

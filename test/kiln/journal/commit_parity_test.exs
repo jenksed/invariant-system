@@ -106,6 +106,46 @@ defmodule Kiln.Journal.CommitParityTest do
     assert count(store.conn, "journal_entries") == 1
   end
 
+  test "a session start with contradictory states does not commit", %{store: store, d: d} do
+    invalid_start =
+      JB.entry("session_started/v1", %{
+        "session" => %{"id" => d.session.id, "state" => "completed"},
+        "task" => %{"id" => d.task.id, "state" => "satisfied"},
+        "run" => %{"id" => d.run.id, "state" => "orphaned", "root_run_id" => d.run.root_run_id},
+        "workflow_step" => "acceptance",
+        "objective_revision" => 0,
+        "criteria_revision" => 0,
+        "references" => %{}
+      })
+
+    assert {:error, %{class: :unknown, code: :invalid_entry}} =
+             JB.commit_entries(store, d, :start_session, 0, 2, [invalid_start])
+
+    assert count(store.conn, "journal_entries") == 0
+    assert count(store.conn, "action_commits") == 0
+    assert count(store.conn, "session_projections") == 0
+  end
+
+  test "a valid duplicate replays before entry decoding runs", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+
+    # Same action identity (idempotency key and digest) as commit_start, but the
+    # resubmission carries a decoder-invalid entry. It must replay the stored
+    # result, not fail on the regenerated entry.
+    duplicate = JB.action(d, :start_session, :local_user, "user:local", 0, 2, [])
+
+    invalid_entry =
+      JB.entry("run_transitioned/v1", %{"run" => %{"from" => "nope", "to" => "nope"}})
+
+    assert {:ok, %{status: :replayed}} =
+             Kiln.Store.Journal.commit(store.conn, duplicate, [invalid_entry],
+               now: "2026-07-29T13:30:00Z"
+             )
+
+    assert count(store.conn, "journal_entries") == 1
+    assert count(store.conn, "action_commits") == 1
+  end
+
   defp count(conn, table) do
     [[n]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
     n
