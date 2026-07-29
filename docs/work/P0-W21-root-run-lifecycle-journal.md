@@ -1,116 +1,114 @@
 # P0-W21: Root Run lifecycle and durable journal
 
 **Document type:** Focused planning work package  
-**Status:** In progress  
-**Branch:** `work/p0-w21-root-run-lifecycle-journal`  
-**Depends on:** P0-W20 integrated through pull request 25  
-**Scope:** Root work state, transition authority, durable journal, restart reconstruction, and external-effect boundaries only
+**Status:** Implemented, verified, accepted, and integrated  
+**Integrated through:** Pull request 27, merge commit `ca21d0bbc25ddf5861191f8bde374e0761d86c0a`  
+**Design head:** `7cc2a0f769e947353be287e486be4f0acebba6de`  
+**Scope:** Root work state, transition authority, durable journal, restart reconstruction, and external-effect boundaries only  
+**Build authorization:** Not issued
 
 ## Objective
 
 Define the exact first-month Root Run transition contract and the smallest SQLite journal that reconstructs durable work without asking implementation to invent state, recovery, or persistence semantics.
 
-## Observed current state and evidence
+## Entry evidence
 
-- Prompt 4 is integrated at merge commit `45acc2ed575957c53a8c57195d99c82965e9d48e`.
-- OD-01 is integrated at merge commit `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1` but does not constrain this round.
-- `docs/RUN-MODEL.md` contains a minimum lifecycle but not a complete transition table or invalid-transition behavior.
-- `docs/SESSION-MODEL.md` defines Session and Task concepts but not exact atomic start, completion, abandonment, or restart transactions.
-- `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md` marks IU-02, IU-06, IU-07, and IU-13 as planning-dependent.
-- `docs/contracts/kiln-core.schema.json` contains broad Run states, Agent binding, Client state, and deferred fields that are not accepted first-month contracts.
-- Production source still contains no Session, Task, Run, journal, migration, projection, or restart behavior.
+- Prompt 4 integrated at merge commit `45acc2ed575957c53a8c57195d99c82965e9d48e`.
+- OD-01 integrated at merge commit `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1` but did not constrain this round.
+- The OD-01 merge was current `main` when W21 began.
+- Production source contained no Session, Task, Run, journal, migration, projection, or restart behavior.
+- Prompt 3 marked IU-02, IU-06, IU-07, and IU-13 planning-dependent.
 
-## Assumptions and unknowns
+## Accepted decisions
 
-### Assumptions
+P0-W21 established:
 
-- One SQLite file is sufficient for the first local single-user workflow.
-- One library-owned connection process and one writer are sufficient.
-- Git and the filesystem remain source truth and stay outside the SQLite transaction.
-- A small append-oriented domain journal plus rebuildable current projections is sufficient. A general event-sourcing framework is not required.
+1. Session states `active`, `completed`, and `abandoned`.
+2. Task states `in_progress`, `satisfied`, and `abandoned`.
+3. Root Run states `ready`, `running`, `waiting_for_user`, `orphaned`, `completed`, `failed`, and `canceled`.
+4. Workflow step, pending decision, external-operation state, and Evidence state remain separate from Run status.
+5. Session, initial Task, and Root Run start atomically in usable states.
+6. `completed`, `failed`, and `canceled` are terminal.
+7. `orphaned` can leave only through explicit reconciliation.
+8. Every state-changing action uses expected revision, action identity, idempotency key, and canonical request digest.
+9. One immutable append-oriented journal and one rebuildable Session projection own durable work state.
+10. Direct Exqlite provides one supervised connection and one writer.
+11. The first store uses WAL, `synchronous=FULL`, foreign keys, a two-second busy timeout, and immediate write transactions on a local filesystem.
+12. Kiln owns forward SQL migrations with stable checksums.
+13. External-operation intent is durable before dispatch, and uncertain effects are never repeated automatically.
+14. Completion atomically aligns Session, Task, Root Run, user acceptance, current state, and the proof reference later defined by P0-W24.
 
-### Unknowns
-
-- Exact persisted Run, Session, and Task state subsets.
-- Exact valid and invalid transition behavior.
-- Exact transaction boundaries and idempotency rules.
-- Exact journal envelope and projection ownership.
-- Exact SQLite driver, connection mode, pragmas, migration mechanism, and startup failure behavior.
-- Exact treatment of a crash after an external operation starts but before its result is recorded.
-
-## Requirements
-
-- Define every first-month Run state and transition.
-- Define transition authority, prerequisites, expected revision, duplicate behavior, and invalid behavior.
-- Separate Run state, workflow step, operation state, and Evidence state.
-- Define atomic Session start, revision, cancellation, failure, orphan reconciliation, and completion transactions.
-- Define one immutable journal envelope and one current-projection owner.
-- Define transcript separation.
-- Select one SQLite library and connection model.
-- Define migrations, format version, corruption handling, busy behavior, partial write, and restart reconstruction.
-- Define the external-effect intent and observation boundary without designing provider, Patch, Command, or Evidence payloads.
-- Preserve no-process-per-domain-noun and one-local-writer constraints.
-
-## Proposed changes
-
-1. Create `docs/ROOT-RUN-LIFECYCLE-AND-JOURNAL.md` as focused subject authority.
-2. Create an ADR for the SQLite driver and direct persistence boundary if the comparison supports a durable choice.
-3. Update planning control to link the focused authority and state that it owns conflicting lifecycle and journal detail.
-4. Record exact later-round ownership boundaries.
-5. Complete this work record with final Evidence.
-
-## Files or components expected to change
+## Files integrated
 
 - `docs/ROOT-RUN-LIFECYCLE-AND-JOURNAL.md`
-- `docs/PLANNING.md`
 - `docs/decisions/0022-use-exqlite-for-the-first-state-store.md`
 - `docs/decisions/README.md`
+- `docs/PLANNING.md`
 - `docs/work/P0-W21-root-run-lifecycle-journal.md`
 
-Existing Run, Session, Architecture, Roadmap, slice, gate, disposition, and Schema documents remain inputs. The focused specification will state exact authority and supersessions. Prompt 6 will normalize machine-readable scaffolds after all first-month rounds.
+The integrated design diff contained five Markdown files, 1,268 additions, and seven deletions. It changed no production source, tests, dependency, lockfile, migration, runtime configuration, JSON Schema, CI workflow, script, preflight behavior, Skill, prompt, agent, executable scaffold, or product gate.
 
-## Acceptance criteria
+## Acceptance evidence
 
-- Every first-month Run state is named and defined.
-- Every valid transition and invalid request result is defined.
-- Transition authority and expected revision are defined.
-- Session and Task state changes are defined.
-- Completion, failure, cancellation, and orphan rules are defined.
-- Workflow step, operation state, and Evidence state do not become duplicate Run states.
-- Journal entry, command identity, idempotency, sequence, and causation are defined.
-- Atomic transaction groups are defined.
-- Projection rebuild and transcript separation are defined.
-- SQLite library, connection ownership, transaction mode, pragmas, migration, unsupported-version, corruption, busy, and startup behavior are defined.
-- Restart and unknown-effect behavior are explicit.
-- No provider, Context, Patch, Command, Evidence, CLI, Child, TUI, protocol, or implementation scope is added.
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| Every first-month Run state is named and defined | Pass | lifecycle specification sections 1 and 2 |
+| Every valid transition is defined | Pass | transition table |
+| Invalid, duplicate, stale, denied, and uncertain requests are defined | Pass | invalid-request and failure matrices |
+| Transition authority and expected revision are explicit | Pass | transition and authority matrices |
+| Session and Task terminal alignment is explicit | Pass | atomic failure, cancellation, and completion transactions |
+| Workflow, decision, operation, and proof state do not duplicate Run state | Pass | state-separation section |
+| Journal envelope, idempotency, sequence, and causation are defined | Pass | journal and action-commit contracts |
+| Atomic transaction groups are defined | Pass | transaction sections |
+| Projection rebuild and transcript separation are defined | Pass | projection and transcript sections |
+| SQLite boundary is selected | Pass | ADR-0022 and SQLite section |
+| Migration, corruption, busy, startup, and unsupported-version behavior are explicit | Pass | startup and failure matrices |
+| Restart and unknown-effect behavior are explicit | Pass | restart matrix |
+| No later-round authority or implementation scope entered | Pass | authority and exclusion sections |
 
-## Verification commands
+## Verification
 
-```bash
-scripts/agent-preflight
-scripts/validate-agent-assets
-vale .
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix xref graph --format cycles --label compile-connected --fail-above 0
-mix test
-```
+Design head `7cc2a0f769e947353be287e486be4f0acebba6de` passed GitHub CI run `30419722173` before merge.
 
-Targeted document checks must also prove one transition owner, one journal owner, one SQLite choice, no deferred Run states in the first-month set, and no conflict with P0-W22 ownership.
+The run passed:
 
-## Required completion evidence
+- Vale;
+- current agent-preflight behavior tests;
+- Project agent-asset validation;
+- dependency installation;
+- formatting;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit.
 
-- P0-W21-E01: Prompt 4 and entry-gate merge Evidence.
-- P0-W21-E02: complete transition table and authority matrix.
-- P0-W21-E03: journal envelope, transaction, idempotency, and projection contract.
-- P0-W21-E04: SQLite driver and configuration comparison from current official sources.
-- P0-W21-E05: restart, corruption, migration, duplicate, stale revision, and unknown-effect matrices.
-- P0-W21-E06: exact planning-only diff.
-- P0-W21-E07: exact final-head CI.
+The preflight result proves current P0 mechanics only. It does not prove accepted P1 ticket compatibility.
+
+This closeout correction receives its own exact-head CI through the closeout pull request.
+
+## W22 ownership handoff
+
+P0-W22 can consume:
+
+- Run and operation identity;
+- the common operation states;
+- intent-before-dispatch;
+- terminal or unknown result recording;
+- expected revision and idempotency principles;
+- conservative restart and orphan rules.
+
+P0-W22 cannot add or change:
+
+- Session, Task, or Run states;
+- transition authority;
+- journal entry envelope or projection ownership;
+- migrations or store startup;
+- completion transaction semantics.
+
+P0-W22 must be based on the integrated P0-W21 result and pass an explicit lifecycle and persistence ownership audit before integration.
 
 ## Explicit exclusions
 
-P0-W21 does not:
+P0-W21 did not:
 
 - implement source, tests, migrations, dependencies, Schemas, scripts, or scaffolding;
 - define MiniMax, Context, Tools, Repository reads, or disclosure;
@@ -119,3 +117,13 @@ P0-W21 does not:
 - define criterion Evidence, Receipt aggregation, or CLI presentation;
 - define Child Runs, Attention, TUI, worktrees, protocols, telemetry, remote execution, or attestations;
 - issue build authorization.
+
+## Gate verdict
+
+**P0-W21 passed and is integrated.**
+
+Build authorization remains denied.
+
+## Exact next action
+
+Rebuild or rebase P0-W22 on the integrated and closed P0-W21 baseline. Audit it for lifecycle and persistence overlap, validate its exact final head, and integrate it second.

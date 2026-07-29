@@ -48,4 +48,4 @@ An accepted ADR must not be reversed without a superseding ADR. An accepted ADR 
 | [0019: Implement Kiln through vertical product slices](0019-implement-kiln-through-vertical-product-slices.md) | Partially superseded by ADR 0020 | Integrated through pull request 20 |
 | [0020: Prove a single-Run change loop before delegated orchestration](0020-prove-single-run-change-loop-before-delegation.md) | Accepted | Integrated through pull request 23 |
 | [0021: Use MiniMax as the only initial provider](0021-use-minimax-as-the-only-initial-provider.md) | Accepted | Integrated through pull request 26 |
-| [0022: Use direct Exqlite for the first state store](0022-use-exqlite-for-the-first-state-store.md) | Accepted | Proposed on `work/p0-w21-root-run-lifecycle-journal` |
+| [0022: Use direct Exqlite for the first state store](0022-use-exqlite-for-the-first-state-store.md) | Accepted | Integrated through pull request 27 |

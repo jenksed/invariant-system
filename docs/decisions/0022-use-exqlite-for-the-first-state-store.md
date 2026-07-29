@@ -2,7 +2,7 @@
 
 **Document type:** Explanation  
 **Status:** Accepted  
-**Integration status:** Proposed on `work/p0-w21-root-run-lifecycle-journal`  
+**Integration status:** Integrated through pull request 27  
 **Date:** 2026-07-28  
 **Work package:** P0-W21  
 **Supersedes:** None
