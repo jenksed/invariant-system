@@ -40,8 +40,11 @@ defmodule Kiln.Domain.Id do
          :ok <- validate_entropy(entropy) do
       {:ok, prefix <> "_" <> Base.encode16(entropy, case: :lower)}
     else
-      {:error, %Error{} = error} -> {:error, error}
-      _ -> {:error, Error.new(:invalid_entropy, "entropy source must return 16 bytes")}
+      {:error, %Error{} = error} ->
+        {:error, error}
+
+      _ ->
+        {:error, Error.new(:invalid_entropy, "entropy source must return 16 bytes")}
     end
   end
 
@@ -60,19 +63,27 @@ defmodule Kiln.Domain.Id do
          true <- Regex.match?(~r/^#{prefix}_[0-9a-f]{32}$/, value) do
       :ok
     else
-      {:error, %Error{} = error} -> {:error, error}
+      {:error, %Error{} = error} ->
+        {:error, error}
+
       false ->
         {:error,
-         Error.new(:invalid_identifier, "identifier does not match the required opaque format", :id, %{
-           kind: kind
-         })}
+         Error.new(
+           :invalid_identifier,
+           "identifier does not match the required opaque format",
+           :id,
+           %{
+             kind: kind
+           }
+         )}
     end
   end
 
   def validate(kind, _value) do
     case prefix(kind) do
       {:ok, _prefix} ->
-        {:error, Error.new(:invalid_identifier, "identifier must be a string", :id, %{kind: kind})}
+        {:error,
+         Error.new(:invalid_identifier, "identifier must be a string", :id, %{kind: kind})}
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -82,11 +93,17 @@ defmodule Kiln.Domain.Id do
   @spec prefix(kind()) :: {:ok, String.t()} | {:error, Error.t()}
   def prefix(kind) do
     case Map.fetch(@prefixes, kind) do
-      {:ok, prefix} -> {:ok, prefix}
-      :error -> {:error, Error.new(:unsupported_identifier_kind, "identifier kind is not supported", :kind)}
+      {:ok, prefix} ->
+        {:ok, prefix}
+
+      :error ->
+        {:error,
+         Error.new(:unsupported_identifier_kind, "identifier kind is not supported", :kind)}
     end
   end
 
   defp validate_entropy(entropy) when byte_size(entropy) == @byte_count, do: :ok
-  defp validate_entropy(_entropy), do: {:error, Error.new(:invalid_entropy, "entropy source must return 16 bytes")}
+
+  defp validate_entropy(_entropy),
+    do: {:error, Error.new(:invalid_entropy, "entropy source must return 16 bytes")}
 end
