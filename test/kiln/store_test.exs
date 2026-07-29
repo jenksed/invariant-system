@@ -17,6 +17,8 @@ defmodule Kiln.StoreTest do
     assert {:ready, store} =
              Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
 
+    on_exit(fn -> stop(store.conn) end)
+
     assert store.store_version == 1
     assert store.store_format == "kiln-state/v1"
     assert store.store_id == "store_fixture"
@@ -45,16 +47,21 @@ defmodule Kiln.StoreTest do
   end
 
   test "restarts against an existing store without reapplying or changing identity", %{path: path} do
-    {:ready, _first} =
+    {:ready, first} =
       Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
 
+    stop(first.conn)
+
     assert {:ready, second} = Store.start(path: path)
+    on_exit(fn -> stop(second.conn) end)
+
     assert second.store_version == 1
     assert second.store_id == "store_fixture"
   end
 
   test "start_link exposes the supervised connection on a ready store", %{path: path} do
     assert {:ok, conn} = Store.start_link(path: path, store_id: "store_fixture", now: "t0")
+    on_exit(fn -> stop(conn) end)
 
     assert [[1]] = Connection.query!(conn, "SELECT count(*) FROM schema_migrations")
     assert is_pid(conn)
@@ -66,7 +73,9 @@ defmodule Kiln.StoreTest do
     assert {:error, {:integrity_blocked, %{class: :integrity}}} = Store.start_link(path: path)
   end
 
-  test "version-blocks an unsupported store format", %{path: path} do
+  test "version-blocks an unsupported store format and closes the rejected connection", %{
+    path: path
+  } do
     {:ready, store} =
       Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
 
@@ -75,8 +84,21 @@ defmodule Kiln.StoreTest do
       "UPDATE store_metadata SET store_format = 'kiln-state/v2' WHERE id = 1"
     )
 
+    stop(store.conn)
+
+    name = String.to_atom("kiln_blocked_store_#{System.unique_integer([:positive])}")
+
     assert {:blocked, :version_blocked,
             %{class: :future_version, code: :unsupported_store_format}} =
-             Store.start(path: path)
+             Store.start(path: path, name: name)
+
+    refute Process.whereis(name)
+  end
+
+  defp stop(conn) do
+    if Process.alive?(conn), do: GenServer.stop(conn)
+    :ok
+  catch
+    :exit, _reason -> :ok
   end
 end
