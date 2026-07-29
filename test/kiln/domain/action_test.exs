@@ -58,11 +58,15 @@ defmodule Kiln.Domain.ActionTest do
     ]
 
     for payload <- forbidden_payloads do
-      assert {:error, %{code: :forbidden_payload_field}} = Action.new(Map.put(base, :payload, payload))
+      assert {:error, %{code: :forbidden_payload_field}} =
+               Action.new(Map.put(base, :payload, payload))
     end
 
-    assert {:error, %{code: :invalid_payload}} = Action.new(Map.put(base, :payload, %{handle: self()}))
-    assert {:error, %{code: :invalid_payload}} = Action.new(Map.put(base, :payload, %{tuple: {:runtime, 1}}))
+    assert {:error, %{code: :invalid_payload}} =
+             Action.new(Map.put(base, :payload, %{handle: self()}))
+
+    assert {:error, %{code: :invalid_payload}} =
+             Action.new(Map.put(base, :payload, %{tuple: {:runtime, 1}}))
   end
 
   test "rejects unsupported action kinds and stale revision shapes" do
@@ -83,7 +87,9 @@ defmodule Kiln.Domain.ActionTest do
     }
 
     assert {:error, %{code: :invalid_revision}} = Action.new(attrs)
-    assert {:error, %{code: :invalid_action_kind}} = Action.new(%{attrs | expected_session_revision: 0})
+
+    assert {:error, %{code: :invalid_action_kind}} =
+             Action.new(%{attrs | expected_session_revision: 0})
   end
 
   defp id(prefix, byte) do
