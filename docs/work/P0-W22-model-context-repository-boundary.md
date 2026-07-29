@@ -1,7 +1,7 @@
 # P0-W22: Provider, Context, Tools, Repository reads, and disclosure
 
 **Document type:** Focused planning work package  
-**Status:** In progress  
+**Status:** Implemented and verified on branch  
 **Branch:** `work/p0-w22-model-context-repository-boundary-reconciled`  
 **Depends on:** P0-W21 integrated through pull request 27 and closeout pull request 28  
 **Scope:** MiniMax provider boundary, sealed Context, bounded Repository reads, fixed Tools, disclosure, and secret screening only  
@@ -13,50 +13,39 @@ Define one reproducible MiniMax boundary, one explicit sealed Context package, f
 
 ## Entry evidence
 
-- Prompt 4 integrated at merge commit `45acc2ed575957c53a8c57195d99c82965e9d48e`.
-- OD-01 integrated at merge commit `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1`.
-- P0-W21 integrated at merge commit `ca21d0bbc25ddf5861191f8bde374e0761d86c0a`.
-- P0-W21 status closeout integrated at merge commit `6c80436b9c220a93b0ff37372deacb1f7ec0fd32`.
-- P0-W21 owns Session, Task, Run, transition, journal, projection, migration, restart, orphan, and completion-transaction boundaries.
-- OD-01 selects MiniMax as the only initial real provider, requires one deterministic fake, permits only sealed Context disclosure under accepted Project policy, and forbids fallback.
-- Current official MiniMax documentation lists `MiniMax-M3` as the latest M-series model for coding, agentic reasoning, Tool use, and long Context.
-- The Project owner uses MiniMax M3 as the workhorse and M2.7 Highspeed for bounded helper work.
+- Prompt 4 integrated at `45acc2ed575957c53a8c57195d99c82965e9d48e`.
+- OD-01 integrated at `bdcfcc5d4f4c6f74838d885c74c2240720b3dce1`.
+- P0-W21 integrated at `ca21d0bbc25ddf5861191f8bde374e0761d86c0a`.
+- P0-W21 closeout integrated at `6c80436b9c220a93b0ff37372deacb1f7ec0fd32`.
+- P0-W21 owns every lifecycle, transition, journal, projection, migration, restart, orphan, and completion-transaction boundary.
+- Current official MiniMax documentation identifies `MiniMax-M3` as the latest M-series model for coding, Tool use, agentic reasoning, and long Context.
+- The Project owner uses M3 as the MiniMax workhorse.
 - Production source contains no provider, Context, Tool, Repository-read, disclosure, or secret-screening behavior.
 
-## Assumptions
+## Accepted planning decisions
 
-- A direct OpenAI-compatible HTTP boundary is smaller than a provider SDK or general OpenAI client abstraction.
-- Basic deterministic Repository search and reads are sufficient before LSP, Tree-sitter, or a persistent index.
-- A Project disclosure policy can be accepted before source excerpts are sent.
-- One provider invocation can use a transient provider-native conversation while preserving a sealed initial Context package.
+P0-W22 proposes these decisions for integration:
 
-## Questions resolved by this round
+1. MiniMax is the only initial real provider.
+2. Use `MiniMax-M3` through `https://api.minimax.io/v1/chat/completions`.
+3. Use direct bounded HTTP and JSON mapping behind a Kiln-native provider behaviour.
+4. Use one deterministic fake provider for tests.
+5. Use streaming, `reasoning_split`, one standard service tier, and no fallback.
+6. Keep provider-native reasoning transient inside the live Worker. It is never durable Context, transcript, Evidence, Receipt, or ordinary Artifact content.
+7. Do not retry after dispatch automatically.
+8. Cancellation, timeout, or connection loss after dispatch is unknown unless a terminal provider result was observed.
+9. Seal one ordered Context package before dispatch.
+10. Cap initial provider input at 32,000 estimated tokens and output at 8,192 tokens despite the provider's larger limit.
+11. Define exactly four possible Tools: `repo.search`, `repo.read`, `artifact.read`, and `change.propose`.
+12. Omit unused Tool schemas by workflow step.
+13. Allow only bounded literal search and text-range reads inside one canonical selected checkout.
+14. Deny path escape, symlinks, special files, binaries, invalid UTF-8, oversized files, stale digests, and mandatory secret paths.
+15. Deny hosted source disclosure by default until accepted Project policy permits the exact class and destination.
+16. Treat source and Tool content as untrusted data.
+17. Persist normalized manifests, visible results, Tool records, usage, warnings, and digests rather than raw provider streams or complete payloads.
+18. State hosted provider retention honestly and make no local-only or zero-retention claim.
 
-- Exact provider endpoint and model.
-- Request, streaming, Tool, result, usage, timeout, cancellation, malformed-result, and retry behavior.
-- Deterministic fake-provider behavior.
-- Ordered Context fields, manifest, digest, limits, exclusions, inspection, and staleness.
-- Repository root, path, ignore, symlink, file, encoding, size, search, read, and fingerprint rules.
-- Four model-facing Tools and workflow-step eligibility.
-- Source disclosure, secret screening, untrusted instruction handling, and provider retention claims.
-- Exact W21 ownership consumption without lifecycle or persistence overlap.
-
-## Requirements
-
-- Consume OD-01 without widening it.
-- Consume P0-W21 without redefining it.
-- Select one current MiniMax model and direct API mapping.
-- Define one deterministic fake provider contract.
-- Define streaming, cancellation, timeout, malformed result, usage, and explicit retry behavior.
-- Define an ordered sealed Context package and manifest.
-- Define exact token, byte, file, item, Tool-call, turn, and elapsed limits.
-- Define Repository root, eligible file set, paths, ignores, symlinks, special files, binary and encoding behavior, reads, search, and fingerprints.
-- Define at most four phase-specific Tools with fixed schemas.
-- Define large-result externalization and bounded continuation.
-- Define disclosure, credentials, secrets, untrusted instructions, provider payload retention, and provider-side limitations.
-- Keep all changes planning-only.
-
-## Expected files
+## Files changed
 
 - `docs/MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md`
 - `docs/decisions/0023-use-minimax-m3-openai-compatible-api.md`
@@ -64,64 +53,101 @@ Define one reproducible MiniMax boundary, one explicit sealed Context package, f
 - `docs/PLANNING.md`
 - `docs/work/P0-W22-model-context-repository-boundary.md`
 
-No production source, test, Schema, dependency, configuration, CI, script, preflight, Skill, prompt, agent, or conformance scaffold changes belong in this round.
+Review-head compare against `main`:
 
-## Acceptance criteria
+- five Markdown files;
+- 1,398 additions and eight deletions;
+- no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or conformance scaffolding.
 
-- One MiniMax endpoint, model, request, stream, Tool, result, usage, timeout, cancellation, malformed-result, and retry contract exists.
-- One deterministic fake covers success and required failures.
-- One ordered Context package, manifest, digest, state binding, and inspection contract exists.
-- Exact item, source, token, byte, file, result, turn, Tool-call, and time limits exist.
-- Exact Repository path, ignore, symlink, binary, encoding, special-file, search, read, and fingerprint behavior exists.
-- Exactly four or fewer Tools exist and unused schemas are absent.
-- Secret values, denied paths, reference repositories, runtime Skills, hidden reasoning, and unrelated files cannot enter provider Context.
-- Provider payload and response retention are explicit and honest.
-- No fallback, router, broker, retrieval framework, LSP, Tree-sitter, protocol, Patch application, Command, or Evidence-completion behavior enters scope.
-- No P0-W21 lifecycle or persistence contract is added or changed.
-- Exact final-head CI passes.
+## Acceptance evidence
 
-## Verification commands
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| One provider endpoint and model | Pass | focused specification and ADR-0023 |
+| Request, stream, Tool, result, usage, timeout, cancellation, malformed-result, and retry rules | Pass | provider contract sections |
+| Deterministic fake covers success and failures | Pass | fake-provider section |
+| Ordered sealed Context, manifest, digest, limits, inspection, and staleness | Pass | Context sections |
+| Exact Repository path, file, search, read, and fingerprint rules | Pass | Repository sections |
+| Exactly four possible Tools and unused schemas absent | Pass | Tool projection |
+| Secret values and denied source cannot enter provider Context | Pass | disclosure and secret sections |
+| Provider retention and hosted processing are honest | Pass | disclosure and retention sections |
+| No fallback, routing, Skills, retrieval framework, code intelligence, or protocols | Pass | constraints and exclusions |
+| W21 lifecycle and persistence ownership unchanged | Pass | explicit W21 ownership audit |
+| Review-head Repository validation | Pass | CI run `30421013613` on `32dd41ba53e4eee767b947b22c559d7ff51f20b0` |
+| Exact closeout-head validation | Pending | final CI after this update |
 
-```bash
-scripts/agent-preflight
-scripts/validate-agent-assets
-vale .
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix xref graph --format cycles --label compile-connected --fail-above 0
-mix test
-```
+## W21 ownership audit
 
-Targeted checks must prove:
+P0-W22 consumes:
 
-- OD-01 and P0-W21 are integrated;
-- MiniMax is the only real provider;
-- exactly four or fewer Tools are named;
-- no fallback exists;
-- every provider-bound source item carries a disclosure decision;
-- no lifecycle, transition, journal, projection, migration, restart, or completion authority appears in the focused specification;
-- the previous M2.7 draft did not enter the reconciled branch.
+- operation identity;
+- durable intent before dispatch;
+- terminal or unknown result classification;
+- expected revision and idempotency;
+- restart and orphan handling.
 
-## Required completion evidence
+P0-W22 does not define or modify:
 
-- P0-W22-E01: Prompt 4, OD-01, W21, and W21-closeout merge Evidence.
-- P0-W22-E02: current official MiniMax endpoint, model, Tool, streaming, reasoning, authentication, and privacy source review.
-- P0-W22-E03: provider and deterministic-fake contracts.
-- P0-W22-E04: sealed Context and disclosure contract.
-- P0-W22-E05: Repository-read and Tool matrices.
-- P0-W22-E06: secret, path, malformed-result, timeout, cancellation, and no-fallback examples.
-- P0-W22-E07: W21 ownership audit.
-- P0-W22-E08: exact planning-only compare and final-head CI.
+- Session, Task, or Run states;
+- lifecycle transitions or transition authority;
+- journal envelope or action-commit storage;
+- projection ownership or replay;
+- migrations or store startup;
+- terminal Session and Task alignment;
+- completion transaction prerequisites.
+
+Any conflict resolves in favor of integrated P0-W21.
+
+## External evidence
+
+Official MiniMax sources reviewed on 2026-07-28 support:
+
+- the OpenAI-compatible base URL and Chat Completions endpoint;
+- `MiniMax-M3` as the current latest M-series coding and agentic model;
+- Bearer authentication;
+- streaming;
+- Tool definitions;
+- `reasoning_split` and provider-message continuity;
+- usage fields;
+- hosted processing and non-zero-retention risk.
+
+They do not prove provider-side deletion, non-retention, or server-side cancellation.
+
+## Verification
+
+Review head `32dd41ba53e4eee767b947b22c559d7ff51f20b0` passed GitHub CI run `30421013613`.
+
+The run passed:
+
+- Vale;
+- current preflight behavior tests;
+- Project agent-asset validation;
+- dependency installation;
+- formatting;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit.
+
+The current preflight result proves obsolete P0 mechanics only. It does not prove P1 ticket compatibility.
 
 ## Explicit exclusions
 
-P0-W22 does not:
+P0-W22 did not:
 
-- define or change Run, Session, or Task lifecycle;
-- define journal, transaction, migration, replay, projection, or persistence semantics;
+- define or change lifecycle or persistence;
 - define Patch representation, Approval, source mutation, or rollback;
 - define registered Command, criterion Evidence, completion, Receipt, or CLI presentation;
-- implement or scaffold any behavior;
+- implement or scaffold behavior;
 - add provider fallback, routing, ensemble, Skills, retrieval framework, reference repositories, code intelligence, protocols, telemetry, remote execution, or attestations;
-- run P0-W26 or P0-W27;
+- run Wave B work;
 - issue build authorization.
+
+## Gate verdict
+
+P0-W22 passes on this branch after exact closeout-head CI.
+
+Owner acceptance and integration remain required.
+
+## Exact next action
+
+After exact-head CI passes, merge P0-W22. Then run P0-W23 on current `main`.
