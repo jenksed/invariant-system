@@ -37,6 +37,10 @@ def iter_refs(value: Any) -> Iterable[str]:
             yield from iter_refs(child)
 
 
+def error_path(error: Any) -> tuple[str, ...]:
+    return tuple(str(part) for part in error.path)
+
+
 def require_pinned_package() -> None:
     try:
         installed = version("jsonschema")
@@ -73,7 +77,7 @@ def main() -> int:
     validator = Draft202012Validator(schema, format_checker=FormatChecker())
 
     for index, document in enumerate(positives):
-        errors = sorted(validator.iter_errors(document), key=lambda error: list(error.path))
+        errors = sorted(validator.iter_errors(document), key=error_path)
         if errors:
             raise AssertionError(
                 f"positive fixture {index} failed Schema validation: {errors[0].message}"
@@ -99,9 +103,7 @@ def main() -> int:
                 f"negative fixture {index} must remain protected by semantic rejection"
             )
 
-        errors = sorted(
-            validator.iter_errors(case["document"]), key=lambda error: list(error.path)
-        )
+        errors = sorted(validator.iter_errors(case["document"]), key=error_path)
         actual = "reject" if errors else "accept"
 
         if actual != schema_expectation:
