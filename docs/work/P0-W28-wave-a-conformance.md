@@ -47,9 +47,9 @@ The work permitted static constants, pure transition checks, behaviour declarati
 
 It denied provider calls, source mutation, SQLite state creation, Command execution, credential reads, product CLI actions, fallback, Child Runs, and Wave B scaffolding.
 
-## Changes integrated
+## Proposed changes
 
-Prompt 6-A integrated:
+The proposed changes were implemented and integrated:
 
 - repaired P0 work-package and P1 slice-ticket preflight grammar;
 - preflight behavior tests;
