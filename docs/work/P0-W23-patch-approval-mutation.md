@@ -1,7 +1,7 @@
 # P0-W23: Patch, Approval, mutation, and recovery
 
 **Document type:** Focused planning work package  
-**Status:** In progress  
+**Status:** Implemented and verified on branch  
 **Branch:** `work/p0-w23-patch-approval-mutation`  
 **Depends on:** P0-W21 and P0-W22 integrated  
 **Scope:** Patch proposal, user Approval, single-checkout mutation, rollback, and uncertain-effect recovery only  
@@ -17,84 +17,91 @@ Define one exact text-Patch representation, one Approval binding, one mutation o
 - P0-W22 integrated at `abbded1af773981c40e0810c19ce043b9485daeb` and controls Repository observation, canonical paths, source reads, Context, `change.propose`, and disclosure.
 - The first-month product has one selected writable checkout and one mutation owner.
 - Production source contains no Patch, Approval, mutation, rollback, or recovery implementation.
-- Existing execution and Git Schemas contain broader worktree, environment, and transactional Patch concepts than the first-month target.
 
-## Questions resolved by this round
+## Accepted planning decisions
 
-- Authoritative Patch representation and human review representation.
-- Base and Repository-state binding.
-- Canonical Patch digest.
-- Supported operations, path and size limits, and unsupported content.
-- Stale Patch behavior.
-- User Approval subject, lifetime, invalidation, denial, and one-time use.
-- Mutation authority and checkout lease.
-- Preparation, rollback bundle, progress manifest, deterministic operation order, and post-state observation.
-- Partial failure, rollback success, rollback failure, crash, and unknown-effect recovery.
-- Exact W21 and W22 ownership consumption.
+P0-W23 proposes:
 
-## Requirements
+1. Use one canonical Patch manifest of complete UTF-8 text after-images.
+2. Support `add`, `replace`, and `delete` only.
+3. Use generated unified diff for review only, never as mutation authority.
+4. Bind the Patch to one W22 Repository state and exact before facts for each path.
+5. Compute SHA-256 over canonical manifest bytes and ordered after-image digests.
+6. Limit the first contract to 32 paths, one MiB per after-image, and four MiB total after-image and rollback content.
+7. Deny binary, symlink, special-file, mode, submodule, Git metadata, and out-of-root mutation.
+8. Require explicit local-user Approval for the exact Patch, base, paths, warnings, preview, objective, criteria, and Session revision.
+9. Allow only `approve` or `deny`; modifications create a new Patch.
+10. Expire Approval after 30 minutes or any bound state change.
+11. Consume Approval when the P0-W21 `patch_application` operation intent commits.
+12. Use one mutation coordinator and one selected-checkout lease.
+13. Prepare and verify rollback data and staged after-images before intent commit.
+14. Maintain an operation-specific progress manifest for reconciliation.
+15. Apply add and replace before delete in deterministic path order.
+16. Observe every path and final target state.
+17. Attempt reverse-order rollback after partial failure.
+18. Treat exact base restoration as known failure and exact target as known success.
+19. Treat mixed or unclassified state as unknown and orphaned under P0-W21.
+20. Never retry or reapply automatically after uncertainty.
+21. Patch application does not format, test, stage, commit, push, merge, publish, or deploy.
 
-- Use one Patch representation.
-- Bind every proposal to exact Repository state and per-path before state.
-- Define one canonical digest and deterministic preview.
-- Define Approval authority, subject, lifetime, invalidation, denial, consumption, and replay behavior.
-- Define one mutation owner and no concurrent writer.
-- Define application preconditions and deterministic operation order.
-- Define rollback data before the first file effect.
-- Define progress observation and restart classification without automatic replay.
-- Define known failure versus unknown effect.
-- Preserve P0-W21 lifecycle and P0-W22 Repository and provider authority.
-- Do not add Command execution, Evidence completion, CLI syntax, Child Runs, worktrees, or implementation.
-
-## Expected files
+## Files changed
 
 - `docs/PATCH-APPROVAL-AND-MUTATION.md`
 - `docs/decisions/0024-use-complete-text-after-images-for-first-patches.md`
 - `docs/decisions/README.md`
 - `docs/PLANNING.md`
+- `docs/work/P0-W22-model-context-repository-boundary.md`
 - `docs/work/P0-W23-patch-approval-mutation.md`
 
-## Acceptance criteria
+Review-head compare against `main`:
 
-- One Patch representation, base binding, digest, path, operation, and size contract exists.
-- Unified diff is review output rather than mutation authority.
-- Approval authority, lifetime, invalidation, denial, one-time use, and replay are explicit.
-- One mutation owner and one checkout lease exist.
-- Preparation, rollback bundle, progress manifest, apply order, post-state validation, and cleanup are explicit.
-- Partial failure, rollback, interruption, restart, unknown effect, and next actions are explicit.
-- No fuzzy application, hidden formatting, automatic Command, automatic Git staging, commit, push, or merge exists.
-- No W21 lifecycle or W22 Repository boundary is redefined.
-- Exact final-head CI passes.
+- six Markdown files;
+- 1,233 additions and 126 deletions;
+- no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or scaffolding.
 
-## Verification commands
+The W22 work-record edits are integration-status corrections only.
 
-```bash
-scripts/agent-preflight
-scripts/validate-agent-assets
-vale .
-mix format --check-formatted
-mix compile --warnings-as-errors
-mix xref graph --format cycles --label compile-connected --fail-above 0
-mix test
-```
+## Acceptance evidence
 
-## Required completion evidence
+| Criterion | Result | Evidence |
+| --- | --- | --- |
+| One Patch representation and exact base binding | Pass | Patch sections 2 and 3 |
+| Canonical digest and deterministic preview | Pass | canonicalization and review sections |
+| Supported operations and limits | Pass | operation and limit sections |
+| Approval authority, lifetime, denial, invalidation, consumption, and replay | Pass | Approval section |
+| One mutation owner and lease | Pass | ownership section |
+| Rollback and staging precede effects | Pass | preparation section |
+| Deterministic application and target observation | Pass | application section |
+| Partial failure and reverse rollback | Pass | failure section |
+| Restart classification and unknown-effect behavior | Pass | restart matrix |
+| W21 and W22 authority unchanged | Pass | upstream audit |
+| Review-head Repository validation | Pass | CI `30421607273` on `3e6045c95a10a9bc5445a0210281b95ba965b5ac` |
+| Exact closeout-head validation | Pending | final CI after this update |
 
-- P0-W23-E01: W21 and W22 integrated merge Evidence.
-- P0-W23-E02: Patch representation, canonicalization, digest, and base-binding contract.
-- P0-W23-E03: Approval and authority contract.
-- P0-W23-E04: mutation preparation, progress, rollback, and post-state contract.
-- P0-W23-E05: partial failure, crash, restart, and unknown-effect matrix.
-- P0-W23-E06: W21 and W22 ownership audit.
-- P0-W23-E07: planning-only compare and exact final-head CI.
+## Upstream ownership audit
+
+P0-W23 consumes W21 operation identity, intent-before-dispatch, terminal-or-unknown result, expected revision, idempotency, restart, and orphan rules. It consumes W22 canonical root, Repository observation, path controls, `change.propose`, and Artifact references.
+
+It does not change Session, Task, or Run states; transitions; journal, projection, migration, provider, Context, Tool projection, Repository reads, disclosure, or secret policy. Any conflict resolves in favor of the upstream authority.
+
+## Verification
+
+Review head `3e6045c95a10a9bc5445a0210281b95ba965b5ac` passed GitHub CI run `30421607273`.
+
+The run passed Vale, current preflight behavior tests, Project agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
+
+The current preflight result proves obsolete P0 mechanics only. It does not prove P1 ticket compatibility.
 
 ## Explicit exclusions
 
-P0-W23 does not:
+P0-W23 did not implement mutation; add dependencies; alter lifecycle, persistence, provider, Context, or Repository authority; define Command, formatting, Evidence, Receipt, completion, or CLI behavior; add binary, symlink, mode, worktree, concurrent writer, Git publication, deployment, or Wave B scope; or issue build authorization.
 
-- implement Patch application or add dependencies;
-- define or modify lifecycle, journal, projection, migration, or provider behavior;
-- define registered Commands, formatting, tests, Evidence, Receipts, completion evaluation, or CLI presentation;
-- add binary Patch, symlink, mode change, rename semantics, worktrees, concurrent writers, commit, push, merge, deploy, or remote execution;
-- run Wave B work;
-- issue build authorization.
+## Gate verdict
+
+P0-W23 passes on this branch after exact closeout-head CI.
+
+Owner acceptance and integration remain required.
+
+## Exact next action
+
+After exact-head CI passes, merge P0-W23. Then record OD-02 and run P0-W24 on current `main`.
