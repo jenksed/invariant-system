@@ -1,8 +1,9 @@
 # P0-W23: Patch, Approval, mutation, and recovery
 
 **Document type:** Focused planning work package  
-**Status:** Implemented and verified on branch  
-**Branch:** `work/p0-w23-patch-approval-mutation`  
+**Status:** Implemented, verified, accepted, and integrated  
+**Integrated through:** Pull request 30, merge commit `58720bcfba815d77c6d815e0ca004e0546cb9a6e`  
+**Final design head:** `2800736164763ed931782714a5ee5b84ab18d53a`  
 **Depends on:** P0-W21 and P0-W22 integrated  
 **Scope:** Patch proposal, user Approval, single-checkout mutation, rollback, and uncertain-effect recovery only  
 **Build authorization:** Not issued
@@ -18,9 +19,9 @@ Define one exact text-Patch representation, one Approval binding, one mutation o
 - The first-month product has one selected writable checkout and one mutation owner.
 - Production source contains no Patch, Approval, mutation, rollback, or recovery implementation.
 
-## Accepted planning decisions
+## Accepted decisions
 
-P0-W23 proposes:
+P0-W23 established:
 
 1. Use one canonical Patch manifest of complete UTF-8 text after-images.
 2. Support `add`, `replace`, and `delete` only.
@@ -44,7 +45,7 @@ P0-W23 proposes:
 20. Never retry or reapply automatically after uncertainty.
 21. Patch application does not format, test, stage, commit, push, merge, publish, or deploy.
 
-## Files changed
+## Files integrated
 
 - `docs/PATCH-APPROVAL-AND-MUTATION.md`
 - `docs/decisions/0024-use-complete-text-after-images-for-first-patches.md`
@@ -53,13 +54,7 @@ P0-W23 proposes:
 - `docs/work/P0-W22-model-context-repository-boundary.md`
 - `docs/work/P0-W23-patch-approval-mutation.md`
 
-Review-head compare against `main`:
-
-- six Markdown files;
-- 1,233 additions and 126 deletions;
-- no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or scaffolding.
-
-The W22 work-record edits are integration-status corrections only.
+The final branch contained six Markdown files, 1,240 additions, and 126 deletions. It changed no production source, tests, dependencies, configuration, JSON Schemas, CI, scripts, preflight, Skills, prompts, agents, or scaffolding.
 
 ## Acceptance evidence
 
@@ -76,7 +71,7 @@ The W22 work-record edits are integration-status corrections only.
 | Restart classification and unknown-effect behavior | Pass | restart matrix |
 | W21 and W22 authority unchanged | Pass | upstream audit |
 | Review-head Repository validation | Pass | CI `30421607273` on `3e6045c95a10a9bc5445a0210281b95ba965b5ac` |
-| Exact closeout-head validation | Pending | final CI after this update |
+| Exact final-head validation | Pass | CI `30421678305` on `2800736164763ed931782714a5ee5b84ab18d53a` |
 
 ## Upstream ownership audit
 
@@ -86,7 +81,7 @@ It does not change Session, Task, or Run states; transitions; journal, projectio
 
 ## Verification
 
-Review head `3e6045c95a10a9bc5445a0210281b95ba965b5ac` passed GitHub CI run `30421607273`.
+Final head `2800736164763ed931782714a5ee5b84ab18d53a` passed GitHub CI run `30421678305`.
 
 The run passed Vale, current preflight behavior tests, Project agent-asset validation, dependency installation, formatting, warnings-as-errors compilation, compile-connected cycle detection, and ExUnit.
 
@@ -98,10 +93,10 @@ P0-W23 did not implement mutation; add dependencies; alter lifecycle, persistenc
 
 ## Gate verdict
 
-P0-W23 passes on this branch after exact closeout-head CI.
+**P0-W23 passed and is integrated.**
 
-Owner acceptance and integration remain required.
+Build authorization remains denied.
 
 ## Exact next action
 
-After exact-head CI passes, merge P0-W23. Then record OD-02 and run P0-W24 on current `main`.
+Record OD-02 and run P0-W24 on current `main`.
