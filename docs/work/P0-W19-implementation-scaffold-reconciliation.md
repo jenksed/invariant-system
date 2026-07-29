@@ -52,25 +52,27 @@ This pass does not implement, repair, remove, or reconfigure product source, tes
 - Provide implementation-grounded Prompt 4 inputs.
 - Do not issue build authorization.
 
-## Implemented planning changes
+## Proposed changes
 
-1. Added `docs/IMPLEMENTATION-ASSET-INVENTORY.md` with observed production, test, tooling, script, CI, agent-asset, Schema, structure, contractual-document, and absence Evidence.
-2. Added `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md` with the executive verdict, implementation-unit map, status, blast radius, dispositions, safety findings, CI meaning, and Prompt 4 inputs.
-3. Classified the Mix shell and empty supervisor as validated bootstrap implementation that can remain.
-4. Classified the version surface as partial implementation pending packaging or CLI need.
-5. Classified the preflight concept as valid conformance scaffolding and its current implementation as a build blocker.
-6. Classified preflight tests as superseded implementation because they prove obsolete positive behavior.
-7. Classified `scripts/check`, CI mechanics, and agent-asset validation as validated Repository tooling with narrow claims.
-8. Classified every Schema family separately and identified overlap, retained value, required revision, and deferred triggers.
-9. Confirmed planned gate paths and Receipts are documentation only.
-10. Identified no active runtime safety issue.
-11. Identified conformance drift, misleading green status, and near-term implementation hazards.
-12. Added implementation-grounded planning dependencies for Prompt 4.
-13. Marked ADR 0020 accepted and integrated and ADR 0019 partially superseded.
-14. Closed the P0-W18 work record as accepted and integrated.
-15. Kept build authorization denied.
+The branch implements these planning changes:
 
-## Files or components changed
+1. Add `docs/IMPLEMENTATION-ASSET-INVENTORY.md` with observed production, test, tooling, script, CI, agent-asset, Schema, structure, contractual-document, and absence Evidence.
+2. Add `docs/IMPLEMENTATION-DISPOSITION-REGISTER.md` with the executive verdict, implementation-unit map, status, blast radius, dispositions, safety findings, CI meaning, and Prompt 4 inputs.
+3. Classify the Mix shell and empty supervisor as validated bootstrap implementation that can remain.
+4. Classify the version surface as partial implementation pending packaging or CLI need.
+5. Classify the preflight concept as valid conformance scaffolding and its current implementation as a build blocker.
+6. Classify preflight tests as superseded implementation because they prove obsolete positive behavior.
+7. Classify `scripts/check`, CI mechanics, and agent-asset validation as validated Repository tooling with narrow claims.
+8. Classify every Schema family separately and identify overlap, retained value, required revision, and deferred triggers.
+9. Confirm planned gate paths and Receipts are documentation only.
+10. Identify no active runtime safety issue.
+11. Identify conformance drift, misleading green status, and near-term implementation hazards.
+12. Add implementation-grounded planning dependencies for Prompt 4.
+13. Mark ADR 0020 accepted and integrated and ADR 0019 partially superseded.
+14. Close the P0-W18 work record as accepted and integrated.
+15. Keep build authorization denied.
+
+## Files or components expected to change
 
 ### Added
 
