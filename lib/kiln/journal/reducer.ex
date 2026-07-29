@@ -92,6 +92,7 @@ defmodule Kiln.Journal.Reducer do
 
   def reduce(projection, %{type: "run_transitioned/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["run"]),
+         :ok <- match_current_run(projection, payload["run"]["from"]),
          {:ok, to} <- transition_run(projection, payload["run"]["to"]) do
       {:ok,
        projection
@@ -112,7 +113,8 @@ defmodule Kiln.Journal.Reducer do
   end
 
   def reduce(projection, %{type: "user_decision_recorded/v1", payload: payload}) do
-    with {:ok, _to} <- transition_run(projection, "ready") do
+    with :ok <- match_current_decision(projection, payload["decision_id"]),
+         {:ok, _to} <- transition_run(projection, "ready") do
       {:ok,
        projection
        |> put_run_state("ready")
@@ -123,6 +125,7 @@ defmodule Kiln.Journal.Reducer do
 
   def reduce(projection, %{type: "external_operation_intent_recorded/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["operation"]),
+         :ok <- no_current_operation(projection),
          {:ok, _to} <- transition_run(projection, "running") do
       operation = %{
         "id" => payload["operation"]["id"],
@@ -140,8 +143,10 @@ defmodule Kiln.Journal.Reducer do
 
   def reduce(projection, %{type: "external_operation_observed/v1", payload: payload}) do
     with :ok <- require_keys(payload, ["operation", "run"]),
+         {:ok, current} <- match_current_operation(projection, payload["operation"]["id"]),
          {:ok, to} <- transition_run(projection, payload["run"]["to"]) do
-      operation = Map.put(projection["operation"] || %{}, "state", payload["operation"]["state"])
+      # Preserve the operation identity and class; only advance its state.
+      operation = Map.put(current, "state", payload["operation"]["state"])
 
       {:ok,
        projection
@@ -170,6 +175,55 @@ defmodule Kiln.Journal.Reducer do
           {:error,
            %{code: :invalid_transition, detail: %{from: from_string, to: to_string_state}}}
       end
+    end
+  end
+
+  # The recorded prior Run state must equal the projection's current Run state,
+  # even when the current state could legally transition to the destination.
+  defp match_current_run(projection, recorded_from) do
+    current = projection["run"]["state"]
+
+    if recorded_from == current do
+      :ok
+    else
+      {:error, %{code: :run_from_mismatch, detail: %{recorded: recorded_from, current: current}}}
+    end
+  end
+
+  defp match_current_decision(projection, decision_id) do
+    case projection["pending_decision"] do
+      %{"id" => ^decision_id} ->
+        :ok
+
+      nil ->
+        {:error, %{code: :no_current_decision, detail: %{decision_id: decision_id}}}
+
+      %{"id" => current} ->
+        {:error, %{code: :decision_mismatch, detail: %{recorded: decision_id, current: current}}}
+    end
+  end
+
+  defp no_current_operation(projection) do
+    case projection["operation"] do
+      nil ->
+        :ok
+
+      %{"id" => current} ->
+        {:error, %{code: :operation_already_open, detail: %{current: current}}}
+    end
+  end
+
+  defp match_current_operation(projection, operation_id) do
+    case projection["operation"] do
+      %{"id" => ^operation_id} = operation ->
+        {:ok, operation}
+
+      nil ->
+        {:error, %{code: :no_current_operation, detail: %{operation_id: operation_id}}}
+
+      %{"id" => current} ->
+        {:error,
+         %{code: :operation_mismatch, detail: %{recorded: operation_id, current: current}}}
     end
   end
 
