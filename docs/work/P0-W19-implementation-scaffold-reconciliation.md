@@ -1,8 +1,9 @@
 # P0-W19: Reconcile implementation-like assets
 
 **Document type:** Planning work package  
-**Status:** Implemented; final verification pending  
+**Status:** Implemented and verified; not integrated  
 **Branch:** `work/p0-w19-implementation-scaffold-reconciliation`  
+**Pull request:** 24  
 **Depends on:** P0-W18 integrated through pull request 23  
 **Scope:** Implementation inventory, status, blast radius, disposition, and Prompt 4 inputs only
 
@@ -99,7 +100,7 @@ The branch implements these planning changes:
 
 ## Acceptance criteria
 
-| Criterion | Status before final CI | Evidence |
+| Criterion | Status | Evidence |
 | --- | --- | --- |
 | Material implementation-like assets inventoried | Pass | Implementation Asset Inventory |
 | First-month and cross-cutting units have dispositions | Pass | Implementation Disposition Register section 6 |
@@ -113,7 +114,8 @@ The branch implements these planning changes:
 | Safety and integrity findings separated | Pass | Register section 15 |
 | Prompt 4 inputs are implementation-grounded | Pass | Register sections 14 and 17 |
 | Documentation-only diff | Pass | GitHub compare against `main` |
-| Exact final-head Repository validation | Pending | GitHub CI required |
+| Repository validation | Pass | GitHub CI run `30414091632` on review head `b2043c8d3d80e33e475a5df5a581e9eb7be38be6` |
+| Exact closeout-head validation | Pending | One final CI run required after this record update |
 
 ## Verification commands
 
@@ -127,7 +129,20 @@ mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-The current CI runs the equivalent Repository checks and also runs `scripts/test-agent-preflight`.
+GitHub CI run `30414091632` executed the equivalent Repository checks on review head `b2043c8d3d80e33e475a5df5a581e9eb7be38be6`.
+
+Passed steps:
+
+- Vale prose check;
+- current agent-preflight behavior test;
+- project agent-asset validation;
+- dependency installation;
+- Elixir format check;
+- warnings-as-errors compilation;
+- compile-connected cycle detection;
+- ExUnit.
+
+The preflight result remains Evidence of obsolete behavior, not P1 compatibility.
 
 Targeted GitHub inspection proved:
 
@@ -152,7 +167,8 @@ Targeted GitHub inspection proved:
 | P0-W19-E07 | Safety and CI meaning | Register sections 15 and 16 |
 | P0-W19-E08 | Prompt 4 inputs | Register sections 14 and 17 |
 | P0-W19-E09 | Change surface | final compare against `main` |
-| P0-W19-E10 | Repository validation | final-head GitHub CI run |
+| P0-W19-E10 | Design-head validation | GitHub CI run `30414091632` |
+| P0-W19-E11 | Final validation | closeout-head GitHub CI run pending |
 
 ## Failures and warnings
 
@@ -182,6 +198,6 @@ P0-W19 does not:
 
 ## Exact next action
 
-After final-head validation, owner review, acceptance, and integration, run **Prompt 4 — Identify and sequence remaining planning rounds** against current `main`.
+After final closeout-head validation, owner review, acceptance, and integration, run **Prompt 4 — Identify and sequence remaining planning rounds** against current `main`.
 
 Do not begin Prompt 4 in this work package.
