@@ -83,9 +83,19 @@ defmodule Kiln.Test.JournalBuilder do
     action = action(d, :answer_decision, :local_user, "user:local", expected, key_byte, [])
 
     entry =
-      entry("user_decision_recorded/v1", %{"response" => "approve", "workflow_step" => "intent"})
+      entry("user_decision_recorded/v1", %{
+        "decision_id" => id(:decision, 30),
+        "response" => "approve",
+        "workflow_step" => "intent"
+      })
 
     Journal.commit(store.conn, action, [entry], now: @now)
+  end
+
+  @doc "Commit several entries as one accepted action (the multi-entry batch path)."
+  def commit_entries(store, d, kind, expected, key_byte, entries) do
+    action = action(d, kind, :system, "kiln:workflow", expected, key_byte, [])
+    Journal.commit(store.conn, action, entries, now: @now)
   end
 
   @doc "Commit `external_operation_intent_recorded/v1`, moving the Run to running."
@@ -109,7 +119,7 @@ defmodule Kiln.Test.JournalBuilder do
 
     entry =
       entry("external_operation_observed/v1", %{
-        "operation" => %{"state" => state},
+        "operation" => %{"id" => id(:operation, 40), "state" => state},
         "run" => %{"to" => run_to},
         "workflow_step" => "intent"
       })
@@ -143,12 +153,46 @@ defmodule Kiln.Test.JournalBuilder do
         schema,
         spec.session_id,
         spec.revision,
-        id(:action, 90 + spec.revision),
+        Map.get(spec, :action_id, id(:action, 90 + spec.revision)),
         spec.idempotency_key,
         spec.request_digest,
         @now,
         Kiln.Store.Canonical.encode(payload),
         Kiln.Store.Canonical.digest(schema, payload)
+      ]
+    )
+  end
+
+  @doc "A two-entry batch: transition ready to running, then bump criteria."
+  def two_entry_batch(revision) do
+    [
+      entry("run_transitioned/v1", %{
+        "run" => %{"from" => "ready", "to" => "running"},
+        "workflow_step" => "execution"
+      }),
+      entry("criteria_revised/v1", %{"criteria_revision" => revision})
+    ]
+  end
+
+  @doc "Insert an action_commit row for crafted fixtures."
+  def insert_action_commit(conn, spec) do
+    Connection.query!(
+      conn,
+      """
+      INSERT INTO action_commits
+        (action_id, session_id, idempotency_key, request_digest, expected_session_revision,
+         first_sequence, last_sequence, result_schema, result, result_digest, committed_at)
+      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'action_result/v1', '{}', 'x', ?8)
+      """,
+      [
+        spec.action_id,
+        spec.session_id,
+        spec.idempotency_key,
+        spec.request_digest,
+        spec.expected_session_revision,
+        spec.first_sequence,
+        spec.last_sequence,
+        @now
       ]
     )
   end

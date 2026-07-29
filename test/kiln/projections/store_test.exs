@@ -2,7 +2,7 @@ defmodule Kiln.Projections.StoreTest do
   use ExUnit.Case, async: true
 
   alias Kiln.Projections.{Session, Store}
-  alias Kiln.Store.Connection
+  alias Kiln.Store.{Canonical, Connection}
   alias Kiln.Test.JournalBuilder, as: JB
 
   setup do
@@ -14,57 +14,102 @@ defmodule Kiln.Projections.StoreTest do
     on_exit(fn -> stop(store.conn) end)
 
     d = JB.domain()
-    {:ok, conn: store.conn, d: d}
+    {:ok, store: store, conn: store.conn, d: d}
   end
 
   test "reports an empty Session with no journal entries", %{conn: conn, d: d} do
     assert {:ok, :empty} = Store.compare(conn, d.session.id)
   end
 
-  test "accepts a cache that already matches the rebuild", %{conn: conn, d: d} do
-    {:ok, _} = JB.commit_start(conn_store(conn), d)
-    assert {:ok, :match, _projection} = Store.compare(conn, d.session.id)
+  test "accepts a cache that already matches the rebuild", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+    assert {:ok, :match, report} = Store.compare(store.conn, d.session.id)
+
+    assert Session.digest(report.projection) ==
+             Session.digest(Store.load(store.conn, d.session.id))
   end
 
-  test "rebuilds a missing cache from the journal", %{conn: conn, d: d} do
-    {:ok, _} = JB.commit_start(conn_store(conn), d)
+  test "rebuilds a missing cache", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
 
-    Connection.query!(conn, "DELETE FROM session_projections WHERE session_id = ?1", [
+    Connection.query!(store.conn, "DELETE FROM session_projections WHERE session_id = ?1", [
       d.session.id
     ])
 
-    assert {:ok, :rebuilt, rebuilt} = Store.compare(conn, d.session.id)
-    assert Session.digest(Store.load(conn, d.session.id)) == Session.digest(rebuilt)
+    assert {:ok, :rebuilt, report} = Store.compare(store.conn, d.session.id)
+
+    assert Session.digest(Store.load(store.conn, d.session.id)) ==
+             Session.digest(report.projection)
   end
 
-  test "replaces a stale cache after the journal validates", %{conn: conn, d: d} do
-    {:ok, _} = JB.commit_start(conn_store(conn), d)
+  test "replaces a malformed cache without raising", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
 
     Connection.query!(
-      conn,
-      "UPDATE session_projections SET projection = '{\"stale\":true}', projection_digest = 'bad' WHERE session_id = ?1",
+      store.conn,
+      "UPDATE session_projections SET projection = 'not json' WHERE session_id = ?1",
       [d.session.id]
     )
 
-    assert {:ok, :rebuilt, rebuilt} = Store.compare(conn, d.session.id)
-    assert Session.digest(Store.load(conn, d.session.id)) == Session.digest(rebuilt)
+    # load is total and never raises.
+    assert Store.load(store.conn, d.session.id) == nil
+
+    assert {:ok, :replaced_malformed, report} = Store.compare(store.conn, d.session.id)
+
+    assert Session.digest(Store.load(store.conn, d.session.id)) ==
+             Session.digest(report.projection)
   end
 
-  test "blocks on a corrupt journal and preserves the cache", %{conn: conn, d: d} do
-    {:ok, _} = JB.commit_start(conn_store(conn), d)
-    original = Store.load(conn, d.session.id)
+  test "replaces a cache whose metadata is inconsistent", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
 
     Connection.query!(
-      conn,
+      store.conn,
+      "UPDATE session_projections SET session_revision = 999 WHERE session_id = ?1",
+      [d.session.id]
+    )
+
+    assert {:ok, :replaced_invalid_metadata, _report} = Store.compare(store.conn, d.session.id)
+  end
+
+  test "replaces a stale but internally consistent cache", %{store: store, d: d} do
+    {:ok, r0} = JB.commit_start(store, d)
+    {:ok, _r1} = JB.commit_transition(store, d, "ready", "running", 0, 3)
+
+    # Overwrite the cache with the earlier, self-consistent revision-0 projection.
+    proj0 = r0.projection
+
+    Connection.query!(
+      store.conn,
+      "UPDATE session_projections SET session_revision = ?1, last_sequence = ?2, projection = ?3, projection_digest = ?4 WHERE session_id = ?5",
+      [
+        proj0["session_revision"],
+        proj0["last_sequence"],
+        Canonical.encode(proj0),
+        Session.digest(proj0),
+        d.session.id
+      ]
+    )
+
+    assert {:ok, :replaced_stale, report} = Store.compare(store.conn, d.session.id)
+    assert report.session_revision == 1
+
+    assert Session.digest(Store.load(store.conn, d.session.id)) ==
+             Session.digest(report.projection)
+  end
+
+  test "blocks on a corrupt journal and preserves the cache", %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+    original = Store.load(store.conn, d.session.id)
+
+    Connection.query!(
+      store.conn,
       ~s|UPDATE journal_entries SET payload = '{"tampered":true}' WHERE session_revision = 0|
     )
 
-    assert {:error, %{code: :corrupt_payload}} = Store.compare(conn, d.session.id)
-    # The cache is not replaced from an invalid journal.
-    assert Session.digest(Store.load(conn, d.session.id)) == Session.digest(original)
+    assert {:error, %{code: :corrupt_payload}} = Store.compare(store.conn, d.session.id)
+    assert Session.digest(Store.load(store.conn, d.session.id)) == Session.digest(original)
   end
-
-  defp conn_store(conn), do: %{conn: conn}
 
   defp stop(conn) do
     if Process.alive?(conn), do: GenServer.stop(conn)

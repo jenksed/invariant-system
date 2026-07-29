@@ -31,7 +31,9 @@ defmodule Kiln.RestartTest do
 
     assert {:ok, recon} = Restart.reconstruct(restarted.conn)
     assert recon.session_revision == 3
-    assert recon.compare == :match
+    assert recon.action_count == 4
+    assert recon.entry_count == 4
+    assert recon.cache_status == :match
     assert recon.orphaned == false
     assert recon.projection["run"]["state"] == "ready"
     assert recon.projection["pending_decision"] == nil
@@ -59,14 +61,32 @@ defmodule Kiln.RestartTest do
     assert recon.projection["operation"]["state"] == "unknown"
     assert recon.projection["unknowns"] != []
 
-    # Reconstruction dispatches and appends nothing: the journal is unchanged.
+    # Reconstruction dispatches and appends nothing.
     assert count(restarted.conn, "journal_entries") == entries_before
+
+    # Repeated reconstruction is idempotent: no duplicate unknown marker.
+    assert {:ok, again} = Restart.reconstruct(restarted.conn)
+    assert length(again.projection["unknowns"]) == 1
+    assert again.projection["unknowns"] == recon.projection["unknowns"]
   end
 
   test "reports an empty store", %{path: path} do
     store = JB.store(path)
     on_exit(fn -> stop(store.conn) end)
     assert {:ok, :empty} = Restart.reconstruct(store.conn)
+  end
+
+  test "blocks explicitly when more than one Session exists", %{path: path} do
+    store = JB.store(path)
+    on_exit(fn -> stop(store.conn) end)
+
+    d1 = JB.domain(1)
+    d2 = JB.domain(9)
+    {:ok, _} = JB.commit_entries(store, d1, :start_session, 0, 2, [JB.start_entry(d1)])
+    {:ok, _} = JB.commit_entries(store, d2, :start_session, 0, 8, [JB.start_entry(d2)])
+
+    assert {:error, %{code: :multiple_sessions, detail: %{count: 2}}} =
+             Restart.reconstruct(store.conn)
   end
 
   test "blocks reconstruction on a corrupt journal", %{path: path} do

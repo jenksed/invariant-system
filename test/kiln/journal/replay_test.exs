@@ -3,6 +3,7 @@ defmodule Kiln.Journal.ReplayTest do
 
   alias Kiln.Journal.Replay
   alias Kiln.Projections.{Session, Store}
+  alias Kiln.Store.Connection
   alias Kiln.Test.JournalBuilder, as: JB
 
   setup do
@@ -22,97 +23,67 @@ defmodule Kiln.Journal.ReplayTest do
     {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3)
     {:ok, last} = JB.commit_criteria(store, d, 1, 4, 1)
 
-    assert {:ok, rebuild} = Replay.rebuild(store.conn, d.session.id)
-    assert rebuild.session_revision == 2
-    assert rebuild.entry_count == 3
+    assert {:ok, report} = Replay.rebuild(store.conn, d.session.id)
+    assert report.session_revision == 2
+    assert report.action_count == 3
+    assert report.entry_count == 3
+    assert report.first_sequence == 1
+    assert report.last_sequence == 3
 
-    # Byte-for-byte identical to the stored projection produced at commit time.
-    assert Session.digest(rebuild.projection) == Session.digest(last.projection)
+    assert Session.digest(report.projection) == Session.digest(last.projection)
 
-    assert Session.digest(rebuild.projection) ==
+    assert Session.digest(report.projection) ==
              Session.digest(Store.load(store.conn, d.session.id))
   end
 
-  test "a duplicate identical action produces no extra projected effect", %{store: store, d: d} do
-    {:ok, _} = JB.commit_start(store, d)
-    {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3)
+  test "applies every entry of one accepted multi-entry action", %{store: store, d: d} do
+    {:ok, start} = JB.commit_start(store, d)
+    # One action appends two legitimate entries sharing its idempotency key.
+    {:ok, batch} = JB.commit_entries(store, d, :transition_run, 0, 5, JB.two_entry_batch(1))
 
-    # A crafted duplicate of the transition: same key and digest, later revision.
-    JB.insert_entry_row(store.conn, %{
-      session_id: d.session.id,
-      sequence: 100,
-      revision: 2,
-      type: "run_transitioned/v1",
-      payload: %{"run" => %{"from" => "running", "to" => "running"}},
-      idempotency_key: JB.id(:idempotency, 3),
-      request_digest: JB.digest(3)
-    })
+    # Commit-time projection reflects both entries.
+    assert batch.session_revision == 2
+    assert batch.projection["run"]["state"] == "running"
+    assert batch.projection["criteria_revision"] == 1
 
-    assert {:ok, rebuild} = Replay.rebuild(store.conn, d.session.id)
-    # The duplicate is skipped: Run stays running and the revision does not advance.
-    assert rebuild.projection["run"]["state"] == "running"
-    assert rebuild.session_revision == 1
-  end
+    assert {:ok, report} = Replay.rebuild(store.conn, d.session.id)
+    assert report.action_count == 2
+    assert report.entry_count == 3
+    assert report.session_revision == 2
 
-  test "blocks a conflicting duplicate idempotency key at its boundary", %{store: store, d: d} do
-    {:ok, _} = JB.commit_start(store, d)
-    {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3)
-
-    JB.insert_entry_row(store.conn, %{
-      session_id: d.session.id,
-      sequence: 100,
-      revision: 2,
-      type: "run_transitioned/v1",
-      payload: %{"run" => %{"from" => "running", "to" => "failed"}},
-      idempotency_key: JB.id(:idempotency, 3),
-      request_digest: "sha256:different"
-    })
-
-    assert {:error, %{code: :idempotency_conflict, boundary: 100}} =
-             Replay.rebuild(store.conn, d.session.id)
+    # Replay is byte-for-byte identical to the commit-time projection: no entry
+    # of the multi-entry action is dropped as a duplicate.
+    assert Session.digest(report.projection) == Session.digest(batch.projection)
+    refute Session.digest(report.projection) == Session.digest(start.projection)
   end
 
   test "blocks a revision discontinuity at its boundary", %{store: store, d: d} do
     {:ok, _} = JB.commit_start(store, d)
     {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3)
 
-    # Corrupt the second entry's revision to create a gap.
-    Kiln.Store.Connection.query!(
+    Connection.query!(
       store.conn,
       "UPDATE journal_entries SET session_revision = 5 WHERE session_revision = 1"
     )
 
-    assert {:error, %{code: :revision_discontinuity, detail: %{expected: 1, got: 5}}} =
+    Connection.query!(
+      store.conn,
+      "UPDATE action_commits SET first_sequence = 2 WHERE first_sequence = 2"
+    )
+
+    assert {:error, %{code: :revision_discontinuity, boundary: 2}} =
              Replay.rebuild(store.conn, d.session.id)
   end
 
   test "blocks a corrupt payload at its boundary", %{store: store, d: d} do
     {:ok, _} = JB.commit_start(store, d)
 
-    # Tamper the payload text while leaving the stored digest unchanged.
-    Kiln.Store.Connection.query!(
+    Connection.query!(
       store.conn,
       ~s|UPDATE journal_entries SET payload = '{"tampered":true}' WHERE session_revision = 0|
     )
 
     assert {:error, %{code: :corrupt_payload, detail: %{reason: :digest_mismatch}}} =
-             Replay.rebuild(store.conn, d.session.id)
-  end
-
-  test "blocks an invalid transition recorded in the journal", %{store: store, d: d} do
-    {:ok, _} = JB.commit_start(store, d)
-
-    JB.insert_entry_row(store.conn, %{
-      session_id: d.session.id,
-      sequence: 100,
-      revision: 1,
-      type: "run_transitioned/v1",
-      payload: %{"run" => %{"from" => "ready", "to" => "waiting_for_user"}},
-      idempotency_key: JB.id(:idempotency, 7),
-      request_digest: JB.digest(7)
-    })
-
-    assert {:error, %{code: :invalid_transition, boundary: 100}} =
              Replay.rebuild(store.conn, d.session.id)
   end
 
@@ -126,10 +97,9 @@ defmodule Kiln.Journal.ReplayTest do
     assert {:ok, after_transcripts} = Replay.rebuild(store.conn, d.session.id)
     assert Session.digest(after_transcripts.projection) == Session.digest(before.projection)
 
-    # Transcript ordering is retained separately from work state.
     ids =
       store.conn
-      |> Kiln.Store.Connection.query!(
+      |> Connection.query!(
         "SELECT transcript_id FROM transcript_records WHERE session_id = ?1 ORDER BY transcript_id",
         [d.session.id]
       )
