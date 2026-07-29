@@ -85,7 +85,8 @@ defmodule Kiln.Domain.Operation do
     end
   end
 
-  def intent(_attrs), do: {:error, Error.new(:invalid_attributes, "operation attributes must be a map")}
+  def intent(_attrs),
+    do: {:error, Error.new(:invalid_attributes, "operation attributes must be a map")}
 
   @spec observe(t(), state(), map()) :: {:ok, t()} | {:error, Error.t()}
   def observe(%__MODULE__{} = operation, state, attrs) when is_map(attrs) do
@@ -113,21 +114,35 @@ defmodule Kiln.Domain.Operation do
   def classes, do: @classes
 
   defp validate_class(class) when class in @classes, do: :ok
-  defp validate_class(_class), do: {:error, Error.new(:invalid_operation_class, "operation class is not supported", :class)}
+
+  defp validate_class(_class),
+    do: {:error, Error.new(:invalid_operation_class, "operation class is not supported", :class)}
 
   defp validate_observation_transition(:intent_recorded, :started), do: :ok
-  defp validate_observation_transition(:intent_recorded, state) when state in @terminal_states, do: :ok
-  defp validate_observation_transition(:started, state) when state in @terminal_states, do: :ok
+
+  defp validate_observation_transition(:intent_recorded, state) when state in @terminal_states,
+    do: :ok
+
+  defp validate_observation_transition(:started, state) when state in @terminal_states,
+    do: :ok
 
   defp validate_observation_transition(from, to) do
     {:error,
-     Error.new(:invalid_operation_transition, "operation transition is not allowed", :state, %{from: from, to: to})}
+     Error.new(:invalid_operation_transition, "operation transition is not allowed", :state, %{
+       from: from,
+       to: to
+     })}
   end
 
   defp validate_revision(value) when is_integer(value) and value >= 0, do: :ok
 
   defp validate_revision(_value) do
-    {:error, Error.new(:invalid_revision, "subject revision must be a non-negative integer", :subject_revision)}
+    {:error,
+     Error.new(
+       :invalid_revision,
+       "subject revision must be a non-negative integer",
+       :subject_revision
+     )}
   end
 
   defp digest(attrs, field) do
