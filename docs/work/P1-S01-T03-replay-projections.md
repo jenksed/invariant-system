@@ -188,9 +188,15 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after PR #39 review remediation
+**Result:** Complete after two PR #39 review rounds
 
-The first submission passed all its tests and CI, but PR #39 review `4810420585` found that replay could reconstruct incorrect durable state while the suite stayed green. The remediation below corrects the defects and adds protected tests that fail before the fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Two review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5 below); review `4812134584` found three more (D6 to D8). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+
+### Final review corrections (review 4812134584)
+
+- **D6 Commit and replay did not share entry validation.** Replay decoded entries; `Kiln.Store.Journal.commit/4` inserted and reduced raw entries. An entry could commit and then fail on restart replay. Fix: `commit/4` now decodes every entry with `Kiln.Journal.Entry.decode/2` before the transaction opens; an invalid entry writes no journal row, no action commit, and no projection. Commit and replay share one decoder and reducer. The invariant holds: if an entry can commit, it can replay.
+- **D7 Wrong workflow-step authority.** `Kiln.Journal.Entry` accepted invented steps (`execution`, `completion`) and omitted accepted ones. Fix: the journal steps are derived from `Kiln.Domain.Run.workflow_steps/0` and converted to strings at the decoding boundary, so commit-time and replay-time validation cannot drift.
+- **D8 Session discovery ignored action commits.** `Replay.sessions/1` read only `journal_entries`, so an action commit with missing journal rows reported an empty store. Fix: discovery is the distinct union of `journal_entries` and `action_commits` session ids; a commit with missing rows now blocks on `:missing_journal_rows`, and the projection cache never creates a candidate.
 
 ### Observed defects (PR #39 review)
 
@@ -224,11 +230,11 @@ The first submission passed all its tests and CI, but PR #39 review `4810420585`
 | P1-S01-T03-AC03 | Pass | P1-S01-T03-E03 | transcript records leave the projection digest unchanged and keep their own ordering |
 | P1-S01-T03-AC04 | Pass | P1-S01-T03-E04 | a nonterminal operation reconstructs as unknown operation and `orphaned` Run, appends nothing, dispatches nothing, and is idempotent on repeat |
 | P1-S01-T03-AC05 | Pass | P1-S01-T03-E05 | missing, malformed, metadata-mismatched, and stale caches are replaced after full journal validation; a matching cache is kept; a corrupt journal blocks and preserves the cache |
-| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `0e282c8`; no excluded capability is reachable |
+| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `b613c2c`; no excluded capability is reachable |
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `0e282c85`.
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `b613c2c8`.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
@@ -243,8 +249,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 | `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures |
 | `mix test test/kiln/projections` | 0 | cache classification and rebuild |
 | `mix test test/kiln/restart_test.exs` | 0 | restart, orphan, multiple-Session, idempotence |
-| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 42 passed |
-| `mix test` | 0 | 89 passed |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 50 passed |
+| `mix test` | 0 | 97 passed |
 | `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### New protected tests
@@ -277,8 +283,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 
 ### Repository state
 
-- Commit: `0e282c852d45ac4eca914a9f7a8109fdcad627c3`
+- Commit: `b613c2c8d0c8644a212d8bba42d954fe3677e6a1`
 - Branch: `work/p1-s01-t03-replay-projections`
-- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (2196 insertions, 105 deletions versus `main`)
+- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (2453 insertions, 106 deletions versus `main`)
 - Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
 - Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04
