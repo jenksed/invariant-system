@@ -3,7 +3,7 @@ defmodule Kiln.Store.FixturesTest do
 
   alias Kiln.Domain.{Action, ProjectObservation, Session}
   alias Kiln.Store
-  alias Kiln.Store.Journal
+  alias Kiln.Store.{Canonical, Journal}
 
   @now "2026-07-29T13:30:00Z"
   @at ~U[2026-07-29 13:30:00Z]
@@ -14,6 +14,17 @@ defmodule Kiln.Store.FixturesTest do
     File.mkdir_p!(dir)
     on_exit(fn -> File.rm_rf!(dir) end)
     {:ok, dir: dir, path: Path.join(dir, "state.sqlite3")}
+  end
+
+  test "canonical JSON supports every scalar accepted by the domain payload contract" do
+    assert Canonical.encode(%{count: 2, "ratio" => 1.5, enabled: true, note: nil}) ==
+             ~s({"count":2,"enabled":true,"note":null,"ratio":1.5})
+  end
+
+  test "canonical JSON rejects atom and string keys that normalize to the same key" do
+    assert_raise ArgumentError, ~r/duplicate normalized key "same"/, fn ->
+      Canonical.encode(%{:same => 1, "same" => 2})
+    end
   end
 
   test "integrity-blocks a corrupt store and preserves the file", %{path: path} do
@@ -42,6 +53,8 @@ defmodule Kiln.Store.FixturesTest do
   @tag :slow
   test "classifies a busy writer after the accepted timeout", %{path: path} do
     {:ready, store} = Store.start(path: path, store_id: "store_fixture", now: @now)
+    on_exit(fn -> stop(store.conn) end)
+
     {:ok, action, entries} = start_request(store)
 
     # A second raw connection holds the WAL write lock for the whole attempt.
@@ -119,5 +132,12 @@ defmodule Kiln.Store.FixturesTest do
   defp id(kind, byte) do
     {:ok, value} = Kiln.Domain.Id.generate(kind, fn 16 -> :binary.copy(<<byte>>, 16) end)
     value
+  end
+
+  defp stop(conn) do
+    if Process.alive?(conn), do: GenServer.stop(conn)
+    :ok
+  catch
+    :exit, _reason -> :ok
   end
 end
