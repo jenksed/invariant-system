@@ -1,419 +1,438 @@
 # Roadmap
 
 **Document type:** Implementation-order authority  
-**Decision status:** Owner-directed reconciliation  
-**Integration status:** Proposed on P0-W16
+**Decision status:** Proposed P0-W18 reconciliation; owner acceptance required  
+**Integration status:** Proposed on `work/p0-w18-product-scope-architecture`  
+**Implementation status:** No product slice implemented  
+**Product-scope authority:** `docs/PRODUCT-SCOPE-AND-MINIMUM-ARCHITECTURE.md`
 
 ## Roadmap rule
 
-Kiln is implemented through vertical product slices.
+Kiln is implemented through vertical user workflows.
 
-The roadmap does not complete an internal component merely because the final architecture contains it. Each slice must produce user-visible value, deterministic tests, an explicit security boundary, a demo, and a Receipt.
+A slice must produce usable behavior, deterministic tests, an explicit security boundary, a demo, and a bounded Receipt.
 
-Detailed slice contracts are in `docs/IMPLEMENTATION-SLICES.md`.
+A slice does not complete a subsystem merely because the long-term architecture describes it.
 
-## Integrated product sequence
+Build authorization has not been issued.
+
+# Product sequence
 
 ```text
-Navigable work
-→ real read-only investigation
-→ visible background work and Attention
-→ independent verification
-→ durable recovery
+one durable CLI Run
+→ one real evidence-backed change
+→ interruption and unknown-effect recovery
+→ one bounded read-only Scout Child
+→ one independent Verifier Child
+→ optional TUI projection
+→ managed mutation isolation
 → local code intelligence
-→ safe delegated writing
 → evidence-driven interoperability
 → local project intelligence
-→ later expansion evaluations
 ```
 
-## Reconciliation with the broader architecture sequence
+The sequence proves a coding workflow before it proves a Run graph interface, generalized infrastructure, protocols, or indexes.
 
-The prior broader sequence remains useful as an architecture map, not as a component-first implementation order.
+# Phase 0 — Planning completion
 
-| Broader architectural area | Reconciled vertical delivery |
-| --- | --- |
-| Internal foundations | Introduced incrementally in P1-S01 through P1-S05. Domain, events, authority, execution, Evidence, and persistence are not separate pre-product phases. |
-| Local code intelligence | P1-S06 after the durable Run kernel exists. Tree-sitter comes before broad live LSP dependence. |
-| Protocol interoperability | P1-S08 after native commands, projections, Evidence, and recovery exist. Adapters are independently evidence-gated. |
-| Local project knowledge | P1-S09 reuses Slice 6 extractors and indexes under stricter reference-Repository policy. |
-| Advanced project intelligence | Deferred until deterministic retrieval and dogfooding identify real missed query classes. |
-| Expanded interfaces | ACP begins in P1-S08; AG-UI, Phoenix, and other interfaces remain later consumers of the same projections. |
-
-## Phase 0 — Planning and architecture foundation
-
-**Goal:** constrain the product enough to begin implementation without freezing speculative implementation detail.
-
-### Integrated work
+## Integrated planning
 
 | ID | Outcome | Status |
 | --- | --- | --- |
-| P0-W01 through P0-W05 | Repository foundation, work governance, development controls, Run graph direction, and planning baseline. | Integrated |
-| P0-W06 | Protocol-neutral internal domain model. | Integrated |
-| P0-W07 | Capability integration hierarchy and broker. | Integrated |
-| P0-W08 | Bounded Context compiler. | Integrated |
-| P0-W09 | Protocol and standards strategy. | Integrated through pull request 13 |
-| P0-W10 | Git change isolation. | Integrated through pull request 14 |
-| P0-W11 | Delegated Run model. | Integrated through pull request 15 |
-| P0-W12 | Initial CLI and TUI. | Integrated through pull request 16 |
-| P0-W13 | Read-only local project intelligence. | Integrated through pull request 17 |
-| P0-W14 | Local project intelligence security boundary. | Integrated through pull request 18 |
-| P0-W15 | Trustworthy execution plane. | Integrated through pull request 19 |
-| P0-W16 | Integrated architecture, document hierarchy, vertical slices, and first twelve-week target. | In progress |
+| P0-W01 through P0-W15 | Foundation, domain, Capability, Context, Git, delegation, interface, knowledge, security, and execution planning | Integrated |
+| P0-W16 | Integrated architecture and earlier vertical roadmap | Integrated through pull requests 20 and 21 |
+| P0-W17 | Planning-completion baseline | Integrated through pull request 22 |
+| P0-W18 | Product, scope, and minimum architecture reconciliation | Proposed on current branch |
 
-### Phase 0 exit
+## Remaining planning-completion sequence
 
-Phase 0 exits when P0-W16 is accepted and integrated.
+```text
+P0-W18  product, scope, and minimum architecture
+→ Prompt 3  implementation and scaffold reconciliation
+→ Prompt 4  remaining planning-round register
+→ Prompt 5  required focused planning rounds
+→ Prompt 6  justified conformance scaffolding
+→ Prompt 7  independent adversarial review
+→ Prompt 8  adjudication and build authorization
+```
 
-At exit, the Repository has:
+## Phase 0 exit
 
-- one integrated architecture authority;
-- one vertical implementation roadmap;
-- one detailed slice plan;
-- accepted subject specifications and ADRs;
-- explicit version 0.1 scope;
-- a first coding task;
-- a twelve-week target;
-- no claim that planned runtime capabilities are implemented.
+Phase 0 exits only after Prompt 8 issues explicit build authorization.
+
+A named first ticket, accepted architecture, passing documentation CI, or existing JSON Schema does not authorize construction.
 
 ---
 
-# Phase 1 — Vertical product slices
+# Phase 1 — Change-loop-first product slices
 
-## P1-S01 — Navigable simulated Runs
+## P1-S01 — Durable single-Run CLI
 
-**Purpose:** prove the product interaction before persistence, providers, or Commands.
+**Purpose:** establish the smallest durable Kiln work boundary before model or mutation complexity.
 
-**Deliver:**
+### User-visible outcome
 
-- Session;
-- Root and Child Runs;
-- Run tree, breadcrumb, Child cards, Parent and sibling navigation;
-- simulated streaming events;
-- client-local focus;
-- renderer-independent projections;
-- headless TUI tests.
+A developer can open one Repository, record one objective and criteria, create one Session, Task, and Root Run, inspect status through the CLI, restart Kiln, and return to the same work state.
 
-**Exit:** a user can navigate a deterministic simulated Run graph and the same interactions pass headlessly.
+### Deliver
 
-**Branch:** `work/p1-s01-navigable-runs`
+- one active Project and Repository boundary;
+- Session, Task, Root Run, and minimum lifecycle;
+- append-oriented SQLite journal;
+- current projections;
+- transcript records separate from domain events;
+- CLI start, status, inspect, cancel, and resume actions;
+- restart reconstruction;
+- one bounded slice Receipt.
 
-## P1-S02 — One real read-only Scout
+### Explicit exclusions
 
-**Purpose:** prove one real evidence-backed model Child without mutation.
+- provider invocation;
+- source mutation;
+- Commands;
+- Child Runs;
+- TUI;
+- Capability broker service;
+- code intelligence;
+- protocols.
 
-**Deliver:**
+### Exit
 
-- one direct provider adapter, MiniMax first;
-- minimal deterministic model routing;
-- independent Child Context;
-- minimal Capability broker and read-only grants;
-- native Repository search and reads;
-- token and step limits;
-- structured Scout result and source Evidence;
-- Parent result delivery.
+The same objective, criteria, Task, Root Run, current status, warnings, and user decisions are reconstructed after restart without treating a transcript summary as state.
 
-**Exit:** a real Scout answers one bounded Repository question with current source references and no mutation.
+### Proposed ticket sequence
 
-**Branch:** `work/p1-s02-real-read-only-scout`
+| Ticket | Outcome |
+| --- | --- |
+| P1-S01-T01 | Minimal Project subset, Session, Task, Run, Event, identifiers, and pure transition rules |
+| P1-S01-T02 | SQLite journal transaction and migration boundary |
+| P1-S01-T03 | Current Session, Task, and Run projections plus deterministic replay |
+| P1-S01-T04 | CLI start, status, inspect, cancel, and resume actions |
+| P1-S01-T05 | Restart, duplicate-event, invalid-transition, and Receipt fixtures |
 
-## P1-S03 — Background work and Attention
+No ticket plan is accepted until Prompt 8 authorizes implementation.
 
-**Purpose:** make concurrency visible and user-controlled.
+## P1-S02 — Evidence-backed single-Run change loop
 
-**Deliver:**
+**Purpose:** prove Kiln's complete coding value in one Root Run.
 
-- Parent and Child concurrency;
-- Worker leases and scheduler limits;
-- global Attention inbox;
-- questions and permission requests;
-- pause, resume, and cancel;
-- completion notifications;
-- race-safe responses.
+### User-visible outcome
 
-**Exit:** background work never becomes hidden or silently blocked.
+A developer can ask one model to investigate the active Repository, inspect one exact Patch proposal, approve it, apply it, run one registered verification Command, and accept completion only when current Evidence passes.
 
-**Branch:** `work/p1-s03-background-attention`
+### Deliver
 
-## P1-S04 — Independent Verifier
+- one provider-neutral behaviour;
+- deterministic fake provider;
+- one configured real provider adapter;
+- explicit Context package and manifest;
+- at most four model-facing Tools;
+- native bounded Repository read and exact search;
+- Claims separated from source observations;
+- exact base-bound Patch proposal;
+- explicit user Approval for the Patch digest;
+- transactional Patch application and rollback reference;
+- one registered non-shell verification Command;
+- transient model and Command Workers;
+- initial Artifact store;
+- criterion Evidence and completion Receipt;
+- recovery without automatic repeat of uncertain effects.
 
-**Purpose:** prove that verification is independent from author confidence.
+### Explicit exclusions
 
-**Deliver:**
+- Child Runs;
+- background concurrency;
+- TUI;
+- managed worktrees;
+- arbitrary shell;
+- general model router;
+- general Capability broker;
+- Skills;
+- LSP or Tree-sitter;
+- protocols.
 
-- requirement and diff packages;
-- independent Verifier Context and grants;
-- minimal registered Command runner;
-- bounded output Artifacts;
-- one structured test-report adapter;
-- `PASS`, `FAIL`, and `BLOCKED`;
-- current Evidence and verification Receipt;
-- no source editing.
+### Exit
 
-**Exit:** a Verifier reproduces results against exact state and cannot repair the evaluated change.
+One real source change moves from accepted intent to user-accepted verified completion. Failed, blocked, stale, contradictory, or orphaned Evidence prevents completion.
 
-**Branch:** `work/p1-s04-independent-verifier`
+### First-month milestone — Single-Run Change Alpha
 
-## P1-S05 — Durable recovery
+P1-S01 and P1-S02 form the first-month target.
 
-**Purpose:** turn the proven interaction and execution semantics into a durable local runtime.
+```text
+open Repository
+→ record objective and criteria
+→ investigate through bounded reads
+→ propose exact Patch
+→ approve Patch digest
+→ apply Patch
+→ run registered verification
+→ inspect current Evidence
+→ accept completion
+→ restart and restore the record
+```
 
-**Deliver:**
+## P1-S03 — Interruption and unknown-effect recovery
 
-- SQLite event journal and migrations;
-- durable Sessions, Tasks, Runs, transcripts, Attention, Artifacts, Checkpoints, Receipts, and client cursors;
-- rebuildable projections;
-- local runtime endpoint;
-- snapshot and event replay;
-- restart reconciliation and orphan detection.
+**Purpose:** make model, Patch, Command, and application interruption safe and honest.
 
-**Exit:** restarting Kiln reconstructs the same navigable state without transcript reconstruction or duplicate effects.
+### User-visible outcome
 
-**Branch:** `work/p1-s05-durable-recovery`
+The developer can cancel active execution, restart after failure, inspect the last durable boundary, and reconcile uncertain effects without Kiln claiming success or repeating work automatically.
 
-### Version 0.1 milestone — Durable Operator Kernel
+### Deliver
+
+- explicit model and Command cancellation;
+- primary-platform process-tree control;
+- timeout behavior;
+- Patch rollback and partial-failure fixtures;
+- `orphaned` state and reconciliation actions;
+- idempotency keys for external-effect requests;
+- stale Evidence invalidation;
+- retained dirty work and safe cleanup decisions;
+- recovery-focused CLI output.
+
+### Exit
+
+Every interrupted model invocation, Patch, and Command resolves to a known failure, cancellation, rollback, or explicit orphaned state.
+
+## P1-S04 — One bounded Scout Child
+
+**Purpose:** earn the Run graph through one useful delegated investigation.
+
+### User-visible outcome
+
+The Root Run can create one read-only Scout Child, continue or wait, inspect the Child through the CLI, respond to a blocking question, cancel it, and receive one bounded evidence-backed result.
+
+### Deliver
+
+- one depth-one Child Run;
+- maximum one active Child per Session;
+- immutable delegation contract;
+- independent Child Context and narrower grants;
+- one transient Child Worker lease;
+- bounded result delivery;
+- Root-visible Attention for question, permission, failure, and completion;
+- CLI Run list, inspect, enter, return-to-Root, answer, deny, and cancel;
+- no source mutation;
+- no nested delegation.
+
+### Exit
+
+A real Scout Child improves investigation without hidden work, ambient authority, transcript copying, or recursive management.
+
+## P1-S05 — Independent Verifier Child
+
+**Purpose:** separate completion Evidence from author confidence.
+
+### User-visible outcome
+
+The Root Run can create one Verifier Child with independent Context and read-only authority. The Child reproduces required checks and returns `PASS`, `FAIL`, or `BLOCKED` without repairing the evaluated change.
+
+### Deliver
+
+- Verifier role contract;
+- independent criteria and state package;
+- no author-confidence narrative in initial Context;
+- no write or Patch Tool;
+- controlled reuse of registered Commands;
+- structured result and Evidence freshness;
+- bounded Parent delivery;
+- verification Receipt;
+- CLI comparison of Root Claim and Verifier result.
+
+### Exit
+
+Completion can require an independently reproduced result that cannot be converted to `PASS` by the authoring model, a Receipt, or missing tooling.
+
+### Version 0.1 milestone — Trustworthy Delegated CLI
 
 Version 0.1 is complete through P1-S05.
 
-It proves:
+It includes:
 
-- navigable Root and Child Runs;
-- one real read-only Scout;
-- background work and global Attention;
-- independent controlled verification;
-- Artifacts, Evidence, and Receipts sufficient for those workflows;
-- durable restart and recovery;
-- CLI and TUI projections over the same state.
+- one complete durable source-change loop;
+- one read-only Scout Child;
+- one independent Verifier Child;
+- maximum Child depth one;
+- maximum one active Child;
+- Root-visible Attention;
+- exact mutation and Command controls;
+- current Evidence and Receipts;
+- restart and orphan recovery;
+- CLI access to all required actions and status.
 
-It intentionally does not write source.
+It does not include a TUI, nested or concurrent Child graph, writing Child, managed worktree provisioning, code intelligence, protocols, local project intelligence, telemetry export, or remote execution.
 
-## P1-S06 — Local code intelligence
+---
 
-**Purpose:** give Runs compact semantic, structural, and documentation awareness of the active Repository.
+# Phase 2 — Evidence-gated expansion
 
-**Deliver:**
+Phase 2 items do not enter version 0.1 merely because planning exists.
 
-- Repository map;
-- Tree-sitter extraction;
-- native LSP adapter and on-demand lifecycle;
-- persistent normalized semantic cache;
-- documentation resolver;
-- Agent Skill discovery and lazy loading;
-- Context compiler retrieval integration;
-- digest-based invalidation.
+## P2-S01 — TUI projection
 
-**Exit:** a Run can answer definition, reference, diagnostic, structural, and documentation questions through bounded provenance-bearing Context.
+**Entry conditions:**
 
-**Branch:** `work/p1-s06-local-code-intelligence`
+- CLI commands and projections are stable;
+- one real Child workflow exists;
+- terminal navigation has actual work to display;
+- the chosen TUI library passes a focused dependency and headless-behavior review.
 
-## P1-S07 — Safe writing delegation
+**Outcome:** a renderer-independent Run-focused TUI consumes existing commands and projections without becoming state authority.
 
-**Purpose:** add delegated authoring without granting a Child a shared writable checkout.
+## P2-S02 — Managed mutation isolation
 
-**Chosen design:** the Child returns an immutable Patch Artifact. The Parent owns one exclusive writable worktree, applies the Patch, formats, validates, and retains rollback Evidence.
+**Entry conditions:**
 
-**Deliver:**
+- the single selected checkout creates a measured safety or concurrency limitation;
+- Patch application and recovery are stable;
+- worktree lifecycle and cleanup planning is accepted.
 
-- task branch and worktree lease;
-- Patch-proposal Child contract;
-- exact Patch, create, delete, move, and rename preview;
-- deterministic preview, conflict checks, atomic application, rollback, and changed regions;
-- formatter and focused validation Commands;
-- Change set and Patch Receipt.
+**Outcome:** one managed exclusive worktree supports an authorized mutation owner. Writing Children remain separately gated.
 
-**Exit:** one delegated proposal is safely applied and verified without simultaneous writers.
+## P2-S03 — Safe delegated Patch proposal
 
-**Branch:** `work/p1-s07-safe-writing-delegation`
+**Entry conditions:**
 
-## P1-S08 — Capability interoperability
+- Scout and Verifier Child boundaries are stable;
+- managed mutation isolation is available when required;
+- Patch proposal quality and review cost justify delegated authoring.
 
-**Purpose:** prove that external clients, capability protocols, result formats, and contained Environments adapt to Kiln rather than redefining it.
+**Outcome:** one read-only Child returns an immutable Patch Artifact. The Root or authorized applying Run owns application and verification.
 
-**Required first increments:**
+## P2-S04 — Local code intelligence
 
-1. local ACP attach and reconnect;
-2. broader structured test and SARIF ingestion.
+**Entry conditions:**
 
-**Evidence-gated increments:**
+- deterministic source search has measured retrieval, latency, or token failures;
+- one supported language workflow is accepted;
+- parser and language-server lifecycle planning is complete.
 
-3. one local MCP client integration for a concrete capability;
-4. one OpenAPI-generated capability for a different concrete service;
-5. one accepted Dev Container profile;
-6. one pinned OCI worker when stronger disposable isolation is required.
+**Outcome:** Tree-sitter, selected read-only LSP operations, version-matched documentation, and an optional normalized cache improve bounded active-Repository Context.
 
-MCP and OpenAPI are not both implemented for the same narrow service merely for protocol coverage.
+## P2-S05 — Capability interoperability
 
-**Exit:** at least one external Client and one external Capability or Environment path pass native authorization, execution, Artifact, Evidence, and recovery rules.
+**Entry conditions:**
 
-**Branch:** `work/p1-s08-capability-interoperability`
-
-## P1-S09 — Local project intelligence
-
-**Purpose:** retrieve reusable local engineering evidence across approved roots without instruction authority or execution.
-
-**Deliver:**
-
-- approved roots and opt-out;
-- read-only Repository inventory and snapshots;
-- exact, structural, dependency, error, and text search;
-- compact candidates and explicit inspection;
-- complete provenance, freshness, trust, licensing, sanitization, and disclosure state;
-- instruction quarantine and secret screening;
-- incremental invalidation and atomic snapshot publication;
-- malicious fixture corpus.
-
-**Exit:** Kiln finds one useful prior pattern, exposes its differences and provenance, and proves that hostile reference content causes no write, Command, network, secret, or authority effect.
-
-**Branch:** `work/p1-s09-local-project-intelligence`
-
-## P1-S10 — Expansion capability evaluations
-
-**Purpose:** evaluate later capabilities without turning the roadmap into a protocol backlog.
+- native requests, results, policy, Evidence, and recovery are stable;
+- one concrete external Client, capability, service, or Environment exists;
+- simpler function, library, CLI, or API options were evaluated.
 
 **Candidates:**
+
+- ACP Client adapter;
+- one MCP client capability;
+- one OpenAPI capability;
+- one accepted Dev Container or OCI Environment.
+
+No requirement exists to implement every candidate.
+
+## P2-S06 — Local project intelligence
+
+**Entry conditions:**
+
+- active-Repository retrieval is stable and useful;
+- explicit approved roots and no-execution policy exist;
+- instruction quarantine, licensing, secret screening, and disclosure planning is accepted;
+- a measured user workflow justifies cross-project Evidence.
+
+**Outcome:** read-only provenance-bearing pattern retrieval from approved repositories without product-direction or authority contamination.
+
+## Research register
+
+The following remain research or rejected-for-now candidates rather than implementation slices:
 
 - DAP;
 - AG-UI;
 - MCP server;
 - SCIP import or export;
-- AHP adapter;
+- AHP;
 - A2A;
-- in-toto export;
-- SLSA export;
-- WASI and WIT.
+- WASI and WIT;
+- in-toto and SLSA export;
+- OTLP export;
+- embeddings and hosted retrieval.
 
-**Exit:** candidates have evidence-backed adopt, defer, or reject decisions. No requirement exists to implement all of them.
-
-**Branch:** candidate-specific only after an accepted evaluation.
-
----
+Prompt 4 determines whether any candidate earns a focused planning round.
 
 # Dependency graph
 
 ```mermaid
 flowchart TD
-    S1[P1-S01 Navigable simulated Runs] --> S2[P1-S02 Real read-only Scout]
-    S2 --> S3[P1-S03 Background and Attention]
-    S3 --> S4[P1-S04 Independent Verifier]
-    S4 --> S5[P1-S05 Durable recovery]
-    S5 --> S6[P1-S06 Local code intelligence]
-    S6 --> S7[P1-S07 Safe writing delegation]
+    S1[P1-S01 Durable single-Run CLI] --> S2[P1-S02 Evidence-backed change loop]
+    S2 --> S3[P1-S03 Interruption recovery]
+    S3 --> S4[P1-S04 Scout Child]
+    S4 --> S5[P1-S05 Verifier Child]
 
-    S5 --> S8[P1-S08 Capability interoperability]
-    S4 --> S8
-    S7 --> S8
-
-    S5 --> S9[P1-S09 Local project intelligence]
-    S6 --> S9
-
-    S7 --> S10[P1-S10 Expansion evaluations]
-    S8 --> S10
-    S9 --> S10
+    S5 --> TUI[P2-S01 TUI]
+    S3 --> WT[P2-S02 Managed mutation isolation]
+    S5 --> PATCH[P2-S03 Delegated Patch proposal]
+    WT --> PATCH
+    S5 --> CODE[P2-S04 Local code intelligence]
+    S5 --> INTEROP[P2-S05 Interoperability]
+    CODE --> KNOW[P2-S06 Local project intelligence]
 ```
 
-The numbered sequence is the default priority. P1-S09 can begin after P1-S06 without waiting for every optional P1-S08 adapter.
+# Delivery targets
 
-# Milestones
+## First month
 
-| Milestone | Required slices | Observable outcome |
-| --- | --- | --- |
-| M1 — Interactive Run shell | P1-S01 | Simulated Runs are navigable in the TUI and headless projection tests. |
-| M2 — Investigative runtime | P1-S02–S03 | A real Scout can work visibly in the background and raise Attention. |
-| M3 — Trustworthy verification | P1-S04 | Controlled Command execution produces independent `PASS`, `FAIL`, or `BLOCKED`. |
-| M4 — Durable Operator Kernel | P1-S05 | The complete read-only workflow survives restart. This is version 0.1. |
-| M5 — Code-aware investigation | P1-S06 | Tree-sitter, LSP, docs, Skills, and Context retrieval work together. |
-| M6 — Safe delegated authoring | P1-S07 | A Patch-proposal Child produces a safely applied and verified change. |
-| M7 — Interoperable local platform | P1-S08 | Native state and capability boundaries survive external adapters. |
-| M8 — Cross-project intelligence | P1-S09 | Approved-root prior-pattern retrieval is useful and adversarially safe. |
-| M9 — Expansion decisions | P1-S10 | Later standards have evidence-backed positions. |
+| Weeks | Product outcome |
+| --- | --- |
+| 1–2 | Durable single-Run CLI and restart |
+| 3–4 | Real evidence-backed Patch and verification loop |
 
-# Recommended first twelve-week target
+The first-month target must produce a real source change. It is not complete if it only renders simulated Runs, validates Schemas, or builds internal services.
 
-Complete M4: P1-S01 through P1-S05.
+## Twelve weeks
 
-```text
-Weeks 1–2   navigable simulated Runs
-Weeks 3–4   one real read-only Scout
-Weeks 5–6   background work and Attention
-Weeks 7–9   independent Verifier and minimal Command runner
-Weeks 10–12 SQLite durability, Checkpoints, reconnect, and recovery
-```
+| Weeks | Product outcome |
+| --- | --- |
+| 1–4 | Single-Run Change Alpha |
+| 5–6 | Interruption, timeout, rollback, and orphan recovery |
+| 7–9 | One bounded read-only Scout Child and Root-visible Attention |
+| 10–12 | Independent Verifier Child and version 0.1 aggregate proof |
 
-The target demo is:
+The target supports one active Repository, one Session per CLI process, one Root Run, one active depth-one Child, one provider, and one primary operating-system process-control target.
 
-```text
-start Kiln in a Repository
-→ create Session and Root Run
-→ delegate one real read-only Scout
-→ continue Parent work
-→ answer an Attention item
-→ run an independent Verifier
-→ inspect its Evidence and Receipt
-→ kill Kiln
-→ restart and return to the same navigable state
-```
+# First implementation ticket status
 
-Do not add source-writing, LSP, Tree-sitter, ACP, MCP, OpenAPI, containers, local project intelligence, embeddings, Phoenix, or formal attestations to the first twelve-week target.
+No implementation ticket is accepted or authorized.
 
-# First coding task
+After Prompt 8 authorizes construction, the expected first ticket is:
 
-**P1-S01-T01 — Minimal Run event model and pure projection**
+**P1-S01-T01 — Define the minimal Project, Session, Task, Run, Event, and transition model.**
 
-Implement:
+It should implement only the pure data and rules required by P1-S01. It must not add provider code, Patch application, Commands, Child Runs, TUI, protocols, or a process per Run.
 
-- Session, Task, and Run structs;
-- Root, Parent, Child, and sibling invariants;
-- one versioned Event envelope;
-- Session creation, Run creation, status, transcript, and simulated activity events;
-- one pure reducer;
-- stable JSON snapshot;
-- deterministic fixtures and property tests.
+Prompt 3 must first reconcile current scaffolding and conformance with this target.
 
-Do not add SQLite, TUI dependencies, provider code, Commands, Git, a process per Run, or a general service framework.
+# Slice completion
 
-# Acceptance gates
+A slice completes only when:
 
-A slice cannot integrate until:
+- all accepted tickets are integrated;
+- deterministic tests pass against one exact state;
+- security and failure gates pass;
+- the user-visible demo passes;
+- required Evidence is current;
+- the aggregate Receipt references the exact state;
+- warnings, exclusions, and unknowns remain visible;
+- the owner or accepted policy accepts the milestone when required;
+- roadmap status is updated.
 
-- its exact Task and criteria are accepted;
-- required authority and security tests pass;
-- deterministic fixtures pass without live external dependencies;
-- optional live smoke tests are clearly distinguished;
-- user-visible demo script passes;
-- required Receipt is sealed against the tested commit;
-- unresolved failures, exclusions, and deferred concerns remain visible;
-- Repository CI passes on the final head.
-
-# Explicit exclusions from early roadmap
-
-Through version 0.1, exclude:
-
-- writing Child Runs;
-- Git worktree provisioning;
-- arbitrary shell;
-- dependency installation by a model;
-- automatic permission expansion;
-- peer-to-peer Child communication;
-- recursive manager hierarchy;
-- LSP or Tree-sitter production adapters;
-- MCP, ACP, OpenAPI, Dev Container, and OCI product adapters;
-- cross-project local intelligence;
-- embeddings and graph databases;
-- multi-provider arbitration;
-- remote execution;
-- Phoenix, AG-UI, or hosted clients;
-- merge, push, publication, or delivery automation;
-- formal in-toto, SLSA, DSSE, signing, or level claims.
+A green obsolete check, model summary, planned gate name, Schema, or collection of merged tickets does not complete a slice.
 
 # Roadmap-change policy
 
-A later change can reorder or split a slice only when it records:
+A roadmap change must record:
 
 - the user or dogfood workflow;
-- current blocking evidence;
-- dependency and security consequences;
-- migration from existing slice and ticket identifiers;
+- current blocking Evidence;
+- product, dependency, and security consequences;
+- identifiers and migration effects;
 - new acceptance and demo gates;
 - explicit scope removed as well as added.
 
-Do not append a new subsystem to the roadmap without pruning or re-evaluating existing scope.
+Do not append a subsystem without pruning or re-evaluating current scope.
