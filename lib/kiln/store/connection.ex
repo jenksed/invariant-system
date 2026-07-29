@@ -145,6 +145,18 @@ defmodule Kiln.Store.Connection do
     rows
   end
 
+  @doc """
+  Run `fun` inside one `BEGIN IMMEDIATE` transaction.
+
+  The write lock is acquired up front, matching the accepted store contract. A
+  raise inside `fun` rolls the transaction back and re-raises.
+  """
+  @spec transaction(conn(), (conn() -> result)) :: {:ok, result} | {:error, term()}
+        when result: var
+  def transaction(conn, fun) when is_function(fun, 1) do
+    DBConnection.transaction(conn, fun, mode: :immediate)
+  end
+
   defp one(conn, sql) do
     case query!(conn, sql) do
       [[value]] ->

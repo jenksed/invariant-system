@@ -1,0 +1,69 @@
+defmodule Kiln.StoreTest do
+  use ExUnit.Case, async: true
+
+  alias Kiln.Store
+  alias Kiln.Store.Connection
+
+  setup do
+    dir = Path.join(System.tmp_dir!(), "kiln-startup-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf!(dir) end)
+    {:ok, path: Path.join(dir, "state.sqlite3")}
+  end
+
+  test "starts ready on an empty directory with verified schema, pragmas, and version", %{
+    path: path
+  } do
+    assert {:ready, store} =
+             Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
+
+    assert store.store_version == 1
+    assert store.store_format == "kiln-state/v1"
+    assert store.store_id == "store_fixture"
+
+    assert store.info.journal_mode == "wal"
+    assert store.info.synchronous == 2
+    assert store.info.foreign_keys == 1
+    assert store.info.busy_timeout == 2000
+    assert store.info.quick_check == "ok"
+
+    parts =
+      store.sqlite_version
+      |> String.split(".")
+      |> Enum.map(&String.to_integer/1)
+      |> List.to_tuple()
+
+    assert parts >= {3, 51, 3}
+
+    assert [[1, checksum]] =
+             Connection.query!(store.conn, "SELECT version, checksum FROM schema_migrations")
+
+    assert String.length(checksum) == 64
+
+    assert [["kiln-state/v1", "store_fixture"]] =
+             Connection.query!(store.conn, "SELECT store_format, store_id FROM store_metadata")
+  end
+
+  test "restarts against an existing store without reapplying or changing identity", %{path: path} do
+    {:ready, _first} =
+      Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
+
+    assert {:ready, second} = Store.start(path: path)
+    assert second.store_version == 1
+    assert second.store_id == "store_fixture"
+  end
+
+  test "version-blocks an unsupported store format", %{path: path} do
+    {:ready, store} =
+      Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
+
+    Connection.query!(
+      store.conn,
+      "UPDATE store_metadata SET store_format = 'kiln-state/v2' WHERE id = 1"
+    )
+
+    assert {:blocked, :version_blocked,
+            %{class: :future_version, code: :unsupported_store_format}} =
+             Store.start(path: path)
+  end
+end
