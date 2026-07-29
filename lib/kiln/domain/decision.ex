@@ -74,22 +74,31 @@ defmodule Kiln.Domain.Decision do
     end
   end
 
-  def new(_attrs), do: {:error, Error.new(:invalid_attributes, "decision attributes must be a map")}
+  def new(_attrs),
+    do: {:error, Error.new(:invalid_attributes, "decision attributes must be a map")}
 
   defp validate_subject_kind(kind) when kind in @subject_kinds, do: :ok
 
   defp validate_subject_kind(_kind) do
-    {:error, Error.new(:invalid_subject_kind, "decision subject kind is not supported", :subject_kind)}
+    {:error,
+     Error.new(:invalid_subject_kind, "decision subject kind is not supported", :subject_kind)}
   end
 
   defp validate_revision(value) when is_integer(value) and value >= 0, do: :ok
 
   defp validate_revision(_value) do
-    {:error, Error.new(:invalid_revision, "subject revision must be a non-negative integer", :subject_revision)}
+    {:error,
+     Error.new(
+       :invalid_revision,
+       "subject revision must be a non-negative integer",
+       :subject_revision
+     )}
   end
 
   defp validate_actor(actor) when actor in @actors, do: :ok
-  defp validate_actor(_actor), do: {:error, Error.new(:invalid_actor, "decision actor is not permitted", :requested_actor)}
+
+  defp validate_actor(_actor),
+    do: {:error, Error.new(:invalid_actor, "decision actor is not permitted", :requested_actor)}
 
   defp responses(attrs) do
     value = Map.get(attrs, :permitted_responses)
@@ -99,7 +108,11 @@ defmodule Kiln.Domain.Decision do
       {:ok, value}
     else
       {:error,
-       Error.new(:invalid_responses, "permitted responses must be a non-empty unique atom list", :permitted_responses)}
+       Error.new(
+         :invalid_responses,
+         "permitted responses must be a non-empty unique atom list",
+         :permitted_responses
+       )}
     end
   end
 
