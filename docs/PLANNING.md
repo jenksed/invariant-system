@@ -4,20 +4,18 @@
 **Status:** Active  
 **Build authorization:** Not issued
 
-## Integrated planning baseline
+## Integrated first-month shaping
 
 | Pass or decision | Integrated equivalent |
 | --- | --- |
-| Prompt 1 | PR 22 |
-| Prompt 2 | PR 23 |
-| Prompt 3 | PR 24 |
-| Prompt 4 | PR 25 |
+| Prompt 1 through Prompt 4 | PRs 22–25 |
 | OD-01 | PR 26 |
 | P0-W21 | PR 27 and closeout PR 28 |
 | P0-W22 | PR 29 |
 | P0-W23 | PR 30 |
 | OD-02 | PR 31 |
-| P0-W24 | PR 32, `4e9fe904c31c57a4c76a3569319db4504e08d682` |
+| P0-W24 | PR 32 |
+| P0-W25 | PR 33, `aabfc49a9b0ba294b4e0f6558fbe8fed38263784` |
 
 ## Current authorities
 
@@ -28,45 +26,43 @@ Use, in order:
 3. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md);
 4. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md);
 5. [Command, Evidence, and Acceptance](COMMAND-EVIDENCE-AND-ACCEPTANCE.md);
-6. [CLI and Local Delivery Contract](CLI-AND-LOCAL-DELIVERY-CONTRACT.md), proposed by P0-W25;
-7. Roadmap, implementation slices, and slice gates.
+6. [CLI and Local Delivery Contract](CLI-AND-LOCAL-DELIVERY-CONTRACT.md);
+7. [First-month contract index](contracts/README.md) for Prompt 6-A conformance only;
+8. Roadmap, implementation slices, and slice gates.
 
-Earlier Architecture, Run, Session, execution, interface, and Schema documents cannot broaden or replace the focused first-month authorities.
+Earlier broad Architecture, Run, Session, execution, interface, and Schema documents cannot broaden or replace the focused first-month authorities.
 
-## Integrated authority
+## Integrated focused authority
 
 - **P0-W21:** lifecycle, operations, persistence, restart, orphan, and completion transaction.
 - **P0-W22:** MiniMax M3, fake provider, sealed Context, four Tools, Repository reads, disclosure, and secrets.
 - **P0-W23:** exact complete-text Patch, Approval, one mutation owner, rollback, and base/target/unknown recovery.
-- **P0-W24:** registered non-shell Commands, macOS process-group cleanup, Artifacts, criterion Evidence, aggregate proof, user acceptance, completion input, Receipt, and delivery.
+- **P0-W24:** registered non-shell Commands, macOS process-group cleanup, Artifacts, criterion Evidence, aggregate proof, user acceptance, Receipt, and delivery.
+- **P0-W25:** foreground CLI, text and JSON output, no-bypass review, recovery commands, arm64 macOS Mix release, user-local installation, and version metadata.
 - **OD-02:** Apple Silicon macOS 15.0 or later, local APFS, one local user, owner's M1 Pro primary validation host, other hosts unsupported.
 
-## Proposed P0-W25 authority
+## Prompt 6-A conformance boundary
 
-P0-W25 proposes:
+P0-W28 may add only:
 
-- one permanent CLI named `kiln` with no daemon;
-- text and versioned JSON output;
-- stable exit codes and safe next actions;
-- Project, policy, Command registration, Session, Context, investigation, Patch, verification, Evidence, acceptance, Receipt, cancellation, and recovery commands;
-- no `--yes`, auto-Approval, or auto-acceptance;
-- default `$KILN_HOME` at `~/Library/Application Support/Kiln`;
-- explicit host diagnostics and credential-reference status;
-- one arm64 macOS Mix release containing ERTS, Exqlite, and the command-host helper;
-- user-local side-by-side installation with checksum and build manifest;
-- no root, daemon, Homebrew, public installer, auto-update, or cross-platform binary claim;
-- version derived from application and release metadata rather than a separate literal.
+- current P0 and P1 preflight grammar;
+- conformance-only constants and transition shapes;
+- provider and Command-host behaviours without implementations;
+- one first-month JSON Schema;
+- positive and protected negative fixtures;
+- deterministic validators and CI wiring;
+- explicit tests that runtime external-effect modules remain absent.
 
-ADR-0027 owns the proposed arm64 macOS Mix-release delivery boundary.
+It may not add a Store, Session workflow, MiniMax adapter, Context builder, Repository reader, Patch engine, mutation Worker, Command runner, helper binary, Evidence evaluator, CLI, release, installer, successful product demo, or Wave B contract.
 
-## Wave A
+No conformance result is build authorization.
+
+## Remaining Wave A
 
 ```text
-P0-W21 → P0-W22 → P0-W23 → OD-02 → P0-W24
-→ validate and integrate P0-W25
-→ Prompt 6-A
-→ Prompt 7-A
-→ Prompt 8-A
+integrate Prompt 6-A
+→ Prompt 7-A independent adversarial review
+→ Prompt 8-A adjudication and possible bounded authorization
 ```
 
 Prompt 8-A is the only first-month build-authorization pass.
@@ -77,4 +73,4 @@ P0-W26 and P0-W27 remain blocked until an authorized Single-Run Alpha provides a
 
 ## Current next action
 
-Complete P0-W25 review and exact-head validation. Integrate it, then run Prompt 6-A.
+Complete P0-W28 exact validation and integrate Prompt 6-A. Then run Prompt 7-A without authoring corrections during the review pass.
