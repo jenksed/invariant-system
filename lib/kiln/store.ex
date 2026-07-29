@@ -54,8 +54,32 @@ defmodule Kiln.Store do
     end
   end
 
+  @doc """
+  Supervised entry point: start a ready store or fail the child start.
+
+  Returns `{:ok, conn}` when startup reaches `:ready`, exposing the supervised
+  connection process, or `{:error, reason}` when startup is blocked or the
+  connection is unavailable, so a supervisor does not treat a blocked store as
+  healthy.
+  """
+  @spec start_link(keyword()) :: {:ok, Connection.conn()} | {:error, term()}
+  def start_link(opts) do
+    case start(opts) do
+      {:ready, store} -> {:ok, store.conn}
+      {:blocked, state, error} -> {:error, {state, error}}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc false
+  def child_spec(opts) do
+    %{id: Keyword.get(opts, :name, __MODULE__), start: {__MODULE__, :start_link, [opts]}}
+  end
+
   defp open_and_continue(path, opts) do
-    case Connection.start_link(path: path) do
+    connect_opts = [path: path] |> maybe_put(:name, Keyword.get(opts, :name))
+
+    case Connection.start_link(connect_opts) do
       {:ok, conn} -> continue(conn, opts)
       {:error, reason} -> {:error, reason}
     end

@@ -53,6 +53,19 @@ defmodule Kiln.StoreTest do
     assert second.store_id == "store_fixture"
   end
 
+  test "start_link exposes the supervised connection on a ready store", %{path: path} do
+    assert {:ok, conn} = Store.start_link(path: path, store_id: "store_fixture", now: "t0")
+
+    assert [[1]] = Connection.query!(conn, "SELECT count(*) FROM schema_migrations")
+    assert is_pid(conn)
+  end
+
+  test "start_link fails the child start when the store is blocked", %{path: path} do
+    File.write!(path, :crypto.strong_rand_bytes(2048))
+
+    assert {:error, {:integrity_blocked, %{class: :integrity}}} = Store.start_link(path: path)
+  end
+
   test "version-blocks an unsupported store format", %{path: path} do
     {:ready, store} =
       Store.start(path: path, store_id: "store_fixture", now: "2026-07-29T00:00:00Z")
