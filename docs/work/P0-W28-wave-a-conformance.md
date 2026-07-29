@@ -78,7 +78,7 @@ All planned P0-W28 components were integrated. No future implementation file was
 - **P0-W28-AC02:** Pass. Elixir tests protect accepted states, transitions, Tools, Patch operations, proof results, limits, CLI exits, and behaviour callbacks.
 - **P0-W28-AC03:** Pass for semantic validation. Positive fixtures pass and protected negative fixtures fail for their expected semantic reason.
 - **P0-W28-AC04:** Pass at integration time. No external-effect runtime implementation was added.
-- **P0-W28-AC05:** Pass. Exact final-head CI succeeded.
+- **P0-W28-AC05:** Pass. Exact final-head CI returned a success conclusion.
 
 Prompt 8-A later revised the AC04 test mechanism because an explicit list of absent future module names created unnecessary namespace lock-in. The underlying no-runtime-implementation fact remains true.
 
@@ -97,7 +97,7 @@ mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-GitHub Actions CI run `30425270052` completed successfully on exact head `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`.
+GitHub Actions CI run `30425270052` returned a success conclusion on exact head `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`.
 
 ## Demo contribution
 
@@ -111,7 +111,7 @@ No product demo was claimed. P0-W28 supplied executable planning rails for indep
 | P0-W28-E02 | P0-W28-AC02 | ExUnit conformance tests passed |
 | P0-W28-E03 | P0-W28-AC03 | semantic fixture validator passed |
 | P0-W28-E04 | P0-W28-AC04 | exact PR compare contained conformance work only |
-| P0-W28-E05 | P0-W28-AC05 | CI `30425270052` succeeded |
+| P0-W28-E05 | P0-W28-AC05 | CI `30425270052` returned success |
 
 ### Slice gate contribution
 
@@ -147,7 +147,7 @@ Prompt 6-A did not:
 | P0-W28-AC02 | Pass | P0-W28-E02 | accepted constants and callbacks are protected |
 | P0-W28-AC03 | Pass | P0-W28-E03 | semantic fixtures passed |
 | P0-W28-AC04 | Pass | P0-W28-E04 | no product runtime entered |
-| P0-W28-AC05 | Pass | P0-W28-E05 | exact final-head CI passed |
+| P0-W28-AC05 | Pass | P0-W28-E05 | exact final-head CI returned success |
 
 ### Verification executed
 
