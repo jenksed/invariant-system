@@ -16,6 +16,7 @@
 | P0-W21 | Pull request 27, merge commit `ca21d0bbc25ddf5861191f8bde374e0761d86c0a` |
 | P0-W21 closeout | Pull request 28, merge commit `6c80436b9c220a93b0ff37372deacb1f7ec0fd32` |
 | P0-W22 | Pull request 29, merge commit `abbded1af773981c40e0810c19ce043b9485daeb` |
+| P0-W23 | Pull request 30, merge commit `58720bcfba815d77c6d815e0ca004e0546cb9a6e` |
 
 ## Current authorities
 
@@ -26,9 +27,9 @@ Use these files in this order:
 3. [Implementation Disposition Register](IMPLEMENTATION-DISPOSITION-REGISTER.md).
 4. [Planning Round Register](PLANNING-ROUND-REGISTER.md).
 5. [Owner Decision Register](OWNER-DECISIONS.md).
-6. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md) — integrated lifecycle and persistence authority.
-7. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md) — integrated provider, Context, Tool, Repository-read, disclosure, and secret authority.
-8. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md) — proposed Patch, Approval, mutation, rollback, and uncertain-effect authority.
+6. [Root Run Lifecycle and Durable Journal](ROOT-RUN-LIFECYCLE-AND-JOURNAL.md).
+7. [Model, Context, and Repository Boundary](MODEL-CONTEXT-AND-REPOSITORY-BOUNDARY.md).
+8. [Patch, Approval, and Mutation](PATCH-APPROVAL-AND-MUTATION.md).
 9. [Planning Round Authoritative Inputs](PLANNING-ROUND-INPUTS.md).
 10. [Roadmap](ROADMAP.md).
 11. [Implementation Slices](IMPLEMENTATION-SLICES.md).
@@ -36,56 +37,30 @@ Use these files in this order:
 
 The Architecture, Run Model, Session Model, accepted ADRs, and focused specifications provide subject authority. They cannot broaden scope or reorder delivery without an accepted authority change.
 
-The P0-W21 and P0-W22 work records and this index control their integration status. Branch-era status text remaining in large focused specifications is non-authoritative bookkeeping.
+The P0-W21 through P0-W23 work records and this index control integration status. Branch-era status text remaining in large focused specifications is non-authoritative bookkeeping.
 
-## Integrated upstream authority
+## Integrated focused authority
 
-### P0-W21
+- **P0-W21:** lifecycle, transition, operation intent and observation, journal, projection, migration, restart, orphan, and completion-transaction boundaries.
+- **P0-W22:** MiniMax M3, deterministic fake, sealed Context, four-Tool projection, active-Repository reads, disclosure, secrets, and transient provider-message behavior.
+- **P0-W23:** complete-text after-image Patch, exact base and digest, user Approval, one mutation owner, rollback preparation, deterministic mutation, and exact base/target/unknown recovery.
 
-P0-W21 owns Session, Task, and Root Run states; transitions; operation intent and observation; journal, projection, migration, restart, orphan, and completion-transaction boundaries.
+Later rounds consume these decisions. They cannot redefine them.
 
-### P0-W22
+## Current owner decisions
 
-P0-W22 owns MiniMax M3, deterministic fake provider, sealed Context, four-Tool projection, active-Repository reads, disclosure, secrets, and transient provider-message behavior.
+- **OD-01:** accepted through ADR-0021.
+- **OD-02:** accepted through proposed ADR-0025 on this branch: Apple Silicon macOS 15.0 or later, local APFS, one local interactive user, and the owner's M1 Pro Mac as the primary validation machine. Other hosts remain unsupported.
 
-Later rounds cannot redefine either authority.
-
-## Proposed P0-W23 authority
-
-P0-W23 proposes:
-
-- one canonical Patch manifest of complete UTF-8 text after-images;
-- `add`, `replace`, and `delete` operations only;
-- generated unified diff as review output only;
-- exact Repository and per-path before-state binding;
-- SHA-256 Patch digest over canonical manifest and after-image digests;
-- maximum 32 paths and four MiB total after-image data;
-- explicit one-time user Approval bound to Patch, base, paths, warnings, and Session revision;
-- Approval expiry after 30 minutes or any bound state change;
-- one mutation owner and one selected-checkout lease;
-- complete rollback bundle and progress manifest before the first file effect;
-- deterministic add, replace, and delete ordering;
-- exact target and base observation;
-- reverse rollback after partial failure;
-- unknown-effect and orphan handling when neither base nor target can be proved;
-- no automatic retry or reapplication;
-- no formatting, Command, Git staging, commit, push, merge, publish, deploy, worktree, binary, symlink, or mode-change scope.
-
-ADR-0024 owns the proposed complete-after-image representation.
-
-## Upstream ownership audit
-
-P0-W23 consumes W21 operation identity, intent-before-dispatch, terminal-or-unknown result, idempotency, restart, and orphan rules. It consumes W22 Repository observation, canonical paths, file controls, `change.propose`, and Artifact references.
-
-It does not change lifecycle, persistence, provider, Context, Tool projection, Repository reads, or disclosure. Any conflict resolves in favor of the upstream authority.
+P0-W24 and P0-W25 must consume OD-02 without widening it.
 
 ## Wave A sequence
 
 ```text
 P0-W21 integrated
 → P0-W22 integrated
-→ validate and integrate P0-W23
-→ record OD-02
+→ P0-W23 integrated
+→ integrate OD-02
 → P0-W24
 → P0-W25
 → Prompt 6-A
@@ -94,11 +69,6 @@ P0-W21 integrated
 ```
 
 Prompt 7-A remains immediately before Prompt 8-A. Prompt 8-A is the only pass that may issue first-month build authorization.
-
-## Current owner decisions
-
-- OD-01 is accepted through ADR-0021.
-- OD-02 remains pending and must be accepted before P0-W24 and P0-W25 complete.
 
 ## Wave B entry gate
 
@@ -117,4 +87,4 @@ P0-W26
 
 ## Current next action
 
-Complete P0-W23 review and exact-head validation. Integrate it, then record OD-02 and begin P0-W24.
+Validate and integrate OD-02. Then run P0-W24 on current `main`.
