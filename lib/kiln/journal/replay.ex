@@ -1,27 +1,39 @@
 defmodule Kiln.Journal.Replay do
   @moduledoc """
-  Deterministic journal replay: load a Session's entries in sequence order and
-  fold them into the current projection, from zero, without trusting any stored
-  projection (P1-S01-T03-R01, R02).
+  Deterministic journal replay: reconstruct a Session's current projection from
+  its durable `action_commits` and `journal_entries`, from zero, without trusting
+  any cached projection (P1-S01-T03-R01, R02).
 
-  Every entry is validated before it is applied: the payload digest must match
-  (corruption), the session revision must be contiguous (missing or out-of-order),
-  a reused idempotency key with the same digest is a benign duplicate with no
-  extra effect while a different digest is a conflict, the kind must be known, and
-  the Run transition must be accepted. The first invalid entry blocks
-  reconstruction and reports its exact sequence boundary (P1-S01-T03-R03, R04,
-  R05).
+  T02 commits one accepted application action - one or more journal entries - in
+  one atomic transaction. Replay therefore validates and applies whole action
+  batches, using each `action_commits` record as the authoritative transaction
+  boundary, rather than deduplicating individual rows. A truly repeated request
+  writes no second journal row at commit time, so a repeated journal row is
+  invalid durable state, not a benign duplicate.
+
+  Every batch is validated before any entry applies: the commit exists, all its
+  entries carry the declared action id, session id, idempotency key, and request
+  digest; the row sequences are exactly the declared contiguous range; the row
+  count agrees; the Session revisions are contiguous and follow the prior
+  accepted revision; and each payload decodes to its accepted shape with a
+  matching digest and a legal transition. The first invalid batch or entry blocks
+  reconstruction and reports its exact sequence boundary (P1-S01-T03-R03, R05).
   """
 
-  alias Kiln.Journal.Reducer
+  alias Kiln.Journal.{Entry, Reducer}
   alias Kiln.Projections.Session
   alias Kiln.Store.{Canonical, Connection}
 
-  @type rebuild :: %{
+  @type report :: %{
+          session_id: String.t() | nil,
           projection: Session.t() | nil,
           session_revision: non_neg_integer() | nil,
-          last_sequence: non_neg_integer(),
-          entry_count: non_neg_integer()
+          first_sequence: non_neg_integer() | nil,
+          last_sequence: non_neg_integer() | nil,
+          action_count: non_neg_integer(),
+          entry_count: non_neg_integer(),
+          projection_digest: String.t() | nil,
+          journal_head_digest: String.t() | nil
         }
 
   @type block :: %{code: atom(), boundary: non_neg_integer() | nil, detail: map()}
@@ -36,97 +48,309 @@ defmodule Kiln.Journal.Replay do
     |> List.flatten()
   end
 
-  @doc "Rebuild the projection for `session_id` from sequence zero."
-  @spec rebuild(Connection.conn(), String.t()) :: {:ok, rebuild()} | {:error, block()}
+  @doc "Rebuild the projection for `session_id` from its action batches."
+  @spec rebuild(Connection.conn(), String.t()) :: {:ok, report()} | {:error, block()}
   def rebuild(conn, session_id) do
-    rows =
-      Connection.query!(
-        conn,
-        """
-        SELECT sequence, entry_type, payload, payload_digest, payload_schema,
-               session_revision, idempotency_key, request_digest
-        FROM journal_entries
-        WHERE session_id = ?1
-        ORDER BY sequence
-        """,
-        [session_id]
-      )
+    entries = load_entries(conn, session_id)
+    commits = load_commits(conn, session_id)
 
-    initial = %{projection: nil, prev_revision: -1, last_sequence: 0, applied: 0, seen: %{}}
-
-    rows
-    |> Enum.reduce_while({:ok, initial}, &step/2)
-    |> finish()
+    with {:ok, batches} <- build_batches(entries, commits) do
+      apply_batches(session_id, batches)
+    end
   end
 
-  defp step(row, {:ok, acc}) do
-    [sequence, type, payload_text, payload_digest, payload_schema, revision, idem_key, req_digest] =
-      row
+  # -- loading --
 
-    with {:ok, payload} <- decode(payload_text, sequence),
-         :ok <- verify_digest(payload_schema, payload, payload_digest, sequence) do
-      case Map.fetch(acc.seen, idem_key) do
-        {:ok, ^req_digest} ->
-          # Duplicate identical action: no additional projected effect.
-          {:cont, {:ok, acc}}
+  defp load_entries(conn, session_id) do
+    conn
+    |> Connection.query!(
+      """
+      SELECT sequence, entry_type, payload, payload_digest, payload_schema,
+             session_revision, action_id, idempotency_key, request_digest
+      FROM journal_entries
+      WHERE session_id = ?1
+      ORDER BY sequence
+      """,
+      [session_id]
+    )
+    |> Enum.map(fn [seq, type, payload, digest, schema, rev, action_id, idem, req] ->
+      %{
+        sequence: seq,
+        type: type,
+        payload_text: payload,
+        payload_digest: digest,
+        payload_schema: schema,
+        revision: rev,
+        action_id: action_id,
+        idempotency_key: idem,
+        request_digest: req
+      }
+    end)
+  end
 
-        {:ok, _other_digest} ->
-          {:halt, block(:idempotency_conflict, sequence, %{idempotency_key: idem_key})}
+  defp load_commits(conn, session_id) do
+    conn
+    |> Connection.query!(
+      """
+      SELECT action_id, idempotency_key, request_digest, expected_session_revision,
+             first_sequence, last_sequence
+      FROM action_commits
+      WHERE session_id = ?1
+      ORDER BY first_sequence
+      """,
+      [session_id]
+    )
+    |> Enum.map(fn [action_id, idem, req, expected, first, last] ->
+      %{
+        action_id: action_id,
+        idempotency_key: idem,
+        request_digest: req,
+        expected_session_revision: expected,
+        first_sequence: first,
+        last_sequence: last
+      }
+    end)
+  end
 
-        :error ->
-          apply_new(acc, sequence, type, payload, revision, idem_key, req_digest)
-      end
+  # -- batch structure --
+
+  defp build_batches(entries, commits) do
+    by_action = Map.new(commits, &{&1.action_id, &1})
+
+    case Enum.find(entries, fn e -> not Map.has_key?(by_action, e.action_id) end) do
+      %{sequence: seq} ->
+        block(:missing_action_commit, seq, %{})
+
+      nil ->
+        grouped = Enum.group_by(entries, & &1.action_id)
+
+        commits
+        |> Enum.reduce_while({:ok, []}, fn commit, {:ok, acc} ->
+          case validate_batch(commit, Map.get(grouped, commit.action_id, [])) do
+            {:ok, batch} -> {:cont, {:ok, [batch | acc]}}
+            {:error, _} = error -> {:halt, error}
+          end
+        end)
+        |> case do
+          {:ok, batches} -> {:ok, Enum.reverse(batches)}
+          {:error, _} = error -> error
+        end
+    end
+  end
+
+  defp validate_batch(commit, []) do
+    block(:missing_journal_rows, commit.first_sequence, %{action_id: commit.action_id})
+  end
+
+  defp validate_batch(commit, rows) do
+    sequences = Enum.map(rows, & &1.sequence)
+    revisions = Enum.map(rows, & &1.revision)
+    expected_sequences = Enum.to_list(commit.first_sequence..commit.last_sequence)
+
+    cond do
+      List.first(sequences) != commit.first_sequence or
+          List.last(sequences) != commit.last_sequence ->
+        block(:action_boundary_mismatch, commit.first_sequence, %{
+          declared: {commit.first_sequence, commit.last_sequence},
+          actual: {List.first(sequences), List.last(sequences)}
+        })
+
+      sequences != expected_sequences ->
+        block(:noncontiguous_sequence, commit.first_sequence, %{sequences: sequences})
+
+      Enum.any?(rows, &(&1.idempotency_key != commit.idempotency_key)) ->
+        block(:idempotency_key_mismatch, commit.first_sequence, %{action_id: commit.action_id})
+
+      Enum.any?(rows, &(&1.request_digest != commit.request_digest)) ->
+        block(:request_digest_mismatch, commit.first_sequence, %{action_id: commit.action_id})
+
+      not contiguous?(revisions) ->
+        block(:revision_discontinuity, commit.first_sequence, %{revisions: revisions})
+
+      true ->
+        {:ok,
+         %{
+           commit: commit,
+           entries: rows,
+           first_sequence: commit.first_sequence,
+           last_sequence: commit.last_sequence,
+           first_revision: List.first(revisions),
+           last_revision: List.last(revisions)
+         }}
+    end
+  end
+
+  defp contiguous?([]), do: false
+
+  defp contiguous?([first | _] = list),
+    do: list == Enum.to_list(first..(first + length(list) - 1))
+
+  # -- application --
+
+  defp apply_batches(session_id, batches) do
+    initial = %{
+      projection: nil,
+      prev_revision: nil,
+      prev_sequence: nil,
+      actions: 0,
+      entries: 0,
+      first_sequence: nil,
+      last_sequence: nil,
+      head: []
+    }
+
+    batches
+    |> Enum.reduce_while({:ok, initial}, &apply_batch/2)
+    |> finish(session_id)
+  end
+
+  defp apply_batch(batch, {:ok, acc}) do
+    with :ok <- check_batch_revision(batch, acc.prev_revision),
+         :ok <- check_batch_sequence(batch, acc.prev_sequence),
+         {:ok, projection, head} <- reduce_batch(acc.projection, batch.entries, acc.head) do
+      {:cont,
+       {:ok,
+        %{
+          acc
+          | projection: projection,
+            prev_revision: batch.last_revision,
+            prev_sequence: batch.last_sequence,
+            actions: acc.actions + 1,
+            entries: acc.entries + length(batch.entries),
+            first_sequence: acc.first_sequence || batch.first_sequence,
+            last_sequence: batch.last_sequence,
+            head: head
+        }}}
     else
       {:error, _} = error -> {:halt, error}
     end
   end
 
-  defp apply_new(acc, sequence, type, payload, revision, idem_key, req_digest) do
-    cond do
-      revision != acc.prev_revision + 1 ->
-        {:halt,
-         block(:revision_discontinuity, sequence, %{
-           expected: acc.prev_revision + 1,
-           got: revision
-         })}
-
-      true ->
-        case Reducer.reduce(acc.projection, %{type: type, payload: payload}) do
-          {:ok, projection} ->
-            {:cont,
-             {:ok,
-              %{
-                acc
-                | projection: projection,
-                  prev_revision: revision,
-                  last_sequence: sequence,
-                  applied: acc.applied + 1,
-                  seen: Map.put(acc.seen, idem_key, req_digest)
-              }}}
-
-          {:error, %{code: code, detail: detail}} ->
-            {:halt, block(code, sequence, detail)}
-        end
+  # The first accepted action creates the Session at revision 0; each later
+  # action asserts the prior accepted revision and advances by one.
+  defp check_batch_revision(batch, nil) do
+    if batch.commit.expected_session_revision == 0 and batch.first_revision == 0 do
+      :ok
+    else
+      revision_block(batch, 0)
     end
   end
 
-  defp finish({:ok, %{applied: 0}}) do
-    {:ok, %{projection: nil, session_revision: nil, last_sequence: 0, entry_count: 0}}
+  defp check_batch_revision(batch, prev) do
+    if batch.commit.expected_session_revision == prev and batch.first_revision == prev + 1 do
+      :ok
+    else
+      revision_block(batch, prev + 1)
+    end
   end
 
-  defp finish({:ok, acc}) do
+  defp revision_block(batch, expected_first) do
+    {:error,
+     %{
+       code: :revision_discontinuity,
+       boundary: batch.first_sequence,
+       detail: %{
+         expected_first_revision: expected_first,
+         first_revision: batch.first_revision,
+         expected_session_revision: batch.commit.expected_session_revision
+       }
+     }}
+  end
+
+  defp check_batch_sequence(_batch, nil), do: :ok
+
+  defp check_batch_sequence(batch, prev) do
+    if batch.first_sequence > prev do
+      :ok
+    else
+      {:error,
+       %{
+         code: :sequence_not_increasing,
+         boundary: batch.first_sequence,
+         detail: %{previous: prev, first: batch.first_sequence}
+       }}
+    end
+  end
+
+  defp reduce_batch(projection, entries, head) do
+    Enum.reduce_while(entries, {:ok, projection, head}, fn row, {:ok, acc, acc_head} ->
+      case apply_entry(acc, row) do
+        {:ok, next} -> {:cont, {:ok, next, [row.payload_digest | acc_head]}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+    |> case do
+      {:ok, projection, head} -> {:ok, projection, head}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp apply_entry(projection, row) do
+    with {:ok, payload} <- decode(row.payload_text, row.sequence),
+         :ok <- verify_digest(row.payload_schema, payload, row.payload_digest, row.sequence),
+         {:ok, decoded} <- decode_entry(row.type, payload, row.sequence),
+         {:ok, next} <- reduce(projection, decoded, row.sequence) do
+      {:ok, next}
+    end
+  end
+
+  defp decode_entry(type, payload, sequence) do
+    case Entry.decode(type, payload) do
+      {:ok, decoded} -> {:ok, decoded}
+      {:error, %{code: code, detail: detail}} -> block(code, sequence, detail)
+    end
+  end
+
+  defp reduce(projection, decoded, sequence) do
+    case Reducer.reduce(projection, decoded) do
+      {:ok, next} -> {:ok, next}
+      {:error, %{code: code, detail: detail}} -> block(code, sequence, detail)
+    end
+  end
+
+  defp finish({:ok, %{actions: 0}}, session_id) do
+    {:ok, empty_report(session_id)}
+  end
+
+  defp finish({:ok, acc}, session_id) do
     projection = Session.stamp(acc.projection, acc.prev_revision, acc.last_sequence)
 
     {:ok,
      %{
+       session_id: session_id,
        projection: projection,
        session_revision: acc.prev_revision,
+       first_sequence: acc.first_sequence,
        last_sequence: acc.last_sequence,
-       entry_count: acc.applied
+       action_count: acc.actions,
+       entry_count: acc.entries,
+       projection_digest: Session.digest(projection),
+       journal_head_digest: head_digest(acc.head)
      }}
   end
 
-  defp finish({:error, _} = error), do: error
+  defp finish({:error, _} = error, _session_id), do: error
+
+  defp empty_report(session_id) do
+    %{
+      session_id: session_id,
+      projection: nil,
+      session_revision: nil,
+      first_sequence: nil,
+      last_sequence: nil,
+      action_count: 0,
+      entry_count: 0,
+      projection_digest: nil,
+      journal_head_digest: nil
+    }
+  end
+
+  # A bounded diagnostic digest over the ordered validated entry digests. Not a
+  # tamper-proof hash chain - only a traceable identity for the replayed prefix.
+  defp head_digest([]), do: nil
+  defp head_digest(reversed), do: Canonical.digest("journal_head/v1", Enum.reverse(reversed))
+
+  # -- primitives --
 
   defp decode(text, sequence) do
     {:ok, JSON.decode!(text)}
