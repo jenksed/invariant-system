@@ -38,6 +38,11 @@ defmodule Kiln.RestartTest do
     assert recon.projection["run"]["state"] == "ready"
     assert recon.projection["pending_decision"] == nil
     assert Session.digest(recon.projection) == Session.digest(before.projection)
+
+    # No orphan classification: the two digests agree and describe the returned
+    # projection.
+    assert recon.reconstructed_projection_digest == Session.digest(recon.projection)
+    assert recon.reconstructed_projection_digest == recon.journal_projection_digest
   end
 
   test "reconstructs a nonterminal operation as an orphaned Run without dispatching", %{
@@ -60,6 +65,11 @@ defmodule Kiln.RestartTest do
     assert recon.projection["run"]["state"] == "orphaned"
     assert recon.projection["operation"]["state"] == "unknown"
     assert recon.projection["unknowns"] != []
+
+    # The reconstructed digest describes the returned orphaned projection, which
+    # differs from the pure journal projection digest.
+    assert recon.reconstructed_projection_digest == Session.digest(recon.projection)
+    assert recon.reconstructed_projection_digest != recon.journal_projection_digest
 
     # Reconstruction dispatches and appends nothing.
     assert count(restarted.conn, "journal_entries") == entries_before

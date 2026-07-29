@@ -29,7 +29,8 @@ defmodule Kiln.Restart do
           entry_count: non_neg_integer(),
           first_sequence: non_neg_integer() | nil,
           last_sequence: non_neg_integer() | nil,
-          projection_digest: String.t(),
+          journal_projection_digest: String.t(),
+          reconstructed_projection_digest: String.t(),
           journal_head_digest: String.t() | nil,
           cache_status: Store.status(),
           orphaned: boolean()
@@ -91,7 +92,11 @@ defmodule Kiln.Restart do
       entry_count: report.entry_count,
       first_sequence: report.first_sequence,
       last_sequence: report.last_sequence,
-      projection_digest: report.projection_digest,
+      # The journal digest describes pure journal truth; the reconstructed digest
+      # describes the returned projection, which may carry conservative orphan
+      # classification.
+      journal_projection_digest: report.projection_digest,
+      reconstructed_projection_digest: Session.digest(final),
       journal_head_digest: report.journal_head_digest,
       cache_status: cache_status,
       orphaned: orphaned
