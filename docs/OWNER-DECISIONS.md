@@ -27,25 +27,40 @@ A focused planning round must consume an accepted owner decision. It must not in
 
 ### Boundary
 
-P0-W22 must define the exact provider request, result, streaming, cancellation, timeout, retry, usage, retention, redaction, Context, Tool, Repository-read, and secret-screening contract.
-
-P0-W22 must not change Run lifecycle, journal semantics, Patch authority, or Evidence completion rules.
+P0-W22 defines the exact provider, Context, Tool, Repository-read, disclosure, and secret-screening contract. It cannot change lifecycle, persistence, Patch authority, or Evidence completion rules.
 
 ## OD-02 — First supported host and architecture
 
-**Status:** Pending  
+**Status:** Accepted on 2026-07-28  
+**Authority:** [ADR-0025](decisions/0025-support-apple-silicon-macos-first.md)  
 **Required by:** P0-W24 and P0-W25
 
-### Question
+### Decision
 
-Which one host platform and architecture receive first-month process-tree, filesystem, packaging, and support guarantees?
-
-### Current recommended decision
-
-- macOS on Apple Silicon is the first supported host.
-- Other systems are not supported until the complete workflow passes there.
+- macOS 15.0 or later on Apple Silicon is the only first-month supported host.
+- The owner's M1 Pro MacBook Pro is the primary acceptance machine.
+- The exact patched macOS release used for validation must be recorded.
+- `$KILN_HOME`, SQLite state, mutation recovery data, Artifacts, and the selected checkout must be on a local APFS volume.
+- The product runs as one interactive local user without root or a system daemon.
+- Other hosts and architectures are unsupported until the complete workflow passes host-specific conformance and review.
 - Domain contracts remain portable where practical.
-- Host-specific process and filesystem controls report unsupported, degraded, blocked, or unknown behavior honestly.
-- The final decision must state minimum macOS and runtime assumptions.
+- Host-specific process, filesystem, packaging, and security controls report `unsupported`, `degraded`, `blocked`, or `unknown` honestly.
+- Missing controls do not silently fall back to weaker claims.
 
-OD-02 must be accepted before P0-W24 and P0-W25 complete.
+### Required diagnostics
+
+The supported-host profile records:
+
+- macOS product version and build;
+- `arm64` architecture;
+- filesystem type and local mount status;
+- Erlang/OTP, Elixir, Git, Exqlite, and embedded SQLite versions;
+- locale and terminal encoding;
+- registered executable paths;
+- effective process-group, cancellation, file replacement, sync, permission, and case-sensitivity behavior.
+
+### Boundary
+
+P0-W24 must define registered Command and process-tree behavior for this profile. P0-W25 must define installation, invocation, version, upgrade, configuration, diagnostics, and support messaging for this profile.
+
+Neither round can claim Linux, Intel macOS, Windows, containers, remote execution, kernel sandboxing, cgroup-like Resource enforcement, or reliable mutation on network or synchronized filesystems.
