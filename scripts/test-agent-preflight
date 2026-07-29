@@ -9,17 +9,145 @@ fail() {
 root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
 cd "$root"
 
-KILN_BRANCH=work/p0-w03-agent-ready-development scripts/agent-preflight >/dev/null
+valid_ticket=docs/work/P9-S99-T99-preflight-fixture.md
+invalid_ticket=docs/work/P9-S99-T98-preflight-fixture.md
+valid_slice=docs/work/P9-S99-preflight-fixture.md
+
+cleanup() {
+  rm -f "$valid_ticket" "$invalid_ticket" "$valid_slice"
+}
+trap cleanup EXIT
+
+cat >"$valid_ticket" <<'PLAN'
+# P9-S99-T99: Preflight fixture
+
+**Document type:** Implementation plan
+**Status:** Proposed
+**Parent slice:** P9-S99
+**Branch:** `work/p9-s99-t99-preflight-fixture`
+**Depends on:** None
+
+## Slice contribution
+Fixture only.
+## Objective
+Fixture only.
+## Observed current state
+Fixture only.
+## Assumptions and unknowns
+Fixture only.
+## Requirements
+Fixture only.
+## Security boundary
+Fixture only.
+## Proposed changes
+Fixture only.
+## Expected files or components
+Fixture only.
+## Acceptance criteria
+Fixture only.
+## Deterministic verification
+Fixture only.
+## Demo contribution
+Fixture only.
+## Required completion Evidence
+Fixture only.
+## Explicit exclusions
+Fixture only.
+## Completion record
+Fixture only.
+PLAN
+
+cat >"$invalid_ticket" <<'PLAN'
+# P9-S99-T98: Invalid preflight fixture
+
+**Document type:** Implementation plan
+**Status:** Proposed
+**Parent slice:** P9-S99
+**Branch:** `work/p9-s99-t98-preflight-fixture`
+**Depends on:** None
+
+## Slice contribution
+Fixture only.
+## Objective
+Fixture only.
+## Observed current state
+Fixture only.
+## Assumptions and unknowns
+Fixture only.
+## Requirements
+Fixture only.
+## Security boundary
+Fixture only.
+## Proposed changes
+Fixture only.
+## Expected files or components
+Fixture only.
+## Acceptance criteria
+Fixture only.
+## Deterministic verification
+Fixture only.
+## Required completion Evidence
+Fixture only.
+## Explicit exclusions
+Fixture only.
+## Completion record
+Fixture only.
+PLAN
+
+cat >"$valid_slice" <<'PLAN'
+# P9-S99: Slice integration fixture
+
+**Document type:** Implementation plan
+**Status:** Proposed
+**Parent slice:** None
+**Branch:** `work/p9-s99-preflight-fixture`
+**Depends on:** None
+
+## Objective
+Fixture only.
+## Observed current state
+Fixture only.
+## Assumptions and unknowns
+Fixture only.
+## Requirements
+Fixture only.
+## Proposed changes
+Fixture only.
+## Expected files or components
+Fixture only.
+## Acceptance criteria
+Fixture only.
+## Deterministic verification
+Fixture only.
+## Required completion Evidence
+Fixture only.
+## Explicit exclusions
+Fixture only.
+## Completion record
+Fixture only.
+PLAN
+
+KILN_BRANCH=work/p0-w28-wave-a-conformance scripts/agent-preflight >/dev/null
+KILN_BRANCH=work/p9-s99-t99-preflight-fixture scripts/agent-preflight >/dev/null
+KILN_BRANCH=work/p9-s99-preflight-fixture scripts/agent-preflight >/dev/null
+
+if KILN_BRANCH=work/p9-s99-t98-preflight-fixture scripts/agent-preflight >/dev/null 2>&1; then
+  fail "ticket plan missing Demo contribution passed preflight"
+fi
 
 if KILN_BRANCH=work/p0-invalid scripts/agent-preflight >/dev/null 2>&1; then
   fail "invalid work branch passed preflight"
+fi
+
+if KILN_BRANCH=work/p1-s1-t1-bad-width scripts/agent-preflight >/dev/null 2>&1; then
+  fail "invalid slice-ticket width passed preflight"
 fi
 
 if KILN_BRANCH=main scripts/agent-preflight >/dev/null 2>&1; then
   fail "main passed implementation preflight"
 fi
 
-if KILN_BRANCH=unknown/p0-w03 scripts/agent-preflight >/dev/null 2>&1; then
+if KILN_BRANCH=unknown/p0-w28 scripts/agent-preflight >/dev/null 2>&1; then
   fail "unknown branch class passed preflight"
 fi
 
