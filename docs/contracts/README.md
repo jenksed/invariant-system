@@ -1,154 +1,120 @@
 # Kiln Domain Contracts
 
-**Document type:** Provisional contract index  
-**Status:** Conformance scaffolding; not implemented  
-**P0-W18 disposition:** Prompt 3 must reconcile every contract family against the reduced first-month and version 0.1 subsets
+**Document type:** Contract authority index  
+**Status:** First-month conformance active; historical broad contracts deferred  
+**Implementation status:** Conformance scaffolding only  
+**Build authorization:** Not issued
 
-## Purpose
+## Current required contract
 
-The JSON Schemas under this directory express previously planned Kiln-native concepts.
+`kiln-first-month.schema.json` is the only recurring machine-readable contract required before Prompt 8-A.
 
-They are not:
+It covers the narrow records exercised by the accepted Single-Run plan:
 
-- runtime implementation;
-- accepted database schema;
-- one horizontal implementation backlog;
-- proof that a Tool, process, Capability, interface, or adapter exists;
-- current complete validators for the reconciled product;
-- permission or authority.
+- Root Run projection state;
+- sealed MiniMax M3 Context manifest and four-Tool maximum;
+- complete-text Patch manifest;
+- local-user Patch Approval;
+- registered non-shell Command and terminal result;
+- criterion Evidence and evaluation;
+- non-authoritative Receipt;
+- CLI result status and exit code.
 
-P0-W18 does not modify Schema files. Prompt 3 must classify them before Prompt 6 adds any recurring validation.
+Validation:
 
-## Contract families
-
-- `kiln.domain/v0`
-- `kiln.capability/v0`
-- `kiln.context/v0`
-- `kiln.git/v0`
-- `kiln.delegation/v0`
-- `kiln.interface/v0`
-- `kiln.knowledge/v0`
-- `kiln.knowledge.security/v0`
-- `kiln.execution_plane/v0`
-
-## Files
-
-- `kiln-core.schema.json` — broad Workspace, Project, Repository, Environment, Session, Task, Run, Client, Context, and policy planning.
-- `kiln-execution.schema.json` — broad Agent, Worker, invocation, Capability, Tool, Command, Terminal, Approval, Attention, and interruption planning.
-- `kiln-evidence.schema.json` — broad Artifact, Change set, Claim, Evidence, Receipt, Trace, and Checkpoint planning.
-- `kiln-capability.schema.json` — generalized registration, selection, Tool projection, and result planning.
-- `kiln-context.schema.json` — generalized compilation, manifest, rendering, documentation, budget, cache, invalidation, and observability planning.
-- `kiln-git-change.schema.json` — Repository state, branch, worktree, Change set, Patch, verification, and integration planning.
-- `kiln-delegation.schema.json` — broad Child contract, Scout, Verifier, transition, Attention, cancellation, timeout, and delivery planning.
-- `kiln-interface.schema.json` — broad interface event, snapshot, Client state, intent, and CLI result planning.
-- `kiln-knowledge.schema.json` — approved-root and local project intelligence planning.
-- `kiln-knowledge-security.schema.json` — reference-content security and disclosure planning.
-- `kiln-execution-plane.schema.json` — Environment, Command, Patch, structured result, Receipt, telemetry, and attestation planning.
-
-## Reconciled implementation rule
-
-Each slice implements only the minimum native records it exercises.
-
-The first-month target may need a small compatible subset for:
-
-```text
-Project observation
-Session
-Task
-Root Run
-minimum Run transition
-Event envelope
-Context manifest
-model invocation request and result
-Repository observation
-Patch proposal and application
-Command request and result
-Artifact metadata
-Evidence
-Receipt
-CLI result
+```bash
+python3 scripts/validate_first_month_contracts.py
 ```
 
-The first month does not require complete support for:
+The validator checks the Schema's protected enums and limits, accepts the positive fixtures, and proves each protected negative fixture fails for its expected reason.
 
-- Child Runs or Attention;
+This contract is not:
+
+- runtime implementation;
+- a database layout;
+- a complete serialization format for every planned field;
+- permission or authority;
+- proof that a provider, Store, Patch engine, Command runner, Evidence evaluator, Receipt sealer, or CLI exists;
+- build authorization.
+
+## Executable Elixir conformance
+
+The `Kiln.Conformance` modules expose only:
+
+- accepted constants and transition shapes;
+- provider behaviour callbacks;
+- macOS Command-host behaviour callbacks.
+
+They provide no external-effect implementation.
+
+Tests explicitly require these runtime modules to remain absent during Prompt 6-A:
+
+- Store and Session runtime;
+- MiniMax adapter;
+- Context builder and Repository reader;
+- Patch and mutation Worker;
+- Command Worker;
+- Evidence and Receipt runtime;
+- CLI.
+
+## Historical broad Schemas
+
+These files preserve earlier planning and remain deferred review inputs:
+
+- `kiln-core.schema.json`;
+- `kiln-execution.schema.json`;
+- `kiln-evidence.schema.json`;
+- `kiln-capability.schema.json`;
+- `kiln-context.schema.json`;
+- `kiln-git-change.schema.json`;
+- `kiln-delegation.schema.json`;
+- `kiln-interface.schema.json`;
+- `kiln-knowledge.schema.json`;
+- `kiln-knowledge-security.schema.json`;
+- `kiln-execution-plane.schema.json`.
+
+They are not one active contract set and are not implementation backlog.
+
+Prompt 6-A does not rewrite all historical Schemas. It prevents them from forcing:
+
+- deferred Run states;
 - Agent catalogs;
-- generalized Capability registrations or broker selection;
-- Skills;
-- worktree leases;
-- TUI or external Client events;
-- code intelligence;
-- knowledge and knowledge security;
-- telemetry;
-- protocol adapters;
-- containers;
-- attestation exports.
+- generalized Capability brokerage;
+- runtime Skills;
+- worktrees;
+- TUI or external Client state;
+- Child Runs;
+- code or project intelligence;
+- telemetry or attestations;
+- protocols, containers, or remote execution.
 
-Version 0.1 can add the minimum Child, Scout, Verifier, Attention, cancellation, and delivery records required by P1-S04 and P1-S05.
+A later authorized ticket can reuse a compatible historical field only after mapping it to the focused authority and adding current fixtures.
 
-A later slice extends or replaces provisional shapes only when its user-visible workflow requires them.
+## Protected first-month rules
 
-## Known P0-W18 conflicts and review targets
+1. Root Run states are `ready`, `running`, `waiting_for_user`, `orphaned`, `completed`, `failed`, and `canceled`.
+2. Workflow step and external-operation state remain separate from Run state.
+3. MiniMax M3 is the only real provider; fallback is false.
+4. At most four Tool schemas exist: `repo.search`, `repo.read`, `artifact.read`, and `change.propose`.
+5. Patches support only complete-text `add`, `replace`, and `delete` operations.
+6. Approval actor is the local user.
+7. Registered Commands do not use a shell.
+8. Known terminal Command cleanup requires the process group to be proved gone.
+9. Passing Evidence is current, complete, and non-contradicted.
+10. A Receipt has no authority.
+11. CLI status and exit code must agree.
+12. No first-month contract includes Child or Wave B concepts.
 
-Prompt 3 must examine at least these contract conflicts:
+## Extension rule
 
-1. broad current domain shapes include more entities and lifecycle fields than the first slice requires;
-2. generic and focused Run transition definitions overlap;
-3. current delegation planning reflects earlier depth-two and three-active-Child defaults;
-4. interface contracts include TUI-first concepts before the TUI is scheduled;
-5. capability contracts imply a generalized broker before one fixed authority profile;
-6. context contracts imply a generalized compiler before one explicit package builder;
-7. Git contracts emphasize managed worktrees before one selected sequential checkout;
-8. knowledge contracts are outside version 0.1;
-9. execution-plane contracts include telemetry and attestations outside version 0.1;
-10. the contract package lacks a current accepted command that validates every retained Schema and negative invariant.
+Prompt 8-A can authorize implementation against this subset. It cannot silently authorize every historical Schema.
 
-Prompt 3 shall assign retain, narrow, replace, defer, or remove dispositions. It shall not change Schema files merely to eliminate warnings.
+A new or changed contract requires:
 
-## Contract rules that remain valid
-
-1. Kiln generates core identifiers.
-2. External identifiers remain adapter metadata.
-3. A Schema does not require a table, process, Tool, or public API.
-4. Runtime handles do not enter durable identity.
-5. Git and the filesystem remain Repository truth.
-6. Availability does not grant permission.
-7. Context cannot grant authority.
-8. Large and unbounded results use Artifact references.
-9. A model-facing Tool describes intent, not implementation mechanism.
-10. External protocol objects do not enter the native domain.
-11. Task and Run remain separate.
-12. Run lineage does not define OTP supervision.
-13. A Run does not require a permanent process.
-14. A Child receives independent Context and explicit narrower grants.
-15. A Verifier `PASS` requires reproduced current Evidence.
-16. Unknown effects require orphaned or explicit unknown state.
-17. A Receipt cannot make Evidence current, grant authority, accept work, or authorize integration.
-18. Patch application binds to exact base state and retains rollback information.
-19. Command execution uses registered executable and argv rather than unrestricted shell strings.
-20. Model confidence, exit zero, Receipt sealing, and format export do not imply verification or acceptance.
-
-## P0-W18 narrowed planning rules
-
-After owner acceptance, implementation planning shall also preserve:
-
-- one Root Run and no separate Root Task in the first product;
-- one selected writable checkout and one mutation owner in the first month;
-- at most four active Tool schemas in one first-month model invocation;
-- no Child Run requirement until P1-S04;
-- maximum Child depth one and one active Child through version 0.1;
-- no writing Child through version 0.1;
-- no TUI, worktree provisioner, code intelligence, protocol adapter, knowledge system, telemetry export, or attestation requirement through version 0.1;
-- event journaling only for material work state, recovery, audit, replay, duplicate prevention, and unknown-effect reconciliation.
-
-If an existing Schema cannot express the accepted minimum without forcing distant scope, Prompt 3 must report the conflict and Prompt 6 must apply the smallest accepted conformance change.
-
-## Validation status
-
-Historical planning pull requests recorded JSON parsing, Draft 2020-12 meta-schema checks, and representative positive and negative fixtures for individual Schemas.
-
-The current Repository has no accepted recurring command that validates the complete retained contract set.
-
-Historical validation is Evidence for the exact historical blobs only. It is not current proof of compatibility with P0-W18.
-
-A future validation command must be justified after Prompt 3 determines which Schemas remain authoritative.
+- an owning accepted authority;
+- a bounded implementation purpose;
+- positive fixtures;
+- protected negative fixtures;
+- recurring validation;
+- an explicit disposition of any superseded field;
+- no fake success.
