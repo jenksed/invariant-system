@@ -18,7 +18,7 @@ defmodule Kiln.Store.Journal do
   """
 
   alias Kiln.Domain.Action
-  alias Kiln.Journal.Reducer
+  alias Kiln.Journal.{Entry, Reducer}
   alias Kiln.Projections.Session
   alias Kiln.Store.{Canonical, Connection, Error, Uuid}
 
@@ -49,6 +49,35 @@ defmodule Kiln.Store.Journal do
     result_map = Keyword.get(opts, :result, %{})
     result_schema = Keyword.get(opts, :result_schema, @default_result_schema)
 
+    with :ok <- validate_entries(entries) do
+      commit_validated(conn, action, entries, now, result_map, result_schema, opts)
+    end
+  end
+
+  # Decode every proposed entry with the shared journal decoder before the
+  # transaction opens, so an entry that cannot replay cannot commit: nothing is
+  # inserted, no action commit is written, and no projection changes.
+  defp validate_entries(entries) do
+    Enum.reduce_while(entries, :ok, fn entry, :ok ->
+      case Entry.decode(entry.type, entry.payload) do
+        {:ok, _decoded} ->
+          {:cont, :ok}
+
+        {:error, %{code: code, detail: detail}} ->
+          {:halt, {:error, invalid_entry_error(entry.type, code, detail)}}
+      end
+    end)
+  end
+
+  defp invalid_entry_error(type, code, detail) do
+    Error.new(:unknown, :invalid_entry, "journal entry failed shared decoding", %{
+      type: type,
+      decode_code: code,
+      decode_detail: detail
+    })
+  end
+
+  defp commit_validated(conn, action, entries, now, result_map, result_schema, opts) do
     outcome =
       Connection.transaction(conn, fn tx ->
         case existing_commit(tx, action) do

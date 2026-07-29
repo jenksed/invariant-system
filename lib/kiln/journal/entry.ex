@@ -17,7 +17,9 @@ defmodule Kiln.Journal.Entry do
   @run_states ~w(ready running waiting_for_user orphaned completed failed canceled)
   @task_states ~w(in_progress satisfied abandoned)
   @session_states ~w(active completed abandoned)
-  @workflow_steps ~w(intent execution approval reconciliation completion)
+  # Derived from the single domain authority so commit and replay validation
+  # cannot drift from Kiln.Domain.Run.workflow_steps/0.
+  @workflow_steps Enum.map(Kiln.Domain.Run.workflow_steps(), &Atom.to_string/1)
   @operation_classes ~w(model_invocation patch_application command_execution)
   @operation_states ~w(intent_recorded started succeeded failed canceled unknown)
 

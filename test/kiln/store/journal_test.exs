@@ -197,7 +197,7 @@ defmodule Kiln.Store.JournalTest do
         payload_schema: "run_transitioned/v1",
         payload: %{
           "run" => %{"id" => ctx.run.id, "from" => "ready", "to" => "running"},
-          "workflow_step" => "execution"
+          "workflow_step" => "application"
         }
       }
     ]

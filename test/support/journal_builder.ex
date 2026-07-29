@@ -37,7 +37,7 @@ defmodule Kiln.Test.JournalBuilder do
   end
 
   @doc "Commit `run_transitioned/v1` from `from` to `to`."
-  def commit_transition(store, d, from, to, expected, key_byte, step \\ "execution") do
+  def commit_transition(store, d, from, to, expected, key_byte, step \\ "application") do
     action = action(d, :transition_run, :system, "kiln:workflow", expected, key_byte, [])
 
     entry =
@@ -107,7 +107,7 @@ defmodule Kiln.Test.JournalBuilder do
     entry =
       entry("external_operation_intent_recorded/v1", %{
         "operation" => operation,
-        "workflow_step" => "execution"
+        "workflow_step" => "application"
       })
 
     Journal.commit(store.conn, action, [entry], now: @now)
@@ -168,7 +168,7 @@ defmodule Kiln.Test.JournalBuilder do
     [
       entry("run_transitioned/v1", %{
         "run" => %{"from" => "ready", "to" => "running"},
-        "workflow_step" => "execution"
+        "workflow_step" => "application"
       }),
       entry("criteria_revised/v1", %{"criteria_revision" => revision})
     ]
