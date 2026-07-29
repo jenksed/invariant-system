@@ -1,141 +1,154 @@
 # Kiln Domain Contracts
 
-**Status:** Foundational contract direction; not implemented  
-**Contract families:** `kiln.domain/v0`, `kiln.capability/v0`, `kiln.context/v0`, `kiln.git/v0`, `kiln.delegation/v0`, `kiln.interface/v0`, `kiln.knowledge/v0`, `kiln.knowledge.security/v0`, `kiln.execution_plane/v0`
+**Document type:** Provisional contract index  
+**Status:** Conformance scaffolding; not implemented  
+**P0-W18 disposition:** Prompt 3 must reconcile every contract family against the reduced first-month and version 0.1 subsets
 
-These JSON Schemas express Kiln-native domain, Capability, Context, Git change-coordination, delegated-work, public terminal-interface, local-project-intelligence, knowledge-security, and trustworthy-execution contracts.
+## Purpose
 
-They do not define external protocol messages. An adapter can translate ACP, MCP, LSP, SCIP, A2A, AG-UI, AHP, provider, terminal, hosting-provider, OpenTelemetry, SARIF, in-toto, SLSA, or Client messages to these contracts.
+The JSON Schemas under this directory express previously planned Kiln-native concepts.
+
+They are not:
+
+- runtime implementation;
+- accepted database schema;
+- one horizontal implementation backlog;
+- proof that a Tool, process, Capability, interface, or adapter exists;
+- current complete validators for the reconciled product;
+- permission or authority.
+
+P0-W18 does not modify Schema files. Prompt 3 must classify them before Prompt 6 adds any recurring validation.
+
+## Contract families
+
+- `kiln.domain/v0`
+- `kiln.capability/v0`
+- `kiln.context/v0`
+- `kiln.git/v0`
+- `kiln.delegation/v0`
+- `kiln.interface/v0`
+- `kiln.knowledge/v0`
+- `kiln.knowledge.security/v0`
+- `kiln.execution_plane/v0`
 
 ## Files
 
-- `kiln-core.schema.json`: Workspace, Project, Repository, Environment, Session, Task, Run, Client focus, Context, Repository trust policy, and Privacy policy.
-- `kiln-execution.schema.json`: Agent, Worker lease, model invocation, Capability, Capability grant, Skill, Resource, Tool call, generic Command, Terminal, Approval, Attention request, and Interruption.
-- `kiln-evidence.schema.json`: Artifact, Change set, Claim, Evidence, generic Receipt, Trace reference, and Checkpoint.
-- `kiln-capability.schema.json`: Capability implementation registration, selection decision, compact model-facing Tool projection, and normalized Capability result.
-- `kiln-context.schema.json`: Context compile request, immutable manifest, rendered package, documentation resolution, Artifact reference, budget, cache, invalidation, and Context observability contracts.
-- `kiln-git-change.schema.json`: Repository state, branch contract, worktree lease, Change set, Patch Artifact, verification binding, and integration Receipt.
-- `kiln-delegation.schema.json`: delegation contract, Scout result, Verifier result, Run transition, Attention event, cancellation, timeout, and Child result delivery.
-- `kiln-interface.schema.json`: public interface event, projection snapshot, Client-local state, normalized input intent, and structured CLI result.
-- `kiln-knowledge.schema.json`: approved-root configuration, Repository snapshot, typed node, typed edge, search result, candidate inspection, provenance trace, and scan result.
-- `kiln-knowledge-security.schema.json`: knowledge security policy, complete candidate provenance, disclosure decision, security audit event, separately authorized reference execution, and sanitized candidate projection.
-- `kiln-execution-plane.schema.json`: Environment profile, Command registration, Command request and result, Patch transaction, precise completion stage, structured result, execution Receipt, telemetry record, and optional attestation export.
+- `kiln-core.schema.json` — broad Workspace, Project, Repository, Environment, Session, Task, Run, Client, Context, and policy planning.
+- `kiln-execution.schema.json` — broad Agent, Worker, invocation, Capability, Tool, Command, Terminal, Approval, Attention, and interruption planning.
+- `kiln-evidence.schema.json` — broad Artifact, Change set, Claim, Evidence, Receipt, Trace, and Checkpoint planning.
+- `kiln-capability.schema.json` — generalized registration, selection, Tool projection, and result planning.
+- `kiln-context.schema.json` — generalized compilation, manifest, rendering, documentation, budget, cache, invalidation, and observability planning.
+- `kiln-git-change.schema.json` — Repository state, branch, worktree, Change set, Patch, verification, and integration planning.
+- `kiln-delegation.schema.json` — broad Child contract, Scout, Verifier, transition, Attention, cancellation, timeout, and delivery planning.
+- `kiln-interface.schema.json` — broad interface event, snapshot, Client state, intent, and CLI result planning.
+- `kiln-knowledge.schema.json` — approved-root and local project intelligence planning.
+- `kiln-knowledge-security.schema.json` — reference-content security and disclosure planning.
+- `kiln-execution-plane.schema.json` — Environment, Command, Patch, structured result, Receipt, telemetry, and attestation planning.
 
-## Vertical implementation rule
+## Reconciled implementation rule
 
-The schemas define accepted semantic boundaries. They are not one horizontal implementation backlog.
+Each slice implements only the minimum native records it exercises.
 
-P1-S01 through P1-S10 implement only the contract subset exercised by the current vertical demo. A later slice extends or consolidates the same Kiln-native contracts when its user-visible behavior requires additional fields.
+The first-month target may need a small compatible subset for:
 
-Kiln does not add a `slice` runtime entity or contract family. Slice identifiers belong to work planning, acceptance gates, demos, and Receipts.
+```text
+Project observation
+Session
+Task
+Root Run
+minimum Run transition
+Event envelope
+Context manifest
+model invocation request and result
+Repository observation
+Patch proposal and application
+Command request and result
+Artifact metadata
+Evidence
+Receipt
+CLI result
+```
 
-Contract existence does not imply:
+The first month does not require complete support for:
 
-- a database table;
-- an OTP process;
-- a public Tool;
-- model visibility;
-- Capability availability;
-- permission;
-- implemented runtime support.
+- Child Runs or Attention;
+- Agent catalogs;
+- generalized Capability registrations or broker selection;
+- Skills;
+- worktree leases;
+- TUI or external Client events;
+- code intelligence;
+- knowledge and knowledge security;
+- telemetry;
+- protocol adapters;
+- containers;
+- attestation exports.
 
-## Rules
+Version 0.1 can add the minimum Child, Scout, Verifier, Attention, cancellation, and delivery records required by P1-S04 and P1-S05.
 
-1. Kiln generates all core identifiers.
-2. External identifiers belong in adapter-owned mapping records.
-3. Unknown external fields do not enter a core entity.
-4. A schema definition does not require a database table or OTP process.
-5. State transitions are durable events. Entity documents can be immutable records or rebuildable projections.
-6. Contract version `v0` can change before implementation. A later incompatible contract requires a new version.
-7. Capability availability, effective authority, Evidence freshness, Trace, completion readiness, integration readiness, and most Client state are derived projections.
-8. Process identifiers and runtime handles must not appear in durable contracts.
-9. The complete Capability catalog remains outside model Context.
-10. A model-facing Tool name describes software-development intent, not a protocol, server, vendor, CLI, executable, or persistence mechanism.
-11. Availability does not grant permission.
-12. Large and unbounded results use Artifact references rather than model-visible payloads.
-13. A larger provider Context window does not increase the Run Context ceiling automatically.
-14. Every model invocation or Context-consuming Worker step receives a new immutable Context manifest.
-15. Context items preserve authority, trust, sensitivity, freshness, state binding, selection reason, transformation, and retrieval provenance.
-16. Context package and Tool-schema limits are explicit contract fields, not provider defaults.
-17. Context7, external documentation, model memory, and reference repositories cannot override higher-authority active Project sources.
-18. Git remains authoritative for commits, refs, worktrees, and Repository content.
-19. Branch contracts and worktree leases record Kiln authorization and coordination. They do not replace Git facts.
-20. One writable worktree has at most one active mutation-owner Run.
-21. Verification binds to an exact commit or head plus dirty-tree and Environment fingerprint.
-22. A Receipt cannot make stale Evidence current, grant Capability authority, accept work, or authorize integration.
-23. Every delegated Task receives a Child Run and immutable delegation contract before delegated execution.
-24. A Child receives independent Context, grants, accounting, cancellation, Artifacts, Evidence, and result delivery.
-25. Scout and Verifier are the only initial delegated role contracts.
-26. A Verifier `PASS` requires reproduced Evidence. `BLOCKED` must not be represented as `PASS`.
-27. A blocking user or permission wait requires a global Attention item and recorded resume state.
-28. Unknown effects after crash, timeout, cancellation, or rollback require `orphaned` or explicit unknown-effects state rather than success.
-29. Logical Parent-Child Run lineage does not define OTP supervision.
-30. The delegated-work contract prohibits peer communication, shared mutable Context, and Child permission expansion in the initial version.
-31. Interface events and snapshots are public projections. They do not become a second domain authority.
-32. Focus, selection, navigation history, scroll, layout, and drafts are client-local.
-33. Run execution, Attention, permissions, events, Artifacts, Evidence, Receipts, and Git ownership are shared durable state.
-34. Public CLI output must not expose persistence schemas.
-35. Duplicate, delayed, and replayed interface events must not create false state.
-36. Generic activation must not approve permission, shell execution, integration, cancellation, or another destructive action.
-37. Renderer or Client failure must not terminate active Runs.
-38. ExRatatui types must remain outside Kiln domain contracts and modules.
-39. Local project intelligence is disabled until explicit approved roots exist.
-40. Reference Repository content has `instruction_authority: none` for the active Project.
-41. Knowledge indexing must not mutate source or execute Repository code in the initial version.
-42. Knowledge records preserve Repository snapshot, content digest, extractor, freshness, confidence, and provenance.
-43. Embeddings are disabled and no graph or vector database is required by `kiln.knowledge/v0`.
-44. Model-facing knowledge access uses narrow intent-level operations and does not expose SQL or arbitrary graph queries.
-45. Knowledge search results are investigation candidates and cannot become current Project decisions automatically.
-46. Reference instructions, prompts, roadmaps, ADRs, comments, and generated recommendations remain inert quoted data.
-47. Knowledge policy denies source execution, source writes, command authority, network authority, and hosted embeddings in v0.
-48. Every external disclosure is bound to policy, Run, destination, data classes, payload digest, Approval, and expiry.
-49. Every displayed or reusable candidate carries complete source, state, hash, trust, licensing, sanitization, and disclosure provenance.
-50. Future execution against a reference Repository requires a separate Run, grant, Environment, Approval, source snapshot, Evidence record, and audit trail.
-51. The Environment broker selects the least powerful Environment that satisfies correctness, authority, isolation, and Evidence requirements. It cannot grant authority.
-52. Harmless deterministic reads do not require a worktree or container.
-53. Ordinary Commands use accepted versioned registrations and argument vectors rather than unrestricted shell strings.
-54. An unrestricted shell requires exact explicit Approval and a dedicated Capability grant.
-55. A Command owns and terminates its complete process tree or reports incomplete cleanup and unknown effects.
-56. Patch transactions bind to exact base state, validate all operations before mutation, and retain rollback information.
-57. Formatting and focused validation remain visible registered Commands after Patch application.
-58. `Proposed`, `Implemented`, `Inspected`, `Executed`, `Verified`, `Accepted`, and `Delivered` are separate facts.
-59. Exit zero, model confidence, Receipt sealing, and attestation export do not imply verification, acceptance, integration, or delivery.
-60. Machine-readable results have stronger evidentiary authority than model summaries only when valid, complete, current, and subject-bound.
-61. Raw structured reports remain immutable Artifacts with parser, path-mapping, completeness, and state provenance.
-62. Execution Receipts contain bounded facts and references. They do not replace underlying Evidence or decisions.
-63. OpenTelemetry is operational observation, not durable Evidence or audit authority.
-64. Source, Patch content, secrets, sensitive prompts, raw argv, stdout, stderr, and complete result content remain outside telemetry by default.
-65. Optional in-toto or SLSA-shaped export does not create a SLSA-level Claim or cryptographic authenticity.
-66. WASI and WIT remain future component boundaries until a concrete accepted operation justifies them.
-67. A Run does not require a permanent process. Active lifecycle owners receive processes only while needed.
-68. Active code intelligence and local project intelligence share extraction and index primitives but not instruction authority or execution policy.
-69. Persistent semantic records are Kiln-native normalized facts first; SCIP remains a later adapter option.
-70. The first writing Child remains read-only and returns a Patch Artifact to an authorized applying Run.
-71. The P1-W01 through P1-W13 component sequence is superseded by P1-S01 through P1-S10 vertical slices.
-72. Version 0.1 ends after durable read-only recovery in P1-S05.
+A later slice extends or replaces provisional shapes only when its user-visible workflow requires them.
 
-## Contract precedence during v0
+## Known P0-W18 conflicts and review targets
 
-`kiln.delegation/v0` is the detailed authority for delegated Run transitions and Attention events introduced by P0-W11.
+Prompt 3 must examine at least these contract conflicts:
 
-`kiln.interface/v0` is the public projection and Client-input authority introduced by P0-W12. It does not replace domain events, delegation contracts, or durable storage.
+1. broad current domain shapes include more entities and lifecycle fields than the first slice requires;
+2. generic and focused Run transition definitions overlap;
+3. current delegation planning reflects earlier depth-two and three-active-Child defaults;
+4. interface contracts include TUI-first concepts before the TUI is scheduled;
+5. capability contracts imply a generalized broker before one fixed authority profile;
+6. context contracts imply a generalized compiler before one explicit package builder;
+7. Git contracts emphasize managed worktrees before one selected sequential checkout;
+8. knowledge contracts are outside version 0.1;
+9. execution-plane contracts include telemetry and attestations outside version 0.1;
+10. the contract package lacks a current accepted command that validates every retained Schema and negative invariant.
 
-`kiln.knowledge/v0` is the public configuration, Repository-snapshot, node, edge, result, inspection, provenance, and scan authority introduced by P0-W13.
+Prompt 3 shall assign retain, narrow, replace, defer, or remove dispositions. It shall not change Schema files merely to eliminate warnings.
 
-`kiln.knowledge.security/v0` narrows `kiln.knowledge/v0` with mandatory instruction quarantine, read-only authority, complete provenance, Privacy modes, disclosure decisions, security audit events, and separate reference-execution authorization.
+## Contract rules that remain valid
 
-`kiln.execution_plane/v0` is the detailed authority for Environment selection, registered Command requests and results, transactional Patches, completion stages, structured-result ingestion, execution Receipts, telemetry records, and optional attestation exports introduced by P0-W15. It refines but does not replace the generic Command, Evidence, Receipt, Git, Capability, or Run contracts.
+1. Kiln generates core identifiers.
+2. External identifiers remain adapter metadata.
+3. A Schema does not require a table, process, Tool, or public API.
+4. Runtime handles do not enter durable identity.
+5. Git and the filesystem remain Repository truth.
+6. Availability does not grant permission.
+7. Context cannot grant authority.
+8. Large and unbounded results use Artifact references.
+9. A model-facing Tool describes intent, not implementation mechanism.
+10. External protocol objects do not enter the native domain.
+11. Task and Run remain separate.
+12. Run lineage does not define OTP supervision.
+13. A Run does not require a permanent process.
+14. A Child receives independent Context and explicit narrower grants.
+15. A Verifier `PASS` requires reproduced current Evidence.
+16. Unknown effects require orphaned or explicit unknown state.
+17. A Receipt cannot make Evidence current, grant authority, accept work, or authorize integration.
+18. Patch application binds to exact base state and retains rollback information.
+19. Command execution uses registered executable and argv rather than unrestricted shell strings.
+20. Model confidence, exit zero, Receipt sealing, and format export do not imply verification or acceptance.
 
-A more detailed contract cannot broaden an upper-layer policy or grant.
+## P0-W18 narrowed planning rules
 
-P1-S01 begins with a minimal compatible subset of the generic Session, Task, Run, Event, projection, and Receipt contracts. Later slices consolidate accepted fields before those schemas become complete production validators.
+After owner acceptance, implementation planning shall also preserve:
 
-## Validation
+- one Root Run and no separate Root Task in the first product;
+- one selected writable checkout and one mutation owner in the first month;
+- at most four active Tool schemas in one first-month model invocation;
+- no Child Run requirement until P1-S04;
+- maximum Child depth one and one active Child through version 0.1;
+- no writing Child through version 0.1;
+- no TUI, worktree provisioner, code intelligence, protocol adapter, knowledge system, telemetry export, or attestation requirement through version 0.1;
+- event journaling only for material work state, recovery, audit, replay, duplicate prevention, and unknown-effect reconciliation.
 
-The schemas use JSON Schema Draft 2020-12.
+If an existing Schema cannot express the accepted minimum without forcing distant scope, Prompt 3 must report the conflict and Prompt 6 must apply the smallest accepted conformance change.
 
-The three domain schemas use stable `urn:kiln:schema:*` cross-file identifiers. A validator registers them in one catalog before resolving cross-file references.
+## Validation status
 
-The Capability, Context, Git change, delegation, interface, knowledge, knowledge-security, and execution-plane schemas are self-contained and use provisional `https://kiln.local/schemas/*` identifiers.
+Historical planning pull requests recorded JSON parsing, Draft 2020-12 meta-schema checks, and representative positive and negative fixtures for individual Schemas.
 
-A contract change requires parser validation. A foundational contract package also requires representative Draft 2020-12 validation for each top-level document type and negative cases for protected invariants.
+The current Repository has no accepted recurring command that validates the complete retained contract set.
+
+Historical validation is Evidence for the exact historical blobs only. It is not current proof of compatibility with P0-W18.
+
+A future validation command must be justified after Prompt 3 determines which Schemas remain authoritative.
