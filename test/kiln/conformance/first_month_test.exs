@@ -54,7 +54,15 @@ defmodule Kiln.Conformance.FirstMonthTest do
     assert FirstMonth.patch_operations() == [:add, :replace, :delete]
     assert FirstMonth.evidence_statuses() == [:pass, :fail, :blocked, :unknown]
     assert FirstMonth.freshness_states() == [:current, :stale, :unknown]
-    assert FirstMonth.completeness_states() == [:complete, :partial, :truncated, :missing, :unknown]
+
+    assert FirstMonth.completeness_states() == [
+             :complete,
+             :partial,
+             :truncated,
+             :missing,
+             :unknown
+           ]
+
     assert FirstMonth.contradiction_states() == [:none, :present, :unknown]
 
     assert FirstMonth.criterion_results() == [
@@ -136,7 +144,8 @@ defmodule Kiln.Conformance.FirstMonthTest do
     ]
 
     for module <- absent_runtime_modules do
-      refute Code.ensure_loaded?(module), "#{inspect(module)} must remain unimplemented in Prompt 6-A"
+      message = "#{inspect(module)} must remain unimplemented in Prompt 6-A"
+      refute Code.ensure_loaded?(module), message
     end
   end
 end
