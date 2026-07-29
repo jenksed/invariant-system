@@ -38,13 +38,26 @@ defmodule Kiln.Journal.Replay do
 
   @type block :: %{code: atom(), boundary: non_neg_integer() | nil, detail: map()}
 
-  @doc "Distinct Session identifiers present in the journal, in first-seen order."
+  @doc """
+  Distinct Session identifiers from the durable journal, in first-seen order.
+
+  A Session is a candidate if it has any `journal_entries` row or any
+  `action_commits` row, so an action commit whose journal rows are missing is
+  discovered and blocks on incomplete durable state instead of vanishing. The
+  non-authoritative projection cache never creates a candidate.
+  """
   @spec sessions(Connection.conn()) :: [String.t()]
   def sessions(conn) do
     conn
-    |> Connection.query!(
-      "SELECT session_id FROM journal_entries GROUP BY session_id ORDER BY min(sequence)"
+    |> Connection.query!("""
+    SELECT session_id FROM (
+      SELECT session_id, sequence FROM journal_entries
+      UNION ALL
+      SELECT session_id, first_sequence AS sequence FROM action_commits
     )
+    GROUP BY session_id
+    ORDER BY min(sequence)
+    """)
     |> List.flatten()
   end
 
