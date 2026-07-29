@@ -128,11 +128,17 @@ defmodule Kiln.Domain.Action do
 
   defp validate_revision(_value) do
     {:error,
-     Error.new(:invalid_revision, "expected Session revision must be a non-negative integer", :expected_session_revision)}
+     Error.new(
+       :invalid_revision,
+       "expected Session revision must be a non-negative integer",
+       :expected_session_revision
+     )}
   end
 
   defp validate_actor_kind(kind) when kind in @actor_kinds, do: :ok
-  defp validate_actor_kind(_kind), do: {:error, Error.new(:invalid_actor, "actor kind is not permitted", :actor_kind)}
+
+  defp validate_actor_kind(_kind),
+    do: {:error, Error.new(:invalid_actor, "actor kind is not permitted", :actor_kind)}
 
   defp validate_action_kind(kind) when kind in @action_kinds, do: :ok
 
@@ -162,12 +168,19 @@ defmodule Kiln.Domain.Action do
         MapSet.member?(@forbidden_payload_keys, key) ->
           {:halt,
            {:error,
-            Error.new(:forbidden_payload_field, "payload contains a forbidden runtime or sensitive field", :payload, %{
-              key: key
-            })}}
+            Error.new(
+              :forbidden_payload_field,
+              "payload contains a forbidden runtime or sensitive field",
+              :payload,
+              %{
+                key: key
+              }
+            )}}
 
         not (is_atom(key) or is_binary(key)) ->
-          {:halt, {:error, Error.new(:invalid_payload, "payload keys must be atoms or strings", :payload)}}
+          {:halt,
+           {:error,
+            Error.new(:invalid_payload, "payload keys must be atoms or strings", :payload)}}
 
         true ->
           case validate_payload_value(child) do
@@ -188,7 +201,8 @@ defmodule Kiln.Domain.Action do
   end
 
   defp validate_payload_value(value)
-       when is_binary(value) or is_boolean(value) or is_integer(value) or is_float(value) or is_nil(value),
+       when is_binary(value) or is_boolean(value) or is_integer(value) or is_float(value) or
+              is_nil(value),
        do: :ok
 
   defp validate_payload_value(_value) do
