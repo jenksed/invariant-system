@@ -17,13 +17,13 @@ defmodule Kiln.Store.FixturesTest do
   end
 
   test "canonical JSON supports every scalar accepted by the domain payload contract" do
-    assert Canonical.encode(%{count: 2, "ratio" => 1.5, enabled: true, note: nil}) ==
+    assert Canonical.encode(%{"ratio" => 1.5, count: 2, enabled: true, note: nil}) ==
              ~s({"count":2,"enabled":true,"note":null,"ratio":1.5})
   end
 
   test "canonical JSON rejects atom and string keys that normalize to the same key" do
     assert_raise ArgumentError, ~r/duplicate normalized key "same"/, fn ->
-      Canonical.encode(%{:same => 1, "same" => 2})
+      Canonical.encode(%{"same" => 2, same: 1})
     end
   end
 
