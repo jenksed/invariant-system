@@ -18,7 +18,10 @@ defmodule Kiln.Store.Journal do
   """
 
   alias Kiln.Domain.Action
-  alias Kiln.Store.{Canonical, Connection, Error, Projection, Uuid}
+  alias Kiln.Journal.{Entry, Reducer, Replay}
+  alias Kiln.Projections.Session
+  alias Kiln.Projections.Store, as: ProjectionStore
+  alias Kiln.Store.{Canonical, Connection, Error, Uuid}
 
   @entry_schema "journal_entry/v1"
   @default_result_schema "action_result/v1"
@@ -29,7 +32,7 @@ defmodule Kiln.Store.Journal do
           status: :committed | :replayed,
           session_revision: non_neg_integer(),
           last_sequence: non_neg_integer() | nil,
-          projection: Projection.t() | nil,
+          projection: Session.t() | nil,
           result: map()
         }
 
@@ -51,13 +54,22 @@ defmodule Kiln.Store.Journal do
       Connection.transaction(conn, fn tx ->
         case existing_commit(tx, action) do
           {:replay, stored} ->
-            {:replayed, stored}
+            # A duplicate replay must validate the stored action boundary
+            # against the authoritative journal before returning the prior
+            # result, so a deleted or corrupt journal cannot masquerade as
+            # accepted recorded truth (R04). The replay still happens before
+            # any regenerated caller entries are decoded, so a valid duplicate
+            # never fails on caller-entry shape.
+            replay_boundary_valid?(tx, action, stored)
 
           {:conflict, _} ->
             DBConnection.rollback(tx, {:idempotency_conflict})
 
+          {:corrupt_result, error} ->
+            DBConnection.rollback(tx, {:corrupt_result, error})
+
           :none ->
-            do_commit(tx, action, entries, result_map, result_schema, now, opts)
+            commit_new(tx, action, entries, result_map, result_schema, now, opts)
         end
       end)
 
@@ -65,11 +77,93 @@ defmodule Kiln.Store.Journal do
       {:ok, {:committed, data}} -> {:ok, data}
       {:ok, {:replayed, stored}} -> {:ok, replayed_result(stored)}
       {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
+      {:error, {:invalid_entry, error}} -> {:error, error}
+      {:error, {:corrupt_result, error}} -> {:error, error}
+      {:error, {:cache_corrupt, error}} -> {:error, error}
+      {:error, {:cache_invalid_metadata, error}} -> {:error, error}
+      {:error, {:journal_invalid, error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
   rescue
     exception -> {:error, transaction_error(Exception.message(exception))}
+  end
+
+  # Decode every proposed entry with the shared journal decoder before insertion,
+  # but only for a new action, so an entry that cannot replay cannot commit while
+  # a duplicate still replays. Nothing is inserted on an invalid entry.
+  defp commit_new(tx, action, entries, result_map, result_schema, now, opts) do
+    case validate_entries(entries) do
+      :ok -> do_commit(tx, action, entries, result_map, result_schema, now, opts)
+      {:error, error} -> DBConnection.rollback(tx, {:invalid_entry, error})
+    end
+  end
+
+  defp validate_entries([]) do
+    {:error,
+     Error.new(:unknown, :empty_entry_batch, "an action must append at least one entry", %{})}
+  end
+
+  defp validate_entries(entries) do
+    Enum.reduce_while(entries, :ok, fn entry, :ok ->
+      case validate_entry(entry) do
+        :ok -> {:cont, :ok}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # Make malformed caller input total: the entry must be a map with a string
+  # type, a payload_schema that matches the shared authority, and a map payload
+  # that decodes.
+  defp validate_entry(entry) when is_map(entry) do
+    type = Map.get(entry, :type)
+    payload_schema = Map.get(entry, :payload_schema)
+    payload = Map.get(entry, :payload)
+
+    cond do
+      not is_binary(type) ->
+        {:error, malformed_entry(:missing_type, %{})}
+
+      not is_binary(payload_schema) ->
+        {:error, malformed_entry(:missing_payload_schema, %{type: type})}
+
+      not is_map(payload) ->
+        {:error, malformed_entry(:payload_not_a_map, %{type: type})}
+
+      Entry.payload_schema(type) != payload_schema ->
+        {:error,
+         malformed_entry(:payload_schema_mismatch, %{type: type, payload_schema: payload_schema})}
+
+      true ->
+        decode_entry(type, payload)
+    end
+  end
+
+  defp validate_entry(_entry), do: {:error, malformed_entry(:entry_not_a_map, %{})}
+
+  defp decode_entry(type, payload) do
+    case Entry.decode(type, payload) do
+      {:ok, _decoded} -> :ok
+      {:error, %{code: code, detail: detail}} -> {:error, invalid_entry_error(type, code, detail)}
+    end
+  end
+
+  defp malformed_entry(reason, detail) do
+    Error.new(
+      :unknown,
+      :invalid_entry,
+      "malformed journal entry",
+      Map.put(detail, :reason, reason)
+    )
+  end
+
+  defp invalid_entry_error(type, code, detail) do
+    Error.new(:unknown, :invalid_entry, "journal entry failed shared decoding", %{
+      type: type,
+      decode_code: code,
+      decode_detail: detail
+    })
   end
 
   # -- transaction body --
@@ -82,63 +176,236 @@ defmodule Kiln.Store.Journal do
 
     new_revision = base_next + length(entries) - 1
 
-    projection = build_projection(current_projection, appended, new_revision, last_sequence)
-    upsert_projection(tx, action.session_id, projection, now)
+    case build_projection(current_projection, appended, new_revision, last_sequence) do
+      {:ok, projection} ->
+        upsert_projection(tx, action.session_id, projection, now)
 
-    write_action_commit(tx, action, first_sequence, last_sequence, result_map, result_schema, now)
+        write_action_commit(
+          tx,
+          action,
+          first_sequence,
+          last_sequence,
+          result_map,
+          result_schema,
+          now
+        )
 
-    maybe_fault!(opts)
+        maybe_fault!(opts)
 
-    {:committed,
-     %{
-       status: :committed,
-       session_revision: new_revision,
-       last_sequence: last_sequence,
-       projection: projection,
-       result: result_map
-     }}
+        {:committed,
+         %{
+           status: :committed,
+           session_revision: new_revision,
+           last_sequence: last_sequence,
+           projection: projection,
+           result: result_map
+         }}
+
+      {:error, %{code: code, detail: detail}} ->
+        DBConnection.rollback(
+          tx,
+          {:invalid_entry, invalid_entry_error("<reduce>", code, detail)}
+        )
+    end
   end
 
   defp existing_commit(tx, action) do
     case Connection.query!(
            tx,
-           "SELECT request_digest, result_schema, result FROM action_commits WHERE session_id = ?1 AND idempotency_key = ?2",
+           "SELECT request_digest, result_schema, result, result_digest FROM action_commits WHERE session_id = ?1 AND idempotency_key = ?2",
            [action.session_id, action.idempotency_key]
          ) do
       [] ->
         :none
 
-      [[digest, result_schema, result]] ->
-        if digest == action.request_digest do
-          {:replay, %{result_schema: result_schema, result: result}}
-        else
-          {:conflict, digest}
+      [[digest, result_schema, result, result_digest]] ->
+        cond do
+          digest != action.request_digest ->
+            {:conflict, digest}
+
+          not valid_stored_result?(result_schema, result, result_digest) ->
+            {:corrupt_result,
+             Error.new(:integrity, :corrupt_result, "stored idempotency result is corrupt", %{
+               session_id: action.session_id,
+               idempotency_key: action.idempotency_key
+             })}
+
+          true ->
+            {:replay, %{result_schema: result_schema, result: result}}
         end
     end
   end
 
-  # Returns {next_revision_for_first_entry, current_projection_or_nil} or aborts
-  # the transaction with a stale-revision rollback.
-  defp revision_base!(tx, action) do
-    case Connection.query!(
-           tx,
-           "SELECT session_revision, projection FROM session_projections WHERE session_id = ?1",
-           [action.session_id]
-         ) do
-      [] ->
-        if action.expected_session_revision == 0 do
-          {0, nil}
-        else
-          DBConnection.rollback(tx, {:stale, nil})
-        end
+  # The stored idempotency result is the cached answer, not the source of truth.
+  # Validate the authoritative Session journal before returning it, so a duplicate
+  # request cannot succeed after its journal rows have been deleted or corrupted.
+  # This runs inside the same `BEGIN IMMEDIATE` transaction as the replay lookup
+  # so a concurrent tamper cannot interleave between the two reads.
+  defp replay_boundary_valid?(tx, action, stored) do
+    case Replay.rebuild(tx, action.session_id) do
+      {:ok, _report} ->
+        {:replayed, stored}
 
-      [[current, projection_json]] ->
-        if action.expected_session_revision == current do
-          {current + 1, JSON.decode!(projection_json)}
-        else
-          DBConnection.rollback(tx, {:stale, current})
+      {:error, block} ->
+        DBConnection.rollback(
+          tx,
+          {:journal_invalid,
+           Error.new(
+             :integrity,
+             :journal_invalid,
+             "duplicate replay found the stored action boundary invalid",
+             %{
+               session_id: action.session_id,
+               idempotency_key: action.idempotency_key,
+               block: block
+             }
+           )}
+        )
+    end
+  end
+
+  # A stored idempotency result must decode and match its recorded digest before
+  # it is replayed, so corrupt durable result data cannot crash or mislead.
+  defp valid_stored_result?(result_schema, result, result_digest) do
+    case safe_decode(result) do
+      {:ok, decoded} -> Canonical.digest(result_schema, decoded) == result_digest
+      :error -> false
+    end
+  end
+
+  # The journal is authoritative. Replay it first to derive the current
+  # projection and revision, then classify the optional cache as a secondary
+  # check. The cache can never produce a stale-revision error or short-circuit
+  # the rebuild; if the journal is empty a missing cache is still a valid first
+  # start, and a tampered cache cannot masquerade as authoritative state.
+  defp revision_base!(tx, action) do
+    case Replay.rebuild(tx, action.session_id) do
+      {:error, block} ->
+        DBConnection.rollback(
+          tx,
+          {:journal_invalid,
+           Error.new(
+             :integrity,
+             :journal_invalid,
+             "journal rebuild failed before the cache could be classified",
+             %{session_id: action.session_id, block: block}
+           )}
+        )
+
+      {:ok, report} ->
+        check_revision_against_rebuild!(tx, action, report)
+    end
+  end
+
+  defp check_revision_against_rebuild!(tx, action, report) do
+    authoritative_revision = report.session_revision
+    authoritative_projection = report.projection
+
+    cond do
+      is_nil(authoritative_revision) and action.expected_session_revision == 0 ->
+        # Empty journal: the next accepted revision is 0.
+        classify_cache!(tx, action.session_id, 0, nil)
+
+      is_nil(authoritative_revision) ->
+        DBConnection.rollback(tx, {:stale, nil})
+
+      action.expected_session_revision != authoritative_revision ->
+        DBConnection.rollback(tx, {:stale, authoritative_revision})
+
+      true ->
+        classify_cache!(
+          tx,
+          action.session_id,
+          authoritative_revision + 1,
+          authoritative_projection
+        )
+    end
+  end
+
+  # The cache is optional. A missing row is fine — the rebuild is authoritative.
+  # A present row must be internally valid and digest-match the rebuild.
+  defp classify_cache!(tx, session_id, base_next, authoritative_projection) do
+    case load_cache_record(tx, session_id) do
+      nil ->
+        {base_next, authoritative_projection}
+
+      :malformed ->
+        DBConnection.rollback(
+          tx,
+          {:cache_corrupt,
+           Error.new(:integrity, :cache_corrupt, "cached projection is corrupt", %{
+             session_id: session_id
+           })}
+        )
+
+      record ->
+        case ProjectionStore.validate_cache_metadata(record) do
+          :ok ->
+            rebuilt_digest =
+              if is_map(authoritative_projection),
+                do: Session.digest(authoritative_projection),
+                else: nil
+
+            if is_nil(rebuilt_digest) or Session.digest(record.projection) == rebuilt_digest do
+              {base_next, authoritative_projection}
+            else
+              DBConnection.rollback(
+                tx,
+                {:cache_invalid_metadata,
+                 Error.new(
+                   :integrity,
+                   :cache_invalid_metadata,
+                   "cached projection does not match the journal rebuild",
+                   %{session_id: session_id, reason: :projection_does_not_match_journal}
+                 )}
+              )
+            end
+
+          {:error, reason} ->
+            DBConnection.rollback(
+              tx,
+              {:cache_invalid_metadata,
+               Error.new(
+                 :integrity,
+                 :cache_invalid_metadata,
+                 "cached projection metadata or invariants are invalid",
+                 %{session_id: session_id, reason: reason}
+               )}
+            )
         end
     end
+  end
+
+  defp load_cache_record(tx, session_id) do
+    case Connection.query!(
+           tx,
+           "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
+           [session_id]
+         ) do
+      [] ->
+        nil
+
+      [[schema, revision, last_sequence, projection_text, digest]] ->
+        case safe_decode(projection_text) do
+          {:ok, projection} ->
+            %{
+              schema: schema,
+              session_revision: revision,
+              last_sequence: last_sequence,
+              projection: projection,
+              digest: digest
+            }
+
+          :error ->
+            :malformed
+        end
+    end
+  end
+
+  defp safe_decode(text) do
+    {:ok, JSON.decode!(text)}
+  rescue
+    _ -> :error
   end
 
   defp append_entries(tx, action, entries, base_next, now) do
@@ -148,7 +415,13 @@ defmodule Kiln.Store.Journal do
       |> Enum.map_reduce([], fn {entry, index}, seqs ->
         revision = base_next + index
         sequence = insert_entry(tx, action, entry, revision, now)
-        {Map.put(entry, :session_revision, revision), [sequence | seqs]}
+
+        reduced_entry =
+          entry
+          |> Map.put(:session_revision, revision)
+          |> Map.put(:session_id, action.session_id)
+
+        {reduced_entry, [sequence | seqs]}
       end)
 
     ordered = Enum.reverse(sequences)
@@ -192,15 +465,14 @@ defmodule Kiln.Store.Journal do
   end
 
   defp build_projection(current, appended, new_revision, last_sequence) do
-    {:ok, reduced} = Projection.reduce_all(current, appended)
-
-    reduced
-    |> Map.put("session_revision", new_revision)
-    |> Map.put("last_sequence", last_sequence)
+    case Reducer.reduce_all(current, appended) do
+      {:ok, reduced} -> {:ok, Session.stamp(reduced, new_revision, last_sequence)}
+      {:error, _} = error -> error
+    end
   end
 
   defp upsert_projection(tx, session_id, projection, now) do
-    digest = Canonical.digest(Projection.schema(), projection)
+    digest = Session.digest(projection)
 
     Connection.query!(
       tx,
@@ -218,7 +490,7 @@ defmodule Kiln.Store.Journal do
       """,
       [
         session_id,
-        Projection.schema(),
+        Session.schema(),
         projection["session_revision"],
         projection["last_sequence"],
         Canonical.encode(projection),

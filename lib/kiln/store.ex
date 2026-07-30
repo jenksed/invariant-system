@@ -109,6 +109,12 @@ defmodule Kiln.Store do
   @spec store_format() :: String.t()
   def store_format, do: @store_format
 
+  @doc "Rebuild a Session projection from the journal (see `Kiln.Journal.Replay`)."
+  defdelegate rebuild(conn, session_id), to: Kiln.Journal.Replay
+
+  @doc "Reconstruct the current Session at startup (see `Kiln.Restart`)."
+  defdelegate reconstruct(conn), to: Kiln.Restart
+
   defp continue(conn, opts) do
     with {:ok, info} <- verify(conn),
          {:ok, meta} <- ensure_metadata(conn, opts),
