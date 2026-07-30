@@ -188,9 +188,9 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after six PR #39 review rounds
+**Result:** Complete after seven PR #39 review rounds
 
-Six review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15); review `4813460182` found five blockers (B1 to B5) plus a decision deadlock (B6); review `4814467298` found that B2 remained incomplete because the live commit still queried and trusted `session_projections` before deriving state from journal replay. All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Seven review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15); review `4813460182` found five blockers (B1 to B5) plus a decision deadlock (B6); review `4814467298` found that B2 remained incomplete because the live commit still queried and trusted `session_projections` before deriving state from journal replay. Review round 7 (follow-up) found two remaining correctness blockers - a duplicate replay that could return `:replayed` after the supporting journal rows had been deleted or corrupted, and a `criteria_revised/v1` entry that updated the revision counter but never the criteria list and did not enforce monotonic revision. All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Final hardening corrections (review 4813027808)
 
@@ -252,6 +252,29 @@ Protected tests added (each fails against the pre-fix code and passes against th
 - A tampered cache revision column cannot produce a false `STALE_REVISION`; it is rejected as `:cache_invalid_metadata` (or `:cache_corrupt` for malformed JSON) without appending anything.
 - An empty journal with `expected > 0` returns `STALE_REVISION current=nil` without appending anything.
 - The complete invariant holds: **every accepted journal prefix either deterministically produces one internally valid projection or blocks at a stable, bounded, inspectable boundary.**
+
+### Seventh review corrections (follow-up round)
+
+Round 7 found two remaining correctness blockers that the sixth-round CI did not catch. Both were bounded to the existing T03 production surface; no new module, no expansion, no architectural change.
+
+- **R7-1 Duplicate replay returned `:replayed` after its journal rows had been deleted or corrupted.** `Kiln.Store.Journal.commit/4` previously returned the cached `action_commits` row as soon as the idempotency key and request digest matched, without confirming the supporting journal rows still existed and remained valid. A duplicate replay could therefore report success for a key whose authoritative action boundary was gone, even though restart reconstruction would block on `:missing_journal_rows` or `:corrupt_payload`. Fix: `commit/4` now rebuilds the authoritative Session inside the same `BEGIN IMMEDIATE` transaction via a new `replay_boundary_valid?/3` helper before returning the prior result. The replay still happens before caller entries are decoded, so a valid duplicate never fails on regenerated entry shape. A replay whose journal is missing or corrupt rolls back with `{:journal_invalid, %{block: ...}}` and appends nothing.
+- **R7-2 `criteria_revised/v1` updated only the revision counter, never the criteria list, and did not enforce monotonic revision.** The entry accepted only a `criteria_revision` integer and the reducer `Map.put`ed it into the projection, so a higher counter could coexist with stale criteria content. The journal authority now requires a non-empty `criteria` list, the reducer applies both the list and the revision, and a new `monotonic_criteria_revision/2` helper rejects any non-monotonic revision with `:criteria_revision_not_monotonic`. After restart, replay reconstructs the revised criteria list, not only a higher counter.
+
+Protected tests added (each fails against the pre-fix code and passes against the fix):
+
+- `a duplicate replay after the stored journal rows are deleted returns :journal_invalid and appends nothing`
+- `a duplicate replay after the stored journal payload is corrupted returns :journal_invalid and appends nothing`
+- `criteria_revised/v1 replaces the criteria list and advances the revision`
+- `criteria_revised/v1 rejects a non-monotonic revision`
+- `criteria_revised/v1 requires a non-empty criteria list`
+
+### Verified seventh-round statements
+
+- A duplicate replay validates the authoritative Session journal before returning the stored result.
+- A duplicate replay rolls back with `:journal_invalid` when its stored journal rows are missing or corrupted, and does not append a new entry or action commit.
+- `criteria_revised/v1` now carries the new criteria list and the accepted schema validates a non-empty list.
+- Replay reconstructs the revised criteria list alongside the counter; commit and replay projections agree on the new contract.
+- A non-monotonic revision is rejected with `:criteria_revision_not_monotonic`; the recorded conclusion stays accurate after restart.
 
 ### Third review corrections (review 4812387784)
 
