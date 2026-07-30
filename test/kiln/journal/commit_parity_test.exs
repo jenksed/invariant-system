@@ -336,6 +336,66 @@ defmodule Kiln.Journal.CommitParityTest do
     end)
   end
 
+  # Block B2 — rebuild-first ordering. The journal is authoritative; the cache
+  # is a non-authoritative secondary check. The live commit must rebuild the
+  # Session from the journal first and only then validate or classify the
+  # optional cache, so a missing cache row never short-circuits the rebuild
+  # and a tampered cache revision can never produce a false stale result.
+
+  test "a missing cache row does not block a valid commit because the journal is authoritative",
+       %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+
+    Connection.query!(
+      store.conn,
+      "DELETE FROM session_projections WHERE session_id = ?1",
+      [d.session.id]
+    )
+
+    assert count(store.conn, "session_projections") == 0
+
+    # The journal still records the session at revision 0. A valid transition
+    # with expected=0 must succeed and rebuild the cache row.
+    assert {:ok, %{status: :committed, session_revision: 1}} =
+             JB.commit_transition(store, d, "ready", "running", 0, 3)
+
+    assert count(store.conn, "session_projections") == 1
+  end
+
+  test "a tampered cache revision column does not produce a false stale result",
+       %{store: store, d: d} do
+    {:ok, _} = JB.commit_start(store, d)
+
+    Connection.query!(
+      store.conn,
+      "UPDATE session_projections SET session_revision = 99 WHERE session_id = ?1",
+      [d.session.id]
+    )
+
+    # The journal reports revision 0. A valid transition with expected=0 must
+    # not return STALE_REVISION with current=99 — the cache column cannot
+    # outrank the authoritative journal rebuild. The tampered cache must be
+    # rejected as invalid metadata (column 99 != embedded 0) and nothing may
+    # be appended.
+    assert {:error, %{class: :integrity, code: :cache_invalid_metadata}} =
+             JB.commit_transition(store, d, "ready", "running", 0, 3)
+
+    assert count(store.conn, "journal_entries") == 1
+    assert count(store.conn, "action_commits") == 1
+  end
+
+  test "an empty journal with no cache row returns stale when expected > 0",
+       %{store: store, d: d} do
+    # No commit_start: journal and cache are both empty. A request with
+    # expected > 0 must return STALE_REVISION with current=nil because the
+    # rebuild-first path sees no journal entries.
+    assert {:error, %{class: :revision, code: :stale_revision, details: %{current: nil}}} =
+             JB.commit_transition(store, d, "ready", "running", 1, 3)
+
+    assert count(store.conn, "journal_entries") == 0
+    assert count(store.conn, "action_commits") == 0
+  end
+
   defp assert_cache_metadata_commit_blocked(store, d, mutate) do
     {:ok, _} = JB.commit_start(store, d)
     before_entries = count(store.conn, "journal_entries")

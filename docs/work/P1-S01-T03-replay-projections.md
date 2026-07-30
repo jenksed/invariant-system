@@ -188,9 +188,9 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after five PR #39 review rounds
+**Result:** Complete after six PR #39 review rounds
 
-Five review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15); review `4813460182` found five blockers (B1 to B5) plus a decision deadlock (B6). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Six review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15); review `4813460182` found five blockers (B1 to B5) plus a decision deadlock (B6); review `4814467298` found that B2 remained incomplete because the live commit still queried and trusted `session_projections` before deriving state from journal replay. All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Final hardening corrections (review 4813027808)
 
@@ -230,6 +230,28 @@ Review `4813460182` found five remaining blockers and one decision deadlock that
 - The cache metadata validator runs in both live commit and reconciliation; journal-rebuild divergence in the live commit path blocks with `:journal_invalid`.
 - Replay refuses malformed `action_id`, `idempotency_key`, or `request_digest` even when `action_commits` and `journal_entries` agree.
 - `permitted_responses = [""]` cannot reach replay.
+
+### Sixth review corrections (review 4814467298)
+
+Review `4814467298` found that B2 remained incomplete after the fifth round: `revision_base!/2` still queried and trusted `session_projections` before deriving state from journal replay. The narrow correction specified was to run `Replay.rebuild/2` first inside the existing transaction, derive the authoritative projection and revision from its report, and only then validate or classify the optional cache.
+
+- **B2a Missing cache short-circuited the rebuild.** When the cache row was absent and `expected_session_revision == 0`, the function returned `{0, nil}` and reduced the new entries over `nil`, behaving as if no Session existed. After a valid Session start, deleting the rebuildable cache let the next valid action insert a duplicate `session_started` at revision 0 and fail with a UNIQUE-constraint violation. Fix: rebuild runs first; an empty journal with `expected == 0` returns `{0, nil}` from the rebuild path; the optional cache is consulted only after the authoritative state is known.
+- **B2b Tampered cache revision produced a false stale.** When the cache column revision disagreed with the authoritative journal revision, the function compared the request against the cache column before any rebuild or metadata validation and rolled back with `STALE_REVISION current=<tampered>`. Fix: rebuild runs first; expected-session-revision is compared against `report.session_revision`; the cache is then classified against the rebuild, so a tampered cache column cannot masquerade as authoritative state. Cache defects block with `:cache_invalid_metadata`; journal defects block with `:journal_invalid`.
+- **B2c Empty journal still returns stale without rebuilding anything.** A request with `expected > 0` and no journal rows must roll back with `STALE_REVISION current=nil`; the rebuild-first path observes the empty report and rejects without committing.
+
+Protected tests added (each fails against the pre-fix code and passes against the fix):
+
+- `a missing cache row does not block a valid commit because the journal is authoritative`
+- `a tampered cache revision column does not produce a false stale result`
+- `an empty journal with no cache row returns stale when expected > 0`
+
+### Verified sixth-round statements
+
+- `revision_base!/2` runs `Replay.rebuild/2` first; the cache is consulted only after the authoritative state is derived from the journal.
+- A missing cache row never short-circuits the rebuild; a valid follow-up commit recreates the cache.
+- A tampered cache revision column cannot produce a false `STALE_REVISION`; it is rejected as `:cache_invalid_metadata` (or `:cache_corrupt` for malformed JSON) without appending anything.
+- An empty journal with `expected > 0` returns `STALE_REVISION current=nil` without appending anything.
+- The complete invariant holds: **every accepted journal prefix either deterministically produces one internally valid projection or blocks at a stable, bounded, inspectable boundary.**
 
 ### Third review corrections (review 4812387784)
 
@@ -280,7 +302,7 @@ Review `4813460182` found five remaining blockers and one decision deadlock that
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `58c43a40`.
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `7790d26` plus three additional rebuild-first protected tests at the new exact head (see Sixth review corrections).
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
@@ -291,12 +313,12 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 | `mix format --check-formatted` | 0 | no output |
 | `mix compile --warnings-as-errors` | 0 | clean |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | `No cycles found` |
-| `mix test test/kiln/store` | 0 | 21 passed |
-| `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures |
+| `mix test test/kiln/store` | 0 | pass |
+| `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures, commit-parity rebuild-first guards |
 | `mix test test/kiln/projections` | 0 | cache classification and rebuild |
 | `mix test test/kiln/restart_test.exs` | 0 | restart, orphan, multiple-Session, idempotence |
-| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 78 passed |
-| `mix test` | 0 | 125 passed |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 126 passed |
+| `mix test` | 0 | 155 passed |
 | `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### New protected tests
@@ -329,8 +351,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 
 ### Repository state
 
-- Commit: `58c43a40a8080119ef827cbf4d081309dacf65bc` (code and tests verified locally; the final PR head is the closeout documentation commit on top, and the authoritative CI run is for that PR head)
+- Commit: `7790d26` (fifth-round corrections) followed by the sixth-round rebuild-first ordering corrections landed on top; the authoritative CI run for the final PR head is the relevant gate.
 - Branch: `work/p1-s01-t03-replay-projections`
-- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites (3404 insertions, 133 deletions versus `main`)
-- Exact CI run: full local gate green at exact head; authoritative CI run and owner review pending on the pull request
-- Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04
+- Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites including the rebuild-first protected tests.
+- Exact CI run: full local gate green at the new exact head; authoritative CI run and owner review pending on the pull request.
+- Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04.

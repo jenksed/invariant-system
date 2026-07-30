@@ -242,61 +242,74 @@ defmodule Kiln.Store.Journal do
     end
   end
 
+  # The journal is authoritative. Replay it first to derive the current
+  # projection and revision, then classify the optional cache as a secondary
+  # check. The cache can never produce a stale-revision error or short-circuit
+  # the rebuild; if the journal is empty a missing cache is still a valid first
+  # start, and a tampered cache cannot masquerade as authoritative state.
   defp revision_base!(tx, action) do
-    case Connection.query!(
-           tx,
-           "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
-           [action.session_id]
-         ) do
-      [] ->
-        if action.expected_session_revision == 0 do
-          {0, nil}
-        else
-          DBConnection.rollback(tx, {:stale, nil})
-        end
+    case Replay.rebuild(tx, action.session_id) do
+      {:error, block} ->
+        DBConnection.rollback(
+          tx,
+          {:journal_invalid,
+           Error.new(
+             :integrity,
+             :journal_invalid,
+             "journal rebuild failed before the cache could be classified",
+             %{session_id: action.session_id, block: block}
+           )}
+        )
 
-      [[schema, current, last_sequence, projection_json, digest]] ->
-        cond do
-          action.expected_session_revision != current ->
-            DBConnection.rollback(tx, {:stale, current})
-
-          true ->
-            record = %{
-              schema: schema,
-              session_revision: current,
-              last_sequence: last_sequence,
-              projection: decode_projection!(tx, projection_json),
-              digest: digest
-            }
-
-            {current + 1, current_projection!(tx, action.session_id, record)}
-        end
+      {:ok, report} ->
+        check_revision_against_rebuild!(tx, action, report)
     end
   end
 
-  defp decode_projection!(tx, projection_json) do
-    case safe_decode(projection_json) do
-      {:ok, projection} ->
-        projection
+  defp check_revision_against_rebuild!(tx, action, report) do
+    authoritative_revision = report.session_revision
+    authoritative_projection = report.projection
 
-      :error ->
+    cond do
+      is_nil(authoritative_revision) and action.expected_session_revision == 0 ->
+        # Empty journal: the next accepted revision is 0.
+        classify_cache!(tx, action.session_id, 0, nil)
+
+      is_nil(authoritative_revision) ->
+        DBConnection.rollback(tx, {:stale, nil})
+
+      action.expected_session_revision != authoritative_revision ->
+        DBConnection.rollback(tx, {:stale, authoritative_revision})
+
+      true ->
+        classify_cache!(tx, action.session_id, authoritative_revision + 1, authoritative_projection)
+    end
+  end
+
+  # The cache is optional. A missing row is fine — the rebuild is authoritative.
+  # A present row must be internally valid and digest-match the rebuild.
+  defp classify_cache!(tx, session_id, base_next, authoritative_projection) do
+    case load_cache_record(tx, session_id) do
+      nil ->
+        {base_next, authoritative_projection}
+
+      :malformed ->
         DBConnection.rollback(
           tx,
           {:cache_corrupt,
-           Error.new(:integrity, :cache_corrupt, "cached projection is corrupt", %{})}
+           Error.new(:integrity, :cache_corrupt, "cached projection is corrupt", %{
+             session_id: session_id
+           })}
         )
-    end
-  end
 
-  # The cached projection must be internally valid and equal to a fresh journal
-  # rebuild before it can serve as the base for a new append transaction.
-  defp current_projection!(tx, session_id, record) do
-    case ProjectionStore.validate_cache_metadata(record) do
-      :ok ->
-        case Replay.rebuild(tx, session_id) do
-          {:ok, %{projection: rebuilt}} when is_map(rebuilt) ->
-            if Session.digest(record.projection) == Session.digest(rebuilt) do
-              record.projection
+      record ->
+        case ProjectionStore.validate_cache_metadata(record) do
+          :ok ->
+            rebuilt_digest =
+              if is_map(authoritative_projection), do: Session.digest(authoritative_projection), else: nil
+
+            if is_nil(rebuilt_digest) or Session.digest(record.projection) == rebuilt_digest do
+              {base_next, authoritative_projection}
             else
               DBConnection.rollback(
                 tx,
@@ -305,47 +318,49 @@ defmodule Kiln.Store.Journal do
                    :integrity,
                    :cache_invalid_metadata,
                    "cached projection does not match the journal rebuild",
-                   %{session_id: session_id}
+                   %{session_id: session_id, reason: :projection_does_not_match_journal}
                  )}
               )
             end
 
-          {:ok, _report} ->
+          {:error, reason} ->
             DBConnection.rollback(
               tx,
               {:cache_invalid_metadata,
                Error.new(
                  :integrity,
                  :cache_invalid_metadata,
-                 "cached projection does not match the journal rebuild",
-                 %{session_id: session_id}
-               )}
-            )
-
-          {:error, block} ->
-            DBConnection.rollback(
-              tx,
-              {:journal_invalid,
-               Error.new(
-                 :integrity,
-                 :journal_invalid,
-                 "journal rebuild failed while validating the cache base",
-                 %{session_id: session_id, block: block}
+                 "cached projection metadata or invariants are invalid",
+                 %{session_id: session_id, reason: reason}
                )}
             )
         end
+    end
+  end
 
-      {:error, reason} ->
-        DBConnection.rollback(
-          tx,
-          {:cache_invalid_metadata,
-           Error.new(
-             :integrity,
-             :cache_invalid_metadata,
-             "cached projection metadata or invariants are invalid",
-             %{session_id: session_id, reason: reason}
-           )}
-        )
+  defp load_cache_record(tx, session_id) do
+    case Connection.query!(
+           tx,
+           "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
+           [session_id]
+         ) do
+      [] ->
+        nil
+
+      [[schema, revision, last_sequence, projection_text, digest]] ->
+        case safe_decode(projection_text) do
+          {:ok, projection} ->
+            %{
+              schema: schema,
+              session_revision: revision,
+              last_sequence: last_sequence,
+              projection: projection,
+              digest: digest
+            }
+
+          :error ->
+            :malformed
+        end
     end
   end
 
