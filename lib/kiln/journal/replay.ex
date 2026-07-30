@@ -20,6 +20,7 @@ defmodule Kiln.Journal.Replay do
   reconstruction and reports its exact sequence boundary (P1-S01-T03-R03, R05).
   """
 
+  alias Kiln.Domain.Id
   alias Kiln.Journal.{Entry, Reducer}
   alias Kiln.Projections.Session
   alias Kiln.Store.{Canonical, Connection}
@@ -204,6 +205,56 @@ defmodule Kiln.Journal.Replay do
   end
 
   defp validate_batch(commit, rows) do
+    # Format first: every persisted envelope ID and request digest must match
+    # the opaque shapes the domain action boundary enforces at construction.
+    # `Kiln.Domain.Action.new/1` rejects malformed identifiers and digests at
+    # commit time, but replay re-reads the persisted rows directly. A
+    # consistent corruption in both `action_commits` and `journal_entries`
+    # would otherwise pass equality and be applied as if it were committed
+    # truth (P1-S01-T03-B5).
+    with :ok <- validate_commit_envelope(commit),
+         :ok <- validate_entries_envelope(rows) do
+      validate_batch_continuity(commit, rows)
+    end
+  end
+
+  defp validate_commit_envelope(commit) do
+    first = commit.first_sequence
+
+    cond do
+      not Id.valid?(:action, commit.action_id) ->
+        block(:invalid_action_id, first, %{value: commit.action_id})
+
+      not Id.valid?(:idempotency, commit.idempotency_key) ->
+        block(:invalid_idempotency_key, first, %{value: commit.idempotency_key})
+
+      not valid_request_digest?(commit.request_digest) ->
+        block(:invalid_request_digest, first, %{value: commit.request_digest})
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_entries_envelope(rows) do
+    Enum.reduce_while(rows, :ok, fn row, :ok ->
+      cond do
+        not Id.valid?(:action, row.action_id) ->
+          {:halt, block(:invalid_action_id, row.sequence, %{value: row.action_id})}
+
+        not Id.valid?(:idempotency, row.idempotency_key) ->
+          {:halt, block(:invalid_idempotency_key, row.sequence, %{value: row.idempotency_key})}
+
+        not valid_request_digest?(row.request_digest) ->
+          {:halt, block(:invalid_request_digest, row.sequence, %{value: row.request_digest})}
+
+        true ->
+          {:cont, :ok}
+      end
+    end)
+  end
+
+  defp validate_batch_continuity(commit, rows) do
     sequences = Enum.map(rows, & &1.sequence)
     revisions = Enum.map(rows, & &1.revision)
     first = commit.first_sequence
@@ -254,6 +305,14 @@ defmodule Kiln.Journal.Replay do
          }}
     end
   end
+
+  # The canonical request-digest shape. Anything else - including a 64-hex
+  # string missing the `sha256:` prefix or a 40-hex SHA-1 - blocks.
+  defp valid_request_digest?(value) when is_binary(value) do
+    Regex.match?(~r/^sha256:[0-9a-f]{64}$/, value)
+  end
+
+  defp valid_request_digest?(_value), do: false
 
   # Each value equals the first value plus its index. Bounded by the row count,
   # so it never materializes an untrusted range.

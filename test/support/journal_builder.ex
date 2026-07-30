@@ -213,6 +213,10 @@ defmodule Kiln.Test.JournalBuilder do
       "task" => %{"id" => d.task.id, "state" => "in_progress"},
       "run" => %{"id" => d.run.id, "state" => "ready", "root_run_id" => d.run.root_run_id},
       "workflow_step" => "intent",
+      "objective" => d.session.objective,
+      "criteria" => d.task.criteria,
+      "constraints" => d.task.constraints,
+      "exclusions" => d.task.exclusions,
       "objective_revision" => d.session.revision,
       "criteria_revision" => d.session.criteria_revision,
       "references" => %{"project_observation_id" => d.session.project_observation_id}

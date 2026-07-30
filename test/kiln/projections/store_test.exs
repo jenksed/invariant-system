@@ -72,6 +72,75 @@ defmodule Kiln.Projections.StoreTest do
     assert {:ok, :replaced_invalid_metadata, _report} = Store.compare(store.conn, d.session.id)
   end
 
+  test "classifies metadata and invariant mismatches as replaced_invalid_metadata", %{
+    store: store,
+    d: d
+  } do
+    {:ok, _} = JB.commit_start(store, d)
+
+    mutations = [
+      fn ->
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection_schema = 'wrong/v1' WHERE session_id = ?1",
+          [d.session.id]
+        )
+      end,
+      fn ->
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection_digest = 'wrong' WHERE session_id = ?1",
+          [d.session.id]
+        )
+      end,
+      fn ->
+        projection = Store.load(store.conn, d.session.id)
+        tampered = Map.put(projection, "reducer_version", "wrong")
+
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+          [Canonical.encode(tampered), d.session.id]
+        )
+      end,
+      fn ->
+        projection = Store.load(store.conn, d.session.id)
+        tampered = Map.put(projection, "session_revision", 99)
+
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+          [Canonical.encode(tampered), d.session.id]
+        )
+      end,
+      fn ->
+        projection = Store.load(store.conn, d.session.id)
+        tampered = Map.put(projection, "last_sequence", 99)
+
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+          [Canonical.encode(tampered), d.session.id]
+        )
+      end,
+      fn ->
+        projection = Store.load(store.conn, d.session.id)
+        tampered = put_in(projection, ["run", "root_run_id"], "run_wrong")
+
+        Connection.query!(
+          store.conn,
+          "UPDATE session_projections SET projection = ?1, projection_digest = ?2 WHERE session_id = ?3",
+          [Canonical.encode(tampered), Session.digest(tampered), d.session.id]
+        )
+      end
+    ]
+
+    for mutate <- mutations do
+      mutate.()
+      assert {:ok, :replaced_invalid_metadata, _report} = Store.compare(store.conn, d.session.id)
+    end
+  end
+
   test "replaces a stale but internally consistent cache", %{store: store, d: d} do
     {:ok, r0} = JB.commit_start(store, d)
     {:ok, _r1} = JB.commit_transition(store, d, "ready", "running", 0, 3)

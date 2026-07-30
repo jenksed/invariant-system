@@ -78,24 +78,51 @@ defmodule Kiln.Projections.Store do
 
   defp classify_record(record, rebuilt) do
     cond do
-      not metadata_consistent?(record) -> :replaced_invalid_metadata
+      validate_cache_metadata(record) != :ok -> :replaced_invalid_metadata
       Session.digest(record.projection) == Session.digest(rebuilt) -> :match
       true -> :replaced_stale
     end
   end
 
-  # Every metadata field must agree: the column schema and revision and sequence,
-  # the embedded schema and reducer version, and the stored digest.
-  defp metadata_consistent?(record) do
-    projection = record.projection
+  @doc "Validate cache columns and embedded projection metadata and invariants."
+  @spec validate_cache_metadata(map()) :: :ok | {:error, term()}
+  def validate_cache_metadata(record) when is_map(record) do
+    projection = Map.get(record, :projection)
 
-    record.schema == Session.schema() and
-      projection["schema"] == Session.schema() and
-      projection["reducer_version"] == Session.reducer_version() and
-      record.digest == Session.digest(projection) and
-      record.session_revision == projection["session_revision"] and
-      record.last_sequence == projection["last_sequence"]
+    cond do
+      Map.get(record, :schema) != Session.schema() ->
+        {:error, :projection_schema_mismatch}
+
+      not is_map(projection) ->
+        {:error, :projection_not_a_map}
+
+      projection["schema"] != Session.schema() ->
+        {:error, :embedded_schema_mismatch}
+
+      projection["reducer_version"] != Session.reducer_version() ->
+        {:error, :reducer_version_mismatch}
+
+      Map.get(record, :digest) != safe_digest(projection) ->
+        {:error, :projection_digest_mismatch}
+
+      Map.get(record, :session_revision) != projection["session_revision"] ->
+        {:error, :session_revision_mismatch}
+
+      Map.get(record, :last_sequence) != projection["last_sequence"] ->
+        {:error, :last_sequence_mismatch}
+
+      true ->
+        case safe_validate(projection) do
+          :ok -> :ok
+          {:error, _reason} -> {:error, :invalid_projection}
+          :error -> {:error, :invalid_projection}
+        end
+    end
+  rescue
+    _ -> {:error, :invalid_cache_metadata}
   end
+
+  def validate_cache_metadata(_record), do: {:error, :invalid_cache_metadata}
 
   # -- persistence --
 
@@ -158,6 +185,18 @@ defmodule Kiln.Projections.Store do
 
   defp safe_decode(text) do
     {:ok, JSON.decode!(text)}
+  rescue
+    _ -> :error
+  end
+
+  defp safe_digest(projection) do
+    Session.digest(projection)
+  rescue
+    _ -> :invalid_digest
+  end
+
+  defp safe_validate(projection) do
+    Session.validate(projection)
   rescue
     _ -> :error
   end

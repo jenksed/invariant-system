@@ -11,6 +11,10 @@ defmodule Kiln.Journal.ReducerTest do
         "task" => %{"id" => "tsk_1", "state" => "in_progress"},
         "run" => %{"id" => "run_1", "state" => "ready", "root_run_id" => "run_1"},
         "workflow_step" => "intent",
+        "objective" => "Build the feature",
+        "criteria" => ["The feature works"],
+        "constraints" => [],
+        "exclusions" => [],
         "objective_revision" => 0,
         "criteria_revision" => 0,
         "references" => %{"project_observation_id" => "pro_1"}
@@ -24,9 +28,37 @@ defmodule Kiln.Journal.ReducerTest do
     assert projection["operation"] == nil
   end
 
+  test "session start projects objective, criteria, constraints, and exclusions for restart" do
+    assert {:ok, projection} = Reducer.reduce(nil, session_started())
+    assert projection["objective"] == "Build the feature"
+    assert projection["criteria"] == ["The feature works"]
+    assert projection["constraints"] == []
+    assert projection["exclusions"] == []
+  end
+
   test "the first entry must start the Session" do
     assert {:error, %{code: :missing_session_start}} =
              Reducer.reduce(nil, %{type: "run_transitioned/v1", payload: %{}})
+  end
+
+  test "a terminal known operation permits recording the next operation intent" do
+    for state <- ["succeeded", "failed", "canceled"] do
+      {:ok, projection} = Reducer.reduce(nil, session_started())
+      terminal = %{"id" => "opn_old", "class" => "command_execution", "state" => state}
+      projection = Map.put(projection, "operation", terminal)
+
+      assert {:ok, next} =
+               Reducer.reduce(projection, %{
+                 type: "external_operation_intent_recorded/v1",
+                 payload: %{"operation" => %{"id" => "opn_new", "class" => "command_execution"}}
+               })
+
+      assert next["operation"] == %{
+               "id" => "opn_new",
+               "class" => "command_execution",
+               "state" => "intent_recorded"
+             }
+    end
   end
 
   test "accepts a valid Run transition and rejects an invalid one" do
@@ -148,6 +180,44 @@ defmodule Kiln.Journal.ReducerTest do
              })
   end
 
+  test "an unknown operation observation forces the Run to orphaned" do
+    {:ok, running} = with_operation()
+
+    assert {:ok, orphaned} =
+             Reducer.reduce(running, %{
+               type: "external_operation_observed/v1",
+               payload: %{
+                 "operation" => %{"id" => "opn_1", "state" => "unknown"},
+                 "run" => %{"to" => "orphaned"}
+               }
+             })
+
+    assert orphaned["run"]["state"] == "orphaned"
+    assert orphaned["operation"]["state"] == "unknown"
+  end
+
+  test "an unknown operation observation rejects a non-orphaned Run target" do
+    {:ok, running} = with_operation()
+
+    assert {:error, %{code: :unknown_operation_requires_orphaned}} =
+             Reducer.reduce(running, %{
+               type: "external_operation_observed/v1",
+               payload: %{
+                 "operation" => %{"id" => "opn_1", "state" => "unknown"},
+                 "run" => %{"to" => "ready"}
+               }
+             })
+  end
+
+  test "failure and cancellation block while an operation remains unknown" do
+    {:ok, unknown} = unknown_operation()
+
+    for terminal <- ["failed", "canceled"] do
+      assert {:error, %{code: :operation_unknown_on_terminal_failure}} =
+               transition(unknown, "orphaned", terminal)
+    end
+  end
+
   defp transition(projection, from, to) do
     Reducer.reduce(projection, %{
       type: "run_transitioned/v1",
@@ -174,6 +244,18 @@ defmodule Kiln.Journal.ReducerTest do
     end
   end
 
+  defp unknown_operation do
+    with {:ok, running} <- with_operation() do
+      Reducer.reduce(running, %{
+        type: "external_operation_observed/v1",
+        payload: %{
+          "operation" => %{"id" => "opn_1", "state" => "unknown"},
+          "run" => %{"to" => "orphaned"}
+        }
+      })
+    end
+  end
+
   defp decision do
     %{
       "id" => "dec_1",
@@ -193,6 +275,10 @@ defmodule Kiln.Journal.ReducerTest do
         "task" => %{"id" => "tsk_1", "state" => "in_progress"},
         "run" => %{"id" => "run_1", "state" => "ready", "root_run_id" => "run_1"},
         "workflow_step" => "intent",
+        "objective" => "Build the feature",
+        "criteria" => ["The feature works"],
+        "constraints" => [],
+        "exclusions" => [],
         "objective_revision" => 0,
         "criteria_revision" => 0,
         "references" => %{}

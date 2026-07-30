@@ -94,6 +94,12 @@ defmodule Kiln.Projections.Session do
       is_nil(operation) ->
         :ok
 
+      operation["state"] == "unknown" and run_state == "orphaned" ->
+        :ok
+
+      operation["state"] == "unknown" ->
+        invalid(:operation_unknown_with_non_orphaned_run, %{run_state: run_state})
+
       nonterminal_operation?(operation) and run_state == "running" ->
         :ok
 

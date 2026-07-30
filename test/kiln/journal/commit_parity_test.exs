@@ -9,7 +9,7 @@ defmodule Kiln.Journal.CommitParityTest do
   alias Kiln.Domain.Run
   alias Kiln.Journal.{Entry, Replay}
   alias Kiln.Projections.{Session, Store}
-  alias Kiln.Store.Connection
+  alias Kiln.Store.{Canonical, Connection}
   alias Kiln.Test.JournalBuilder, as: JB
 
   setup do
@@ -113,6 +113,10 @@ defmodule Kiln.Journal.CommitParityTest do
         "task" => %{"id" => d.task.id, "state" => "satisfied"},
         "run" => %{"id" => d.run.id, "state" => "orphaned", "root_run_id" => d.run.root_run_id},
         "workflow_step" => "acceptance",
+        "objective" => d.session.objective,
+        "criteria" => d.task.criteria,
+        "constraints" => d.task.constraints,
+        "exclusions" => d.task.exclusions,
         "objective_revision" => 0,
         "criteria_revision" => 0,
         "references" => %{}
@@ -153,6 +157,10 @@ defmodule Kiln.Journal.CommitParityTest do
         "task" => %{"id" => d.task.id, "state" => "in_progress"},
         "run" => %{"id" => d.run.id, "state" => "ready", "root_run_id" => d.run.root_run_id},
         "workflow_step" => "intent",
+        "objective" => d.session.objective,
+        "criteria" => d.task.criteria,
+        "constraints" => d.task.constraints,
+        "exclusions" => d.task.exclusions,
         "objective_revision" => 0,
         "criteria_revision" => 0,
         "references" => %{}
@@ -231,6 +239,136 @@ defmodule Kiln.Journal.CommitParityTest do
     assert Session.digest(report.projection) == Session.digest(last.projection)
     assert report.projection["operation"]["state"] == "succeeded"
     assert report.projection["run"]["state"] == "ready"
+  end
+
+  test "a cache row with a mismatched projection schema blocks the next commit", %{
+    store: store,
+    d: d
+  } do
+    assert_cache_metadata_commit_blocked(store, d, fn projection ->
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection_schema = 'wrong/v1' WHERE session_id = ?1",
+        [d.session.id]
+      )
+
+      projection
+    end)
+  end
+
+  test "a cache row with a mismatched projection digest blocks the next commit", %{
+    store: store,
+    d: d
+  } do
+    assert_cache_metadata_commit_blocked(store, d, fn _projection ->
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection_digest = 'sha256:#{String.duplicate("0", 64)}' WHERE session_id = ?1",
+        [d.session.id]
+      )
+
+      nil
+    end)
+  end
+
+  test "a cache row with an embedded reducer version mismatch blocks the next commit", %{
+    store: store,
+    d: d
+  } do
+    assert_cache_metadata_commit_blocked(store, d, fn projection ->
+      tampered = Map.put(projection, "reducer_version", "wrong")
+
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+        [Canonical.encode(tampered), d.session.id]
+      )
+
+      tampered
+    end)
+  end
+
+  test "a cache row with an embedded session revision mismatch blocks the next commit", %{
+    store: store,
+    d: d
+  } do
+    assert_cache_metadata_commit_blocked(store, d, fn projection ->
+      tampered = Map.put(projection, "session_revision", 99)
+
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+        [Canonical.encode(tampered), d.session.id]
+      )
+
+      tampered
+    end)
+  end
+
+  test "a cache row with an embedded last sequence mismatch blocks the next commit", %{
+    store: store,
+    d: d
+  } do
+    assert_cache_metadata_commit_blocked(store, d, fn projection ->
+      tampered = Map.put(projection, "last_sequence", 99)
+
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection = ?1 WHERE session_id = ?2",
+        [Canonical.encode(tampered), d.session.id]
+      )
+
+      tampered
+    end)
+  end
+
+  test "a cache row with an invalid projection blocks the next commit", %{store: store, d: d} do
+    assert_cache_metadata_commit_blocked(store, d, fn projection ->
+      tampered = put_in(projection, ["run", "root_run_id"], "run_wrong")
+
+      Connection.query!(
+        store.conn,
+        "UPDATE session_projections SET projection = ?1, projection_digest = ?2 WHERE session_id = ?3",
+        [Canonical.encode(tampered), Session.digest(tampered), d.session.id]
+      )
+
+      tampered
+    end)
+  end
+
+  defp assert_cache_metadata_commit_blocked(store, d, mutate) do
+    {:ok, _} = JB.commit_start(store, d)
+    before_entries = count(store.conn, "journal_entries")
+    before_commits = count(store.conn, "action_commits")
+
+    [[projection_json]] =
+      Connection.query!(
+        store.conn,
+        "SELECT projection FROM session_projections WHERE session_id = ?1",
+        [d.session.id]
+      )
+
+    projection = JSON.decode!(projection_json)
+    mutate.(projection)
+
+    tampered_cache =
+      Connection.query!(
+        store.conn,
+        "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
+        [d.session.id]
+      )
+
+    assert {:error, %{class: :integrity, code: :cache_invalid_metadata}} =
+             JB.commit_transition(store, d, "ready", "running", 0, 3)
+
+    assert count(store.conn, "journal_entries") == before_entries
+    assert count(store.conn, "action_commits") == before_commits
+
+    assert Connection.query!(
+             store.conn,
+             "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
+             [d.session.id]
+           ) == tampered_cache
   end
 
   defp count(conn, table) do

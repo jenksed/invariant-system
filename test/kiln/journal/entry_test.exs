@@ -14,6 +14,63 @@ defmodule Kiln.Journal.EntryTest do
                Entry.decode("session_started/v1", session_started_payload())
     end
 
+    test "validates the required session objective" do
+      payload = session_started_payload()
+
+      assert {:error, %{code: :invalid_payload, detail: %{field: "objective"}}} =
+               Entry.decode("session_started/v1", Map.delete(payload, "objective"))
+
+      assert {:error, %{code: :invalid_payload, detail: %{field: "objective"}}} =
+               Entry.decode("session_started/v1", Map.put(payload, "objective", 1))
+
+      assert {:error, %{code: :invalid_payload, detail: %{field: "objective"}}} =
+               Entry.decode("session_started/v1", Map.put(payload, "objective", ""))
+    end
+
+    test "validates the required non-empty session criteria list" do
+      payload = session_started_payload()
+
+      for criteria <- [nil, "criteria", [], [""], [1]] do
+        candidate =
+          if is_nil(criteria),
+            do: Map.delete(payload, "criteria"),
+            else: Map.put(payload, "criteria", criteria)
+
+        assert {:error, %{code: :invalid_payload, detail: %{field: "criteria"}}} =
+                 Entry.decode("session_started/v1", candidate)
+      end
+    end
+
+    test "validates the required session constraints list while allowing an empty list" do
+      payload = session_started_payload()
+      assert {:ok, _} = Entry.decode("session_started/v1", Map.put(payload, "constraints", []))
+
+      for constraints <- [nil, "constraints", [""], [1]] do
+        candidate =
+          if is_nil(constraints),
+            do: Map.delete(payload, "constraints"),
+            else: Map.put(payload, "constraints", constraints)
+
+        assert {:error, %{code: :invalid_payload, detail: %{field: "constraints"}}} =
+                 Entry.decode("session_started/v1", candidate)
+      end
+    end
+
+    test "validates the required session exclusions list while allowing an empty list" do
+      payload = session_started_payload()
+      assert {:ok, _} = Entry.decode("session_started/v1", Map.put(payload, "exclusions", []))
+
+      for exclusions <- [nil, "exclusions", [""], [1]] do
+        candidate =
+          if is_nil(exclusions),
+            do: Map.delete(payload, "exclusions"),
+            else: Map.put(payload, "exclusions", exclusions)
+
+        assert {:error, %{code: :invalid_payload, detail: %{field: "exclusions"}}} =
+                 Entry.decode("session_started/v1", candidate)
+      end
+    end
+
     test "rejects a missing nested run field" do
       payload = Map.delete(session_started_payload(), "run")
 
@@ -61,6 +118,40 @@ defmodule Kiln.Journal.EntryTest do
 
       assert {:error, %{code: :invalid_payload, detail: %{field: "criteria_revision"}}} =
                Entry.decode("criteria_revised/v1", %{"criteria_revision" => "one"})
+    end
+
+    test "rejects a blank permitted response" do
+      decision = Map.put(decision_payload(), "permitted_responses", [""])
+
+      assert {:error,
+              %{
+                code: :invalid_payload,
+                detail: %{field: "permitted_responses", reason: :empty_response}
+              }} =
+               Entry.decode("pending_decision_recorded/v1", %{"decision" => decision})
+    end
+
+    test "rejects an empty permitted-responses list" do
+      decision = Map.put(decision_payload(), "permitted_responses", [])
+
+      assert {:error, %{code: :invalid_payload, detail: %{field: "permitted_responses"}}} =
+               Entry.decode("pending_decision_recorded/v1", %{"decision" => decision})
+    end
+
+    test "rejects a mixed permitted-responses list containing a blank" do
+      decision = Map.put(decision_payload(), "permitted_responses", ["approve", ""])
+
+      assert {:error,
+              %{
+                code: :invalid_payload,
+                detail: %{field: "permitted_responses", reason: :empty_response}
+              }} =
+               Entry.decode("pending_decision_recorded/v1", %{"decision" => decision})
+    end
+
+    test "accepts non-empty permitted responses" do
+      decision = Map.put(decision_payload(), "permitted_responses", ["approve", "deny"])
+      assert {:ok, _} = Entry.decode("pending_decision_recorded/v1", %{"decision" => decision})
     end
 
     test "rejects a malformed permitted-responses list and unexpected null" do
@@ -165,12 +256,27 @@ defmodule Kiln.Journal.EntryTest do
     end
   end
 
+  defp decision_payload do
+    %{
+      "id" => gid(:decision, 1),
+      "subject_kind" => "run",
+      "subject_id" => "run_1",
+      "subject_revision" => 0,
+      "requested_actor" => "local_user",
+      "permitted_responses" => ["approve"]
+    }
+  end
+
   defp session_started_payload do
     %{
       "session" => %{"id" => gid(:session, 1), "state" => "active"},
       "task" => %{"id" => gid(:task, 1), "state" => "in_progress"},
       "run" => %{"id" => gid(:run, 1), "state" => "ready", "root_run_id" => gid(:run, 1)},
       "workflow_step" => "intent",
+      "objective" => "Build the feature",
+      "criteria" => ["The feature works"],
+      "constraints" => [],
+      "exclusions" => [],
       "objective_revision" => 0,
       "criteria_revision" => 0,
       "references" => %{}

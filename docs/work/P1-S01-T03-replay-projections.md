@@ -188,9 +188,9 @@ P1-S01-D01 steps 6 through 9: stop the application, restart it, and display the 
 
 ## Completion record
 
-**Result:** Complete after four PR #39 review rounds
+**Result:** Complete after five PR #39 review rounds
 
-Four review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
+Five review rounds corrected defects the green test suite did not catch. Review `4810420585` found five issues (D1 to D5); review `4812134584` found three (D6 to D8); review `4812387784` found four (D9 to D12); review `4813027808` found three plus a hardening audit (D13 to D15); review `4813460182` found five blockers (B1 to B5) plus a decision deadlock (B6). All are corrected with protected tests that fail before each fix. All six acceptance criteria pass at the new exact head. Review, merge, and slice acceptance remain downstream and are not claimed here.
 
 ### Final hardening corrections (review 4813027808)
 
@@ -210,6 +210,26 @@ The central invariant is now established: every accepted journal prefix either d
 - Operation observations follow a defined state progression.
 - Commit and replay remain byte-identical.
 - No external effect is dispatched during replay or restart.
+
+### Fifth review corrections (review 4813460182)
+
+Review `4813460182` found five remaining blockers and one decision deadlock that the green test suite after the fourth round did not catch. Every correction is enforced by protected tests that fail before the fix and pass after.
+
+- **B1 Restart could not restore the work contract.** `session_started/v1` validated only revision counters and references; the actual objective, criteria, constraints, and exclusions never entered the projection. R07 requires exclusions restoration and T04 needs the objective after restart. Fix: the entry decoder now requires non-empty `objective`, non-empty `criteria`, and (possibly empty) `constraints` and `exclusions`; the reducer copies all four fields into the projection while retaining both revision counters. Commit and replay remain byte-identical.
+- **B2 Live commits trusted the cache over the journal.** `revision_base!/2` validated only JSON decodability of the cache, never its schema, reducer version, digest, embedded revision, last sequence, projection invariants, or equality with a journal rebuild. Fix: cache classification is promoted to the public total `Kiln.Projections.Store.validate_cache_metadata/1` and called from both `compare/2` and `revision_base!/2`. The live commit additionally runs `Replay.rebuild/2` inside the same `BEGIN IMMEDIATE` transaction and requires cache-to-rebuild digest equality before any append.
+- **B3 A terminal operation prevented every later operation.** `no_current_operation/1` rejected any non-nil operation, including terminal ones, so a real coding workflow with sequential model, patch, and command operations was impossible. Fix: the guard now rejects only `intent_recorded` and `started`; a subsequent operation intent is allowed to replace a `succeeded`, `failed`, `canceled`, or `unknown` record.
+- **B4 Unknown effects did not force `orphaned`.** `observe/4` followed the payload's `run.to` even for state `unknown`; `coordinate_terminal` for `failed` and `canceled` did not check `unknown`; the projection validator accepted `unknown` beside `ready`, `failed`, or `canceled`. Fix: an `unknown` observation forces the Run to `orphaned` (blocking a non-orphaned `run.to`), `failed` and `canceled` reject any unresolved operation, and the validator accepts `unknown` only beside `orphaned`.
+- **B5 Replay did not validate envelope IDs or request-digest format.** `validate_batch/2` compared `idempotency_key` and `request_digest` for equality but did not validate `action_id`, `idempotency_key`, or `request_digest` shape; consistent corruption of the two rows would be accepted. Fix: replay now runs `Kiln.Domain.Id.valid?(:action, _)`, `Kiln.Domain.Id.valid?(:idempotency, _)`, and a `sha256:<64 hex>` digest regex against both the `action_commits` row and every `journal_entries` row, before any equality or arithmetic check.
+- **B6 Decision deadlock from blank permitted responses.** `non_empty_string_list/2` accepted `[""]`; the reducer's `response_permitted/2` rejected empty responses. A decision with `permitted_responses = [""]` had no valid answer. Fix: `pending_decision_recorded/v1` now rejects any empty string in `permitted_responses` with `:empty_response`, while `[]` still blocks with `:not_a_non_empty_list`.
+
+### Verified fifth-round statements
+
+- Restart projection carries the objective statement, criteria list, constraints, and exclusions; both revision counters are preserved; commit and replay projections are byte-identical for the new fields.
+- A terminal known operation does not block a subsequent operation intent.
+- An unknown operation observation drives the Run to `orphaned` and blocks any other target; `failed` and `canceled` block while an operation is unresolved.
+- The cache metadata validator runs in both live commit and reconciliation; journal-rebuild divergence in the live commit path blocks with `:journal_invalid`.
+- Replay refuses malformed `action_id`, `idempotency_key`, or `request_digest` even when `action_commits` and `journal_entries` agree.
+- `permitted_responses = [""]` cannot reach replay.
 
 ### Third review corrections (review 4812387784)
 

@@ -182,6 +182,10 @@ defmodule Kiln.Store.JournalTest do
             "root_run_id" => ctx.run.root_run_id
           },
           "workflow_step" => "intent",
+          "objective" => ctx.session.objective,
+          "criteria" => ctx.task.criteria,
+          "constraints" => ctx.task.constraints,
+          "exclusions" => ctx.task.exclusions,
           "objective_revision" => ctx.session.revision,
           "criteria_revision" => ctx.session.criteria_revision,
           "references" => %{"project_observation_id" => ctx.session.project_observation_id}

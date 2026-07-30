@@ -85,6 +85,10 @@ defmodule Kiln.Journal.Entry do
          :ok <- object(p, "task", &task/1),
          :ok <- object(p, "run", &run_identity/1),
          :ok <- member(p, "workflow_step", @workflow_steps),
+         :ok <- non_empty_string(p, "objective"),
+         :ok <- non_empty_string_list(p, "criteria"),
+         :ok <- string_list(p, "constraints"),
+         :ok <- string_list(p, "exclusions"),
          :ok <- non_neg_int(p, "objective_revision"),
          :ok <- non_neg_int(p, "criteria_revision"),
          :ok <- is_object(p, "references") do
@@ -158,7 +162,7 @@ defmodule Kiln.Journal.Entry do
          :ok <- string(d, "subject_id"),
          :ok <- non_neg_int(d, "subject_revision"),
          :ok <- string(d, "requested_actor"),
-         :ok <- non_empty_string_list(d, "permitted_responses") do
+         :ok <- non_empty_string_list(d, "permitted_responses", :empty_response) do
       :ok
     end
   end
@@ -234,13 +238,53 @@ defmodule Kiln.Journal.Entry do
     end
   end
 
-  defp non_empty_string_list(map, key) do
+  defp non_empty_string(map, key) do
+    case Map.fetch(map, key) do
+      {:ok, value} when is_binary(value) and byte_size(value) > 0 -> :ok
+      {:ok, value} when is_binary(value) -> invalid(key, :empty_string)
+      {:ok, _} -> invalid(key, :not_a_string)
+      :error -> invalid(key, :missing)
+    end
+  end
+
+  defp non_empty_string_list(map, key, empty_reason \\ :empty_string) do
     case Map.fetch(map, key) do
       {:ok, [_ | _] = list} ->
-        if Enum.all?(list, &is_binary/1), do: :ok, else: invalid(key, :not_a_string_list)
+        cond do
+          Enum.any?(list, &(is_binary(&1) and byte_size(&1) == 0)) ->
+            invalid(key, empty_reason)
+
+          Enum.all?(list, &is_binary/1) ->
+            :ok
+
+          true ->
+            invalid(key, :not_a_string_list)
+        end
 
       {:ok, _} ->
         invalid(key, :not_a_non_empty_list)
+
+      :error ->
+        invalid(key, :missing)
+    end
+  end
+
+  defp string_list(map, key) do
+    case Map.fetch(map, key) do
+      {:ok, list} when is_list(list) ->
+        cond do
+          Enum.any?(list, &(is_binary(&1) and byte_size(&1) == 0)) ->
+            invalid(key, :empty_string)
+
+          Enum.all?(list, &is_binary/1) ->
+            :ok
+
+          true ->
+            invalid(key, :not_a_string_list)
+        end
+
+      {:ok, _} ->
+        invalid(key, :not_a_list)
 
       :error ->
         invalid(key, :missing)

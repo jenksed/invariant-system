@@ -52,12 +52,24 @@ defmodule Kiln.Journal.ActionBatchTest do
   end
 
   test "blocks an entry with a mismatched idempotency key", %{conn: conn, d: d} do
-    exec(conn, "UPDATE journal_entries SET idempotency_key = 'wrong' WHERE session_revision = 1")
+    # Use a valid Kiln-format idempotency key so the equality check fires; an
+    # invalid-format value is caught first by the envelope format check.
+    exec(
+      conn,
+      "UPDATE journal_entries SET idempotency_key = '#{JB.id(:idempotency, 99)}' WHERE session_revision = 1"
+    )
+
     assert {:error, %{code: :idempotency_key_mismatch, boundary: 2}} = rebuild(conn, d)
   end
 
   test "blocks an entry with a mismatched request digest", %{conn: conn, d: d} do
-    exec(conn, "UPDATE journal_entries SET request_digest = 'wrong' WHERE session_revision = 1")
+    # Use a valid Kiln-format sha256 digest so the equality check fires; an
+    # invalid-format value is caught first by the envelope format check.
+    exec(
+      conn,
+      "UPDATE journal_entries SET request_digest = '#{JB.digest(99)}' WHERE session_revision = 1"
+    )
+
     assert {:error, %{code: :request_digest_mismatch, boundary: 2}} = rebuild(conn, d)
   end
 
@@ -137,8 +149,62 @@ defmodule Kiln.Journal.ActionBatchTest do
     assert {:error, %{code: :payload_schema_mismatch, boundary: 2}} = rebuild(conn, d)
   end
 
+  # -- Blocker B5: replay must validate persisted envelope IDs and request-digest
+  # format. Consistent corruption across `action_commits` and `journal_entries`
+  # would otherwise pass equality and be applied as if it were committed truth.
+
+  test "blocks a commit whose action_id is not a valid Kiln opaque id", %{conn: conn, d: d} do
+    corrupt(conn, "act_garbage", :action_id)
+    assert {:error, %{code: :invalid_action_id, boundary: 2}} = rebuild(conn, d)
+  end
+
+  test "blocks a commit whose idempotency_key is not a valid Kiln opaque id",
+       %{conn: conn, d: d} do
+    corrupt(conn, "wrong", :idempotency_key)
+    assert {:error, %{code: :invalid_idempotency_key, boundary: 2}} = rebuild(conn, d)
+  end
+
+  test "blocks a commit whose request_digest is not a sha256 digest",
+       %{conn: conn, d: d} do
+    corrupt(conn, "not-a-hash", :request_digest)
+    assert {:error, %{code: :invalid_request_digest, boundary: 2}} = rebuild(conn, d)
+  end
+
+  test "blocks a sha1-shaped digest missing the sha256 prefix", %{conn: conn, d: d} do
+    # SHA-1 is 40 hex chars with no algorithm prefix.
+    corrupt(conn, String.duplicate("a", 40), :request_digest)
+    assert {:error, %{code: :invalid_request_digest, boundary: 2}} = rebuild(conn, d)
+  end
+
+  test "blocks a sha256 digest missing the colon separator", %{conn: conn, d: d} do
+    # 64 hex chars joined directly to the `sha256` prefix without the `:`
+    # separator - looks digest-shaped but is structurally invalid.
+    corrupt(conn, "sha256" <> String.duplicate("0", 64), :request_digest)
+    assert {:error, %{code: :invalid_request_digest, boundary: 2}} = rebuild(conn, d)
+  end
+
+  # Regression guard: the unchanged setup must still replay cleanly through the
+  # new envelope format check.
+  test "replays a batch whose envelope ids and digests are all valid",
+       %{conn: conn, d: d} do
+    assert {:ok, report} = rebuild(conn, d)
+    assert report.action_count == 2
+    assert report.entry_count == 2
+    assert report.session_revision == 1
+  end
+
   defp rebuild(conn, d), do: Replay.rebuild(conn, d.session.id)
   defp exec(conn, sql), do: Connection.query!(conn, sql)
+
+  # Apply `value` to `field` on both the action commit and the matching journal
+  # entry for the transition action (first_sequence = 2, session_revision = 1).
+  defp corrupt(conn, value, field) do
+    sql = "UPDATE action_commits SET #{field} = ?1 WHERE first_sequence = 2"
+    Connection.query!(conn, sql, [value])
+
+    sql = "UPDATE journal_entries SET #{field} = ?1 WHERE session_revision = 1"
+    Connection.query!(conn, sql, [value])
+  end
 
   defp stop(conn) do
     if Process.alive?(conn), do: GenServer.stop(conn)

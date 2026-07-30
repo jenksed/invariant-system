@@ -46,6 +46,17 @@ defmodule Kiln.Projections.SessionTest do
              Session.validate(Map.put(base(), "operation", op("started")))
   end
 
+  test "an unknown operation is valid only beside an orphaned Run" do
+    unknown = Map.put(base(), "operation", op("unknown"))
+    orphaned = run(unknown, "orphaned")
+    assert :ok = Session.validate(orphaned)
+
+    for state <- ["ready", "failed", "canceled"] do
+      assert {:error, %{code: :operation_unknown_with_non_orphaned_run}} =
+               Session.validate(run(unknown, state))
+    end
+  end
+
   test "terminal Run state must coordinate Task and Session state" do
     completed =
       base()

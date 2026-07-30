@@ -101,6 +101,10 @@ defmodule Kiln.Store.FixturesTest do
           "task" => %{"id" => task.id, "state" => "in_progress"},
           "run" => %{"id" => run.id, "state" => "ready", "root_run_id" => run.root_run_id},
           "workflow_step" => "intent",
+          "objective" => session.objective,
+          "criteria" => task.criteria,
+          "constraints" => task.constraints,
+          "exclusions" => task.exclusions,
           "objective_revision" => session.revision,
           "criteria_revision" => session.criteria_revision,
           "references" => %{"project_observation_id" => session.project_observation_id}

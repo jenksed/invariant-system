@@ -92,6 +92,10 @@ defmodule Kiln.Journal.Reducer do
            "root_run_id" => payload["run"]["root_run_id"]
          },
          "workflow_step" => "intent",
+         "objective" => payload["objective"],
+         "criteria" => payload["criteria"],
+         "constraints" => payload["constraints"],
+         "exclusions" => payload["exclusions"],
          "objective_revision" => payload["objective_revision"] || 0,
          "criteria_revision" => payload["criteria_revision"] || 0,
          "references" => payload["references"] || %{},
@@ -193,6 +197,23 @@ defmodule Kiln.Journal.Reducer do
     end
   end
 
+  defp observe(projection, current, "unknown", payload) do
+    if payload["run"]["to"] == "orphaned" do
+      with {:ok, _to} <- transition_run(projection, "orphaned") do
+        {:ok,
+         projection
+         |> put_run_state("orphaned")
+         |> Map.put("operation", Map.put(current, "state", "unknown"))}
+      end
+    else
+      {:error,
+       %{
+         code: :unknown_operation_requires_orphaned,
+         detail: %{run_to: payload["run"]["to"]}
+       }}
+    end
+  end
+
   # A terminal observation advances the operation and transitions the Run,
   # preserving the operation identity and class.
   defp observe(projection, current, terminal_state, payload) do
@@ -227,7 +248,15 @@ defmodule Kiln.Journal.Reducer do
   end
 
   defp coordinate_terminal(projection, terminal) when terminal in ["failed", "canceled"] do
-    {:ok, coordinate(projection, "abandoned", "abandoned")}
+    if unresolved_operation?(projection["operation"]) do
+      {:error,
+       %{
+         code: :operation_unknown_on_terminal_failure,
+         detail: %{operation: projection["operation"], terminal: terminal}
+       }}
+    else
+      {:ok, coordinate(projection, "abandoned", "abandoned")}
+    end
   end
 
   defp coordinate_terminal(projection, _nonterminal), do: {:ok, projection}
@@ -310,11 +339,11 @@ defmodule Kiln.Journal.Reducer do
 
   defp no_current_operation(projection) do
     case projection["operation"] do
-      nil ->
-        :ok
-
-      %{"id" => current} ->
+      %{"id" => current, "state" => state} when state in @nonterminal_operation_states ->
         {:error, %{code: :operation_already_open, detail: %{current: current}}}
+
+      _ ->
+        :ok
     end
   end
 

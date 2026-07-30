@@ -18,8 +18,9 @@ defmodule Kiln.Store.Journal do
   """
 
   alias Kiln.Domain.Action
-  alias Kiln.Journal.{Entry, Reducer}
+  alias Kiln.Journal.{Entry, Reducer, Replay}
   alias Kiln.Projections.Session
+  alias Kiln.Projections.Store, as: ProjectionStore
   alias Kiln.Store.{Canonical, Connection, Error, Uuid}
 
   @entry_schema "journal_entry/v1"
@@ -76,6 +77,8 @@ defmodule Kiln.Store.Journal do
       {:error, {:invalid_entry, error}} -> {:error, error}
       {:error, {:corrupt_result, error}} -> {:error, error}
       {:error, {:cache_corrupt, error}} -> {:error, error}
+      {:error, {:cache_invalid_metadata, error}} -> {:error, error}
+      {:error, {:journal_invalid, error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
@@ -239,12 +242,10 @@ defmodule Kiln.Store.Journal do
     end
   end
 
-  # Returns {next_revision_for_first_entry, current_projection_or_nil} or aborts
-  # the transaction with a stale-revision rollback.
   defp revision_base!(tx, action) do
     case Connection.query!(
            tx,
-           "SELECT session_revision, projection FROM session_projections WHERE session_id = ?1",
+           "SELECT projection_schema, session_revision, last_sequence, projection, projection_digest FROM session_projections WHERE session_id = ?1",
            [action.session_id]
          ) do
       [] ->
@@ -254,21 +255,26 @@ defmodule Kiln.Store.Journal do
           DBConnection.rollback(tx, {:stale, nil})
         end
 
-      [[current, projection_json]] ->
+      [[schema, current, last_sequence, projection_json, digest]] ->
         cond do
           action.expected_session_revision != current ->
             DBConnection.rollback(tx, {:stale, current})
 
           true ->
-            {current + 1, current_projection!(tx, projection_json)}
+            record = %{
+              schema: schema,
+              session_revision: current,
+              last_sequence: last_sequence,
+              projection: decode_projection!(tx, projection_json),
+              digest: digest
+            }
+
+            {current + 1, current_projection!(tx, action.session_id, record)}
         end
     end
   end
 
-  # The cached projection is not authoritative. A corrupt cache during commit
-  # blocks with no durable change rather than crashing; restart reconstruction
-  # repairs the cache from the journal.
-  defp current_projection!(tx, projection_json) do
+  defp decode_projection!(tx, projection_json) do
     case safe_decode(projection_json) do
       {:ok, projection} ->
         projection
@@ -278,6 +284,67 @@ defmodule Kiln.Store.Journal do
           tx,
           {:cache_corrupt,
            Error.new(:integrity, :cache_corrupt, "cached projection is corrupt", %{})}
+        )
+    end
+  end
+
+  # The cached projection must be internally valid and equal to a fresh journal
+  # rebuild before it can serve as the base for a new append transaction.
+  defp current_projection!(tx, session_id, record) do
+    case ProjectionStore.validate_cache_metadata(record) do
+      :ok ->
+        case Replay.rebuild(tx, session_id) do
+          {:ok, %{projection: rebuilt}} when is_map(rebuilt) ->
+            if Session.digest(record.projection) == Session.digest(rebuilt) do
+              record.projection
+            else
+              DBConnection.rollback(
+                tx,
+                {:cache_invalid_metadata,
+                 Error.new(
+                   :integrity,
+                   :cache_invalid_metadata,
+                   "cached projection does not match the journal rebuild",
+                   %{session_id: session_id}
+                 )}
+              )
+            end
+
+          {:ok, _report} ->
+            DBConnection.rollback(
+              tx,
+              {:cache_invalid_metadata,
+               Error.new(
+                 :integrity,
+                 :cache_invalid_metadata,
+                 "cached projection does not match the journal rebuild",
+                 %{session_id: session_id}
+               )}
+            )
+
+          {:error, block} ->
+            DBConnection.rollback(
+              tx,
+              {:journal_invalid,
+               Error.new(
+                 :integrity,
+                 :journal_invalid,
+                 "journal rebuild failed while validating the cache base",
+                 %{session_id: session_id, block: block}
+               )}
+            )
+        end
+
+      {:error, reason} ->
+        DBConnection.rollback(
+          tx,
+          {:cache_invalid_metadata,
+           Error.new(
+             :integrity,
+             :cache_invalid_metadata,
+             "cached projection metadata or invariants are invalid",
+             %{session_id: session_id, reason: reason}
+           )}
         )
     end
   end
