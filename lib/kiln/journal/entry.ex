@@ -96,7 +96,12 @@ defmodule Kiln.Journal.Entry do
     end
   end
 
-  defp validate("criteria_revised/v1", p), do: non_neg_int(p, "criteria_revision")
+  defp validate("criteria_revised/v1", p) do
+    with :ok <- non_empty_string_list(p, "criteria"),
+         :ok <- non_neg_int(p, "criteria_revision") do
+      :ok
+    end
+  end
 
   defp validate("run_transitioned/v1", p) do
     with :ok <- object(p, "run", &run_move/1),

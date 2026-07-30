@@ -54,10 +54,13 @@ defmodule Kiln.Store.Journal do
       Connection.transaction(conn, fn tx ->
         case existing_commit(tx, action) do
           {:replay, stored} ->
-            # A truly repeated request replays its stored result before any
-            # entry decoding, so a valid duplicate never fails on regenerated
-            # entries.
-            {:replayed, stored}
+            # A duplicate replay must validate the stored action boundary
+            # against the authoritative journal before returning the prior
+            # result, so a deleted or corrupt journal cannot masquerade as
+            # accepted recorded truth (R04). The replay still happens before
+            # any regenerated caller entries are decoded, so a valid duplicate
+            # never fails on caller-entry shape.
+            replay_boundary_valid?(tx, action, stored)
 
           {:conflict, _} ->
             DBConnection.rollback(tx, {:idempotency_conflict})
@@ -233,6 +236,34 @@ defmodule Kiln.Store.Journal do
     end
   end
 
+  # The stored idempotency result is the cached answer, not the source of truth.
+  # Validate the authoritative Session journal before returning it, so a duplicate
+  # request cannot succeed after its journal rows have been deleted or corrupted.
+  # This runs inside the same `BEGIN IMMEDIATE` transaction as the replay lookup
+  # so a concurrent tamper cannot interleave between the two reads.
+  defp replay_boundary_valid?(tx, action, stored) do
+    case Replay.rebuild(tx, action.session_id) do
+      {:ok, _report} ->
+        {:replayed, stored}
+
+      {:error, block} ->
+        DBConnection.rollback(
+          tx,
+          {:journal_invalid,
+           Error.new(
+             :integrity,
+             :journal_invalid,
+             "duplicate replay found the stored action boundary invalid",
+             %{
+               session_id: action.session_id,
+               idempotency_key: action.idempotency_key,
+               block: block
+             }
+           )}
+        )
+    end
+  end
+
   # A stored idempotency result must decode and match its recorded digest before
   # it is replayed, so corrupt durable result data cannot crash or mislead.
   defp valid_stored_result?(result_schema, result, result_digest) do
@@ -282,7 +313,12 @@ defmodule Kiln.Store.Journal do
         DBConnection.rollback(tx, {:stale, authoritative_revision})
 
       true ->
-        classify_cache!(tx, action.session_id, authoritative_revision + 1, authoritative_projection)
+        classify_cache!(
+          tx,
+          action.session_id,
+          authoritative_revision + 1,
+          authoritative_projection
+        )
     end
   end
 
@@ -306,7 +342,9 @@ defmodule Kiln.Store.Journal do
         case ProjectionStore.validate_cache_metadata(record) do
           :ok ->
             rebuilt_digest =
-              if is_map(authoritative_projection), do: Session.digest(authoritative_projection), else: nil
+              if is_map(authoritative_projection),
+                do: Session.digest(authoritative_projection),
+                else: nil
 
             if is_nil(rebuilt_digest) or Session.digest(record.projection) == rebuilt_digest do
               {base_next, authoritative_projection}

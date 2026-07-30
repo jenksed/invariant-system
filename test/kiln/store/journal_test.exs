@@ -74,6 +74,41 @@ defmodule Kiln.Store.JournalTest do
     assert count(ctx.conn, "action_commits") == 1
   end
 
+  test "rejects a duplicate replay after the stored journal rows are deleted", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Simulate incomplete durable state: the action commit remains but the
+    # journal rows it depends on are gone. A duplicate replay must not succeed
+    # by trusting the cached idempotency result alone.
+    Connection.query!(ctx.conn, "DELETE FROM journal_entries")
+
+    assert {:error, %{class: :integrity, code: :journal_invalid}} =
+             Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Nothing is appended: the transaction rolled back before any write.
+    assert count(ctx.conn, "journal_entries") == 0
+    assert count(ctx.conn, "action_commits") == 1
+  end
+
+  test "rejects a duplicate replay after the stored journal payload is corrupted", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Tamper the persisted payload so its recorded digest no longer matches.
+    Connection.query!(
+      ctx.conn,
+      ~s|UPDATE journal_entries SET payload = '{"tampered":true}'|
+    )
+
+    assert {:error, %{class: :integrity, code: :journal_invalid}} =
+             Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # The duplicate must not append a new journal row or a new action commit.
+    assert count(ctx.conn, "journal_entries") == 1
+    assert count(ctx.conn, "action_commits") == 1
+  end
+
   test "rejects a reused idempotency key with a different request", ctx do
     {:ok, start} = start_action(ctx, idem(2), @digest_a)
     {:ok, _} = Journal.commit(ctx.conn, start, start_entries(ctx), now: @now)

@@ -116,8 +116,12 @@ defmodule Kiln.Journal.Reducer do
   end
 
   defp do_reduce(projection, %{type: "criteria_revised/v1", payload: payload}) do
-    with :ok <- require_keys(payload, ["criteria_revision"]) do
-      {:ok, Map.put(projection, "criteria_revision", payload["criteria_revision"])}
+    with :ok <- require_keys(payload, ["criteria", "criteria_revision"]),
+         :ok <- monotonic_criteria_revision(projection, payload["criteria_revision"]) do
+      {:ok,
+       projection
+       |> Map.put("criteria", payload["criteria"])
+       |> Map.put("criteria_revision", payload["criteria_revision"])}
     end
   end
 
@@ -183,6 +187,23 @@ defmodule Kiln.Journal.Reducer do
 
   defp do_reduce(_projection, %{type: type}) do
     {:error, %{code: :unknown_entry_type, detail: %{type: type}}}
+  end
+
+  # Criteria revisions are append-only and must strictly advance the recorded
+  # counter. A non-monotonic revision would let a later entry silently rewrite
+  # the accepted work contract while reporting a stale revision value.
+  defp monotonic_criteria_revision(projection, attempted) do
+    current = projection["criteria_revision"] || 0
+
+    if is_integer(attempted) and attempted > current do
+      :ok
+    else
+      {:error,
+       %{
+         code: :criteria_revision_not_monotonic,
+         detail: %{current: current, attempted: attempted}
+       }}
+    end
   end
 
   # -- operation observation --

@@ -21,7 +21,7 @@ defmodule Kiln.Journal.ReplayTest do
   test "replays a valid journal into the exact committed projection", %{store: store, d: d} do
     {:ok, _} = JB.commit_start(store, d)
     {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3)
-    {:ok, last} = JB.commit_criteria(store, d, 1, 4, 1)
+    {:ok, last} = JB.commit_criteria(store, d, 1, 4, 1, ["The revised criterion passes"])
 
     assert {:ok, report} = Replay.rebuild(store.conn, d.session.id)
     assert report.session_revision == 2
@@ -29,6 +29,12 @@ defmodule Kiln.Journal.ReplayTest do
     assert report.entry_count == 3
     assert report.first_sequence == 1
     assert report.last_sequence == 3
+
+    # The revised criteria must be reconstructed by replay, not only the
+    # counter. Both commit and replay must agree on the rewritten contract.
+    assert report.projection["criteria"] == ["The revised criterion passes"]
+    assert report.projection["criteria_revision"] == 1
+    assert last.projection["criteria"] == ["The revised criterion passes"]
 
     assert Session.digest(report.projection) == Session.digest(last.projection)
 

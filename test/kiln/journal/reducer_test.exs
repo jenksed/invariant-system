@@ -85,8 +85,60 @@ defmodule Kiln.Journal.ReducerTest do
     assert {:error, %{code: :unknown_entry_type}} =
              Reducer.reduce(projection, %{type: "mystery/v9", payload: %{}})
 
-    assert {:error, %{code: :invalid_payload, detail: %{missing: "criteria_revision"}}} =
+    assert {:error, %{code: :invalid_payload, detail: %{missing: "criteria"}}} =
              Reducer.reduce(projection, %{type: "criteria_revised/v1", payload: %{}})
+  end
+
+  test "criteria_revised replaces the criteria list and advances the revision" do
+    {:ok, projection} = Reducer.reduce(nil, session_started())
+    assert projection["criteria"] == ["The feature works"]
+    assert projection["criteria_revision"] == 0
+
+    assert {:ok, revised} =
+             Reducer.reduce(projection, %{
+               type: "criteria_revised/v1",
+               payload: %{
+                 "criteria" => ["The revised criterion passes"],
+                 "criteria_revision" => 1
+               }
+             })
+
+    assert revised["criteria"] == ["The revised criterion passes"]
+    assert revised["criteria_revision"] == 1
+  end
+
+  test "criteria_revised rejects a non-monotonic revision" do
+    {:ok, projection} = Reducer.reduce(nil, session_started())
+
+    # Equal to the current revision is a regression: the new contract cannot
+    # be the same revision as the old one.
+    assert {:error, %{code: :criteria_revision_not_monotonic}} =
+             Reducer.reduce(projection, %{
+               type: "criteria_revised/v1",
+               payload: %{
+                 "criteria" => ["Different content"],
+                 "criteria_revision" => 0
+               }
+             })
+
+    # A lower revision is also a regression.
+    {:ok, advanced} =
+      Reducer.reduce(projection, %{
+        type: "criteria_revised/v1",
+        payload: %{
+          "criteria" => ["Step 1"],
+          "criteria_revision" => 1
+        }
+      })
+
+    assert {:error, %{code: :criteria_revision_not_monotonic}} =
+             Reducer.reduce(advanced, %{
+               type: "criteria_revised/v1",
+               payload: %{
+                 "criteria" => ["Step 0"],
+                 "criteria_revision" => 1
+               }
+             })
   end
 
   test "a terminal Run transition coordinates Task and Session state" do

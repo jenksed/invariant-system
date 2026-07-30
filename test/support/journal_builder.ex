@@ -49,10 +49,17 @@ defmodule Kiln.Test.JournalBuilder do
     Journal.commit(store.conn, action, [entry], now: @now)
   end
 
-  @doc "Commit `criteria_revised/v1` bumping the criteria revision."
-  def commit_criteria(store, d, expected, key_byte, criteria_revision) do
+  @doc "Commit `criteria_revised/v1` with the new criteria list and revision."
+  def commit_criteria(store, d, expected, key_byte, criteria_revision, criteria)
+      when is_list(criteria) do
     action = action(d, :revise_intent, :local_user, "user:local", expected, key_byte, [])
-    entry = entry("criteria_revised/v1", %{"criteria_revision" => criteria_revision})
+
+    entry =
+      entry("criteria_revised/v1", %{
+        "criteria" => criteria,
+        "criteria_revision" => criteria_revision
+      })
+
     Journal.commit(store.conn, action, [entry], now: @now)
   end
 
@@ -163,14 +170,17 @@ defmodule Kiln.Test.JournalBuilder do
     )
   end
 
-  @doc "A two-entry batch: transition ready to running, then bump criteria."
+  @doc "A two-entry batch: transition ready to running, then revise criteria."
   def two_entry_batch(revision) do
     [
       entry("run_transitioned/v1", %{
         "run" => %{"from" => "ready", "to" => "running"},
         "workflow_step" => "application"
       }),
-      entry("criteria_revised/v1", %{"criteria_revision" => revision})
+      entry("criteria_revised/v1", %{
+        "criteria" => ["The revised criterion passes"],
+        "criteria_revision" => revision
+      })
     ]
   end
 

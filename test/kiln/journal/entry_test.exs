@@ -114,10 +114,34 @@ defmodule Kiln.Journal.EntryTest do
 
     test "rejects a negative revision and a non-integer revision" do
       assert {:error, %{code: :invalid_payload, detail: %{field: "criteria_revision"}}} =
-               Entry.decode("criteria_revised/v1", %{"criteria_revision" => -1})
+               Entry.decode("criteria_revised/v1", %{
+                 "criteria" => ["ok"],
+                 "criteria_revision" => -1
+               })
 
       assert {:error, %{code: :invalid_payload, detail: %{field: "criteria_revision"}}} =
-               Entry.decode("criteria_revised/v1", %{"criteria_revision" => "one"})
+               Entry.decode("criteria_revised/v1", %{
+                 "criteria" => ["ok"],
+                 "criteria_revision" => "one"
+               })
+    end
+
+    test "criteria_revised requires a non-empty criteria list" do
+      for criteria <- [nil, [], ["", "ok"], [1]] do
+        candidate =
+          if is_nil(criteria),
+            do: %{"criteria_revision" => 1},
+            else: %{"criteria" => criteria, "criteria_revision" => 1}
+
+        assert {:error, %{code: :invalid_payload, detail: %{field: "criteria"}}} =
+                 Entry.decode("criteria_revised/v1", candidate)
+      end
+
+      assert {:ok, _} =
+               Entry.decode("criteria_revised/v1", %{
+                 "criteria" => ["The revised criterion passes"],
+                 "criteria_revision" => 1
+               })
     end
 
     test "rejects a blank permitted response" do
