@@ -321,11 +321,11 @@ Protected tests added (each fails against the pre-fix code and passes against th
 | P1-S01-T03-AC03 | Pass | P1-S01-T03-E03 | transcript records leave the projection digest unchanged and keep their own ordering |
 | P1-S01-T03-AC04 | Pass | P1-S01-T03-E04 | a nonterminal operation reconstructs as unknown operation and `orphaned` Run, appends nothing, dispatches nothing, and is idempotent on repeat |
 | P1-S01-T03-AC05 | Pass | P1-S01-T03-E05 | missing, malformed, metadata-mismatched, and stale caches are replaced after full journal validation; a matching cache is kept; a corrupt journal blocks and preserves the cache |
-| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero at exact head `58c43a4`; no excluded capability is reachable |
+| P1-S01-T03-AC06 | Pass | P1-S01-T03-E06 | full deterministic gate exits zero for the final reviewed PR head; no excluded capability is reachable |
 
 ### Verification executed
 
-Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed at commit `7790d26` plus three additional rebuild-first protected tests at the new exact head (see Sixth review corrections).
+Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0`. Executed against the final reviewed PR head after all seven review rounds. The mutable PR description records the resulting exact SHA and successful CI run after this closeout-only documentation commit lands.
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
@@ -340,8 +340,8 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 | `mix test test/kiln/journal` | 0 | reducer, entry, replay, action-batch fixtures, commit-parity rebuild-first guards |
 | `mix test test/kiln/projections` | 0 | cache classification and rebuild |
 | `mix test test/kiln/restart_test.exs` | 0 | restart, orphan, multiple-Session, idempotence |
-| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 126 passed |
-| `mix test` | 0 | 155 passed |
+| `mix test test/kiln/journal test/kiln/projections test/kiln/restart_test.exs` | 0 | 111 passed |
+| `mix test` | 0 | 160 passed |
 | `scripts/check` (aggregate) | 0 | `check: pass` |
 
 ### New protected tests
@@ -371,11 +371,12 @@ Toolchain: Elixir 1.20.2 / Erlang OTP 28 (repo `mise.toml`); `jsonschema==4.26.0
 - User interaction (the foundation CLI) is T04. Reconstruction is exposed through application APIs and tests only.
 - Persisting an orphan-classification journal fact at restart is left to the workflow layer; reconstruction is read-only.
 - Deep decision and operation subject validation beyond identity and class belongs to later tickets; replay preserves the references faithfully and blocks obvious contradictions.
+- [NEW-37](https://linear.app/10via/issue/NEW-37/define-empty-journal-surviving-projection-cache-policy) tracks the non-blocking policy for an empty authoritative journal with a surviving projection-cache row. The cache must be rejected, deleted, or otherwise unreadable as current Session truth, with protected regression coverage. No production correction for this follow-up is included in PR #39.
 
 ### Repository state
 
-- Commit: `7790d26` (fifth-round corrections) followed by the sixth-round rebuild-first ordering corrections landed on top; the authoritative CI run for the final PR head is the relevant gate.
+- Commit: final reviewed PR head; the mutable PR description records the resulting exact SHA after this closeout-only documentation commit lands.
 - Branch: `work/p1-s01-t03-replay-projections`
 - Diff reviewed: Yes; adds `lib/kiln/journal/*` (entry, reducer, replay), `lib/kiln/projections/*`, `lib/kiln/restart.ex`, refactors `lib/kiln/store/journal.ex` and `lib/kiln/store.ex`, removes `lib/kiln/store/projection.ex`, and adds the replay, projection, restart, entry, and action-batch test suites including the rebuild-first protected tests.
-- Exact CI run: full local gate green at the new exact head; authoritative CI run and owner review pending on the pull request.
+- Exact CI run: required for the final reviewed PR head; the mutable PR description records the successful resulting run number and 160-test count.
 - Parent slice status after merge: the application can reconstruct durable state through APIs and tests; the user-facing foundation CLI remains T04.
