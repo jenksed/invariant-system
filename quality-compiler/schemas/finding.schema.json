@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiln.local/schemas/finding.schema.json",
+  "title": "Kiln Quality Finding Occurrence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "occurrence_id",
+    "stable_id",
+    "fingerprint_version",
+    "inspection_id",
+    "producer",
+    "rule_id",
+    "category",
+    "severity",
+    "subject_digest",
+    "classification"
+  ],
+  "properties": {
+    "schema": {
+      "const": "kiln.quality.finding/v1alpha1"
+    },
+    "occurrence_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stable_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fingerprint_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "inspection_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pack_id",
+        "pack_version",
+        "parser_version",
+        "tool_id",
+        "tool_version"
+      ],
+      "properties": {
+        "pack_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parser_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_version": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rule_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "category": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "enum": [
+        "info",
+        "low",
+        "medium",
+        "high",
+        "critical",
+        "error"
+      ]
+    },
+    "path": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "range": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "start_line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "start_column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "end_line": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "end_column": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        }
+      },
+      "required": [
+        "start_line"
+      ]
+    },
+    "semantic_anchor": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "message": {
+      "type": "string"
+    },
+    "message_class": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "exact_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "structural_fingerprint": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "subject_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "classification": {
+      "enum": [
+        "introduced",
+        "preexisting",
+        "resolved",
+        "regressed",
+        "worsened",
+        "improved",
+        "moved",
+        "changed",
+        "ambiguous"
+      ]
+    },
+    "source_artifact_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

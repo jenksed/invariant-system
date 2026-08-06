@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiln.local/schemas/evidence-contribution.schema.json",
+  "title": "Kiln Evidence Contribution",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "id",
+    "claim_id",
+    "observation_id",
+    "subject_digest",
+    "method",
+    "disposition",
+    "guarantee",
+    "scope",
+    "completeness",
+    "freshness",
+    "contradiction"
+  ],
+  "properties": {
+    "schema": {
+      "const": "kiln.quality.evidence_contribution/v1alpha1"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "subject_digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "method": {
+      "type": "string",
+      "minLength": 1
+    },
+    "disposition": {
+      "enum": [
+        "supports",
+        "refutes",
+        "inconclusive",
+        "not_applicable"
+      ]
+    },
+    "guarantee": {
+      "enum": [
+        "proof",
+        "sound_for_pass",
+        "sound_for_failure",
+        "bounded_sound_for_pass",
+        "bounded_sound_for_failure",
+        "empirical",
+        "heuristic",
+        "human_observation",
+        "unknown"
+      ]
+    },
+    "scope": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "completeness": {
+      "enum": [
+        "complete",
+        "partial",
+        "truncated",
+        "missing",
+        "unknown"
+      ]
+    },
+    "freshness": {
+      "enum": [
+        "current",
+        "stale",
+        "unknown"
+      ]
+    },
+    "contradiction": {
+      "enum": [
+        "none",
+        "present",
+        "unknown"
+      ]
+    },
+    "artifact_references": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "schema": "kiln.development_pack.manifest/v1alpha1",
+  "id": "kiln.elixir",
+  "version": "0.1.0",
+  "protocol_versions": [
+    "kiln.development_pack/v1alpha1"
+  ],
+  "display_name": "Kiln Elixir Development Pack",
+  "pack_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "executable_identity": null,
+  "project_kinds": [
+    "mix",
+    "mix_umbrella"
+  ],
+  "operations": [
+    "describe",
+    "detect",
+    "plan",
+    "parse",
+    "impact",
+    "policy_metadata"
+  ],
+  "limits": {
+    "maximum_request_bytes": 1048576,
+    "maximum_response_bytes": 4194304
+  },
+  "trust_class": "bundled",
+  "effects": {
+    "reads_source": false,
+    "loads_project_code": false,
+    "executes_project_code": false,
+    "writes_cache": false,
+    "requires_network": "no",
+    "requires_secrets": false,
+    "mutates_repository": false
+  }
+}
