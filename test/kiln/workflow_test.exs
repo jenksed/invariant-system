@@ -254,13 +254,25 @@ defmodule Kiln.WorkflowTest do
       assert is_binary(result.projection_digest)
     end
 
-    test "commits a cancel from running or waiting_for_user Run states", %{store: store, d: d} do
+    test "commits a cancel from a running Run", %{store: store, d: d} do
       {:ok, _} = JB.commit_start(store, d)
       {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3, "application")
 
       assert {:ok, %{run_state: :canceled}} =
                Workflow.cancel_session(d.session.id,
                  expected_session_revision: 1,
+                 actor_id: "user:local"
+               )
+    end
+
+    test "rejects a cancel from :waiting_for_user", %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+      {:ok, _} = JB.commit_transition(store, d, "ready", "running", 0, 3, "application")
+      {:ok, _} = JB.commit_decision(store, d, 1, 4)
+
+      assert {:error, %Error{code: :run_transition_not_allowed}} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 2,
                  actor_id: "user:local"
                )
     end
@@ -1004,6 +1016,512 @@ defmodule Kiln.WorkflowTest do
     end
   end
 
+  # ---- AC12: restart durability ----
+
+  describe "restart durability (AC12)" do
+    test "an idempotent start retry survives a store process restart and returns the same identifiers",
+         %{store: _store, dir: dir} do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      path = Path.join(dir, "state.sqlite3")
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      stop_registered_store()
+
+      {:ready, _restored} =
+        Store.start(
+          path: path,
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      assert {:ok, replayed} = Workflow.start_session(opts)
+
+      assert replayed.session_id == first.session_id
+      assert replayed.task_id == first.task_id
+      assert replayed.run_id == first.run_id
+      assert replayed.action_id == first.action_id
+      assert replayed.session_revision == first.session_revision
+      assert replayed.projection_digest == first.projection_digest
+
+      count_after_restart = count(Process.whereis(Kiln.Store.Connection), "journal_entries")
+      assert count_after_restart == 1
+    end
+
+    test "an idempotent cancel retry survives a store process restart and returns the same action_id",
+         %{store: _store, d: d, dir: dir} do
+      stop_registered_store()
+
+      {:ready, conn_store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      {:ok, _} = JB.commit_start(conn_store, d)
+
+      key = unique_idempotency_key()
+
+      cancel_opts = [
+        expected_session_revision: 0,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.cancel_session(d.session.id, cancel_opts)
+
+      stop_registered_store()
+
+      {:ready, _restored} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      assert {:ok, replayed} = Workflow.cancel_session(d.session.id, cancel_opts)
+      assert replayed.action_id == first.action_id
+      assert replayed.run_state == :canceled
+      assert replayed.session_revision == first.session_revision
+    end
+
+    test "an idempotent resume retry survives a store process restart", %{
+      store: _store,
+      d: d,
+      dir: dir
+    } do
+      stop_registered_store()
+
+      {:ready, conn_store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      {:ok, _} = JB.commit_start(conn_store, d)
+
+      key = unique_idempotency_key()
+
+      resume_opts = [
+        expected_session_revision: 0,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.resume_session(d.session.id, resume_opts)
+
+      stop_registered_store()
+
+      {:ready, _restored} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      assert {:ok, replayed} = Workflow.resume_session(d.session.id, resume_opts)
+      assert replayed.action_id == first.action_id
+      assert replayed.run_state == :running
+      assert replayed.session_revision == first.session_revision
+    end
+
+    test "the workflow still answers query_session after a restart", %{
+      store: _store,
+      d: d,
+      dir: dir
+    } do
+      stop_registered_store()
+
+      {:ready, conn_store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      {:ok, _} = JB.commit_start(conn_store, d)
+
+      stop_registered_store()
+
+      {:ready, _restored} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      assert {:ok, viewed} = Workflow.query_session(d.session.id)
+      assert viewed.projection["session"]["id"] == d.session.id
+      assert viewed.projection["run"]["state"] == "ready"
+    end
+
+    test "the workflow still answers valid_next_actions after a restart", %{
+      store: _store,
+      d: d,
+      dir: dir
+    } do
+      stop_registered_store()
+
+      {:ready, conn_store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      {:ok, _} = JB.commit_start(conn_store, d)
+
+      stop_registered_store()
+
+      {:ready, _restored} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_fixture",
+          now: @now,
+          name: Kiln.Store.Connection
+        )
+
+      assert {:ok, actions} = Workflow.valid_next_actions(d.session.id)
+      assert actions == [:cancel_session, :resume_session]
+    end
+  end
+
+  # ---- AC13: complete conflict matrix ----
+
+  describe "complete conflict matrix (AC13)" do
+    test "every P1-S01 x-operation pair is rejected except the capability matrix entries" do
+      pairs = [
+        # {:from_state, :public_relation, expected_outcome}
+        {:ready, :cancel_session, :ok},
+        {:ready, :resume_session, :ok},
+        {:running, :cancel_session, :ok},
+        {:running, :resume_session, :error},
+        {:waiting_for_user, :cancel_session, :error},
+        {:waiting_for_user, :resume_session, :error},
+        {:orphaned, :cancel_session, :error},
+        {:orphaned, :resume_session, :error},
+        {:completed, :cancel_session, :error},
+        {:completed, :resume_session, :error},
+        {:failed, :cancel_session, :error},
+        {:failed, :resume_session, :error},
+        {:canceled, :cancel_session, :error},
+        {:canceled, :resume_session, :error}
+      ]
+
+      for {state, op, expected} <- pairs do
+        assert_matrix_pair(state, op, expected)
+      end
+    end
+
+    test "every transition row produces a deterministic, ascending-sorted capability list",
+         %{store: store} do
+      for state <- [
+            :ready,
+            :running,
+            :waiting_for_user,
+            :orphaned,
+            :completed,
+            :failed,
+            :canceled
+          ] do
+        session_id = fresh_session(store, state)
+        assert {:ok, atoms} = Workflow.valid_next_actions(session_id)
+
+        assert atoms == Enum.sort(atoms),
+               "valid_next_actions for #{state} must be ascending-sorted but was #{inspect(atoms)}"
+      end
+    end
+  end
+
+  # ---- AC14: explicit timestamp contract ----
+
+  describe "explicit timestamp contract (AC14)" do
+    test "an omitted started_at still produces a replayable idempotency key", %{
+      store: store
+    } do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      assert {:ok, replayed} = Workflow.start_session(opts)
+
+      assert replayed.session_id == first.session_id
+      assert replayed.action_id == first.action_id
+      assert count(store.conn, "journal_entries") == 1
+    end
+
+    test "a caller-supplied started_at participates in the digest (same start with same caller timestamp is a replay)",
+         %{store: store} do
+      key = unique_idempotency_key()
+      started_at = @at
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key,
+        started_at: started_at
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      assert {:ok, replayed} = Workflow.start_session(opts)
+
+      assert replayed.session_id == first.session_id
+      assert replayed.action_id == first.action_id
+      assert count(store.conn, "journal_entries") == 1
+    end
+
+    test "a caller-supplied started_at that differs across retries is a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      first_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key,
+        started_at: ~U[2026-07-29 13:30:00Z]
+      ]
+
+      assert {:ok, _} = Workflow.start_session(first_opts)
+      before_entries = count(store.conn, "journal_entries")
+
+      second_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key,
+        started_at: ~U[2026-07-29 14:30:00Z]
+      ]
+
+      assert {:error, %Error{code: :idempotency_conflict}} = Workflow.start_session(second_opts)
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "omitted started_at and two concurrent retries are still idempotent (auto-generated timestamps are excluded from the digest)",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      tasks =
+        for _ <- 1..5 do
+          Task.async(fn -> Workflow.start_session(opts) end)
+        end
+
+      results = Task.await_many(tasks, 5_000)
+
+      assert Enum.all?(results, &match?({:ok, _}, &1))
+      assert 1 == results |> Enum.map(fn {:ok, r} -> r.session_id end) |> Enum.uniq() |> length()
+      assert count(store.conn, "journal_entries") == 1
+    end
+
+    test "an invalid started_at (non-DateTime) is rejected as :invalid_started_at" do
+      assert {:error, %Error{code: :invalid_started_at}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 started_at: "2026-07-29T13:30:00Z"
+               )
+    end
+  end
+
+  # ---- AC15: corrupt stored-result semantics ----
+
+  describe "corrupt stored-result semantics (AC15)" do
+    test "a stored result with a nil projection_digest returns an integrity error, never a success" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+      store = %{conn: conn}
+
+      __MODULE__.CorruptHelpers.replace_stored_result_first_field(
+        store,
+        first.session_id,
+        :projection_digest,
+        nil
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "a stored result with a malformed projection_digest returns an integrity error" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      __MODULE__.CorruptHelpers.replace_stored_result_first_field(
+        %{conn: conn},
+        first.session_id,
+        :projection_digest,
+        "sha256:not-hex"
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "a stored result with a negative session_revision returns an integrity error" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      __MODULE__.CorruptHelpers.replace_stored_result_first_field(
+        %{conn: conn},
+        first.session_id,
+        :session_revision,
+        -1
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "a stored result with a wrong run_state for the operation returns an integrity error" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      __MODULE__.CorruptHelpers.replace_stored_result_first_field(
+        %{conn: conn},
+        first.session_id,
+        :run_state,
+        "canceled"
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "a stored result with a session_id that disagrees with the authoritative journal returns an integrity error" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      __MODULE__.CorruptHelpers.replace_stored_result_first_field(
+        %{conn: conn},
+        first.session_id,
+        :session_id,
+        "ses_00000000000000000000000000000099"
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "a stored result with a missing action_id returns an integrity error" do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      __MODULE__.CorruptHelpers.remove_stored_result_first_field(
+        %{conn: conn},
+        first.session_id,
+        :action_id
+      )
+
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+  end
+
   # ---- helpers ----
 
   defp observation do
@@ -1095,6 +1613,120 @@ defmodule Kiln.WorkflowTest do
     case Workflow.query_session(session_id) do
       {:ok, %{projection: %{"session_revision" => rev}}} when is_integer(rev) -> rev
       _ -> 0
+    end
+  end
+
+  defp assert_matrix_pair(state, op, expected) do
+    counter = System.unique_integer([:positive])
+    base = rem(counter, 200) + 400
+    d = JB.domain(base)
+    conn = Process.whereis(Kiln.Store.Connection)
+    store = %{conn: conn}
+    {:ok, _start_result} = commit_unique_start(store, d, base)
+
+    session_id =
+      case state do
+        :ready ->
+          d.session.id
+
+        :running ->
+          {:ok, _} =
+            JB.commit_transition(store, d, "ready", "running", 0, base + 1, "application")
+
+          d.session.id
+
+        :waiting_for_user ->
+          {:ok, _} =
+            JB.commit_transition(store, d, "ready", "running", 0, base + 1, "application")
+
+          {:ok, _} = JB.commit_decision(store, d, 1, base + 2)
+          d.session.id
+
+        :orphaned ->
+          {:ok, _} = JB.commit_operation_intent(store, d, 0, base + 1)
+          {:ok, _} = JB.commit_operation_observe(store, d, 1, base + 2, "unknown", "orphaned")
+          d.session.id
+
+        :completed ->
+          {:ok, _} = JB.commit_transition(store, d, "ready", "completed", 0, base + 1, "intent")
+          d.session.id
+
+        :failed ->
+          {:ok, _} = JB.commit_transition(store, d, "ready", "failed", 0, base + 1, "intent")
+          d.session.id
+
+        :canceled ->
+          {:ok, _} = JB.commit_transition(store, d, "ready", "canceled", 0, base + 1, "intent")
+          d.session.id
+      end
+
+    expected_revision = current_revision_for(session_id)
+
+    args = [
+      expected_session_revision: expected_revision,
+      actor_id: "user:local",
+      idempotency_key: unique_idempotency_key()
+    ]
+
+    result =
+      case op do
+        :cancel_session -> Workflow.cancel_session(session_id, args)
+        :resume_session -> Workflow.resume_session(session_id, args)
+      end
+
+    case expected do
+      :ok ->
+        assert {:ok, _} = result,
+               "expected #{op} from #{state} to succeed; got #{inspect(result)}"
+
+      :error ->
+        assert {:error, %Error{}} = result,
+               "expected #{op} from #{state} to fail; got #{inspect(result)}"
+    end
+  end
+
+  # Helpers for corrupting different fields of a stored application result,
+  # rerunning the journal with the new value, and reusing the recomputed
+  # digest so the replay-boundary validator can find the row.
+  defmodule CorruptHelpers do
+    alias Kiln.Store.Canonical
+
+    def replace_stored_result_first_field(store, session_id, field, new_value) do
+      swap_stored_result(store, session_id, fn decoded ->
+        key = field_to_key(field)
+        Map.put(decoded, key, new_value)
+      end)
+    end
+
+    def remove_stored_result_first_field(store, session_id, field) do
+      swap_stored_result(store, session_id, fn decoded ->
+        Map.delete(decoded, field_to_key(field))
+      end)
+    end
+
+    defp field_to_key(field) when is_atom(field), do: Atom.to_string(field)
+    defp field_to_key(field) when is_binary(field), do: field
+
+    defp swap_stored_result(store, session_id, transform) do
+      [[result_text, _digest, schema]] =
+        Connection.query!(
+          store.conn,
+          "SELECT result, result_digest, result_schema FROM action_commits WHERE session_id = ?1",
+          [session_id]
+        )
+
+      decoded = JSON.decode!(result_text)
+      new_decoded = transform.(decoded)
+      new_text = Canonical.encode(new_decoded)
+      new_digest = Canonical.digest(schema, new_decoded)
+
+      Connection.query!(
+        store.conn,
+        "UPDATE action_commits SET result = ?1, result_digest = ?2 WHERE session_id = ?3",
+        [new_text, new_digest, session_id]
+      )
+
+      :ok
     end
   end
 end

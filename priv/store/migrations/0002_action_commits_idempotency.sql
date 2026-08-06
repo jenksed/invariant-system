@@ -12,6 +12,27 @@
 -- because it is logically implied by the new global uniqueness and dropping
 -- it would require recreating the table. The new index is the only one
 -- that enforces the lookup contract.
+--
+-- Upgrade policy from v1:
+--
+-- A v1 store that stored two action_commits rows with the same
+-- idempotency_key under different session_ids (the v1 constraint
+-- permitted this) will fail to apply this migration. The migration is
+-- applied inside one transaction; any duplicate row raises a SQLite
+-- UNIQUE constraint failure and the runner rolls the entire batch back.
+-- The store records no version increment and the operator is expected to
+-- inspect the existing rows, deduplicate them by the stored request_digest
+-- (the original idempotency contract was content-addressed, so a same-key
+-- duplicate with a different stored digest is a real corruption), and
+-- retry the migration. After applying this migration, the
+-- action_commits_idempotency_key_idx is enforced and a v1 row with
+-- per-session duplicates becomes a single global key per idempotency_key.
+--
+-- A v1 store that used the per-session constraint correctly (every
+-- idempotency_key appeared once across the table) applies this migration
+-- in one transaction and proceeds.
+--
+-- Tests in test/kiln/store/migrations_test.exs cover both paths.
 
 CREATE UNIQUE INDEX action_commits_idempotency_key_idx
   ON action_commits (idempotency_key);

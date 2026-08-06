@@ -13,12 +13,17 @@ defmodule Kiln.Workflow do
 
     * `start_session/1` — atomic Session creation. Required: `:objective`,
       `:criteria` (≥1), `:actor_id`, `:project_observation`. Optional:
-      `:constraints`, `:exclusions`, `:started_at`, `:idempotency_key`.
+      `:constraints`, `:exclusions`, `:started_at` (caller-supplied values
+      participate in the request digest; omitted values are auto-generated
+      and excluded), `:idempotency_key`.
 
     * `query_session/1` — current projection for a `session_id`.
 
     * `cancel_session/2` — atomic cancellation. Required: `:actor_id`,
-      `:expected_session_revision`.
+      `:expected_session_revision`. Permitted from `:ready` and `:running`
+      Run states. Cancel from `:waiting_for_user` is not yet wired because
+      the accepted projection invariant requires a `:waiting_for_user` Run
+      to retain its pending decision until a paired clearing entry lands.
 
     * `resume_session/2` — atomic resumption. Required: `:actor_id`,
       `:expected_session_revision`. Permitted only from `:ready` in this
@@ -39,15 +44,29 @@ defmodule Kiln.Workflow do
   raw `%Kiln.Domain.Session{}` / `%Kiln.Domain.Run{}` / `%Kiln.Domain.Task{}`
   structs never appear in any return value.
 
+  ## Capability authority
+
+  `valid_next_actions/1` and the mutating operations share one capability
+  matrix (`@capability_matrix/0`). Every advertised operation is executable
+  from its advertised Run state; every unadvertised operation is rejected
+  before any journal write. Terminal Run states advertise nothing. Internal
+  journal action kinds (such as `:transition_run`) are never exposed.
+
   ## Idempotency
 
   Each mutating operation finds an existing commit by `idempotency_key`
   alone. A retry with the same key and the same request digest returns the
   original stable result without performing any additional journal write or
   action commit. A retry with the same key but a different request digest
-  returns an `idempotency_conflict` error. The durable application result
-  (session, task, run, action identifiers, revision, run state, projection
-  digest) is stored with the action commit and replayed verbatim.
+  returns an `idempotency_conflict` error. The replay-boundary validator
+  rebuilds the authoritative Session journal inside one `BEGIN IMMEDIATE`
+  transaction before returning the stored application result, so a deleted
+  or corrupt journal cannot masquerade as accepted recorded truth. The
+  durable application result (session, task, run, action identifiers,
+  revision, run state, projection digest) is stored with the action commit
+  and replayed verbatim. The workflow's `commit/4` and `lookup_commit/3`
+  paths share the same classifier, so a check/use race cannot interleave
+  between the pre-lookup and the eventual write.
 
   ## Configuration
 
@@ -98,26 +117,20 @@ defmodule Kiln.Workflow do
   @request_digest_schema "kiln.workflow.request_digest/v1"
   @application_result_schema "kiln.workflow.application_result/v1"
 
-  # The single capability authority: every public mutating operation
-  # advertised by `valid_next_actions/1` must actually be executable from
-  # the named Run state by the workflow, and the run state must permit it
-  # under the accepted transition table. Internal journal action kinds
-  # (such as `:transition_run`) are never exposed. The matrix is the
-  # P1-S01-T06 slice: cancel from :ready or :running; resume from :ready.
-  # Terminal states advertise no operations.
+  # Single capability authority for application-facing operations. Every
+  # operation advertised here is the set the workflow accepts from the
+  # corresponding Run state, and the set `valid_next_actions/1` returns.
+  # `cancel_session` is permitted from `:ready` and `:running`; `resume_session`
+  # is permitted from `:ready` only. `:waiting_for_user` is not in the cancel
+  # set because the accepted projection invariant requires a `:waiting_for_user`
+  # Run to retain its pending decision until a `user_decision_recorded/v1`
+  # entry clears it; canceling a Session that still holds a pending decision
+  # without a paired clearing entry would violate the invariant. Terminal
+  # states advertise nothing. Internal journal action kinds such as
+  # `:transition_run` are never exposed by this boundary.
   @capability_matrix %{
-    :ready => [:cancel_session, :resume_session],
-    :running => [:cancel_session]
-  }
-
-  @run_state_to_atom %{
-    "ready" => :ready,
-    "running" => :running,
-    "waiting_for_user" => :waiting_for_user,
-    "orphaned" => :orphaned,
-    "completed" => :completed,
-    "failed" => :failed,
-    "canceled" => :canceled
+    ready: [:cancel_session, :resume_session],
+    running: [:cancel_session]
   }
 
   @doc """
@@ -128,7 +141,9 @@ defmodule Kiln.Workflow do
   `:project_observation` (a `%ProjectObservation{}` or a map with
   `:repository_root`, `:repository_fingerprint` (sha256:...), `:observed_at`).
   Optional: `:constraints`, `:exclusions` (default `[]`), `:started_at`
-  (default `DateTime.utc_now/0`), `:idempotency_key` (auto-generated when omitted).
+  (default `DateTime.utc_now/0`; a supplied value participates in the
+  request digest while an auto-generated value is excluded), `:idempotency_key`
+  (auto-generated when omitted).
 
   Returns the application-facing identifiers and the resulting revision,
   run state, and projection digest. Performs no journal write on any
@@ -172,14 +187,7 @@ defmodule Kiln.Workflow do
   @spec cancel_session(term(), keyword() | map()) ::
           {:ok, cancel_result()} | {:error, Error.t()}
   def cancel_session(session_id, opts) do
-    run_transition(
-      session_id,
-      opts,
-      target_state: :canceled,
-      public_relation: :cancel_session,
-      from_states: [:ready, :running, :waiting_for_user],
-      reducer_step: "intent"
-    )
+    run_transition(session_id, opts, public_relation: :cancel_session)
   end
 
   @doc """
@@ -194,14 +202,7 @@ defmodule Kiln.Workflow do
   @spec resume_session(term(), keyword() | map()) ::
           {:ok, resume_result()} | {:error, Error.t()}
   def resume_session(session_id, opts) do
-    run_transition(
-      session_id,
-      opts,
-      target_state: :running,
-      public_relation: :resume_session,
-      from_states: [:ready],
-      reducer_step: "application"
-    )
+    run_transition(session_id, opts, public_relation: :resume_session)
   end
 
   @doc """
@@ -227,17 +228,12 @@ defmodule Kiln.Workflow do
 
   # ---- transition path (cancel + resume) ----
 
-  defp run_transition(session_id, opts,
-         target_state: target_state,
-         public_relation: public_relation,
-         from_states: from_states,
-         reducer_step: reducer_step
-       ) do
+  defp run_transition(session_id, opts, public_relation: public_relation) do
     with :ok <- require_session_id_format(session_id),
          {:ok, normalized} <- normalize_transition_opts(opts),
          {:ok, idempotency_key} <- resolve_idempotency_key(normalized),
          {:ok, request_digest} <-
-           build_transition_request_digest(public_relation, normalized, session_id, target_state),
+           build_transition_request_digest(public_relation, normalized, session_id),
          {:ok, conn} <- store_conn() do
       run_transition_commit(
         conn,
@@ -245,10 +241,7 @@ defmodule Kiln.Workflow do
         normalized,
         idempotency_key,
         request_digest,
-        target_state,
-        public_relation,
-        from_states,
-        reducer_step
+        public_relation
       )
     end
   end
@@ -258,16 +251,22 @@ defmodule Kiln.Workflow do
   defp run_start_commit(conn, normalized, idempotency_key, request_digest) do
     # Pre-lookup by idempotency_key alone so a retry returns the stored
     # session_id, task_id, run_id, and action_id verbatim. The retry's
-    # freshly generated identifiers must not become a second Session.
-    case Journal.lookup_commit(conn, idempotency_key, request_digest) do
-      {:ok, stored_result} ->
-        {:ok, start_result_from_stored(string_keyed_to_atom(stored_result))}
-
+    # freshly generated identifiers must not become a second Session. The
+    # journal's classifier rebuilds the authoritative Session journal
+    # before returning success so a deleted or corrupt journal cannot
+    # masquerade as accepted recorded truth.
+    case Journal.classify_commit(conn, idempotency_key, request_digest) do
       :none ->
         start_session_build_and_commit(conn, normalized, idempotency_key, request_digest)
 
-      {:error, %Kiln.Store.Error{code: code, message: message, details: details}} ->
-        {:error, Error.new(code, message, nil, details)}
+      {:replay, replay} ->
+        apply_stored_start_result(atomize_replay(replay))
+
+      {:conflict, error} ->
+        {:error, classify_error(error)}
+
+      {:error, %Kiln.Store.Error{} = error} ->
+        {:error, store_error_to_domain(error)}
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -297,7 +296,9 @@ defmodule Kiln.Workflow do
               action,
               [entry],
               result_map,
-              &start_result_from_stored/1
+              &start_result_from_stored/1,
+              expected_revision: 0,
+              session_id: session.id
             )
 
           {:error, _} = error ->
@@ -317,21 +318,15 @@ defmodule Kiln.Workflow do
          normalized,
          idempotency_key,
          request_digest,
-         target_state,
-         public_relation,
-         from_states,
-         reducer_step
+         public_relation
        ) do
     # Pre-lookup by idempotency_key alone so a retry replays without the
     # Run state transition check firing on the post-commit state. The
-    # journal's own commit/4 performs the same lookup inside its
-    # `BEGIN IMMEDIATE` transaction, but the workflow needs the answer
-    # *before* validation so the validator sees the original state, not
-    # the already-transitioned state from a prior commit.
-    case Journal.lookup_commit(conn, idempotency_key, request_digest) do
-      {:ok, stored_result} ->
-        {:ok, transition_result_from_stored(public_relation, string_keyed_to_atom(stored_result))}
-
+    # journal's classifier validates the stored boundary against the
+    # authoritative journal before returning success, and `commit/4`
+    # performs the same classification inside its `BEGIN IMMEDIATE`
+    # transaction so a check/use race cannot interleave.
+    case Journal.classify_commit(conn, idempotency_key, request_digest) do
       :none ->
         run_transition_validate_and_commit(
           conn,
@@ -339,14 +334,17 @@ defmodule Kiln.Workflow do
           normalized,
           idempotency_key,
           request_digest,
-          target_state,
-          public_relation,
-          from_states,
-          reducer_step
+          public_relation
         )
 
-      {:error, %Kiln.Store.Error{code: code, message: message, details: details}} ->
-        {:error, Error.new(code, message, nil, details)}
+      {:replay, replay} ->
+        apply_stored_transition_result(public_relation, atomize_replay(replay))
+
+      {:conflict, error} ->
+        {:error, classify_error(error)}
+
+      {:error, %Kiln.Store.Error{} = error} ->
+        {:error, store_error_to_domain(error)}
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -359,13 +357,10 @@ defmodule Kiln.Workflow do
          normalized,
          idempotency_key,
          request_digest,
-         target_state,
-         public_relation,
-         from_states,
-         reducer_step
+         public_relation
        ) do
     with {:ok, %{projection: projection}} <- load_projection(conn, session_id),
-         :ok <- validate_transition(projection, target_state, from_states) do
+         :ok <- capability_authorize(public_relation, projection) do
       run_id = run_id_from_projection(projection)
       {:ok, action_id} = Id.generate(:action, strong_rand_bytes())
       from_state = run_state_from_projection(projection)
@@ -378,11 +373,18 @@ defmodule Kiln.Workflow do
              idempotency_key,
              request_digest,
              public_relation,
-             from_state,
-             target_state
+             from_state
            ) do
         {:ok, action} ->
-          entry = build_run_transitioned_entry(from_state, target_state, reducer_step)
+          target_state = target_state_for(public_relation)
+
+          entry =
+            build_run_transitioned_entry(
+              from_state,
+              target_state,
+              reducer_step_for(public_relation)
+            )
+
           placeholder = build_transition_placeholder(session_id, action.id, target_state)
 
           commit(
@@ -390,7 +392,9 @@ defmodule Kiln.Workflow do
             action,
             [entry],
             placeholder,
-            &transition_result_from_stored(public_relation, &1)
+            &transition_result_from_stored(public_relation, &1),
+            expected_revision: normalized.expected_session_revision,
+            session_id: session_id
           )
 
         {:error, _} = error ->
@@ -404,13 +408,15 @@ defmodule Kiln.Workflow do
 
   # ---- commit (handles replay vs new commit) ----
 
-  # The journal commits the action atomically. If the lookup-by-key finds an
+  # The journal commits the action atomically. If the classifier finds an
   # existing commit with the same request digest, the journal returns the
-  # stored application result verbatim. If the digest differs, the journal
-  # returns an idempotency conflict. The result map is built once with the
-  # fresh identifiers the workflow would write; on replay the journal
-  # discards it and returns the stored durable result instead.
-  defp commit(conn, action, entries, result_map, result_fun) do
+  # stored application result verbatim after rebuilding the authoritative
+  # Session journal. If the digest differs, the journal returns an
+  # idempotency conflict.
+  defp commit(conn, action, entries, result_map, result_fun, opts) do
+    expected_revision = Keyword.fetch!(opts, :expected_revision)
+    session_id = Keyword.fetch!(opts, :session_id)
+
     case Journal.commit(
            conn,
            action,
@@ -420,10 +426,31 @@ defmodule Kiln.Workflow do
            result_schema: @application_result_schema
          ) do
       {:ok, %{status: :committed, session_revision: revision, projection: projection}} ->
-        {:ok, result_fun.(committed_result(result_map, revision, projection))}
+        committed = committed_result(result_map, revision, projection)
+        replay = %{session_id: action.session_id, action_id: action.id, result: committed}
 
-      {:ok, %{status: :replayed, result: stored_result}} ->
-        {:ok, result_fun.(string_keyed_to_atom(stored_result))}
+        case result_fun.(replay) do
+          {:ok, _} = ok -> ok
+          {:error, %Error{} = error} -> {:error, error}
+        end
+
+      {:ok, %{status: :replayed, result: stored_result, session_id: stored_session_id}} ->
+        # The journal already validated the stored boundary against the
+        # authoritative journal; convert the stored result into the public
+        # shape and re-validate semantic completeness so a corrupt stored
+        # map cannot leak through the replay path. Use the stored
+        # `session_id` so the retry's freshly generated candidate never
+        # collides with the original Session under a concurrent retry race.
+        replay = %{
+          session_id: stored_session_id,
+          action_id: action.id,
+          result: string_keyed_to_atom(stored_result)
+        }
+
+        case result_fun.(replay) do
+          {:ok, _} = ok -> ok
+          {:error, %Error{} = error} -> {:error, error}
+        end
 
       {:error, %Kiln.Store.Error{code: code, message: message, details: details}} ->
         {:error, Error.new(code, message, nil, details)}
@@ -439,23 +466,34 @@ defmodule Kiln.Workflow do
            nil,
            %{reason: inspect(reason)}
          )}
+
+      _ ->
+        {:error,
+         Error.new(
+           :transaction_failed,
+           "the append transaction returned an unrecognized outcome",
+           nil,
+           %{
+             expected_revision: expected_revision,
+             session_id: session_id
+           }
+         )}
     end
   end
 
-  defp string_keyed_to_atom(result) when is_map(result) do
-    %{
-      session_id: result["session_id"],
-      task_id: result["task_id"],
-      run_id: result["run_id"],
-      action_id: result["action_id"],
-      session_revision: result["session_revision"],
-      run_state: result["run_state"],
-      projection_digest: result["projection_digest"]
-    }
+  defp classify_error(%Kiln.Store.Error{} = error), do: store_error_to_domain(error)
+  defp classify_error(%Error{} = error), do: error
+
+  defp store_error_to_domain(%Kiln.Store.Error{code: code, message: message, details: details}) do
+    Error.new(code, message, nil, details)
   end
 
   # ---- capability authority ----
 
+  # The single source of truth for what this boundary exposes from each
+  # Run state. `valid_next_actions/1` lists the advertised set; every
+  # mutator (cancel/resume) checks `capability_authorize/2` against the
+  # same matrix before any journal write.
   defp capability_for(projection) do
     case run_state_from_projection(projection) do
       nil -> []
@@ -469,6 +507,48 @@ defmodule Kiln.Workflow do
       :error -> []
     end
   end
+
+  defp capability_authorize(public_relation, projection) do
+    case run_state_from_projection(projection) do
+      nil ->
+        {:error, Error.new(:unknown_run_state, "current Run state is not recognized", :run_state)}
+
+      state ->
+        if public_relation in Map.get(@capability_matrix, state, []) do
+          case Transition.validate_run(state, target_state_for(public_relation)) do
+            :ok -> :ok
+            {:error, %Error{} = error} -> {:error, transition_domain_error(state, error)}
+          end
+        else
+          {:error,
+           Error.new(
+             :run_transition_not_allowed,
+             "the current Run state does not permit this operation",
+             nil,
+             %{
+               from: Atom.to_string(state),
+               operation: Atom.to_string(public_relation),
+               permitted_operations: capability_for_state(state)
+             }
+           )}
+        end
+    end
+  end
+
+  defp transition_domain_error(state, %Error{} = inner) do
+    Error.new(
+      :run_transition_not_allowed,
+      "the Run transition is not in the accepted transition table",
+      nil,
+      %{from: Atom.to_string(state), inner: inner.code}
+    )
+  end
+
+  defp target_state_for(:cancel_session), do: :canceled
+  defp target_state_for(:resume_session), do: :running
+
+  defp reducer_step_for(:cancel_session), do: "intent"
+  defp reducer_step_for(:resume_session), do: "application"
 
   # ---- input normalization ----
 
@@ -484,7 +564,7 @@ defmodule Kiln.Workflow do
          {:ok, criteria} <- require_string_list_map(opts, :criteria, :criteria, minimum: 1),
          {:ok, constraints} <- optional_string_list_map(opts, :constraints, :constraints),
          {:ok, exclusions} <- optional_string_list_map(opts, :exclusions, :exclusions),
-         {:ok, started_at} <- require_started_at_map(opts),
+         {:ok, started_at, started_at_source} <- require_started_at_map(opts),
          {:ok, project_observation} <- resolve_project_observation_map(opts),
          {:ok, idempotency_key_input} <- optional_idempotency_key_map(opts) do
       {:ok,
@@ -495,6 +575,7 @@ defmodule Kiln.Workflow do
          constraints: constraints,
          exclusions: exclusions,
          started_at: started_at,
+         started_at_source: started_at_source,
          project_observation: project_observation,
          idempotency_key: idempotency_key_input
        }}
@@ -583,16 +664,20 @@ defmodule Kiln.Workflow do
     end
   end
 
+  # Returns `{:ok, datetime, :caller | :generated}`. The `:caller` vs
+  # `:generated` distinction is preserved so the request digest can include
+  # a caller-supplied timestamp and exclude an auto-generated one without
+  # the caller having to introspect the value.
   defp require_started_at_map(opts) do
     case Map.fetch(opts, :started_at) do
       {:ok, %DateTime{} = value} ->
-        {:ok, value}
+        {:ok, value, :caller}
 
       {:ok, _} ->
         {:error, Error.new(:invalid_started_at, "started_at must be a DateTime", :started_at)}
 
       :error ->
-        {:ok, DateTime.utc_now()}
+        {:ok, DateTime.utc_now(), :generated}
     end
   end
 
@@ -706,6 +791,9 @@ defmodule Kiln.Workflow do
 
   # ---- request digest ----
 
+  # Caller-supplied timestamps participate in the digest; auto-generated
+  # timestamps do not, because every auto-generation produces a different
+  # value and would defeat idempotency for retries that omit the field.
   defp build_start_request_digest(normalized) do
     attrs = %{
       "operation" => "start_session",
@@ -714,29 +802,34 @@ defmodule Kiln.Workflow do
       "criteria" => normalized.criteria,
       "constraints" => normalized.constraints,
       "exclusions" => normalized.exclusions,
+      "started_at_source" => Atom.to_string(normalized.started_at_source),
+      "started_at" => started_at_digest_value(normalized),
       "project_observation" => project_observation_digest_data(normalized.project_observation)
     }
 
     encode_request_digest(attrs)
   end
 
-  defp build_transition_request_digest(:cancel_session, normalized, session_id, target_state) do
+  defp started_at_digest_value(%{started_at_source: :caller, started_at: value}),
+    do: DateTime.to_iso8601(value)
+
+  defp started_at_digest_value(%{started_at_source: :generated}), do: nil
+
+  defp build_transition_request_digest(:cancel_session, normalized, session_id) do
     encode_request_digest(%{
       "operation" => "cancel_session",
       "session_id" => session_id,
       "actor_id" => normalized.actor_id,
-      "expected_session_revision" => normalized.expected_session_revision,
-      "target_state" => Atom.to_string(target_state)
+      "expected_session_revision" => normalized.expected_session_revision
     })
   end
 
-  defp build_transition_request_digest(:resume_session, normalized, session_id, target_state) do
+  defp build_transition_request_digest(:resume_session, normalized, session_id) do
     encode_request_digest(%{
       "operation" => "resume_session",
       "session_id" => session_id,
       "actor_id" => normalized.actor_id,
-      "expected_session_revision" => normalized.expected_session_revision,
-      "target_state" => Atom.to_string(target_state)
+      "expected_session_revision" => normalized.expected_session_revision
     })
   end
 
@@ -799,8 +892,7 @@ defmodule Kiln.Workflow do
          idempotency_key,
          request_digest,
          public_relation,
-         from_state,
-         target_state
+         from_state
        ) do
     Action.new(%{
       id: action_id,
@@ -815,7 +907,7 @@ defmodule Kiln.Workflow do
       payload: %{
         public_relation: Atom.to_string(public_relation),
         from_state: Atom.to_string(from_state),
-        to_state: Atom.to_string(target_state)
+        to_state: Atom.to_string(target_state_for(public_relation))
       },
       causation_action_id: nil,
       correlation_id: nil,
@@ -857,38 +949,207 @@ defmodule Kiln.Workflow do
     SessionProjection.digest(projection)
   end
 
-  defp projection_digest_of(_), do: nil
-
-  defp start_result_from_stored(result) do
+  # Convert a string-keyed decoded stored result into the atom-keyed shape
+  # the public contract uses. Task and run IDs are present only in start
+  # results; for transition results JSON omits them and the atom-keyed map
+  # carries nil. The validators below treat `nil` as a missing field for
+  # start results and ignore it for transition results.
+  defp string_keyed_to_atom(result) when is_map(result) do
     %{
-      session_id: result[:session_id],
-      task_id: result[:task_id],
-      run_id: result[:run_id],
-      action_id: result[:action_id],
-      session_revision: result[:session_revision],
-      run_state: :ready,
-      projection_digest: result[:projection_digest]
+      session_id: result["session_id"],
+      task_id: result["task_id"],
+      run_id: result["run_id"],
+      action_id: result["action_id"],
+      session_revision: result["session_revision"],
+      run_state: result["run_state"],
+      projection_digest: result["projection_digest"]
     }
   end
 
-  defp transition_result_from_stored(:cancel_session, result) do
-    %{
-      session_id: result[:session_id],
-      action_id: result[:action_id],
-      session_revision: result[:session_revision],
-      run_state: :canceled,
-      projection_digest: result[:projection_digest]
-    }
+  defp atomize_replay(replay) do
+    %{replay | result: string_keyed_to_atom(replay.result)}
   end
 
-  defp transition_result_from_stored(:resume_session, result) do
-    %{
-      session_id: result[:session_id],
-      action_id: result[:action_id],
-      session_revision: result[:session_revision],
-      run_state: :running,
-      projection_digest: result[:projection_digest]
-    }
+  defp apply_stored_start_result(replay) do
+    start_result_from_stored(replay)
+  end
+
+  defp apply_stored_transition_result(public_relation, replay) do
+    transition_result_from_stored(public_relation, replay)
+  end
+
+  defp validate_stored_start_result(replay) do
+    result = replay.result
+
+    with :ok <- require_nonempty_string(result, :session_id),
+         :ok <- require_nonempty_string(result, :task_id),
+         :ok <- require_nonempty_string(result, :run_id),
+         :ok <- require_nonempty_string(result, :action_id),
+         :ok <- require_non_neg_integer(result, :session_revision),
+         :ok <- require_run_state(result, "ready"),
+         :ok <- require_projection_digest(result) do
+      require_stored_session_matches_id(replay.session_id, result.session_id)
+    end
+  end
+
+  defp validate_stored_transition_result(public_relation, replay) do
+    result = replay.result
+
+    with :ok <- require_nonempty_string(result, :session_id),
+         :ok <- require_nonempty_string(result, :action_id),
+         :ok <- require_non_neg_integer(result, :session_revision),
+         :ok <- require_run_state(result, Atom.to_string(target_state_for(public_relation))),
+         :ok <- require_projection_digest(result) do
+      require_stored_session_matches_id(replay.session_id, result.session_id)
+    end
+  end
+
+  defp require_nonempty_string(result, field) do
+    case Map.fetch(result, field) do
+      {:ok, value} when is_binary(value) and byte_size(value) > 0 ->
+        :ok
+
+      _ ->
+        {:error,
+         Error.new(
+           :corrupt_result,
+           "stored result is missing a required identifier",
+           nil,
+           %{reason: :corrupt_result, field: field}
+         )}
+    end
+  end
+
+  defp require_non_neg_integer(result, field) do
+    case Map.fetch(result, field) do
+      {:ok, value} when is_integer(value) and value >= 0 ->
+        :ok
+
+      _ ->
+        {:error,
+         Error.new(
+           :corrupt_result,
+           "stored result is missing a non-negative integer",
+           nil,
+           %{reason: :corrupt_result, field: field}
+         )}
+    end
+  end
+
+  defp require_run_state(result, expected) do
+    case Map.fetch(result, :run_state) do
+      {:ok, ^expected} ->
+        :ok
+
+      {:ok, actual} ->
+        {:error,
+         Error.new(
+           :corrupt_result,
+           "stored result run_state does not match the requested operation",
+           nil,
+           %{reason: :corrupt_result, expected: expected, actual: actual}
+         )}
+
+      :error ->
+        {:error,
+         Error.new(
+           :corrupt_result,
+           "stored result is missing run_state",
+           nil,
+           %{reason: :corrupt_result}
+         )}
+    end
+  end
+
+  defp require_projection_digest(result) do
+    case Map.fetch(result, :projection_digest) do
+      {:ok, value} when is_binary(value) ->
+        if Regex.match?(~r/^[0-9a-f]{64}$/, value) do
+          :ok
+        else
+          {:error,
+           Error.new(
+             :corrupt_result,
+             "stored result projection_digest is malformed",
+             nil,
+             %{reason: :corrupt_result, value: value}
+           )}
+        end
+
+      _ ->
+        {:error,
+         Error.new(
+           :corrupt_result,
+           "stored result is missing projection_digest",
+           nil,
+           %{reason: :corrupt_result}
+         )}
+    end
+  end
+
+  defp require_stored_session_matches_id(stored_session_id, claimed_session_id)
+       when stored_session_id == claimed_session_id,
+       do: :ok
+
+  defp require_stored_session_matches_id(stored_session_id, claimed_session_id) do
+    {:error,
+     Error.new(
+       :corrupt_result,
+       "stored result session_id disagrees with the authoritative journal session",
+       nil,
+       %{
+         reason: :corrupt_result,
+         stored_session_id: stored_session_id,
+         claimed_session_id: claimed_session_id
+       }
+     )}
+  end
+
+  defp start_result_from_stored(replay) do
+    with :ok <- validate_stored_start_result(replay) do
+      result = replay.result
+
+      {:ok,
+       %{
+         session_id: result.session_id,
+         task_id: result.task_id,
+         run_id: result.run_id,
+         action_id: result.action_id,
+         session_revision: result.session_revision,
+         run_state: :ready,
+         projection_digest: result.projection_digest
+       }}
+    end
+  end
+
+  defp transition_result_from_stored(:cancel_session, replay) do
+    with :ok <- validate_stored_transition_result(:cancel_session, replay) do
+      result = replay.result
+
+      {:ok,
+       %{
+         session_id: result.session_id,
+         action_id: result.action_id,
+         session_revision: result.session_revision,
+         run_state: :canceled,
+         projection_digest: result.projection_digest
+       }}
+    end
+  end
+
+  defp transition_result_from_stored(:resume_session, replay) do
+    with :ok <- validate_stored_transition_result(:resume_session, replay) do
+      result = replay.result
+
+      {:ok,
+       %{
+         session_id: result.session_id,
+         action_id: result.action_id,
+         session_revision: result.session_revision,
+         run_state: :running,
+         projection_digest: result.projection_digest
+       }}
+    end
   end
 
   # ---- entry construction ----
@@ -972,58 +1233,22 @@ defmodule Kiln.Workflow do
   defp source_from_status(_), do: :rebuilt
 
   defp run_state_from_projection(%{"run" => %{"state" => state}}) when is_binary(state) do
-    case Map.fetch(@run_state_to_atom, state) do
-      {:ok, atom} -> atom
-      :error -> nil
-    end
-  end
-
-  defp run_state_from_projection(%{"run_state" => state}) when is_binary(state) do
-    case Map.fetch(@run_state_to_atom, state) do
-      {:ok, atom} -> atom
-      :error -> nil
-    end
+    state_to_atom(state)
   end
 
   defp run_state_from_projection(_projection), do: nil
 
+  defp state_to_atom("ready"), do: :ready
+  defp state_to_atom("running"), do: :running
+  defp state_to_atom("waiting_for_user"), do: :waiting_for_user
+  defp state_to_atom("orphaned"), do: :orphaned
+  defp state_to_atom("completed"), do: :completed
+  defp state_to_atom("failed"), do: :failed
+  defp state_to_atom("canceled"), do: :canceled
+  defp state_to_atom(_), do: nil
+
   defp run_id_from_projection(%{"run" => %{"id" => id}}) when is_binary(id), do: id
-  defp run_id_from_projection(%{"run_id" => id}) when is_binary(id), do: id
   defp run_id_from_projection(_projection), do: nil
-
-  defp validate_transition(projection, target_state, from_states) do
-    current = run_state_from_projection(projection)
-
-    cond do
-      is_nil(current) ->
-        {:error, Error.new(:unknown_run_state, "current Run state is not recognized", :run_state)}
-
-      current not in from_states ->
-        {:error,
-         Error.new(
-           :run_transition_not_allowed,
-           "the current Run state does not permit this transition",
-           nil,
-           %{
-             from: Atom.to_string(current),
-             to: Atom.to_string(target_state),
-             permitted_from_states: Enum.map(from_states, &Atom.to_string/1)
-           }
-         )}
-
-      not MapSet.member?(Transition.allowed_run_transitions(), {current, target_state}) ->
-        {:error,
-         Error.new(
-           :run_transition_not_allowed,
-           "the Run transition is not in the accepted transition table",
-           nil,
-           %{from: Atom.to_string(current), to: Atom.to_string(target_state)}
-         )}
-
-      true ->
-        :ok
-    end
-  end
 
   # ---- connection acquisition ----
 
