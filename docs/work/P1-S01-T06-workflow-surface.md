@@ -1,11 +1,44 @@
 # P1-S01-T06: Add Kiln.Workflow public boundary
 
 **Document type:** Implementation plan  
-**Status:** Accepted  
+**Status:** Accepted (revised after PR-42 review)  
 **Parent slice:** P1-S01  
 **Branch:** `work/p1-s01-t06-workflow-surface`  
 **Depends on:** P1-S01-T03 merged and accepted  
 **Enables:** P1-S01-T04 (foundation CLI), contributes to P1-S01-T05 (slice gate)
+
+## Revision history
+
+This plan and its implementation were revised after a PR-42 review
+surfaced five correctness gaps:
+
+1. **Broken retry and idempotency.** The first implementation generated a
+   fresh session identifier on every retry, leaving the
+   `UNIQUE (session_id, idempotency_key)` constraint unable to find the
+   original commit because the retry's session_id differed from the
+   stored one. A retry therefore created a *second* Session instead of
+   returning the original.
+2. **`valid_next_actions/1` contradicted actual operations.** The
+   function advertised operations (e.g. `:transition_run`) that the
+   workflow either did not implement or did not expose, and it omitted
+   the `Kiln.Workflow.cancel_session/2` / `resume_session/2` atoms it
+   actually accepted.
+3. **Public functions raised exceptions for invalid input.** Several
+   code paths used `String.to_existing_atom/1` and clause-matched
+   patterns that crashed for expected malformed input.
+4. **Broad rescue paths returned success results.** A blanket
+   `rescue _ -> ...` converted integrity failures into
+   `{:ok, _}`-shaped envelopes.
+5. **Contradictions among implementation, tests, plan, docs, evidence.**
+   The result shape excluded `:action_id` while the spec required it;
+   the moduledoc of `resume_session/2` promised three permitted states
+   while the implementation narrowed to one; the projection digest
+   returned `nil` on a replay.
+
+The revision corrects the implementation, the executable tests, this
+plan, the module documentation, and the PR evidence so they describe
+and enforce the same contract. The full set of design decisions and
+post-review changes is captured in `Completion record` below.
 
 ## Slice contribution
 
@@ -60,7 +93,7 @@ Each function returns `{:ok, value}` or `{:error, %Kiln.Domain.Error{}}`. Return
 ## Requirements
 
 - **P1-S01-T06-R01:** `Kiln.Workflow.start_session/1` shall accept a keyword list or map with `:objective`, `:criteria` (≥1 non-empty binary), `:constraints` (default `[]`), `:exclusions` (default `[]`), and a required `:actor_id` (non-blank binary). Optional inputs: `:started_at`, `:idempotency_key`, `:project_observation` (a `ProjectObservation` struct or one built from supported fields). The function shall not read `actor_id` from configuration.
-- **P1-S01-T06-R02:** `start_session/1` shall call `Kiln.Domain.Session.start/2`, build a `Kiln.Domain.Action{}` envelope of kind `:start_session`, commit via `Kiln.Store.Journal.commit/4`, and reconcile via `Kiln.Projections.Store.compare/2`. It shall return `{:ok, %{session_id, task_id, run_id, session_revision, run_state, projection_digest}}` on success or `{:error, %Error{}}` on any expected boundary failure. The committed `Kiln.Domain.Action{}` envelope, the `%Kiln.Domain.Session{}` struct, the journal entries, and any handle-equivalent value shall not appear in the return shape.
+- **P1-S01-T06-R02:** `start_session/1` shall call `Kiln.Domain.Session.start/2`, build a `Kiln.Domain.Action{}` envelope of kind `:start_session`, commit via `Kiln.Store.Journal.commit/4`, and reconcile via `Kiln.Projections.Store.compare/2`. It shall return `{:ok, %{session_id, task_id, run_id, action_id, session_revision, run_state, projection_digest}}` on success or `{:error, %Error{}}` on any expected boundary failure. The committed `Kiln.Domain.Action{}` envelope, the `%Kiln.Domain.Session{}` struct, the journal entries, and any handle-equivalent value shall not appear in the return shape. The `action_id` is the only externally meaningful identifier carried in the committed `Action{}` envelope; the full envelope is never exposed.
 - **P1-S01-T06-R03:** `Kiln.Workflow.query_session/1` shall take `session_id`, return `{:ok, %{projection, source, projection_digest}}` where `source` is `:cache | :rebuilt`, or `{:ok, :empty}` when no events exist, or `{:error, %Error{}}` when the journal does not validate.
 - **P1-S01-T06-R04:** `Kiln.Workflow.cancel_session/2` shall take `session_id`, `expected_session_revision`, and a required `actor_id:` option, validate the run transition via `Kiln.Domain.Transition.validate_run/2`, build a `:cancel_session` action, commit, and reconcile. It shall return `{:ok, %{session_id, action_id, session_revision, run_state, projection_digest}}` on success or `{:error, %Error{}}` on failure. It shall perform no journal write when validation or input checking fails.
 - **P1-S01-T06-R05:** `Kiln.Workflow.resume_session/2` shall take `session_id`, `expected_session_revision`, and a required `actor_id:` option. It shall validate that the current Root Run state is `:ready` and the transition to `:running` is permitted by `Kiln.Domain.Transition.allowed_run_transitions/0`. Resume from `:waiting_for_user` and `:orphaned` is out of scope for this ticket (see `Failures and warnings`); the reducer invariants for pending decisions and unknown operations are not relaxable here. It shall build a resume action (default kind `:resume_session`, falling back to a `:transition_run` payload if R1 under U01 is infeasible), commit, and reconcile. It shall return the same envelope shape as `cancel_session/2` on success or `{:error, %Error{}}` on failure, and shall perform no journal write when validation or input checking fails.
@@ -97,6 +130,10 @@ Denied:
 1. Add `lib/kiln/workflow.ex` implementing the five public functions with bounded deterministic ordering for `valid_next_actions/1`.
 2. Add `test/kiln/workflow_test.exs` covering each public function plus source-guard tests for R07, R08, R09, R10.
 3. If U01 R1 is selected, add the atom `:resume_session` to `Kiln.Domain.Action.kinds/0` (`lib/kiln/domain/action.ex`) so the new action kind passes envelope validation. This is a one-line addition; reducer or replay changes are out of scope and recorded as a follow-up if needed.
+4. **Revised:** Add `priv/store/migrations/0002_action_commits_idempotency.sql` introducing a global `UNIQUE INDEX` on `action_commits(idempotency_key)`. The P1-S01-T02 per-session constraint is insufficient for workflow retries because a `start_session` retry generates a fresh `session_id` before the lookup. The new global index makes `idempotency_key` alone a sufficient lookup key.
+5. **Revised:** Add `Kiln.Store.Journal.lookup_commit/3` so the workflow can perform the idempotency lookup *before* its `Run`-state transition check, so a retry replays without the transition validator firing on the post-commit state. The journal's `commit/4` continues to perform the same lookup inside its `BEGIN IMMEDIATE` transaction.
+6. **Revised:** Have the journal stamp the freshly computed `session_revision` and `projection_digest` into the stored application result before write, so an idempotent replay returns the durable values verbatim instead of the placeholder values.
+7. **Revised:** Bind the workflow's request digest to caller-controlled input only (omit the auto-generated `started_at` and the auto-generated `ProjectObservation.id`) so retries with the same `idempotency_key` produce identical request digests.
 
 ## Expected files or components
 
@@ -105,6 +142,10 @@ Denied:
 | `lib/kiln/workflow.ex` | New public module with `start_session/1`, `query_session/1`, `cancel_session/2`, `resume_session/2`, `valid_next_actions/1` | Proposed |
 | `test/kiln/workflow_test.exs` | boundary tests, no-handles-leak test, no-envelope-leak test, no-scattered-config source guard, no-CLI-alias source guard | Proposed |
 | `lib/kiln/domain/action.ex` | Conditional one-line edit to `kinds/0` if R1 for U01 is adopted | Conditional |
+| `priv/store/migrations/0002_action_commits_idempotency.sql` | Global `UNIQUE INDEX action_commits_idempotency_key_idx` so retries can find the original commit by `idempotency_key` alone | **Revised** |
+| `lib/kiln/store/journal.ex` | New `lookup_commit/3`; `do_commit` stamps `session_revision` and `projection_digest` into the stored application result; `existing_commit` queries by `idempotency_key` alone and returns the stored `session_id` for replay-boundary validation | **Revised** |
+| `test/kiln/store/migrations_test.exs` | Update version expectations to reflect the new migration (current version is 2; two rows in `schema_migrations`) | **Revised** |
+| `test/kiln/store_test.exs` | Update version expectations to reflect the new migration | **Revised** |
 
 A JSON runtime dependency is not authorized automatically. This ticket does not emit JSON. T04 owns the JSON renderer per its own decision to use the Elixir 1.20 stdlib `JSON` module.
 
@@ -113,8 +154,8 @@ A JSON runtime dependency is not authorized automatically. This ticket does not 
 - **P1-S01-T06-AC01**
   - **Given** an empty accepted store, bounded start input, and an explicit non-blank `actor_id`
   - **When** `start_session/1` runs
-  - **Then** it commits exactly one Session-start action and returns `{:ok, %{session_id, task_id, run_id, session_revision: 1, run_state, projection_digest}}` only — no `action`, no session struct, no envelope, no handle
-  - **Evidence:** integration test using a temporary store path; explicit assertion that the result map has exactly the named keys.
+  - **Then** it commits exactly one Session-start action and returns `{:ok, %{session_id, task_id, run_id, action_id, session_revision: 0, run_state: :ready, projection_digest}}` only — no `action` envelope, no session struct, no handle, no `started_at`/`observed_at` derived input
+  - **Evidence:** integration test using a temporary store path; explicit assertion that the result map has exactly the named keys (`[:action_id, :projection_digest, :run_id, :run_state, :session_id, :session_revision, :task_id]`). An exact retry with the same `idempotency_key` and same request digest returns the original map verbatim — the same `session_id`, `task_id`, `run_id`, `action_id`, `session_revision`, and `projection_digest` — and writes no second journal row.
 
 - **P1-S01-T06-AC02**
   - **Given** a current projection (with or without cache)
@@ -137,8 +178,8 @@ A JSON runtime dependency is not authorized automatically. This ticket does not 
 - **P1-S01-T06-AC05**
   - **Given** a Session in each P1-S01 lifecycle state (`:ready`, `:running`, `:waiting_for_user`, `:orphaned`, `:completed`, `:failed`, `:canceled`)
   - **When** `valid_next_actions/1` runs
-  - **Then** it returns `{:ok, list}` where `list` is the same bounded-atom set, deterministically ascending-sorted, for the same state across runs and across renderers. The set is derived from `Kiln.Domain.Action.kinds/0` minus the atoms filtered out by `Kiln.Domain.Transition.allowed_run_transitions/0` for the current Root Run state.
-  - **Evidence:** parameterised state-matrix test plus a deterministic-ordering property test (calling twice yields equal lists).
+  - **Then** it returns `{:ok, list}` where `list` is the same bounded-atom set, deterministically ascending-sorted, for the same state across runs and across renderers. The P1-S01-T06 capability matrix is `:ready => [:cancel_session, :resume_session]`, `:running => [:cancel_session]`, with `[]` for every other state — including `:waiting_for_user` and `:orphaned`, for which the reducer rejects the corresponding transitions in this slice. Internal journal action kinds such as `:transition_run` never appear in the list. Every atom in the list must be executable from the current Run state by the workflow; conversely, every public mutating operation the workflow accepts must appear in the list.
+  - **Evidence:** parameterised state-matrix test plus a deterministic-ordering property test (calling twice yields equal lists) plus a capability-parity test that executes every advertised operation from the advertised source state.
 
 - **P1-S01-T06-AC06**
   - **Given** any expected boundary failure (stale revision, blocked store, invalid input, malformed store path, missing or blank `actor_id`)
@@ -207,58 +248,64 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
 
 ## Completion record
 
-**Result:** Implemented and verified
+**Result:** Implemented and verified (revised after PR-42 review)
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T06-AC01 | Passed | P1-S01-T06-E01 | `test/kiln/workflow_test.exs` describe `start_session/1 (AC01)` — 4 tests pass (identifier-only return shape; exactly one committed action; missing `actor_id` and empty-criteria rejected without write) |
-| P1-S01-T06-AC02 | Passed | P1-S01-T06-E02 | `test/kiln/workflow_test.exs` describe `query_session/1 (AC02)` — 6 tests pass (`:empty` for unknown session; cache or rebuilt source after start; parity with `ProjectionStore.compare/2`; cache-invalidation rebuild path; malformed session_id rejected) |
-| P1-S01-T06-AC03 | Passed | P1-S01-T06-E03 | `test/kiln/workflow_test.exs` describe `cancel_session/2 (AC03)` — 5 tests pass (cancel from `:ready`, from `:running`/`:waiting_for_user`, stale revision without write, missing `actor_id` without write, terminal-state rejection without write) |
-| P1-S01-T06-AC04 | Passed | P1-S01-T06-E04 | `test/kiln/workflow_test.exs` describe `resume_session/2 (AC04)` — 4 tests pass (resume from `:ready`; rejection from `:running`; stale revision without write; missing `actor_id` without write). Given narrowed to `:ready` only (resume from `:waiting_for_user` and `:orphaned` deferred per `Failures and warnings`). |
-| P1-S01-T06-AC05 | Passed | P1-S01-T06-E05 | `test/kiln/workflow_test.exs` describe `valid_next_actions/1 (AC05)` — 3 tests pass (empty for unknown session; parameterised state matrix returns ascending-sorted atoms for `:ready`/`:running`/`:waiting_for_user`/`:orphaned`/`:completed`/`:failed`/`:canceled`; deterministic across repeated calls) |
-| P1-S01-T06-AC06 | Passed | P1-S01-T06-E06 | `test/kiln/workflow_test.exs` describe `boundary failure modes (AC06)` — 7 tests pass (blank `actor_id` for start/cancel/resume; malformed session_id for all five functions; missing objective; missing project_observation; corrupt journal without raising) |
+| P1-S01-T06-AC01 | Passed | P1-S01-T06-E01 | `test/kiln/workflow_test.exs` describe `start_session/1 (AC01)` — identifier-only return shape with exactly `[:action_id, :projection_digest, :run_id, :run_state, :session_id, :session_revision, :task_id]`; exactly one committed action; missing `actor_id` and empty-criteria rejected without write. AC08 idempotency suite covers the exact-retry no-second-Session case. |
+| P1-S01-T06-AC02 | Passed | P1-S01-T06-E02 | `test/kiln/workflow_test.exs` describe `query_session/1 (AC02)` — `:empty` for unknown session; cache or rebuilt source after start; parity with `ProjectionStore.compare/2`; cache-invalidation rebuild path; malformed session_id rejected. |
+| P1-S01-T06-AC03 | Passed | P1-S01-T06-E03 | `test/kiln/workflow_test.exs` describe `cancel_session/2 (AC03)` — cancel from `:ready`, from `:running`; stale revision without write, missing `actor_id` without write, terminal-state rejection without write. AC08 covers the retry-while-already-canceled case. |
+| P1-S01-T06-AC04 | Passed | P1-S01-T06-E04 | `test/kiln/workflow_test.exs` describe `resume_session/2 (AC04)` — resume from `:ready`; rejection from `:running`; stale revision without write; missing `actor_id` without write. Scoped to `:ready` only (see `Failures and warnings`). AC08 covers the retry-while-already-running case. |
+| P1-S01-T06-AC05 | Passed | P1-S01-T06-E05 | `test/kiln/workflow_test.exs` describe `valid_next_actions/1 (AC05)` and `capability parity (AC09)` — empty for unknown session; parameterised state matrix returns ascending-sorted atoms for `:ready`/`:running`/`:waiting_for_user`/`:orphaned`/`:completed`/`:failed`/`:canceled`; deterministic across repeated calls; capability-parity test executes every advertised operation from its advertised source state; `:transition_run` is never exposed. |
+| P1-S01-T06-AC06 | Passed | P1-S01-T06-E06 | `test/kiln/workflow_test.exs` describe `boundary failure modes (AC06)`, `totality (AC10)`, and `integrity (AC11)` — blank `actor_id` for start/cancel/resume; malformed session_id for all five functions; missing objective; missing project_observation; corrupt journal without raising; corrupt idempotency result returns `{:error, %Error{code: :integrity | :corrupt_result}}`; malformed projection state never raises; every public function accepts either a keyword list or a map; no broad rescue converts an integrity failure into a success. |
 | P1-S01-T06-AC07 | Passed | P1-S01-T06-E07 | `test/kiln/workflow_test.exs` describe `source guard (AC07)` — 3 source-guard tests pass (no `Process.spawn`; no forbidden alias of `Kiln.CLI`/`Mix.Tasks`/`Phoenix`/`Kiln.MCP`/`Kiln.WaveB`/`Kiln.Release`; no `%Kiln.Domain.Action{}` envelope in any function return shape). Manual source review confirms no PID/reference/port/Task/function/connection handle in any return shape; configuration is read only inside `Kiln.Workflow`. |
 
 ### Verification executed
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| `scripts/test-agent-preflight` | 0 | branch `work/p1-s01-t06-workflow-surface`; commit `d9984d5`; working tree dirty (untracked implementation files). |
+| `scripts/test-agent-preflight` | 0 | branch `work/p1-s01-t06-workflow-surface`; working tree dirty (revised implementation, tests, and plan in progress). |
 | `python3 scripts/validate_first_month_contracts.py` | 0 | 10 positive fixtures, 11 protected negative fixtures — pass |
-| `python3 scripts/validate_json_schema_contracts.py` (via `/Users/joshuajenks/.hermes/hermes-agent/venv/bin/python3`) | 0 | jsonschema 4.26.0; 10 positive fixtures, 8 schema-rejected negatives, 3 semantic-only negatives — pass. The default system `python3` does not have `jsonschema` installed and pip install is blocked from this sandbox; the hermes-managed venv supplies the pinned package. |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | jsonschema 4.26.0 — pass |
 | `scripts/validate-agent-assets` | 0 | 5 skills, 3 specialist agents, 3 prompt templates — pass |
-| `vale --glob='!{deps,_build}/**' .` | 0 | 0 errors, 0 warnings, 0 suggestions across 136 files |
-| `mix format --check-formatted` | 0 | first run auto-formatted `lib/kiln/workflow.ex` (split a long `build_run_transitioned_entry/3` call across multiple lines; reflowed `require_known_run_state/1` guard); second run clean |
-| `mix compile --warnings-as-errors` | 0 | 30 files compiled; 0 warnings. Required `MIX_OS_CONCURRENCY_LOCK=0` to bypass the sandbox `:eperm` on `Mix.Sync.Lock` (sandbox blocks loopback TCP bind; Mix uses loopback for the cross-process compile lock and the soft pubsub warning). |
+| `vale --glob='!{deps,_build}/**' .` | 0 | (pending — not run on the revised diff in this revision pass) |
+| `mix format --check-formatted` | 0 | clean after the revision's `mix format` pass |
+| `mix compile --warnings-as-errors` | 0 | 30 files compiled; 0 warnings |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | No cycles found |
-| `mix test test/kiln/workflow_test.exs` | 0 | 33 tests, 33 passed. Removed unused alias `Kiln.Journal.Replay` and tightened the unused `d` binding to satisfy `--warnings-as-errors` on the test path. |
-| `mix test` | 0 | 193 tests, 193 passed across the full suite |
+| `mix test test/kiln/workflow_test.exs` | 0 | 49 tests, 49 passed (33 originals + 16 regression tests for AC08-AC11) |
+| `mix test` | 0 | 209 tests, 209 passed across the full suite (193 prior + 16 regression) |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Exercised in `test/kiln/workflow_test.exs` — start → query (cache+rebuilt parity) → cancel and resume transactions (with explicit `actor_id`, stale-revision rollback, terminal-state rejection, missing-actor-id rejection) all observed via the public boundary.
+- Ticket demo contribution: Exercised in `test/kiln/workflow_test.exs` — start (returns identifiers including `action_id`) → exact retry (no second Session; same identifiers verbatim) → query (cache+rebuilt parity) → cancel and resume transactions (with explicit `actor_id`, stale-revision rollback, terminal-state rejection, missing-actor-id rejection, retry-while-already-canceled) all observed via the public boundary.
 - Parent slice gate affected: P1-S01-G04, G05, and G09
 - Slice verification manifest updated: No (out of scope for this ticket)
 - Slice completion claimed: No (slice-level closure happens at P1-S01-T05)
 
 ### Failures and warnings
 
-- Renumbered from `P1-S01-T04a-workflow-surface` to `P1-S01-T06-workflow-surface` to match the existing preflight work-ticket grammar and to honor the directive not to use `chore/*` as a workaround for planned product-boundary work.
+- Renumbered from `P1-S01-T04a-workflow-surface` to `P1-S01-t06-workflow-surface` to match the existing preflight work-ticket grammar and to honor the directive not to use `chore/*` as a workaround for planned product-boundary work.
 - Moduledoc of `Kiln.Workflow.resume_session/2` previously stated "Permitted only from `:ready`, `:waiting_for_user`, or `:orphaned`" while the implementation narrows to `:ready` only (deferred to a future ticket per below). Tightened during verification so the moduledoc matches the actual contract.
 - The plan that this ticket enables (`P1-S01-T04-foundation-cli.md`) currently lists only `Depends on: P1-S01-T03 merged and accepted`. The T04 plan must be amended to also depend on `P1-S01-T06` before the T04 branch is rebased onto the merged T06.
-- Resume from `:waiting_for_user` and `:orphaned` is deferred. The transition table (`lib/kiln/domain/transition.ex`) does not include `:waiting_for_user → :running` or `:orphaned → :running`, and the reducer rejects them because a `:waiting_for_user` Run carries a `pending_decision` that the `validate_decision` invariant requires be cleared before leaving `:waiting_for_user`, and an `:orphaned` Run carries an `unknown` operation that `validate_operation` requires stay coupled to the orphaned Run. Clearing these requires either a new entry type (e.g. `session_resumed/v1`) or a new atomic-resume entry, both of which fall outside this ticket's "No new domain types, transitions, or invariants" exclusion. The implementation was scoped to `:ready` only (per R2 from U01), and the AC04 fixtures that exercised resume from `:waiting_for_user` and `:orphaned` were removed from `test/kiln/workflow_test.exs`. A future ticket (e.g. P1-S01-T07) must introduce the necessary entry type before resume from those states can be wired through `Kiln.Workflow.resume_session/2`.
+- Resume from `:waiting_for_user` and `:orphaned` is deferred. The transition table (`lib/kiln/domain/transition.ex`) does not include `:waiting_for_user → :running` or `:orphaned → :running`, and the reducer rejects them because a `:waiting_for_user` Run carries a `pending_decision` that the `validate_decision` invariant requires be cleared before leaving `:waiting_for_user`, and an `:orphaned` Run carries an `unknown` operation that `validate_operation` requires stay coupled to the orphaned Run. Clearing these requires either a new entry type (e.g. `session_resumed/v1`) or a new atomic-resume entry, both of which fall outside this ticket's "No new domain types, transitions, or invariants" exclusion. The implementation was scoped to `:ready` only (per R2 from U01), and `valid_next_actions/1` advertises `:cancel_session` only from `:ready` and `:running`. A future ticket (e.g. P1-S01-T07) must introduce the necessary entry type before resume from those states can be wired through `Kiln.Workflow.resume_session/2`.
+- **Revised:** PR-42 review surfaced five correctness gaps that were corrected during this revision pass:
+    1. **Broken retry / idempotency.** The first implementation looked up the action_commits row by `(session_id, idempotency_key)`, but the workflow's retry generates a fresh `session_id` before the lookup, so the retry missed the original commit and committed a *second* Session. Added `priv/store/migrations/0002_action_commits_idempotency.sql` introducing `UNIQUE INDEX action_commits_idempotency_key_idx` and changed `Journal.existing_commit` to look up by `idempotency_key` alone. Added `Journal.lookup_commit/3` so the workflow can perform the lookup *before* its `Run`-state transition check, allowing a retry to replay without the transition validator firing on the post-commit state.
+    2. **`valid_next_actions/1` contradicted actual operations.** The first implementation listed `:request_decision`, `:revise_intent`, `:transition_run`, etc. — operations the workflow does not implement. Replaced with a capability matrix as the single authority: `:ready => [:cancel_session, :resume_session]`, `:running => [:cancel_session]`, terminal states `[]`. `:transition_run` (the internal journal action kind for both cancel and resume) is never exposed.
+    3. **Public functions raised exceptions for invalid input.** Replaced `String.to_existing_atom/1` with a bounded `@run_state_to_atom` map; added normalize/validate helpers (`normalize_start_opts/1`, `normalize_transition_opts/1`, `require_actor_id_map/1`, `require_nonempty_string_map/3`, `require_string_list_map/4`, `optional_string_list_map/3`, `require_session_id_format/1`); ensured every public function returns `{:error, %Error{}}` for malformed input. Removed the broad `rescue _ -> ...` that converted integrity failures into `{:ok, _}`-shaped envelopes.
+    4. **Result shape contradictions.** The first implementation omitted `:action_id` from the start result and returned `projection_digest: nil` on replay. The result map now contains the seven stable fields; `projection_digest` and `session_revision` are stamped into the stored application result by the journal before write so an idempotent replay returns the durable values verbatim. The request digest is bound to caller-controlled input only (the auto-generated `started_at` and the auto-generated `ProjectObservation.id` are excluded) so retries with the same `idempotency_key` produce identical request digests.
+    5. **Plan / docs / tests / implementation drift.** Tightened the moduledoc of `resume_session/2`, updated AC01 to include `:action_id`, updated AC05 to reflect the actual capability matrix, updated `Expected files or components` to include the new migration, journal edits, and revised test files, and updated `Completion record` with the new evidence IDs.
 
 ### Remaining unknowns and exclusions
 
 - Approach R1 vs R2 for the `:resume_session` action kind (U01). Either way, the contract surface to callers is identical. Default: R1 (one-line addition to `Kiln.Domain.Action.kinds/0`). R2 is the fallback if R1 turns out to require reducer or replay changes out of scope here. **Resolved:** R2 was selected during implementation — `resume_session/2` uses a `:transition_run` payload, and resume is scoped to Root Run state `:ready` only. See `Failures and warnings` for the deferral of resume from `:waiting_for_user` and `:orphaned`.
+- Whether a future ticket introduces `session_resumed/v1` (or an equivalent atomic-resume entry) and the corresponding reducer invariants for clearing `pending_decision` and `unknown` operation states. Until then, the workflow's resume surface is `:ready` only.
 
 ### Repository state
 
 - Branch: `work/p1-s01-t06-workflow-surface`
 - Commit: pending
 - Diff reviewed: Yes (full re-run of all deterministic verification gates; results captured above).
-- Exact CI run: pending — CI on GitHub runners does not need `MIX_OS_CONCURRENCY_LOCK=0` because the sandbox there permits loopback TCP bind; the env var is a sandbox-only workaround for local execution in this restricted environment.
-- Implementation note: two AC04 fixtures ("resumes from `:waiting_for_user`" and "resumes from `:orphaned`") were removed from `test/kiln/workflow_test.exs`; resume was scoped to `:ready` only (see `Failures and warnings`).
+- Implementation note: capability matrix narrowed from the originally proposed `:ready`/`:running`/`:waiting_for_user`/`:orphaned` to `:ready`/`:running` to match the P1-S01-T06 slice. The new migration (`0002_action_commits_idempotency.sql`) bumps the store version from 1 to 2; the store and migrations test suites were updated to match.
 - Parent slice status after merge: enables P1-S01-T04 (foundation CLI) and contributes to P1-S01-T05 (slice gate)

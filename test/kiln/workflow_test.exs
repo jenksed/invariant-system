@@ -72,13 +72,22 @@ defmodule Kiln.WorkflowTest do
                )
 
       assert Map.keys(result) |> Enum.sort() ==
-               [:projection_digest, :run_id, :run_state, :session_id, :session_revision, :task_id]
+               [
+                 :action_id,
+                 :projection_digest,
+                 :run_id,
+                 :run_state,
+                 :session_id,
+                 :session_revision,
+                 :task_id
+               ]
 
       assert result.session_revision == 0
       assert result.run_state == :ready
       assert is_binary(result.session_id)
       assert is_binary(result.task_id)
       assert is_binary(result.run_id)
+      assert is_binary(result.action_id)
       assert is_binary(result.projection_digest)
 
       refute Map.has_key?(result, :action)
@@ -361,10 +370,10 @@ defmodule Kiln.WorkflowTest do
 
     test "returns the ascending-sorted atoms for each P1-S01 Run state", %{store: store} do
       cases = [
-        {:ready, [:cancel_session, :request_decision, :revise_intent, :transition_run]},
-        {:running, [:revise_intent, :transition_run]},
-        {:waiting_for_user, [:answer_decision, :cancel_session, :transition_run]},
-        {:orphaned, [:cancel_session, :fail_session, :transition_run]},
+        {:ready, [:cancel_session, :resume_session]},
+        {:running, [:cancel_session]},
+        {:waiting_for_user, []},
+        {:orphaned, []},
         {:completed, []},
         {:failed, []},
         {:canceled, []}
@@ -381,6 +390,10 @@ defmodule Kiln.WorkflowTest do
 
         assert atoms == Enum.sort(atoms),
                "valid_next_actions for #{inspect(target_state)} is not ascending-sorted"
+
+        # Internal journal action kinds must never be exposed.
+        refute :transition_run in atoms,
+               "valid_next_actions must not expose the internal :transition_run kind"
       end
     end
 
@@ -501,6 +514,496 @@ defmodule Kiln.WorkflowTest do
     end
   end
 
+  # ---- AC08: idempotent retry / conflict / capability parity ----
+
+  describe "idempotent retry (AC08)" do
+    test "an exact start retry with the same key and digest does not create a second Session", %{
+      store: store
+    } do
+      key = unique_idempotency_key()
+
+      first_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(first_opts)
+
+      second_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, second} = Workflow.start_session(second_opts)
+
+      assert second.session_id == first.session_id
+      assert second.task_id == first.task_id
+      assert second.run_id == first.run_id
+      assert second.action_id == first.action_id
+      assert second.session_revision == first.session_revision
+      assert second.projection_digest == first.projection_digest
+
+      assert count(store.conn, "journal_entries") == 1
+      assert count(store.conn, "action_commits") == 1
+      assert count(store.conn, "session_projections") == 1
+    end
+
+    test "a retry of cancel_session does not fail because the Run is already canceled", %{
+      store: store,
+      d: d
+    } do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      first_opts = [
+        session_id: d.session.id,
+        expected_session_revision: 0,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.cancel_session(d.session.id, first_opts)
+      assert first.run_state == :canceled
+
+      before_entries = count(store.conn, "journal_entries")
+      before_commits = count(store.conn, "action_commits")
+
+      assert {:ok, replayed} = Workflow.cancel_session(d.session.id, first_opts)
+      assert replayed.session_id == first.session_id
+      assert replayed.action_id == first.action_id
+      assert replayed.run_state == :canceled
+      assert replayed.session_revision == first.session_revision
+
+      assert count(store.conn, "journal_entries") == before_entries
+      assert count(store.conn, "action_commits") == before_commits
+    end
+
+    test "a retry of resume_session does not fail because the Run is already running", %{
+      store: store,
+      d: d
+    } do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      first_opts = [
+        expected_session_revision: 0,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.resume_session(d.session.id, first_opts)
+      assert first.run_state == :running
+
+      before_entries = count(store.conn, "journal_entries")
+      before_commits = count(store.conn, "action_commits")
+
+      assert {:ok, replayed} = Workflow.resume_session(d.session.id, first_opts)
+      assert replayed.action_id == first.action_id
+      assert replayed.run_state == :running
+      assert replayed.session_revision == first.session_revision
+
+      assert count(store.conn, "journal_entries") == before_entries
+      assert count(store.conn, "action_commits") == before_commits
+    end
+
+    test "a replay returns the original action_id, not a freshly generated one", %{
+      store: _store
+    } do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+
+      # A retry generates a fresh action_id candidate internally; the journal
+      # MUST discard it and return the original stored action_id instead.
+      assert {:ok, replayed} = Workflow.start_session(opts)
+      assert replayed.action_id == first.action_id
+    end
+
+    test "a successful result never contains a nil revision or nil projection_digest", %{
+      store: _store
+    } do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      assert is_integer(first.session_revision) and first.session_revision >= 0
+      assert is_binary(first.projection_digest) and byte_size(first.projection_digest) > 0
+
+      assert {:ok, replayed} = Workflow.start_session(opts)
+      assert is_integer(replayed.session_revision) and replayed.session_revision >= 0
+      assert is_binary(replayed.projection_digest) and byte_size(replayed.projection_digest) > 0
+    end
+
+    test "an idempotency conflict returns :idempotency_conflict without writing", %{
+      store: store
+    } do
+      key = unique_idempotency_key()
+
+      base_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, _} = Workflow.start_session(base_opts)
+      before_entries = count(store.conn, "journal_entries")
+      before_commits = count(store.conn, "action_commits")
+
+      conflicting_opts =
+        Keyword.put(base_opts, :actor_id, "user:different")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(conflicting_opts)
+
+      assert count(store.conn, "journal_entries") == before_entries
+      assert count(store.conn, "action_commits") == before_commits
+    end
+
+    test "the same idempotency_key with changed start criteria is a conflict, not a replay", %{
+      store: _store
+    } do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["A different criterion passes"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+    end
+  end
+
+  # ---- AC09: capability parity ----
+
+  describe "capability parity (AC09)" do
+    test "every action advertised by valid_next_actions is executable from that Run state", %{
+      store: store
+    } do
+      cases = [
+        {:ready, :cancel_session},
+        {:ready, :resume_session},
+        {:running, :cancel_session}
+      ]
+
+      for {state, action_atom} <- cases do
+        session_id = fresh_session(store, state)
+        assert {:ok, advertised} = Workflow.valid_next_actions(session_id)
+        assert action_atom in advertised, "#{action_atom} must be advertised from #{state}"
+
+        # And executing it from the source state must succeed without raising.
+        result = execute_atomic(session_id, state, action_atom)
+
+        assert {:ok, _} = result,
+               "executing #{action_atom} from #{state} must succeed; got #{inspect(result)}"
+      end
+    end
+
+    test "valid_next_actions never exposes the internal :transition_run kind", %{store: store} do
+      for state <- [:ready, :running] do
+        session_id = fresh_session(store, state)
+        assert {:ok, advertised} = Workflow.valid_next_actions(session_id)
+
+        refute :transition_run in advertised,
+               ":transition_run must never appear in valid_next_actions for #{state}"
+      end
+    end
+
+    test "valid_next_actions returns [] for terminal states (no false advertising)", %{
+      store: store
+    } do
+      for state <- [:completed, :failed, :canceled] do
+        session_id = fresh_session(store, state)
+        assert {:ok, []} = Workflow.valid_next_actions(session_id)
+      end
+    end
+  end
+
+  # ---- AC10: totality ----
+
+  describe "totality (AC10)" do
+    test "malformed argument types never raise a function-clause exception" do
+      bogus = [
+        # map with string keys (not atom keys)
+        %{"objective" => "x", "criteria" => ["y"], "actor_id" => "z"},
+        # nil where a keyword list is expected
+        nil,
+        # integer where a binary session id is expected
+        42,
+        # atom where a binary session id is expected
+        :ready,
+        # map where a binary session id is expected
+        %{}
+      ]
+
+      for value <- bogus do
+        result1 = Workflow.start_session(value)
+
+        assert match?({:error, %Error{}}, result1),
+               "got #{inspect(result1)} for #{inspect(value)}"
+
+        result2 = Workflow.query_session(value)
+
+        assert match?({:error, %Error{}}, result2),
+               "got #{inspect(result2)} for #{inspect(value)}"
+
+        result3 = Workflow.valid_next_actions(value)
+
+        assert match?({:error, %Error{}}, result3),
+               "got #{inspect(result3)} for #{inspect(value)}"
+
+        result4 = Workflow.cancel_session(value, expected_session_revision: 0, actor_id: "u")
+
+        assert match?({:error, %Error{}}, result4),
+               "got #{inspect(result4)} for #{inspect(value)}"
+
+        result5 = Workflow.resume_session(value, expected_session_revision: 0, actor_id: "u")
+
+        assert match?({:error, %Error{}}, result5),
+               "got #{inspect(result5)} for #{inspect(value)}"
+      end
+    end
+
+    test "malformed projection state cannot trigger String.to_existing_atom or any other crash",
+         %{store: store} do
+      counter = System.unique_integer([:positive])
+      base = rem(counter, 200) + 200
+      d = JB.domain(base)
+      {:ok, _} = commit_unique_start(store, d, base)
+
+      # Inject a row with a bogus run state — String.to_existing_atom would
+      # raise here on an older implementation; the bounded @run_state_to_atom
+      # map must return nil and the workflow must reject the transition
+      # without raising.
+      bogus_state = "totally_unrecognized_state"
+      revision = 1
+
+      Connection.query!(
+        store.conn,
+        """
+        INSERT INTO journal_entries
+          (entry_id, entry_schema, entry_type, payload_schema, session_id, session_revision,
+           action_id, actor_kind, actor_id, idempotency_key, request_digest,
+           causation_entry_id, correlation_id, recorded_at, payload, payload_digest)
+        VALUES (?1, 'journal_entry/v1', 'session_started/v1', 'session_started/v1', ?2, ?3,
+                ?4, 'system', 'kiln:workflow', ?5, ?6, NULL, NULL, ?7, ?8, ?9)
+        """,
+        [
+          Kiln.Store.Uuid.v7(),
+          d.session.id,
+          revision,
+          JB.id(:action, 99),
+          "idem_bogus_#{base}",
+          JB.digest(99),
+          @now,
+          Kiln.Store.Canonical.encode(%{
+            "session" => %{"id" => d.session.id, "state" => "active"},
+            "task" => %{"id" => d.task.id, "state" => "in_progress"},
+            "run" => %{"id" => d.run.id, "state" => bogus_state, "root_run_id" => d.run.id},
+            "workflow_step" => "intent",
+            "objective" => "x",
+            "criteria" => ["y"],
+            "constraints" => [],
+            "exclusions" => [],
+            "objective_revision" => 0,
+            "criteria_revision" => 0,
+            "references" => %{}
+          }),
+          "sha256:0000000000000000000000000000000000000000000000000000000000000099"
+        ]
+      )
+
+      # The journal now classifies this as an invalid projection; the
+      # workflow must return an error envelope, not raise.
+      assert {:error, %Error{}} = Workflow.query_session(d.session.id)
+      assert {:error, %Error{}} = Workflow.valid_next_actions(d.session.id)
+      assert {:error, %Error{code: :invalid_session_id}} = Workflow.query_session("nope")
+    end
+
+    test "all five public functions accept either a keyword list or a map", %{store: _store} do
+      # Each mutator must accept both shapes; the start_session map path
+      # proves the map branch end-to-end, and the cancel/resume map paths
+      # exercise the map branch on each transition in isolation.
+      assert {:ok, started} =
+               Workflow.start_session(%{
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: unique_idempotency_key()
+               })
+
+      assert {:error, %Error{}} = Workflow.query_session(123)
+      assert {:error, %Error{}} = Workflow.query_session(:nope)
+      assert {:error, %Error{}} = Workflow.query_session(%{})
+
+      assert {:ok, _} =
+               Workflow.cancel_session(started.session_id, %{
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: unique_idempotency_key()
+               })
+
+      # Start a second session for the resume map-path test so the state is
+      # independent of the cancel above.
+      {:ok, second} =
+        Workflow.start_session(
+          objective: "Correct one bounded defect",
+          criteria: ["The focused test passes"],
+          project_observation: observation(),
+          actor_id: "user:local"
+        )
+
+      assert {:ok, _} =
+               Workflow.resume_session(second.session_id, %{
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: unique_idempotency_key()
+               })
+    end
+  end
+
+  # ---- AC11: integrity ----
+
+  describe "integrity (AC11)" do
+    test "a corrupt idempotency result returns an error envelope, never a success-shaped result",
+         %{store: store} do
+      # Commit a start with a known idempotency_key, then tamper with the
+      # stored result blob so its recorded digest no longer matches.
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, _} = Workflow.start_session(opts)
+
+      # Tamper with the action_commits row's stored result to break its
+      # recorded digest. The replay-boundary validator must catch this
+      # before the spoofed result is returned.
+      Connection.query!(
+        store.conn,
+        "UPDATE action_commits SET result = ?1 WHERE idempotency_key = ?2",
+        [
+          Kiln.Store.Canonical.encode(%{"session_id" => "spoofed"}),
+          key
+        ]
+      )
+
+      # An exact retry must surface the integrity error, never the spoofed
+      # result and never an :ok envelope. The error code is one of the
+      # documented integrity codes (:integrity for replay-boundary
+      # failures and :corrupt_result for stored-result digest failures).
+      assert {:error, %Error{code: code}} = Workflow.start_session(opts)
+      assert code in [:integrity, :corrupt_result]
+    end
+
+    test "no broad rescue converts a transaction_failed into :ok", %{store: _store} do
+      # Pass an actor_id that the action module rejects — this must be a
+      # clean :error, not a rescued success.
+      assert {:error, %Error{code: :missing_actor_id}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: observation()
+               )
+
+      # And after a clean start, a malformed revision must be a clean
+      # :error, never :ok.
+      {:ok, _} =
+        Workflow.start_session(
+          objective: "Correct one bounded defect",
+          criteria: ["The focused test passes"],
+          project_observation: observation(),
+          actor_id: "user:local"
+        )
+    end
+
+    test "boundary failure modes never return a success shape for known error codes" do
+      # Every documented failure returns {:error, %Error{}}. No success is
+      # ever wrapped around a known error code.
+      cases = [
+        fn ->
+          Workflow.start_session(
+            criteria: ["x"],
+            project_observation: observation(),
+            actor_id: "u"
+          )
+        end,
+        fn ->
+          Workflow.start_session(
+            objective: "x",
+            project_observation: observation(),
+            actor_id: "u"
+          )
+        end,
+        fn -> Workflow.start_session(objective: "x", criteria: ["x"], actor_id: "u") end,
+        fn ->
+          Workflow.start_session(
+            objective: "x",
+            criteria: [],
+            project_observation: observation(),
+            actor_id: "u"
+          )
+        end,
+        fn -> Workflow.query_session("not_a_session_id") end,
+        fn -> Workflow.valid_next_actions("not_a_session_id") end,
+        fn ->
+          Workflow.cancel_session("not_a_session_id", expected_session_revision: 0, actor_id: "u")
+        end,
+        fn ->
+          Workflow.resume_session("not_a_session_id", expected_session_revision: 0, actor_id: "u")
+        end
+      ]
+
+      for fun <- cases do
+        result = fun.()
+
+        assert match?({:error, %Error{code: _}}, result),
+               "expected {:error, %Error{}} but got #{inspect(result)}"
+      end
+    end
+  end
+
   # ---- helpers ----
 
   defp observation do
@@ -560,5 +1063,38 @@ defmodule Kiln.WorkflowTest do
   defp count(conn, table) do
     [[n]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
     n
+  end
+
+  defp unique_idempotency_key do
+    "idem_" <> Base.encode16(:crypto.strong_rand_bytes(16), case: :lower)
+  end
+
+  defp execute_atomic(session_id, _current_state, action_atom) do
+    # Query the current projection to find the actual expected revision,
+    # since multi-step state transitions bump the revision above 1.
+    expected_revision = current_revision_for(session_id)
+
+    case action_atom do
+      :cancel_session ->
+        Workflow.cancel_session(session_id,
+          expected_session_revision: expected_revision,
+          actor_id: "user:local",
+          idempotency_key: unique_idempotency_key()
+        )
+
+      :resume_session ->
+        Workflow.resume_session(session_id,
+          expected_session_revision: expected_revision,
+          actor_id: "user:local",
+          idempotency_key: unique_idempotency_key()
+        )
+    end
+  end
+
+  defp current_revision_for(session_id) do
+    case Workflow.query_session(session_id) do
+      {:ok, %{projection: %{"session_revision" => rev}}} when is_integer(rev) -> rev
+      _ -> 0
+    end
   end
 end

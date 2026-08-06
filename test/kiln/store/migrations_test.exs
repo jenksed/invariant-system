@@ -15,10 +15,10 @@ defmodule Kiln.Store.MigrationsTest do
   end
 
   test "applies the initial migration on a fresh store", %{conn: conn} do
-    assert {:ok, %{version: 1, applied_now: [1]}} =
+    assert {:ok, %{version: 2, applied_now: [1, 2]}} =
              Migrations.migrate(conn, now: "2026-07-29T00:00:00Z")
 
-    assert Migrations.current_version(conn) == 1
+    assert Migrations.current_version(conn) == 2
 
     tables =
       conn
@@ -34,17 +34,20 @@ defmodule Kiln.Store.MigrationsTest do
 
   test "records the file checksum for an applied migration", %{conn: conn} do
     {:ok, _} = Migrations.migrate(conn, now: "2026-07-29T00:00:00Z")
-    {:ok, [migration]} = Migrations.discover()
+    {:ok, [_migration_1, migration_2]} = Migrations.discover()
 
-    assert [[1, checksum]] =
-             Connection.query!(conn, "SELECT version, checksum FROM schema_migrations")
+    rows =
+      conn
+      |> Connection.query!("SELECT version, checksum FROM schema_migrations ORDER BY version")
+      |> Enum.map(&List.to_tuple/1)
 
-    assert checksum == migration.checksum
+    assert {2, checksum} = List.last(rows)
+    assert checksum == migration_2.checksum
   end
 
   test "is idempotent when already current", %{conn: conn} do
     {:ok, _} = Migrations.migrate(conn, now: "2026-07-29T00:00:00Z")
-    assert {:ok, %{version: 1, applied_now: []}} = Migrations.migrate(conn)
+    assert {:ok, %{version: 2, applied_now: []}} = Migrations.migrate(conn)
   end
 
   test "blocks when the bundled migration set is absent", %{conn: conn, dir: dir} do
