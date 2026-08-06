@@ -1,0 +1,26 @@
+{
+  "schema": "kiln.quality.evidence_contribution/v1alpha1",
+  "id": "econ_example",
+  "claim_id": "claim_cancel_children",
+  "observation_id": "obs_exunit",
+  "subject_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "method": "registered_command",
+  "disposition": "supports",
+  "guarantee": "empirical",
+  "scope": [
+    "executed ExUnit examples",
+    "one macOS environment"
+  ],
+  "assumptions": [
+    "The test exercises the accepted cancellation path."
+  ],
+  "completeness": "complete",
+  "freshness": "current",
+  "contradiction": "none",
+  "artifact_references": [
+    "art_exunit_stdout"
+  ],
+  "limitations": [
+    "The result does not prove all possible process schedules."
+  ]
+}

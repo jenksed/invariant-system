@@ -1,0 +1,32 @@
+{
+  "schema": "kiln.quality.finding/v1alpha1",
+  "occurrence_id": "focc_example",
+  "stable_id": "find_example",
+  "fingerprint_version": 1,
+  "inspection_id": "elixir.compiler.undefined_function",
+  "producer": {
+    "pack_id": "kiln.elixir",
+    "pack_version": "0.1.0",
+    "parser_version": "0.1.0",
+    "tool_id": "elixir",
+    "tool_version": "1.20.2"
+  },
+  "rule_id": "compiler.undefined_function",
+  "category": "correctness",
+  "severity": "error",
+  "path": "lib/kiln/example.ex",
+  "range": {
+    "start_line": 42,
+    "start_column": 7,
+    "end_line": 42,
+    "end_column": 18
+  },
+  "semantic_anchor": "Kiln.Example.run/1",
+  "message": "undefined function missing/1",
+  "message_class": "undefined_function",
+  "exact_fingerprint": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "structural_fingerprint": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "subject_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "classification": "introduced",
+  "source_artifact_id": "art_stderr"
+}
