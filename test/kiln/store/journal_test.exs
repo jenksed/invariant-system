@@ -2,6 +2,7 @@ defmodule Kiln.Store.JournalTest do
   use ExUnit.Case, async: true
 
   alias Kiln.Domain.{Action, ProjectObservation, Session}
+  alias Kiln.Journal.Replay
   alias Kiln.Store
   alias Kiln.Store.{Connection, Journal}
 
@@ -250,27 +251,47 @@ defmodule Kiln.Store.JournalTest do
   describe "independent SQLite connection contention" do
     test "two independent Store connections to the same DB file produce exactly one Session",
          ctx do
-      # Open a second, independent Store connection to the same DB
-      # file the test setup opened. task_a calls Journal.commit on
-      # `ctx.conn` (the setup connection); task_b calls Journal.commit
-      # on `second_store.conn` (the additional connection). They use
-      # DIFFERENT conns — neither task shares the other task's
-      # DBConnection process or Exqlite handle. SQLite's file-level
-      # writer-lock serialization is the only mechanism coordinating
-      # them; there is no Elixir- or DBConnection-level ordering to
-      # fall back on. This is the architecture-level proof of the
-      # one-Session invariant.
+      # This test is sensitive to removal or breakage of the **global**
+      # one-Session guard. It constructs two DISTINCT start candidates
+      # (different Session/Task/Run IDs, different action IDs, different
+      # idempotency keys, different request digests) and races them
+      # across two independent SQLite connections. Without the global
+      # precondition, both candidates are independently valid; the
+      # only thing that prevents both from committing is
+      # `Journal.commit`'s `:no_existing_session` check inside the
+      # first writer's `BEGIN IMMEDIATE` transaction.
       #
-      # The previous version of this test mistakenly had both tasks
-      # call `attempt_commit(second_store.conn, ...)`, which only
-      # exercised DBConnection-level serialization on a single conn
-      # and did not exercise SQLite file-level locking.
+      # Earlier versions of this test reused the setup's session/task/
+      # run IDs for both contenders, which meant the reducer's own
+      # `:session_already_started` rejection could mask a missing
+      # precondition. With distinct IDs the precondition is the sole
+      # one-Session gate.
       path = ctx.path
 
       {:ready, second_store} =
         Store.start(path: path, store_id: "store_writer_b", now: @now)
 
       try do
+        domain_a = build_distinct_domain(byte_a())
+        domain_b = build_distinct_domain(byte_b())
+        action_a = build_distinct_start_action(domain_a, idem(41), @digest_a, 41)
+        action_b = build_distinct_start_action(domain_b, idem(42), @digest_b, 42)
+
+        # Distinctness assertions — every important identity must
+        # actually differ between the two candidates. Earlier versions
+        # of this test reused byte_size(domain.session.id) for both
+        # action IDs, which silently collided because every Session ID
+        # is the same length. These assertions turn that ambiguity
+        # into a hard tripwire.
+        refute domain_a.session.id == domain_b.session.id
+        refute domain_a.task.id == domain_b.task.id
+        refute domain_a.run.id == domain_b.run.id
+        refute action_a.id == action_b.id
+        refute action_a.idempotency_key == action_b.idempotency_key
+        refute action_a.request_digest == action_b.request_digest
+        entries_a = build_distinct_start_entries(domain_a)
+        entries_b = build_distinct_start_entries(domain_b)
+
         # Both tasks register readiness with the parent, then wait
         # for `:go`. The parent releases both simultaneously so the
         # scheduler order does not decide the race — only the SQLite
@@ -284,7 +305,14 @@ defmodule Kiln.Store.JournalTest do
             send(parent, {:ready, self(), barrier_a})
 
             receive do
-              :go -> attempt_commit(ctx.conn, ctx, idem(31), @digest_a, barrier_a)
+              :go ->
+                Journal.commit(
+                  ctx.conn,
+                  action_a,
+                  entries_a,
+                  now: @now,
+                  precondition: :no_existing_session
+                )
             end
           end)
 
@@ -293,7 +321,14 @@ defmodule Kiln.Store.JournalTest do
             send(parent, {:ready, self(), barrier_b})
 
             receive do
-              :go -> attempt_commit(second_store.conn, ctx, idem(32), @digest_b, barrier_b)
+              :go ->
+                Journal.commit(
+                  second_store.conn,
+                  action_b,
+                  entries_b,
+                  now: @now,
+                  precondition: :no_existing_session
+                )
             end
           end)
 
@@ -315,25 +350,66 @@ defmodule Kiln.Store.JournalTest do
         successes = Enum.filter(outcomes, &match?({:ok, _}, &1))
         rejections = Enum.filter(outcomes, &match?({:error, _}, &1))
 
-        # Exactly one commit, exactly one rejection. Acceptable
-        # second-writer rejections are `:session_already_exists`
-        # (the precondition path) or a typed `:busy` / `:store_busy`
-        # (if the accepted two-second busy timeout expires before the
-        # first writer commits — still safe from the invariant's
-        # perspective because no second Session is durably created).
-        # The invariant is "never two committed first Sessions";
-        # the exact second-writer failure code is not the assertion.
+        # Exactly one commit, exactly one rejection.
         assert length(successes) == 1,
-               "exactly one independent-connection start must commit; got #{inspect(outcomes)}"
+               "exactly one distinct-candidate start must commit; got #{inspect(outcomes)}"
 
         assert length(rejections) == 1,
-               "exactly one independent-connection start must be rejected; got #{inspect(outcomes)}"
+               "exactly one distinct-candidate start must be rejected; got #{inspect(outcomes)}"
 
-        [{:error, %Kiln.Store.Error{}}] = rejections
+        # The losing rejection is constrained to one of two typed Store
+        # errors, AND the class/code pair must match exactly. Anything
+        # else (e.g. an :integrity, :unknown, :io error, or a crossed
+        # class/code pair such as :precondition/:store_busy) would
+        # mean a regression in the durable invariant path rather than
+        # a benign timeout.
+        [{:error, %Kiln.Store.Error{} = rejection}] = rejections
 
-        # Read durable counts via the test-setup connection. Both
-        # connections see the same committed state once the IMMEDIATE
-        # locks release.
+        assert match?(
+                 %Kiln.Store.Error{
+                   class: :precondition,
+                   code: :session_already_exists
+                 },
+                 rejection
+               ) or
+                 match?(
+                   %Kiln.Store.Error{
+                     class: :busy,
+                     code: :store_busy
+                   },
+                   rejection
+                 ),
+               "the losing rejection must be exactly :precondition/:session_already_exists " <>
+                 "(the precondition path observed the first writer's session inside its own " <>
+                 "IMMEDIATE transaction) or :busy/:store_busy (the accepted two-second busy " <>
+                 "timeout expired before the first writer committed); got #{inspect(rejection)}"
+
+        # The durable Session ID is exactly the winner's candidate ID.
+        [{:ok, %{projection: %{"session" => %{"id" => winner_session_id}}}} | _] = successes
+
+        all_session_ids =
+          Connection.query!(
+            ctx.conn,
+            "SELECT session_id FROM journal_entries"
+          )
+          |> List.flatten()
+
+        assert all_session_ids == [winner_session_id],
+               "exactly one Session ID must persist and match the winner; got #{inspect(all_session_ids)}"
+
+        # Redundant authoritative proof via Replay.sessions/1: the
+        # Store's session enumeration must see exactly one session
+        # matching the winner's candidate ID. This guards against any
+        # SQL-level proof becoming stale (e.g. if the projection
+        # column moved or the row was duplicated in a regression).
+        {:ok, replayed_sessions} =
+          Replay.sessions(ctx.conn) |> then(&{:ok, &1})
+
+        assert replayed_sessions == [winner_session_id],
+               "Replay.sessions must see exactly the winner's candidate ID; " <>
+                 "got #{inspect(replayed_sessions)}"
+
+        # Read durable counts via the test-setup connection.
         entries_count = count(ctx.conn, "journal_entries")
         commits_count = count(ctx.conn, "action_commits")
         projections_count = count(ctx.conn, "session_projections")
@@ -352,13 +428,97 @@ defmodule Kiln.Store.JournalTest do
     end
   end
 
-  defp attempt_commit(conn, ctx, idem_byte, digest, _barrier) do
-    {:ok, action} = start_action(ctx, idem_byte, digest)
+  defp byte_a, do: 41
+  defp byte_b, do: 42
 
-    Journal.commit(conn, action, start_entries(ctx),
-      now: @now,
-      precondition: :no_existing_session
-    )
+  # Build a deterministic but distinct domain struct for the
+  # cross-connection test. Different entropy bytes produce different
+  # Session, Task, and Run identifiers, so two candidates racing the
+  # same DB file would both be independently valid if the precondition
+  # were removed.
+  defp build_distinct_domain(byte) do
+    entropy = fn 16 -> :binary.copy(<<byte>>, 16) end
+
+    {:ok, po} =
+      ProjectObservation.new(
+        %{
+          repository_root: "/tmp/kiln-fixture-#{byte}",
+          repository_fingerprint:
+            "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+          observed_at: @at
+        },
+        entropy
+      )
+
+    {:ok, %{session: session, task: task, run: run}} =
+      Session.start(
+        %{
+          project_observation: po,
+          objective: "Concurrent start candidate #{byte}",
+          criteria: ["Passes"],
+          constraints: [],
+          exclusions: [],
+          started_at: @at
+        },
+        entropy_source: entropy
+      )
+
+    %{session: session, task: task, run: run}
+  end
+
+  defp build_distinct_start_action(domain, idempotency_key, digest, action_byte) do
+    {:ok, action} =
+      Action.new(%{
+        # Distinct entropy byte per candidate. The earlier
+        # `id(:action, 50 + byte_size(domain.session.id))` produced the
+        # same byte for both candidates because every Session ID is
+        # `ses_` + 32 hex chars (same length), so both candidates
+        # would collide on `action_commits.action_id` — a global
+        # primary key. The precondition test must still pass with
+        # truly independent action IDs so the global one-Session guard
+        # is the sole reason the second commit fails.
+        id: id(:action, action_byte),
+        session_id: domain.session.id,
+        run_id: domain.run.id,
+        expected_session_revision: 0,
+        idempotency_key: idempotency_key,
+        actor_kind: :local_user,
+        actor_id: "user:local",
+        kind: :start_session,
+        request_digest: digest,
+        payload: %{},
+        causation_action_id: nil,
+        correlation_id: nil,
+        requested_at: @at
+      })
+
+    action
+  end
+
+  defp build_distinct_start_entries(domain) do
+    [
+      %{
+        type: "session_started/v1",
+        payload_schema: "session_started/v1",
+        payload: %{
+          "session" => %{"id" => domain.session.id, "state" => "active"},
+          "task" => %{"id" => domain.task.id, "state" => "in_progress"},
+          "run" => %{
+            "id" => domain.run.id,
+            "state" => "ready",
+            "root_run_id" => domain.run.root_run_id
+          },
+          "workflow_step" => "intent",
+          "objective" => domain.session.objective,
+          "criteria" => domain.task.criteria,
+          "constraints" => domain.task.constraints,
+          "exclusions" => domain.task.exclusions,
+          "objective_revision" => domain.session.revision,
+          "criteria_revision" => domain.session.criteria_revision,
+          "references" => %{"project_observation_id" => domain.session.project_observation_id}
+        }
+      }
+    ]
   end
 
   # -- helpers --

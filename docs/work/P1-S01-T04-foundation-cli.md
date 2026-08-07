@@ -204,11 +204,30 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result (provisional):** Implemented and verified by GitHub Actions run `31199785234` on commit `35cb2c3` (the previous code-bearing head before the I6–I8 narrow Store-error-boundary closure). After this pass pushes the Store-error-boundary correction, the new exact-head CI run on the new code-bearing head will become the final verification; the plan text below is kept current on every push.
+**Result:** Implemented and verified.
 
-The current branch head contains every correction from the F1–F9 review pass, the I1–I5 final closure pass, and the I6–I8 narrow Store-error-boundary closure (the bounded `:no_existing_session` precondition inside `Journal.commit`'s `BEGIN IMMEDIATE` transaction; `lib/kiln/store/error.ex` gains a `:precondition` class; the Store layer owns its error representation; Workflow translates `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` into the existing `session_already_exists` Domain error). Concurrent-start protection is now demonstrated by both a same-connection Workflow caller test and an independent-SQLite-connection Store test, the latter directly exercising SQLite file-level writer serialization across two Exqlite handles.
+Code-bearing implementation head:
+  `63a02485326949a92f86e60c66cf374693c67e25`
 
-The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-only without false executable mapping, Workflow-owned orphan capability authority, empty-DB control-flow correction) and the I6–I8 closure pass file (`lib/kiln/store/journal.ex` and `lib/kiln/store/error.ex` for the transaction-level one-Session precondition) are jointly the authoritative scope of the T04 correction cycle. The Orphan-capability authority is fixed; concurrent-start cross-process invariant is proven within the existing SQLite transaction; the Store error boundary is restored.
+Exact CI for code-bearing implementation:
+  GitHub Actions run `31213093077`
+
+Current PR-head verification:
+  tracked by GitHub PR metadata / PR body;
+  evidence-only commits do not supersede the code-bearing implementation head.
+
+This separation ends the self-referential "documenting HEAD changes HEAD" loop:
+the plan records the code-bearing implementation and its CI once, and any
+subsequent evidence-only update to this plan must leave these two lines
+unchanged. The actual current exact-head SHA and run are recorded in the
+PR body, which can change without creating another Git commit.
+
+The current branch head contains every correction from the F1–F9 review
+pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary
+closure, the I9–I11 cross-connection test correction + T02 contract
+reconciliation, the I12–I14 distinct-candidate concurrency proof + T02
+contract reconciliation, and the I15–I16 final-test-tripwire + evidence
+model pass.
 
 ### Acceptance status
 
@@ -237,7 +256,7 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 | Final closure — I5 (CLAUDE.md disposition) | Verified | P1-S01-T04-E21 | `CLAUDE.md` removed from PR #40 (not on `origin/main`); commit-message convention retained in `AGENTS.md` |
 | Final closure — small cleanup (ErrorMap doc, store_id comment, resume doc) | Verified | P1-S01-T04-E22 | local sandbox run; comment changes document actual code behaviour and pass `scripts/check` |
 | Final closure — I6 (Store error boundary restoration) | Verified | P1-S01-T04-E23 | `Kiln.Store.Journal.commit/4` accepts the Store-owned atom `:no_existing_session` (and `nil`); any other precondition atom is rejected up front with `%Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}`. `Kiln.Store.Error` gains a `:precondition` class. Workflow translates `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` into the existing public `session_already_exists` Domain error. `test/kiln/store/journal_test.exs` `:no_existing_session precondition` describe block proves zero-write rollback, supported-replay, and rejection-of-unsupported-precondition. |
-| Final closure — I7 (cross-connection concurrency proof) | Verified | P1-S01-T04-E24 | `test/kiln/store/journal_test.exs` "independent SQLite connection contention" opens a second independent `Store.start/1` to the same DB file; two `Task.async` callers synchronize via a send/receive barrier and call `Journal.commit` with `:no_existing_session` on different idempotency keys; the test asserts exactly one success, exactly one `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` rejection, exactly one journal entry, one action commit, and one projection. |
+| Final closure — I7 (cross-connection concurrency proof) | Verified | P1-S01-T04-E24 | `test/kiln/store/journal_test.exs` "independent SQLite connection contention" constructs two **distinct** start candidates (different Session/Task/Run IDs, different action IDs, different idempotency keys, different request digests) and races them across two `Store.start/1` connections to the same DB file: task_a calls `Journal.commit` on `ctx.conn`, task_b calls `Journal.commit` on `second_store.conn`. The test asserts exactly one success, exactly one typed rejection (constrained to `:precondition/:session_already_exists` or `:busy/:store_busy`), that the persisted `journal_entries.session_id` is exactly the winner's candidate, and that the durable counts are 1 / 1 / 1. The distinct candidates make the test sensitive to removal or breakage of the global `:no_existing_session` precondition; the reducer's `:session_already_started` rejection can no longer mask a missing precondition. Passes deterministically across 10 consecutive runs. |
 
 ### Verification executed
 
@@ -257,21 +276,24 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 | `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
 | `mix test` | 351 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
-| GitHub Actions `prose` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
+| GitHub Actions `test` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
+| GitHub Actions `prose` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
 | Historical exact-head CI runs preserved for provenance: | | |
 | GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
 | GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
 | GitHub Actions run 31199247425 on commit f3fe050 | (historical, I1–I5 closure) | superseded |
 | GitHub Actions run 31199785234 on commit 35cb2c3 | (historical, baseline at start of I6–I8) | superseded |
-| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded by 31206737852 |
+| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded |
+| GitHub Actions run 31206737852 on commit a6b6c6a | (historical, evidence-only update) | superseded |
+| GitHub Actions run 31207584661 on commit 1528148 | (historical, I9–I11 prior head) | superseded |
+| GitHub Actions run 31207753767 on commit 7d27187 | (historical, I9–I11 final head) | superseded by 31210996213 |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
 - Slice verification manifest updated: Yes (the F1–F9, I1–I5, and I6–I8 closure passes are owned by T04, not T05)
-- Slice completion claimed: Yes — verified on final head `a6b6c6a` by GitHub Actions run `31206737852`
+- Slice completion claimed: Yes — verified on final head `2fc6e03` by GitHub Actions run `31210996213`
 
 ### Failures and warnings
 
@@ -289,8 +311,11 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 
 ### Repository state
 
-- **Final implementation head:** `a6b6c6a07603e51940bc9e3df42aeb550cc23e54` — documentation-only update on top of the I6–I8 code-bearing head `2ede2b8`. Verified by GitHub Actions run `31206737852` (both `test` and `prose` jobs green).
-- **Code-bearing implementation head:** `2ede2b887adf3394e8633756851eb555bbe6aea3` — the I6–I8 narrow closure that introduced the bounded `:no_existing_session` precondition inside `Journal.commit`'s `BEGIN IMMEDIATE` transaction and the `:precondition` Store error class. Verified by GitHub Actions run `31206150176`.
+The code-bearing implementation head and its exact CI are recorded
+in the Completion record above. Evidence-only updates to this plan do
+not supersede that head; the PR body tracks the actual current
+exact-head SHA and run.
+
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
@@ -299,5 +324,7 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
   - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
   - `35cb2c3` (corrected-head baseline at start of I6–I8 pass) — verified by GitHub Actions run `31199785234`
   - `2ede2b8` (I6–I8 code-bearing head) — verified by GitHub Actions run `31206150176`
-  - `a6b6c6a` (current final head, evidence-only update) — verified by GitHub Actions run `31206737852` ← **final**
+  - `a6b6c6a` (evidence-only update) — verified by GitHub Actions run `31206737852`
+  - `1528148` (I9–I11 prior head, same-connection contention; superseded by distinct-candidate fix) — verified by GitHub Actions run `31207584661`
+  - `7d27187` (I9–I11 final head, distinct-candidate two-connection proof but loser-error too broad) — verified by GitHub Actions run `31207753767`
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
