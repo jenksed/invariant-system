@@ -2,6 +2,7 @@ defmodule Kiln.Store.JournalTest do
   use ExUnit.Case, async: true
 
   alias Kiln.Domain.{Action, ProjectObservation, Session}
+  alias Kiln.Journal.Replay
   alias Kiln.Store
   alias Kiln.Store.{Connection, Journal}
 
@@ -273,8 +274,21 @@ defmodule Kiln.Store.JournalTest do
       try do
         domain_a = build_distinct_domain(byte_a())
         domain_b = build_distinct_domain(byte_b())
-        action_a = build_distinct_start_action(domain_a, idem(41), @digest_a)
-        action_b = build_distinct_start_action(domain_b, idem(42), @digest_b)
+        action_a = build_distinct_start_action(domain_a, idem(41), @digest_a, 41)
+        action_b = build_distinct_start_action(domain_b, idem(42), @digest_b, 42)
+
+        # Distinctness assertions — every important identity must
+        # actually differ between the two candidates. Earlier versions
+        # of this test reused byte_size(domain.session.id) for both
+        # action IDs, which silently collided because every Session ID
+        # is the same length. These assertions turn that ambiguity
+        # into a hard tripwire.
+        refute domain_a.session.id == domain_b.session.id
+        refute domain_a.task.id == domain_b.task.id
+        refute domain_a.run.id == domain_b.run.id
+        refute action_a.id == action_b.id
+        refute action_a.idempotency_key == action_b.idempotency_key
+        refute action_a.request_digest == action_b.request_digest
         entries_a = build_distinct_start_entries(domain_a)
         entries_b = build_distinct_start_entries(domain_b)
 
@@ -344,14 +358,28 @@ defmodule Kiln.Store.JournalTest do
                "exactly one distinct-candidate start must be rejected; got #{inspect(outcomes)}"
 
         # The losing rejection is constrained to one of two typed Store
-        # errors. Anything else (e.g. an :integrity, :unknown, :io
-        # error) would mean a regression in the durable invariant path
-        # rather than a benign timeout.
+        # errors, AND the class/code pair must match exactly. Anything
+        # else (e.g. an :integrity, :unknown, :io error, or a crossed
+        # class/code pair such as :precondition/:store_busy) would
+        # mean a regression in the durable invariant path rather than
+        # a benign timeout.
         [{:error, %Kiln.Store.Error{} = rejection}] = rejections
 
-        assert rejection.class in [:precondition, :busy] and
-                 rejection.code in [:session_already_exists, :store_busy],
-               "the losing rejection must be either :precondition/:session_already_exists " <>
+        assert match?(
+                 %Kiln.Store.Error{
+                   class: :precondition,
+                   code: :session_already_exists
+                 },
+                 rejection
+               ) or
+                 match?(
+                   %Kiln.Store.Error{
+                     class: :busy,
+                     code: :store_busy
+                   },
+                   rejection
+                 ),
+               "the losing rejection must be exactly :precondition/:session_already_exists " <>
                  "(the precondition path observed the first writer's session inside its own " <>
                  "IMMEDIATE transaction) or :busy/:store_busy (the accepted two-second busy " <>
                  "timeout expired before the first writer committed); got #{inspect(rejection)}"
@@ -368,6 +396,18 @@ defmodule Kiln.Store.JournalTest do
 
         assert all_session_ids == [winner_session_id],
                "exactly one Session ID must persist and match the winner; got #{inspect(all_session_ids)}"
+
+        # Redundant authoritative proof via Replay.sessions/1: the
+        # Store's session enumeration must see exactly one session
+        # matching the winner's candidate ID. This guards against any
+        # SQL-level proof becoming stale (e.g. if the projection
+        # column moved or the row was duplicated in a regression).
+        {:ok, replayed_sessions} =
+          Replay.sessions(ctx.conn) |> then(&{:ok, &1})
+
+        assert replayed_sessions == [winner_session_id],
+               "Replay.sessions must see exactly the winner's candidate ID; " <>
+                 "got #{inspect(replayed_sessions)}"
 
         # Read durable counts via the test-setup connection.
         entries_count = count(ctx.conn, "journal_entries")
@@ -426,10 +466,18 @@ defmodule Kiln.Store.JournalTest do
     %{session: session, task: task, run: run}
   end
 
-  defp build_distinct_start_action(domain, idempotency_key, digest) do
+  defp build_distinct_start_action(domain, idempotency_key, digest, action_byte) do
     {:ok, action} =
       Action.new(%{
-        id: id(:action, 50 + byte_size(domain.session.id)),
+        # Distinct entropy byte per candidate. The earlier
+        # `id(:action, 50 + byte_size(domain.session.id))` produced the
+        # same byte for both candidates because every Session ID is
+        # `ses_` + 32 hex chars (same length), so both candidates
+        # would collide on `action_commits.action_id` — a global
+        # primary key. The precondition test must still pass with
+        # truly independent action IDs so the global one-Session guard
+        # is the sole reason the second commit fails.
+        id: id(:action, action_byte),
         session_id: domain.session.id,
         run_id: domain.run.id,
         expected_session_revision: 0,

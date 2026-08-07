@@ -206,16 +206,28 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 **Result:** Implemented and verified.
 
-Code-bearing implementation head (final):
-  `2fc6e0358d8608ac6e8524d284614ea909899076` — the I12–I14 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections (task_a on `ctx.conn`, task_b on `second_store.conn`), constrained the losing rejection to `:precondition/:session_already_exists` or `:busy/:store_busy`, recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension in `docs/work/P1-S01-T02-durable-store.md`, and replaced the stale provisional completion statement with the truthful final form.
+Code-bearing implementation head:
+  `<final code/test SHA>`
 
-Exact CI for the code-bearing implementation head:
-  GitHub Actions run `31210996213` (both `test` and `prose` jobs green).
+Exact CI for code-bearing implementation:
+  `<final GitHub Actions run on the code-bearing SHA>`
 
-Current PR/evidence head:
-  `2fc6e0358d8608ac6e8524d284614ea909899076` (same SHA — the I12–I14 commit is itself the final head and no subsequent documentation-only commit was needed).
+Current PR-head verification:
+  tracked by GitHub PR metadata / PR body;
+  evidence-only commits do not supersede the code-bearing implementation head.
 
-The current branch head contains every correction from the F1–F9 review pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary closure, the I9–I11 cross-connection test correction + T02 contract reconciliation, and the I12–I14 distinct-candidate concurrency proof + completion-record truth.
+This separation ends the self-referential "documenting HEAD changes HEAD" loop:
+the plan records the code-bearing implementation and its CI once, and any
+subsequent evidence-only update to this plan must leave these two lines
+unchanged. The actual current exact-head SHA and run are recorded in the
+PR body, which can change without creating another Git commit.
+
+The current branch head contains every correction from the F1–F9 review
+pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary
+closure, the I9–I11 cross-connection test correction + T02 contract
+reconciliation, the I12–I14 distinct-candidate concurrency proof + T02
+contract reconciliation, and the I15–I16 final-test-tripwire + evidence
+model pass.
 
 ### Acceptance status
 
@@ -299,8 +311,11 @@ The current branch head contains every correction from the F1–F9 review pass, 
 
 ### Repository state
 
-- **Final implementation head:** `2fc6e0358d8608ac6e8524d284614ea909899076` — the I12–I14 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections, constrained the losing rejection to exactly `:precondition/:session_already_exists` or `:busy/:store_busy`, recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension in `docs/work/P1-S01-T02-durable-store.md`, and replaced the stale provisional completion statement with the truthful final form. Verified by GitHub Actions run `31210996213` (both `test` and `prose` jobs green).
-- **Code-bearing implementation head:** `2fc6e0358d8608ac6e8524d284614ea909899076` (same SHA — the I12–I14 commit is itself the final head).
+The code-bearing implementation head and its exact CI are recorded
+in the Completion record above. Evidence-only updates to this plan do
+not supersede that head; the PR body tracks the actual current
+exact-head SHA and run.
+
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
@@ -312,5 +327,4 @@ The current branch head contains every correction from the F1–F9 review pass, 
   - `a6b6c6a` (evidence-only update) — verified by GitHub Actions run `31206737852`
   - `1528148` (I9–I11 prior head, same-connection contention; superseded by distinct-candidate fix) — verified by GitHub Actions run `31207584661`
   - `7d27187` (I9–I11 final head, distinct-candidate two-connection proof but loser-error too broad) — verified by GitHub Actions run `31207753767`
-  - `2fc6e03` (I12–I14 distinct-candidate two-connection proof, constrained loser error, completion record truth, T02 contract reconciliation) — verified by GitHub Actions run `31210996213` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
