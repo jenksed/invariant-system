@@ -207,15 +207,15 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 **Result:** Implemented and verified.
 
 Code-bearing implementation head (final):
-  `7d2718724f39c0ba564ba22bf2035b85d0957527` — the I9–I11 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections, constrained the losing rejection to `:precondition/:session_already_exists` or `:busy/:store_busy`, and recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension.
+  `2fc6e0358d8608ac6e8524d284614ea909899076` — the I12–I14 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections (task_a on `ctx.conn`, task_b on `second_store.conn`), constrained the losing rejection to `:precondition/:session_already_exists` or `:busy/:store_busy`, recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension in `docs/work/P1-S01-T02-durable-store.md`, and replaced the stale provisional completion statement with the truthful final form.
 
 Exact CI for the code-bearing implementation head:
-  GitHub Actions run `31207753767` (both `test` and `prose` jobs green).
+  GitHub Actions run `31210996213` (both `test` and `prose` jobs green).
 
 Current PR/evidence head:
-  `7d2718724f39c0ba564ba22bf2035b85d0957527` — the same SHA, because the I9–I11 closure commit is the final head and no subsequent documentation-only commit was needed.
+  `2fc6e0358d8608ac6e8524d284614ea909899076` (same SHA — the I12–I14 commit is itself the final head and no subsequent documentation-only commit was needed).
 
-The current branch head contains every correction from the F1–F9 review pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary closure, and the I9–I11 cross-connection test correction. The Orphan-capability authority is fixed; concurrent-start cross-process invariant is proven within the existing SQLite transaction by both a same-connection Workflow caller test and a distinct-candidate independent-SQLite-connection Store test; the Store error boundary is restored and the `:precondition` class is recorded in `docs/work/P1-S01-T02-durable-store.md` as the narrow T02 vocabulary extension.
+The current branch head contains every correction from the F1–F9 review pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary closure, the I9–I11 cross-connection test correction + T02 contract reconciliation, and the I12–I14 distinct-candidate concurrency proof + completion-record truth.
 
 ### Acceptance status
 
@@ -264,8 +264,8 @@ The current branch head contains every correction from the F1–F9 review pass, 
 | `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
 | `mix test` | 351 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on final head | success | GitHub Actions run 31207753767 on commit 7d27187 |
-| GitHub Actions `prose` job on final head | success | GitHub Actions run 31207753767 on commit 7d27187 |
+| GitHub Actions `test` job on final head | success | GitHub Actions run 31210996213 on commit 2fc6e03 |
+| GitHub Actions `prose` job on final head | success | GitHub Actions run 31210996213 on commit 2fc6e03 |
 | Historical exact-head CI runs preserved for provenance: | | |
 | GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
 | GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
@@ -273,14 +273,15 @@ The current branch head contains every correction from the F1–F9 review pass, 
 | GitHub Actions run 31199785234 on commit 35cb2c3 | (historical, baseline at start of I6–I8) | superseded |
 | GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded |
 | GitHub Actions run 31206737852 on commit a6b6c6a | (historical, evidence-only update) | superseded |
-| GitHub Actions run 31207584661 on commit 1528148 | (historical, I9–I11 prior head) | superseded by 31207753767 |
+| GitHub Actions run 31207584661 on commit 1528148 | (historical, I9–I11 prior head) | superseded |
+| GitHub Actions run 31207753767 on commit 7d27187 | (historical, I9–I11 final head) | superseded by 31210996213 |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
 - Slice verification manifest updated: Yes (the F1–F9, I1–I5, and I6–I8 closure passes are owned by T04, not T05)
-- Slice completion claimed: Yes — verified on final head `7d27187` by GitHub Actions run `31207753767`
+- Slice completion claimed: Yes — verified on final head `2fc6e03` by GitHub Actions run `31210996213`
 
 ### Failures and warnings
 
@@ -298,8 +299,8 @@ The current branch head contains every correction from the F1–F9 review pass, 
 
 ### Repository state
 
-- **Final implementation head:** `7d2718724f39c0ba564ba22bf2035b85d0957527` — the I9–I11 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections, constrained the losing rejection to `:precondition/:session_already_exists` or `:busy/:store_busy`, recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension in `docs/work/P1-S01-T02-durable-store.md`, and replaced the stale provisional completion statement. Verified by GitHub Actions run `31207753767` (both `test` and `prose` jobs green).
-- **Code-bearing implementation head:** `7d2718724f39c0ba564ba22bf2035b85d0957527` (same SHA — the I9–I11 commit is itself the final head and no subsequent documentation-only commit was needed).
+- **Final implementation head:** `2fc6e0358d8608ac6e8524d284614ea909899076` — the I12–I14 closure that corrected the cross-connection concurrency test to race two DISTINCT candidate Sessions across two SQLite connections, constrained the losing rejection to exactly `:precondition/:session_already_exists` or `:busy/:store_busy`, recorded the `:precondition` Store error class as the accepted narrow T02 vocabulary extension in `docs/work/P1-S01-T02-durable-store.md`, and replaced the stale provisional completion statement with the truthful final form. Verified by GitHub Actions run `31210996213` (both `test` and `prose` jobs green).
+- **Code-bearing implementation head:** `2fc6e0358d8608ac6e8524d284614ea909899076` (same SHA — the I12–I14 commit is itself the final head).
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
@@ -310,5 +311,6 @@ The current branch head contains every correction from the F1–F9 review pass, 
   - `2ede2b8` (I6–I8 code-bearing head) — verified by GitHub Actions run `31206150176`
   - `a6b6c6a` (evidence-only update) — verified by GitHub Actions run `31206737852`
   - `1528148` (I9–I11 prior head, same-connection contention; superseded by distinct-candidate fix) — verified by GitHub Actions run `31207584661`
-  - `7d27187` (I9–I11 final head with distinct-candidate cross-connection proof) — verified by GitHub Actions run `31207753767` ← **final**
+  - `7d27187` (I9–I11 final head, distinct-candidate two-connection proof but loser-error too broad) — verified by GitHub Actions run `31207753767`
+  - `2fc6e03` (I12–I14 distinct-candidate two-connection proof, constrained loser error, completion record truth, T02 contract reconciliation) — verified by GitHub Actions run `31210996213` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
