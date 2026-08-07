@@ -37,6 +37,7 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 |---|---|---|---|---|
 | `engineering.agents-template` | `template` | `stable` | Vendor-neutral repository contract template for adopting the Engineering Doctrine. | `engineering/templates/AGENTS.md` |
 | `engineering.claude-template` | `template` | `stable` | Thin Claude Code adapter that delegates repository governance to AGENTS.md. | `engineering/templates/CLAUDE.md` |
+| `engineering.development-pack-contract` | `reference` | `draft` | Define the common contract for language/framework Development Packs that provide deterministic feedback, structural invariants, guardrails, and verification tiers. | `engineering/development_packs/CONTRACT.md` |
 | `engineering.doctrine-core` | `doctrine` | `stable` | Compact constitutional core for frequent agent context. | `engineering/doctrine/CORE.md` |
 | `engineering.doctrine-full` | `doctrine` | `stable` | Full Engineering Doctrine, decision heuristics, limits, and tradeoff philosophy. | `engineering/doctrine/ENGINEERING_DOCTRINE.md` |
 
