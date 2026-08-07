@@ -480,7 +480,16 @@ defmodule Kiln.WorkflowTest do
   # ---- concurrent first-month single-Session invariant ----
 
   describe "concurrent first-month single-Session invariant" do
-    test "two competing start_session calls with different idempotency keys produce exactly one Session",
+    # Same-BEAM concurrent caller test. Both tasks share the supervised
+    # Store connection (single pool entry). This proves that the
+    # `BEGIN IMMEDIATE` precondition path correctly serializes two
+    # concurrent `Workflow.start_session/1` callers in the same Elixir
+    # node. For the independent-SQLite-connection test (different
+    # Exqlite handles to the same DB file, exercising SQLite's
+    # file-level writer-lock serialization), see
+    # `Kiln.Store.JournalTest` "independent SQLite connection
+    # contention".
+    test "two competing start_session calls through the supervised connection produce exactly one Session",
          %{store: store} do
       # Two processes concurrently attempt to start a Session against the
       # same store with different idempotency keys. Both pass their

@@ -201,9 +201,11 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented and verified by GitHub Actions run `31199247425` on commit `f3fe050`.
+**Result (provisional):** Implemented and verified by GitHub Actions run `31199785234` on commit `35cb2c3` (the previous code-bearing head before the I6–I8 narrow Store-error-boundary closure). After this pass pushes the Store-error-boundary correction, the new exact-head CI run on the new code-bearing head will become the final verification; the plan text below is kept current on every push.
 
-The current branch head contains every correction from the F1–F9 review pass plus the I1–I5 final closure pass (orphan capability authority at the Workflow boundary, empty-DB control-flow fix, T04 resume semantics distinction, Outcome-B concurrent-start guard via a precondition hook inside the existing journal transaction, and removal of the PR-specific `CLAUDE.md` because the commit-message convention is already in `AGENTS.md` on `origin/main`). Every R01–R50 regression in this plan is covered by a focused test.
+The current branch head contains every correction from the F1–F9 review pass, the I1–I5 final closure pass, and the I6–I8 narrow Store-error-boundary closure (the bounded `:no_existing_session` precondition inside `Journal.commit`'s `BEGIN IMMEDIATE` transaction; `lib/kiln/store/error.ex` gains a `:precondition` class; the Store layer owns its error representation; Workflow translates `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` into the existing `session_already_exists` Domain error). Concurrent-start protection is now demonstrated by both a same-connection Workflow caller test and an independent-SQLite-connection Store test, the latter directly exercising SQLite file-level writer serialization across two Exqlite handles.
+
+The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-only without false executable mapping, Workflow-owned orphan capability authority, empty-DB control-flow correction) and the I6–I8 closure pass file (`lib/kiln/store/journal.ex` and `lib/kiln/store/error.ex` for the transaction-level one-Session precondition) are jointly the authoritative scope of the T04 correction cycle. The Orphan-capability authority is fixed; concurrent-start cross-process invariant is proven within the existing SQLite transaction; the Store error boundary is restored.
 
 ### Acceptance status
 
@@ -228,9 +230,11 @@ The current branch head contains every correction from the F1–F9 review pass p
 | Final closure — I1 (orphan capability authority at Workflow) | Verified | P1-S01-T04-E17 | `Kiln.Workflow.capability_for/1` collapses effective-orphaned Sessions to `[]`; `test/kiln/cli_test.exs` proves the CLI does not advertise a mutation Workflow would then reject for both `intent_recorded` and `:started` orphan states |
 | Final closure — I2 (empty-DB control flow) | Verified | P1-S01-T04-E18 | `test/kiln/cli_test.exs` "initialized empty DB + status/inspect/cancel/resume return blocked NO_SESSION without crash" + "invalid start + subsequent status does not crash" |
 | Final closure — I3 (resume semantics distinction) | Verified | P1-S01-T04-E19 | `Kiln.CLI.translate_capability/1` maps only `:cancel_session -> cancel`; `test/kiln/cli_test.exs` start-result and cancel-result tests assert `resume` is never presented as a Workflow-owned mutation |
-| Final closure — I4 (concurrent starts, Outcome B) | Verified | P1-S01-T04-E20 | `Kiln.Workflow.start_session` passes a precondition into `Journal.commit`'s existing `BEGIN IMMEDIATE` transaction; `test/kiln/workflow_test.exs` "two competing start_session calls with different idempotency keys produce exactly one Session" deterministically forces the race window via send/receive |
+| Final closure — I4 (concurrent starts, Outcome B) | Verified | P1-S01-T04-E20 | `Kiln.Workflow.start_session` passes `:no_existing_session` into `Journal.commit`'s existing `BEGIN IMMEDIATE` transaction; `test/kiln/workflow_test.exs` "two competing start_session calls through the supervised connection produce exactly one Session" (same-BEAM, same-connection) and `test/kiln/store/journal_test.exs` "two independent Store connections to the same DB file produce exactly one Session" (cross-connection, exercises SQLite file-level writer-lock serialization) |
 | Final closure — I5 (CLAUDE.md disposition) | Verified | P1-S01-T04-E21 | `CLAUDE.md` removed from PR #40 (not on `origin/main`); commit-message convention retained in `AGENTS.md` |
 | Final closure — small cleanup (ErrorMap doc, store_id comment, resume doc) | Verified | P1-S01-T04-E22 | local sandbox run; comment changes document actual code behaviour and pass `scripts/check` |
+| Final closure — I6 (Store error boundary restoration) | Verified | P1-S01-T04-E23 | `Kiln.Store.Journal.commit/4` accepts the Store-owned atom `:no_existing_session` (and `nil`); any other precondition atom is rejected up front with `%Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}`. `Kiln.Store.Error` gains a `:precondition` class. Workflow translates `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` into the existing public `session_already_exists` Domain error. `test/kiln/store/journal_test.exs` `:no_existing_session precondition` describe block proves zero-write rollback, supported-replay, and rejection-of-unsupported-precondition. |
+| Final closure — I7 (cross-connection concurrency proof) | Verified | P1-S01-T04-E24 | `test/kiln/store/journal_test.exs` "independent SQLite connection contention" opens a second independent `Store.start/1` to the same DB file; two `Task.async` callers synchronize via a send/receive barrier and call `Journal.commit` with `:no_existing_session` on different idempotency keys; the test asserts exactly one success, exactly one `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` rejection, exactly one journal entry, one action commit, and one projection. |
 
 ### Verification executed
 
@@ -287,17 +291,19 @@ The current branch head contains every correction from the F1–F9 review pass p
 ### Remaining unknowns and exclusions
 
 - Aggregate owner-machine demo of the foundation CLI is T05.
-- The detected-but-not-fixed Workflow/Restart orphan classification tension (a Session whose projection is `orphaned: true` because of a nonterminal operation but whose underlying Run state is still `running` therefore remains Workflow-advertised as `:cancel_session`) is out of scope for T04 and would belong to a future Workflow/Restart reconciliation ticket; the CLI correctly surfaces whatever the Workflow capability matrix advertises, and the assertion in F7 proves the CLI never invents a mutation Workflow does not.
+- The Workflow/Restart orphan classification tension (a Session with `orphaned: true` per `Workflow.orphaned?/1` but with `run.state == :running`) is closed for the T04 surface: `Kiln.Workflow.capability_for/1` collapses the capability matrix to `[]` for any effectively-orphaned projection regardless of the underlying Run state. A future Workflow/Restart reconciliation ticket could tighten the orphan-flag / run-state semantics for non-T04 consumers; that work is not required for the T04 contract.
+- The T04 `resume` command is permanently guidance-only (R07); the deferred Workflow `Workflow.resume_session/2` mutation is not exposed as an executable CLI command and would belong to a future ticket.
 - No additional architecture changes are required to merge.
 
 ### Repository state
 
-- Final implementation head: `f3fe050cd0e1e5f39a32be2b2ac6043c8be3696e`
-- Final exact-head CI: GitHub Actions run `31199247425` on commit `f3fe050` (both `test` and `prose` jobs green)
+- Code-bearing implementation head (final): the new SHA after this pass pushes the I6–I8 Store-error-boundary correction. Will be recorded once the exact-head CI completes green on the push.
+- Current PR head at start of this pass: `35cb2c33118fa3d730a6ab6de1fb4a646a5b43e1`, verified by GitHub Actions run `31199785234` (both `test` and `prose` jobs green). Superseded by the new code-bearing head once this pass pushes and CI completes.
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
   - `bb4b8a4` (pre-correction) — verified by GitHub Actions run `31142579605`
   - `ece4537` (F1–F9 final) — verified by GitHub Actions run `31194974919`
-  - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425` ← **final**
+  - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
+  - `35cb2c3` (corrected-head baseline at start of this pass) — verified by GitHub Actions run `31199785234`
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked

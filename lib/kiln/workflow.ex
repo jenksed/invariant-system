@@ -362,7 +362,7 @@ defmodule Kiln.Workflow do
               &start_result_from_stored/1,
               expected_revision: 0,
               session_id: session.id,
-              precondition: &ensure_one_session_txn/1
+              precondition: :no_existing_session
             )
 
           {:error, _} = error ->
@@ -371,30 +371,6 @@ defmodule Kiln.Workflow do
 
       {:error, _} = error ->
         error
-    end
-  end
-
-  # Single-Session precondition evaluated inside the journal's
-  # `BEGIN IMMEDIATE` transaction. The first month contract is "exactly
-  # one durable Session"; this guard is the authoritative enforcement
-  # at the journal boundary so a concurrent writer that passed its
-  # pre-check by racing the first commit cannot commit a second
-  # Session. The check is bypassed for replays of the same idempotency
-  # key because `Journal.commit/4` routes those to the replay branch
-  # before evaluating `:precondition`.
-  defp ensure_one_session_txn(tx) do
-    case Replay.sessions(tx) do
-      [] ->
-        :ok
-
-      _existing ->
-        {:error,
-         Error.new(
-           :session_already_exists,
-           "a Session already exists in the journal; the first-month contract forbids a second",
-           nil,
-           %{}
-         )}
     end
   end
 

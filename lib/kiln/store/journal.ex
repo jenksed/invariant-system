@@ -144,76 +144,130 @@ defmodule Kiln.Store.Journal do
   Options: `:result` (application result map, default `%{}`), `:result_schema`,
   `:now` (ISO 8601 commit time), and `:fault` (a test-only hook that raises
   inside the transaction to prove nothing partial persists).
+
+  The `:precondition` option names a Store-recognized precondition that runs
+  inside the same `BEGIN IMMEDIATE` transaction as the commit itself. The
+  Store owns the precondition vocabulary, the evaluation, and the rollback;
+  it never accepts an arbitrary caller-supplied callback. Currently
+  recognized:
+
+    * `:no_existing_session` — the journal must hold zero Sessions.
+      First-month single-Session contract enforcement. On failure the
+      transaction rolls back and `commit/4` returns
+      `{:error, %Kiln.Store.Error{class: :precondition, code: :session_already_exists}}`.
+      The caller translates this into its public application error
+      vocabulary; no Domain error type escapes through the Store boundary.
+
+  An unsupported precondition atom is rejected up front with
+  `{:error, %Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}}`
+  before any transaction opens.
   """
   @spec commit(Connection.conn(), Action.t(), [entry_input()], keyword()) ::
           {:ok, result()} | {:error, Error.t()}
   def commit(conn, %Action{} = action, entries, opts \\ []) when is_list(entries) do
-    now = Keyword.get(opts, :now, utc_now())
-    result_map = Keyword.get(opts, :result, %{})
-    result_schema = Keyword.get(opts, :result_schema, @default_result_schema)
-    precondition = Keyword.get(opts, :precondition)
+    with {:ok, precondition} <- normalize_precondition(Keyword.get(opts, :precondition)) do
+      now = Keyword.get(opts, :now, utc_now())
+      result_map = Keyword.get(opts, :result, %{})
+      result_schema = Keyword.get(opts, :result_schema, @default_result_schema)
 
-    outcome =
-      Connection.transaction(conn, fn tx ->
-        case classify_in_transaction(tx, action) do
-          {:replay, replay} ->
-            # The classifier already validated the stored action boundary
-            # against the authoritative journal, so a deleted or corrupt
-            # journal cannot masquerade as accepted recorded truth (R04).
-            # The replay uses the stored session_id (carried in `replay`),
-            # so a retry's freshly generated session identifier cannot
-            # collide with the original.
-            {:replayed, replay}
+      outcome =
+        Connection.transaction(conn, fn tx ->
+          case classify_in_transaction(tx, action) do
+            {:replay, replay} ->
+              # The classifier already validated the stored action boundary
+              # against the authoritative journal, so a deleted or corrupt
+              # journal cannot masquerade as accepted recorded truth (R04).
+              # The replay uses the stored session_id (carried in `replay`),
+              # so a retry's freshly generated session identifier cannot
+              # collide with the original.
+              {:replayed, replay}
 
-          {:conflict, _} ->
-            DBConnection.rollback(tx, {:idempotency_conflict})
+            {:conflict, _} ->
+              DBConnection.rollback(tx, {:idempotency_conflict})
 
-          {:error, %Error{class: :integrity, code: :corrupt_result} = error} ->
-            DBConnection.rollback(tx, {:corrupt_result, error})
+            {:error, %Error{class: :integrity, code: :corrupt_result} = error} ->
+              DBConnection.rollback(tx, {:corrupt_result, error})
 
-          {:error, %Error{class: :integrity, code: :journal_invalid} = error} ->
-            DBConnection.rollback(tx, {:journal_invalid, error})
+            {:error, %Error{class: :integrity, code: :journal_invalid} = error} ->
+              DBConnection.rollback(tx, {:journal_invalid, error})
 
-          {:error, %Error{} = error} ->
-            DBConnection.rollback(tx, {:transaction_failed, error})
+            {:error, %Error{} = error} ->
+              DBConnection.rollback(tx, {:transaction_failed, error})
 
-          :none ->
-            # The optional `:precondition` runs inside the same
-            # `BEGIN IMMEDIATE` transaction as the commit itself. The
-            # first-month contract forbids committing a second Session
-            # once a first one exists; without this check, two
-            # concurrent Workflow.start_session calls — each having
-            # observed `:empty` from a pre-check that ran outside the
-            # authoritative transaction — could each pass the
-            # idempotency-key classifier (different keys) and each
-            # commit a fresh Session. The precondition is the durable
-            # one-Session guard.
-            case precondition_check(tx, precondition) do
-              :ok ->
-                commit_new(tx, action, entries, result_map, result_schema, now, opts)
+            :none ->
+              case evaluate_precondition(tx, precondition) do
+                :ok ->
+                  commit_new(tx, action, entries, result_map, result_schema, now, opts)
 
-              {:error, reason} ->
-                DBConnection.rollback(tx, {:precondition, reason})
-            end
-        end
-      end)
+                {:error, error} ->
+                  DBConnection.rollback(tx, {:precondition, error})
+              end
+          end
+        end)
 
-    case outcome do
-      {:ok, {:committed, data}} -> {:ok, data}
-      {:ok, {:replayed, replay}} -> {:ok, replayed_result(replay)}
-      {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
-      {:error, {:invalid_entry, error}} -> {:error, error}
-      {:error, {:corrupt_result, error}} -> {:error, error}
-      {:error, {:cache_corrupt, error}} -> {:error, error}
-      {:error, {:cache_invalid_metadata, error}} -> {:error, error}
-      {:error, {:journal_invalid, error}} -> {:error, error}
-      {:error, {:transaction_failed, %Error{} = error}} -> {:error, error}
-      {:error, {:stale, current}} -> {:error, stale_error(action, current)}
-      {:error, {:precondition, reason}} -> {:error, reason}
-      {:error, reason} -> {:error, transaction_error(reason)}
+      case outcome do
+        {:ok, {:committed, data}} -> {:ok, data}
+        {:ok, {:replayed, replay}} -> {:ok, replayed_result(replay)}
+        {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
+        {:error, {:invalid_entry, error}} -> {:error, error}
+        {:error, {:corrupt_result, error}} -> {:error, error}
+        {:error, {:cache_corrupt, error}} -> {:error, error}
+        {:error, {:cache_invalid_metadata, error}} -> {:error, error}
+        {:error, {:journal_invalid, error}} -> {:error, error}
+        {:error, {:transaction_failed, %Error{} = error}} -> {:error, error}
+        {:error, {:stale, current}} -> {:error, stale_error(action, current)}
+        {:error, {:precondition, %Error{} = error}} -> {:error, error}
+        {:error, reason} -> {:error, transaction_error(reason)}
+      end
     end
   rescue
     exception -> {:error, transaction_error(Exception.message(exception))}
+  end
+
+  # The Store owns the precondition vocabulary. An unknown precondition
+  # atom is rejected before any transaction opens so a misspelled or
+  # experimental caller cannot silently disable enforcement. `nil`
+  # (no precondition) is accepted and is equivalent to omitting the
+  # option.
+  @preconditions [nil, :no_existing_session]
+
+  defp normalize_precondition(precondition) do
+    if precondition in @preconditions do
+      {:ok, precondition}
+    else
+      {:error,
+       Error.new(
+         :precondition,
+         :unsupported_precondition,
+         "the precondition atom is not recognized by the Store layer",
+         %{precondition: inspect(precondition)}
+       )}
+    end
+  end
+
+  # Evaluate the precondition inside the active `BEGIN IMMEDIATE`
+  # transaction. SQLite writer-lock serialization guarantees any
+  # concurrent transaction has either committed (and is therefore
+  # visible) or is blocked on this transaction; there is no window in
+  # which a separate transaction's writes are unobservable. A
+  # precondition failure raises a typed `%Kiln.Store.Error{}` so the
+  # Store error contract is never violated by an arbitrary caller term.
+  defp evaluate_precondition(_tx, nil), do: :ok
+
+  defp evaluate_precondition(tx, :no_existing_session) do
+    case Replay.sessions(tx) do
+      [] ->
+        :ok
+
+      _existing ->
+        {:error,
+         Error.new(
+           :precondition,
+           :session_already_exists,
+           "a Session already exists in the journal; the first-month contract forbids a second",
+           %{}
+         )}
+    end
   end
 
   # Decode every proposed entry with the shared journal decoder before insertion,
@@ -354,18 +408,8 @@ defmodule Kiln.Store.Journal do
   # is not part of the lookup key, so a `start_session` retry that has not
   # yet resolved the original `session_id` can still find the prior commit
   # (P1-S01-T06).
-  # A precondition is either `nil` (no check), or a one-arity function
-  # that runs inside the `BEGIN IMMEDIATE` transaction and returns
-  # `:ok` or `{:error, term}`. SQLite-level writer serialization means
-  # any concurrent commit is blocked until this transaction commits or
-  # rolls back, so a precondition that queries the journal observes the
-  # authoritative post-serialization state. The term returned from
-  # `{:error, term}` becomes the rollback reason and propagates out of
-  # `commit/4` unchanged, so callers typically return
-  # `{:error, %Kiln.Domain.Error{}}`.
-  defp precondition_check(_tx, nil), do: :ok
-  defp precondition_check(tx, fun) when is_function(fun, 1), do: fun.(tx)
-
+  # Load the stored action commit by idempotency key. Used by the
+  # in-transaction classifier and the public `lookup_commit/3`.
   defp read_commit(tx, idempotency_key) do
     case Connection.query!(
            tx,

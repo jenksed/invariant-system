@@ -14,6 +14,7 @@ defmodule Kiln.Store.Error do
     :future_version,
     :revision,
     :idempotency_conflict,
+    :precondition,
     :io,
     :unknown
   ]
@@ -28,6 +29,7 @@ defmodule Kiln.Store.Error do
           | :future_version
           | :revision
           | :idempotency_conflict
+          | :precondition
           | :io
           | :unknown
 
