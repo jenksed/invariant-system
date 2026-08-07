@@ -2,9 +2,14 @@
 
 Schema-Version: 1.0.0
 
-`arsenal/registry.json` is the canonical metadata registry for reusable Project Arsenal assets.
+Project Arsenal's machine-readable metadata is composed from:
 
-The registry exists so filenames, lifecycle state, dependencies, source briefs, and intended composition can be inspected deterministically instead of inferred from prose or directory names.
+- `arsenal/registry.json` — canonical base registry;
+- `arsenal/registry.d/*.json` — deterministic extension fragments loaded in filename order.
+
+The merged registry is the canonical metadata view for reusable Project Arsenal assets. Fragmentation exists to let independent capability packs/foundations add assets without turning one large JSON file into a merge-conflict hotspot.
+
+Every registry file must use the same schema version.
 
 ## Required fields
 
@@ -23,6 +28,7 @@ Optional relationship fields:
 - `downstream` — asset IDs that commonly consume this asset.
 - `source_brief` — preserved generation source for a compiled prompt.
 - `source_for` — canonical asset produced from a source brief.
+- `invocation` — harness-neutral invocation mode from `arsenal/INVOCATION_MODEL.md`.
 
 ## Kinds
 
@@ -33,6 +39,20 @@ Optional relationship fields:
 - `workflow` — composition or operating sequence across assets.
 - `template` — reusable file or repository template.
 - `doctrine` — governing engineering principles.
+- `method` — reusable reasoning/operating method independent of a particular prompt or harness.
+- `reference` — shared vocabulary, policy, or mechanics consumed by other assets.
+- `router` — chooses among capabilities without owning their implementation.
+
+## Invocation modes
+
+When present, `invocation` must be one of:
+
+- `human`
+- `agent`
+- `reference`
+- `composed`
+
+See `arsenal/INVOCATION_MODEL.md` for semantics.
 
 ## Lifecycle states
 
@@ -48,18 +68,20 @@ Status is an evidence claim. Do not promote an asset because its prose looks goo
 ## Integrity rules
 
 1. Every registry path must exist.
-2. IDs and paths must be unique.
-3. Directly runnable `prompt` assets must not contain a `prompt-generation-brief` payload or the Master Sol/Fable generator wrapper.
-4. A `source_brief` path must exist and be registered as `kind: brief`.
-5. `upstream`, `downstream`, and `source_for` references must resolve to registered asset IDs.
-6. `CATALOG.md` must match the catalog rendered from the registry.
-7. Source briefs remain separate from compiled prompts so the library never again presents generation source as a finished capability.
+2. IDs and paths must be unique across the merged registry.
+3. All registry files must use the supported schema version.
+4. Directly runnable `prompt` assets must not contain a `prompt-generation-brief` payload or the Master Sol/Fable generator wrapper.
+5. A `source_brief` path must exist and be registered as `kind: brief`.
+6. `upstream`, `downstream`, and `source_for` references must resolve to registered asset IDs.
+7. Optional `invocation` values must be valid.
+8. `CATALOG.md` must match the catalog rendered from the merged registry.
+9. Source briefs remain separate from compiled prompts so the library never presents generation source as a finished capability.
 
 ## Change rule
 
 When adding or materially changing an asset:
 
-1. update `arsenal/registry.json`;
+1. update the base registry or the appropriate `registry.d` fragment;
 2. run `python3 scripts/arsenal_audit.py --write-catalog`;
 3. run `python3 scripts/arsenal_audit.py`;
 4. inspect the resulting diff;
