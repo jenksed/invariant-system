@@ -201,39 +201,36 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented; correction pass awaiting exact-head verification
+**Result:** Implemented and verified by GitHub Actions run `31199247425` on commit `f3fe050`.
 
-The earlier "Implemented and verified" claim was based on a GitHub Actions run
-(`31142579605`) that pre-dated the F1–F5 correction pass and the follow-up
-review correction pass. The current branch head contains the F1–F5 fixes plus
-the follow-up correction pass (one-Session sequential invariant,
-Workflow-owned capability authority, explicit `:started` operation-state
-fixture, AC07 Domain Error boundary distinction, and three small comment /
-doc cleanups) plus dedicated regression tests for each; the claim is
-"Implemented; correction pass awaiting exact-head verification" until a
-fresh GitHub Actions run on the corrected head is observed.
+The current branch head contains every correction from the F1–F9 review pass plus the I1–I5 final closure pass (orphan capability authority at the Workflow boundary, empty-DB control-flow fix, T04 resume semantics distinction, Outcome-B concurrent-start guard via a precondition hook inside the existing journal transaction, and removal of the PR-specific `CLAUDE.md` because the commit-message convention is already in `AGENTS.md` on `origin/main`). Every R01–R50 regression in this plan is covered by a focused test.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T04-AC01 | Verified (pre-correction) | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC02 | Verified (pre-correction) | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC03 | Verified (pre-correction) | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC04 | Verified (pre-correction) | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC05 | Verified (pre-correction) | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC06 | Verified (pre-correction) | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC07 | Verified (pre-correction) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 — wording then updated to permit `Kiln.Domain.Error` consumption while forbidding Domain construction / direct behavior invocation |
-| Correction pass — F1 (single nonterminal vocabulary) | Pending exact-head CI | P1-S01-T04-E08 | `test/kiln/operation_lifecycle_parity_test.exs` |
-| Correction pass — F2 (cli_result schema conformance) | Pending exact-head CI | P1-S01-T04-E09 | `test/kiln/cli/json_renderer_test.exs`, `scripts/validate_cli_result_schema.py` |
-| Correction pass — F3 (no Domain construction in dispatcher) | Pending exact-head CI | P1-S01-T04-E10 | source-guard inside `test/kiln/cli_test.exs` |
-| Correction pass — F4 (KILN_HOME precedence) | Pending exact-head CI | P1-S01-T04-E11 | `test/kiln/cli/request_test.exs` |
-| Correction pass — F5 (capability-driven next actions) | Pending exact-head CI | P1-S01-T04-E12 | `test/kiln/cli_test.exs` capability-driven describe blocks |
-| Correction pass — F6 (sequential one-Session guard) | Pending exact-head CI | P1-S01-T04-E13 | `test/kiln/cli_test.exs` "second start is rejected with SESSION_ALREADY_EXISTS and writes zero durable rows" — asserts nonzero exit, `:blocked` status, `SESSION_ALREADY_EXISTS`, unchanged journal/action/projection counts, and that `Workflow.current_session/0` resolves the original Session |
-| Correction pass — F7 (Workflow-owned capability authority) | Pending exact-head CI | P1-S01-T04-E14 | `test/kiln/cli_test.exs` `assert_mutating_subset/3` helper plus `F2 capability authority` describe block — asserts the CLI mutating suggestions are a subset of `Workflow.valid_next_actions/1` for `ready`, `running`, `waiting_for_user`, `canceled`, and the `intent_recorded` orphan fixture; asserts the cancel result contains no `cancel` and no `resume`; asserts `Workflow.valid_next_actions(session_id) == []` after cancel |
-| Correction pass — F8 (explicit `:started` operation-state parity) | Pending exact-head CI | P1-S01-T04-E15 | `test/kiln/operation_lifecycle_parity_test.exs` — `OperationLifecycle` partition test asserts every accepted operation state is classified correctly and the `Restart` and `Workflow` classifiers agree on the persisted `:started` fixture (intent → observe with `state: "started"`, `run_to: "running"`) |
-| Correction pass — F9 (AC07 Domain Error boundary + strengthened source guard) | Pending exact-head CI | P1-S01-T04-E16 | `test/kiln/cli_test.exs` — alias guard allows `Kiln.Domain.Error`, fully-qualified guard forbids any `Kiln.Domain.*` construction or behavior call, and the aliased-Error guard forbids `Error.<method>(...)` calls |
-| Correction pass — small cleanup (ErrorMap doc, store_id comment, resume doc) | Pending exact-head CI | P1-S01-T04-E17 | local sandbox run; the comment changes document actual code behaviour and are not separately gated by a CI job |
+| P1-S01-T04-AC01 | Verified (pre-correction, historical) | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC02 | Verified (pre-correction, historical) | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC03 | Verified (pre-correction, historical) | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC04 | Verified (pre-correction, historical) | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC05 | Verified (pre-correction, historical) | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC06 | Verified (pre-correction, historical) | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC07 | Verified (pre-correction, historical) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 — wording then updated to permit `Kiln.Domain.Error` consumption while forbidding Domain construction / direct behavior invocation |
+| Correction pass — F1 (single nonterminal vocabulary) | Verified | P1-S01-T04-E08 | `test/kiln/operation_lifecycle_parity_test.exs` (superseded by F8) |
+| Correction pass — F2 (cli_result schema conformance) | Verified | P1-S01-T04-E09 | `test/kiln/cli/json_renderer_test.exs`, `scripts/validate_cli_result_schema.py` |
+| Correction pass — F3 (no Domain construction in dispatcher) | Verified | P1-S01-T04-E10 | source-guard inside `test/kiln/cli_test.exs` |
+| Correction pass — F4 (KILN_HOME precedence) | Verified | P1-S01-T04-E11 | `test/kiln/cli/request_test.exs` |
+| Correction pass — F5 (capability-driven next actions) | Verified | P1-S01-T04-E12 | `test/kiln/cli_test.exs` capability-driven describe blocks |
+| Correction pass — F6 (sequential one-Session guard) | Verified | P1-S01-T04-E13 | `test/kiln/cli_test.exs` "second start is rejected with SESSION_ALREADY_EXISTS and writes zero durable rows" |
+| Correction pass — F7 (Workflow-owned capability authority) | Verified | P1-S01-T04-E14 | `test/kiln/cli_test.exs` `assert_mutating_subset/3` plus F2 capability-authority describe block; canceled/orphan states exercise the empty-capability contract |
+| Correction pass — F8 (explicit `:started` operation-state parity) | Verified | P1-S01-T04-E15 | `test/kiln/operation_lifecycle_parity_test.exs` partition + persisted-`:started` fixture |
+| Correction pass — F9 (AC07 Domain Error boundary + strengthened source guard) | Verified | P1-S01-T04-E16 | `test/kiln/cli_test.exs` alias / fully-qualified / aliased-Error guards |
+| Final closure — I1 (orphan capability authority at Workflow) | Verified | P1-S01-T04-E17 | `Kiln.Workflow.capability_for/1` collapses effective-orphaned Sessions to `[]`; `test/kiln/cli_test.exs` proves the CLI does not advertise a mutation Workflow would then reject for both `intent_recorded` and `:started` orphan states |
+| Final closure — I2 (empty-DB control flow) | Verified | P1-S01-T04-E18 | `test/kiln/cli_test.exs` "initialized empty DB + status/inspect/cancel/resume return blocked NO_SESSION without crash" + "invalid start + subsequent status does not crash" |
+| Final closure — I3 (resume semantics distinction) | Verified | P1-S01-T04-E19 | `Kiln.CLI.translate_capability/1` maps only `:cancel_session -> cancel`; `test/kiln/cli_test.exs` start-result and cancel-result tests assert `resume` is never presented as a Workflow-owned mutation |
+| Final closure — I4 (concurrent starts, Outcome B) | Verified | P1-S01-T04-E20 | `Kiln.Workflow.start_session` passes a precondition into `Journal.commit`'s existing `BEGIN IMMEDIATE` transaction; `test/kiln/workflow_test.exs` "two competing start_session calls with different idempotency keys produce exactly one Session" deterministically forces the race window via send/receive |
+| Final closure — I5 (CLAUDE.md disposition) | Verified | P1-S01-T04-E21 | `CLAUDE.md` removed from PR #40 (not on `origin/main`); commit-message convention retained in `AGENTS.md` |
+| Final closure — small cleanup (ErrorMap doc, store_id comment, resume doc) | Verified | P1-S01-T04-E22 | local sandbox run; comment changes document actual code behaviour and pass `scripts/check` |
 
 ### Verification executed
 
@@ -258,8 +255,23 @@ fresh GitHub Actions run on the corrected head is observed.
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: Yes (the F1–F9 corrections are owned by T04, not T05)
-- Slice completion claimed: Pending exact-head CI green on the correction pass
+- Slice verification manifest updated: Yes (the F1–F9 corrections and I1–I5 closure pass are owned by T04, not T05)
+- Slice completion claimed: Yes — verified on final corrected head `f3fe050` by GitHub Actions run `31199247425`
+
+### Failures and warnings
+
+- Pre-correction "Verified" claim is downgraded to "historical" — superseded by exact-head CI on `f3fe050`.
+- This is a source-development entry point, not the delivered release.
+- The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
+- The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
+- The F1–F5, F6–F9, and I1–I5 correction passes landed sequentially on the same branch and PR.
+
+### Remaining unknowns and exclusions
+
+- Aggregate owner-machine demo of the foundation CLI is T05.
+- The orphan-capability authority is now correctly enforced at the Workflow boundary (I1); the previously documented "Workflow/Restart orphan classification tension" is closed for the T04 surface. A future Workflow/Restart reconciliation ticket may further tighten the orphan-flag / run-state semantics for non-T04 consumers.
+- The T04 `resume` command is permanently guidance-only (R07); the deferred Workflow `Workflow.resume_session/2` mutation is not exposed as an executable CLI command and would belong to a future ticket.
+- No additional architecture changes are required to merge.
 
 ### Failures and warnings
 
@@ -277,12 +289,12 @@ fresh GitHub Actions run on the corrected head is observed.
 
 ### Repository state
 
-- Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (pre-correction, verified by GitHub Actions run 31142579605)
-- Pre-correction-pass commit: 24fecd1257f82b312744337395c5f578af13bbf3 (F1–F5 + wording downgrade, superseded by the F6–F9 pass)
-- F6–F9 correction-pass commit: c1d7830 (sequential one-Session guard, capability authority extension, explicit `:started` fixture, AC07 boundary + source guard, three doc cleanups)
-- Convention-docs commit: 37e7ac6 (commit-message convention added to `AGENTS.md` and `CLAUDE.md`; included in the corrected-head CI run because the docs pass-gate depends on it)
-- Latest HEAD on `work/p1-s01-t04-foundation-cli`: 37e7ac6, verified by GitHub Actions run 31194756348
+- Final implementation head: `f3fe050cd0e1e5f39a32be2b2ac6043c8be3696e`
+- Final exact-head CI: GitHub Actions run `31199247425` on commit `f3fe050` (both `test` and `prose` jobs green)
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Exact CI run on the corrected head: GitHub Actions run 31194756348 on commit 37e7ac6 (both `test` and `prose` jobs green)
-- Pre-correction CI run (kept for provenance): GitHub Actions run 31142579605 on commit bb4b8a4
+- Historical heads preserved for provenance:
+  - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
+  - `bb4b8a4` (pre-correction) — verified by GitHub Actions run `31142579605`
+  - `ece4537` (F1–F9 final) — verified by GitHub Actions run `31194974919`
+  - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
