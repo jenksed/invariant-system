@@ -11,6 +11,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 REGISTRY = ROOT / "arsenal" / "registry.json"
 CATALOG = ROOT / "CATALOG.md"
+CANONICAL_GENERATOR = "prompt_design/master-sol-fable-super-prompt-generator.md"
 
 KINDS = {"prompt", "prompt-package", "generator", "brief", "workflow", "template", "doctrine"}
 STATUSES = {"source", "draft", "unverified", "testing", "stable", "deprecated"}
@@ -95,12 +96,21 @@ def audit(data):
             errors.append(f"{aid}: missing path {path}")
             continue
 
+        text = full.read_text(encoding="utf-8", errors="replace")
+
         if asset["kind"] == "prompt":
-            text = full.read_text(encoding="utf-8", errors="replace")
             if "kind: prompt-generation-brief" in text:
                 errors.append(f"{aid}: prompt contains prompt-generation-brief payload")
             if text.lstrip().startswith("# Master Sol/Fable Super-Prompt Generator"):
                 errors.append(f"{aid}: prompt contains generator wrapper instead of canonical prompt")
+
+        if asset["kind"] == "brief":
+            if text.lstrip().startswith("# Master Sol/Fable Super-Prompt Generator"):
+                errors.append(f"{aid}: brief duplicates canonical generator body")
+            if "kind: prompt-generation-brief" not in text:
+                errors.append(f"{aid}: brief is missing prompt-generation-brief marker")
+            if f"generator: {CANONICAL_GENERATOR}" not in text:
+                errors.append(f"{aid}: brief does not reference canonical generator")
 
     for asset in data["assets"]:
         aid = asset.get("id", "<unknown>")

@@ -1,9 +1,11 @@
 # Source Briefs
 
-This directory preserves generation-source artifacts that previously occupied final prompt filenames.
+This directory contains prompt-generation briefs used as source inputs for canonical runnable prompts.
 
-They are intentionally separated from runnable canonical prompts.
+Briefs are **source artifacts, not operational prompts**. Each brief references the single canonical generator at:
 
-A source brief may contain the historical Master Sol/Fable generator wrapper plus the appended `prompt-generation-brief`. The exact source artifact is preserved for provenance; the canonical runnable capability lives at the original category path and is registered in `arsenal/registry.json`.
+`prompt_design/master-sol-fable-super-prompt-generator.md`
 
-Do not select files in this directory as finished operational prompts.
+Do not copy the generator body into individual briefs. Git history preserves the original combined generator-plus-brief files that existed before the integrity migration.
+
+The runnable capability lives at the registered category path in `arsenal/registry.json`.
