@@ -164,9 +164,21 @@ defmodule Kiln.WorkflowTest do
         )
 
       assert {:ok, viewed} = Workflow.query_session(started.session_id)
-      assert Map.keys(viewed) |> Enum.sort() == [:projection, :projection_digest, :source]
+
+      assert Map.keys(viewed) |> Enum.sort() ==
+               [
+                 :journal_head_digest,
+                 :orphaned,
+                 :projection,
+                 :projection_digest,
+                 :session_id,
+                 :source
+               ]
+
       assert viewed.source in [:cache, :rebuilt]
       assert is_binary(viewed.projection_digest)
+      assert viewed.session_id == started.session_id
+      assert viewed.orphaned == false
 
       assert viewed.projection["session"]["id"] == started.session_id
       assert viewed.projection["run"]["state"] == "ready"
@@ -415,6 +427,53 @@ defmodule Kiln.WorkflowTest do
       assert {:ok, first} = Workflow.valid_next_actions(session_id)
       assert {:ok, second} = Workflow.valid_next_actions(session_id)
       assert first == second
+    end
+  end
+
+  # ---- current_session/0: single-Session resolution ----
+
+  describe "current_session/0" do
+    test "returns :empty when the journal holds no Session" do
+      assert {:ok, :empty} = Workflow.current_session()
+    end
+
+    test "returns the same shape as query_session/1 when exactly one Session exists",
+         %{d: d} do
+      {:ok, started} =
+        Workflow.start_session(
+          objective: d.session.objective,
+          criteria: d.task.criteria,
+          project_observation: observation(),
+          actor_id: "user:local"
+        )
+
+      assert {:ok, current} = Workflow.current_session()
+      assert {:ok, queried} = Workflow.query_session(started.session_id)
+      assert current == queried
+      assert current.session_id == started.session_id
+      assert current.orphaned == false
+    end
+
+    test "returns a typed :multiple_sessions error when the journal holds more than one Session",
+         %{store: store} do
+      d1 = JB.domain(1)
+      {:ok, _} = JB.commit_start(store, d1)
+
+      # Plant a second distinct session_id directly into action_commits so
+      # `Replay.sessions/1` sees both without going through `commit_start`
+      # (which would collide on the deterministic action_id used by the helper).
+      JB.insert_action_commit(store.conn, %{
+        action_id: "act_00000000000000000000000000000099",
+        session_id: "sess_00000000000000000000000000000099",
+        idempotency_key: "idem_00000000000000000000000000000099",
+        request_digest: "sha256:" <> String.duplicate("9", 64),
+        expected_session_revision: 0,
+        first_sequence: 1_000,
+        last_sequence: 1_000
+      })
+
+      assert {:error, %Error{code: :multiple_sessions, details: %{count: 2}}} =
+               Workflow.current_session()
     end
   end
 
