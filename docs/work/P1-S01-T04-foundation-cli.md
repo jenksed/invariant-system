@@ -201,19 +201,19 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented but unverified (pending Workflow rebind on rewritten remote head)
+**Result:** Implemented and verified
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T04-AC01 | Implemented | P1-S01-T04-E01 | pending CI on rewritten head |
-| P1-S01-T04-AC02 | Implemented | P1-S01-T04-E02 | pending CI on rewritten head |
-| P1-S01-T04-AC03 | Implemented | P1-S01-T04-E03 | pending CI on rewritten head |
-| P1-S01-T04-AC04 | Implemented | P1-S01-T04-E04 | pending CI on rewritten head |
-| P1-S01-T04-AC05 | Implemented | P1-S01-T04-E05 | pending CI on rewritten head |
-| P1-S01-T04-AC06 | Implemented | P1-S01-T04-E06 | pending CI on rewritten head |
-| P1-S01-T04-AC07 | Implemented | P1-S01-T04-E07 | pending CI on rewritten head |
+| P1-S01-T04-AC01 | Verified | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC02 | Verified | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC03 | Verified | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC04 | Verified | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC05 | Verified | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC06 | Verified | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC07 | Verified | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 |
 
 ### Verification executed
 
@@ -231,29 +231,31 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 | `mix test test/kiln/cli` | 58 passed | local sandbox run, 2026-08-06 |
 | `mix test` | 312 passed | local sandbox run, 2026-08-06 |
 | `scripts/check` | pass | local sandbox run, 2026-08-06 |
-| GitHub CI on rewritten head | pending | to be observed after force-with-lease push |
+| GitHub Actions `test` job | success | https://github.com/jenksed/kiln/actions/runs/31142579605/job/92755364548 |
+| GitHub Actions `prose` job | success | https://github.com/jenksed/kiln/actions/runs/31142579605/job/92755364587 |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Implemented locally; not yet exercised on a fresh owner machine
+- Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: No
-- Slice completion claimed: No
+- Slice verification manifest updated: Yes
+- Slice completion claimed: Yes (foundation CLI)
 
 ### Failures and warnings
 
 - This is a source-development entry point, not the delivered release.
 - The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
+- The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
 
 ### Remaining unknowns and exclusions
 
-- Aggregate proof and owner-machine demo are T05.
-- GitHub CI for the rewritten head has not yet been observed; the completion record will be updated after the green run.
+- Aggregate owner-machine demo of the foundation CLI is T05.
+- No additional architecture changes are required to merge.
 
 ### Repository state
 
-- Commit: pending push
+- Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (implementation + tests + plan, verified by GitHub Actions run 31142579605)
+- Documentation update commit: this edit lands on top of bb4b8a4 as the new branch head
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Diff reviewed: Yes (locally)
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Exact CI run: GitHub Actions run 31142579605 on commit bb4b8a4
+- Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
