@@ -164,9 +164,21 @@ defmodule Kiln.WorkflowTest do
         )
 
       assert {:ok, viewed} = Workflow.query_session(started.session_id)
-      assert Map.keys(viewed) |> Enum.sort() == [:projection, :projection_digest, :source]
+
+      assert Map.keys(viewed) |> Enum.sort() ==
+               [
+                 :journal_head_digest,
+                 :orphaned,
+                 :projection,
+                 :projection_digest,
+                 :session_id,
+                 :source
+               ]
+
       assert viewed.source in [:cache, :rebuilt]
       assert is_binary(viewed.projection_digest)
+      assert viewed.session_id == started.session_id
+      assert viewed.orphaned == false
 
       assert viewed.projection["session"]["id"] == started.session_id
       assert viewed.projection["run"]["state"] == "ready"
@@ -415,6 +427,157 @@ defmodule Kiln.WorkflowTest do
       assert {:ok, first} = Workflow.valid_next_actions(session_id)
       assert {:ok, second} = Workflow.valid_next_actions(session_id)
       assert first == second
+    end
+  end
+
+  # ---- current_session/0: single-Session resolution ----
+
+  describe "current_session/0" do
+    test "returns :empty when the journal holds no Session" do
+      assert {:ok, :empty} = Workflow.current_session()
+    end
+
+    test "returns the same shape as query_session/1 when exactly one Session exists",
+         %{d: d} do
+      {:ok, started} =
+        Workflow.start_session(
+          objective: d.session.objective,
+          criteria: d.task.criteria,
+          project_observation: observation(),
+          actor_id: "user:local"
+        )
+
+      assert {:ok, current} = Workflow.current_session()
+      assert {:ok, queried} = Workflow.query_session(started.session_id)
+      assert current == queried
+      assert current.session_id == started.session_id
+      assert current.orphaned == false
+    end
+
+    test "returns a typed :multiple_sessions error when the journal holds more than one Session",
+         %{store: store} do
+      d1 = JB.domain(1)
+      {:ok, _} = JB.commit_start(store, d1)
+
+      # Plant a second distinct session_id directly into action_commits so
+      # `Replay.sessions/1` sees both without going through `commit_start`
+      # (which would collide on the deterministic action_id used by the helper).
+      JB.insert_action_commit(store.conn, %{
+        action_id: "act_00000000000000000000000000000099",
+        session_id: "sess_00000000000000000000000000000099",
+        idempotency_key: "idem_00000000000000000000000000000099",
+        request_digest: "sha256:" <> String.duplicate("9", 64),
+        expected_session_revision: 0,
+        first_sequence: 1_000,
+        last_sequence: 1_000
+      })
+
+      assert {:error, %Error{code: :multiple_sessions, details: %{count: 2}}} =
+               Workflow.current_session()
+    end
+  end
+
+  # ---- concurrent first-month single-Session invariant ----
+
+  describe "concurrent first-month single-Session invariant" do
+    # Same-BEAM concurrent caller test. Both tasks share the supervised
+    # Store connection (single pool entry). This proves that the
+    # `BEGIN IMMEDIATE` precondition path correctly serializes two
+    # concurrent `Workflow.start_session/1` callers in the same Elixir
+    # node. For the independent-SQLite-connection test (different
+    # Exqlite handles to the same DB file, exercising SQLite's
+    # file-level writer-lock serialization), see
+    # `Kiln.Store.JournalTest` "independent SQLite connection
+    # contention".
+    test "two competing start_session calls through the supervised connection produce exactly one Session",
+         %{store: store} do
+      # Two processes concurrently attempt to start a Session against the
+      # same store with different idempotency keys. Both pass their
+      # pre-check (Replay.sessions == []), both attempt a commit, and
+      # SQLite `BEGIN IMMEDIATE` writer serialization forces exactly
+      # one to commit first; the second observes the first's journal
+      # entries inside its own IMMEDIATE transaction and the
+      # precondition rolls it back with `:session_already_exists`.
+      #
+      # This proves the journal-transaction precondition is the
+      # authoritative one-Session guard. The outcome of which process
+      # wins is scheduler-dependent, but the invariant (exactly one
+      # commits) is deterministic given the IMMEDIATE serialization.
+      parent = self()
+
+      task_a =
+        Task.async(fn ->
+          send(parent, {:ready_a, self()})
+
+          receive do
+            :go ->
+              Workflow.start_session(
+                objective: "Concurrent A",
+                criteria: ["Passes"],
+                project_observation: observation(),
+                actor_id: "user:local-a",
+                idempotency_key: unique_idempotency_key()
+              )
+          end
+        end)
+
+      task_b =
+        Task.async(fn ->
+          send(parent, {:ready_b, self()})
+
+          receive do
+            :go ->
+              Workflow.start_session(
+                objective: "Concurrent B",
+                criteria: ["Passes"],
+                project_observation: observation(),
+                actor_id: "user:local-b",
+                idempotency_key: unique_idempotency_key()
+              )
+          end
+        end)
+
+      # Wait until both tasks have entered their start_session calls,
+      # then release them simultaneously so SQLite IMMEDIATE writer
+      # serialization — not Erlang scheduler ordering — determines which
+      # commits first. This is deterministic given the IMMEDIATE lock.
+      receive do
+        {:ready_a, a_pid} ->
+          receive do
+            {:ready_b, b_pid} ->
+              send(a_pid, :go)
+              send(b_pid, :go)
+          end
+      end
+
+      result_a = Task.await(task_a)
+      result_b = Task.await(task_b)
+
+      # Exactly one commit, exactly one rejection with the typed error.
+      outcomes = [result_a, result_b]
+
+      successes = Enum.filter(outcomes, &match?({:ok, _}, &1))
+      rejections = Enum.filter(outcomes, &match?({:error, %Error{}}, &1))
+
+      assert length(successes) == 1,
+             "exactly one start must succeed; got successes=#{inspect(successes)} rejections=#{inspect(rejections)}"
+
+      assert length(rejections) == 1,
+             "exactly one start must be rejected; got successes=#{inspect(successes)} rejections=#{inspect(rejections)}"
+
+      [{:error, %Error{code: :session_already_exists}}] = rejections
+
+      # Exactly one durable Session exists, and the journal and
+      # projection caches are consistent.
+      assert count(store.conn, "journal_entries") == 1,
+             "exactly one session_started entry must persist; the rejected start must not commit"
+
+      assert count(store.conn, "action_commits") == 1
+      assert count(store.conn, "session_projections") == 1
+
+      {:ok, current} = Workflow.current_session()
+      refute match?({:ok, :empty}, {:ok, current})
+      assert match?(%{session_id: _}, current)
     end
   end
 
@@ -993,18 +1156,15 @@ defmodule Kiln.WorkflowTest do
                  idempotency_key: unique_idempotency_key()
                })
 
-      # Start a second session for the resume map-path test so the state is
-      # independent of the cancel above.
-      {:ok, second} =
-        Workflow.start_session(
-          objective: "Correct one bounded defect",
-          criteria: ["The focused test passes"],
-          project_observation: observation(),
-          actor_id: "user:local"
-        )
-
-      assert {:ok, _} =
-               Workflow.resume_session(second.session_id, %{
+      # The resume map-path test uses the same Session; the Workflow
+      # capability matrix accepts resume from `:canceled` was deferred
+      # to a future ticket, so this asserts that a resume against a
+      # canceled Session is rejected with the typed Workflow error
+      # rather than crashing. The accepted behavior is the typed
+      # `:run_transition_not_allowed`; the map path of resume_session/2
+      # is exercised by the shape match above.
+      assert {:error, %Error{code: :run_transition_not_allowed}} =
+               Workflow.resume_session(started.session_id, %{
                  expected_session_revision: 0,
                  actor_id: "user:local",
                  idempotency_key: unique_idempotency_key()

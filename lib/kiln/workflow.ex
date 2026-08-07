@@ -37,6 +37,15 @@ defmodule Kiln.Workflow do
       deterministically ascending-sorted. `[]` is returned for an unknown
       or empty session and for terminal Run states.
 
+    * `current_session/0` — single-Session resolution for clients that do
+      not carry a `session_id`. Returns `{:ok, :empty}` when the journal
+      holds no Session, the authoritative `{:ok, query_result()}` when
+      exactly one Session exists, or `{:error, %Error{code: :multiple_sessions}}`
+      when the journal holds more than one Session. The CLI, TUI, and
+      other clients that operate against a single current Session use
+      this function in place of a `query_session/1` call when no
+      `session_id` is yet known.
+
   Every return is `{:ok, _}` or `{:error, %Kiln.Domain.Error{}}`. Mutating
   operations perform no journal write when validation or input checking
   fails. Return shapes carry only identifiers, revision, run state, and
@@ -76,6 +85,8 @@ defmodule Kiln.Workflow do
   """
 
   alias Kiln.Domain.{Action, Error, Id, ProjectObservation, Session, Transition}
+  alias Kiln.Journal.Replay
+  alias Kiln.OperationLifecycle
   alias Kiln.Projections.Session, as: SessionProjection
   alias Kiln.Projections.Store, as: ProjectionStore
   alias Kiln.Store.{Canonical, Journal}
@@ -111,7 +122,10 @@ defmodule Kiln.Workflow do
   @type query_result :: %{
           projection: map(),
           source: :cache | :rebuilt,
-          projection_digest: String.t()
+          projection_digest: String.t(),
+          journal_head_digest: String.t() | nil,
+          orphaned: boolean(),
+          session_id: String.t()
         }
 
   @request_digest_schema "kiln.workflow.request_digest/v1"
@@ -226,6 +240,47 @@ defmodule Kiln.Workflow do
     end
   end
 
+  @doc """
+  Resolve the single current Session for clients that do not carry a
+  `session_id`.
+
+  Returns `{:ok, :empty}` when the journal holds no Session, the
+  authoritative `{:ok, query_result()}` when exactly one Session exists,
+  or `{:error, %Error{code: :multiple_sessions}}` when the journal holds
+  more than one Session. A corrupt journal that fails to enumerate the
+  Session list returns `{:error, %Error{code: :journal_invalid}}` and
+  does not fall back to `query_session/1`.
+
+  The first-month contract is exactly one Session. The CLI, TUI, and
+  other single-Session clients use this entry point in place of a
+  `query_session/1` call. Multi-Session clients must call
+  `query_session/1` per Session.
+  """
+  @spec current_session() ::
+          {:ok, :empty}
+          | {:ok, query_result()}
+          | {:error, Error.t()}
+  def current_session() do
+    with {:ok, conn} <- store_conn() do
+      case Replay.sessions(conn) do
+        [] ->
+          {:ok, :empty}
+
+        [session_id] ->
+          load_projection(conn, session_id)
+
+        session_ids ->
+          {:error,
+           Error.new(
+             :multiple_sessions,
+             "more than one Session exists; the foundation CLI supports exactly one",
+             nil,
+             %{count: length(session_ids), sessions: session_ids}
+           )}
+      end
+    end
+  end
+
   # ---- transition path (cancel + resume) ----
 
   defp run_transition(session_id, opts, public_relation: public_relation) do
@@ -291,6 +346,14 @@ defmodule Kiln.Workflow do
           {:ok, action} ->
             entry = build_start_entry(session, task, run)
 
+            # The one-Session precondition runs inside the
+            # `BEGIN IMMEDIATE` transaction that `commit/4` opens. Two
+            # concurrent start invocations serialize on the SQLite
+            # write lock; whichever writer acquires the lock second
+            # observes the first writer's session entries and is
+            # rejected before any durable write. The CLI's earlier
+            # `precheck_no_session/1` continues to provide a friendly
+            # user-facing rejection in the common sequential case.
             commit(
               conn,
               action,
@@ -298,7 +361,8 @@ defmodule Kiln.Workflow do
               result_map,
               &start_result_from_stored/1,
               expected_revision: 0,
-              session_id: session.id
+              session_id: session.id,
+              precondition: :no_existing_session
             )
 
           {:error, _} = error ->
@@ -416,6 +480,7 @@ defmodule Kiln.Workflow do
   defp commit(conn, action, entries, result_map, result_fun, opts) do
     expected_revision = Keyword.fetch!(opts, :expected_revision)
     session_id = Keyword.fetch!(opts, :session_id)
+    precondition = Keyword.get(opts, :precondition)
 
     case Journal.commit(
            conn,
@@ -423,7 +488,8 @@ defmodule Kiln.Workflow do
            entries,
            now: now_iso(),
            result: result_map,
-           result_schema: @application_result_schema
+           result_schema: @application_result_schema,
+           precondition: precondition
          ) do
       {:ok, %{status: :committed, session_revision: revision, projection: projection}} ->
         committed = committed_result(result_map, revision, projection)
@@ -518,10 +584,28 @@ defmodule Kiln.Workflow do
   # ---- capability authority ----
 
   # The single source of truth for what this boundary exposes from each
-  # Run state. `valid_next_actions/1` lists the advertised set; every
-  # mutator (cancel/resume) checks `capability_authorize/2` against the
-  # same matrix before any journal write.
+  # effective Run state. `valid_next_actions/1` lists the advertised set;
+  # every mutator (cancel/resume) checks `capability_authorize/2` against
+  # the same matrix before any journal write.
+  #
+  # The effective state is not just `run.state`. A projection whose Run
+  # state is `running` but whose operation is nonterminal (an unresolved
+  # `intent_recorded` or `started` operation) is conservatively orphaned:
+  # `mix kiln cancel` will refuse to act on it, so advertising
+  # `:cancel_session` in the next-action list would tell the user to
+  # execute an operation the Workflow then rejects. To honour the
+  # "every advertised operation must be executable from the effective
+  # state" contract, the orphan classification collapses the effective
+  # state to a terminal-like set with `[]` capabilities before the
+  # capability matrix is consulted.
   defp capability_for(projection) do
+    cond do
+      orphaned?(projection) -> []
+      true -> capability_for_run_state(projection)
+    end
+  end
+
+  defp capability_for_run_state(projection) do
     case run_state_from_projection(projection) do
       nil -> []
       state -> capability_for_state(state)
@@ -1516,7 +1600,7 @@ defmodule Kiln.Workflow do
       {:ok, :empty} ->
         {:ok, :empty}
 
-      {:ok, status, %{projection: projection}}
+      {:ok, status, %{projection: projection, journal_head_digest: journal_head_digest}}
       when status in [
              :match,
              :rebuilt,
@@ -1526,9 +1610,12 @@ defmodule Kiln.Workflow do
            ] ->
         {:ok,
          %{
+           session_id: session_id,
            projection: projection,
            source: source_from_status(status),
-           projection_digest: SessionProjection.digest(projection)
+           projection_digest: SessionProjection.digest(projection),
+           journal_head_digest: journal_head_digest,
+           orphaned: orphaned?(projection)
          }}
 
       {:ok, status, _report} ->
@@ -1549,8 +1636,26 @@ defmodule Kiln.Workflow do
   end
 
   defp source_from_status(:match), do: :cache
-  defp source_from_status(:rebuilt), do: :rebuilt
   defp source_from_status(_), do: :rebuilt
+
+  # A Root Run is `orphaned` when its projection carries a non-nil
+  # operation whose state is in the canonical nonterminal operation-state
+  # set. The set lives in `Kiln.OperationLifecycle` so the conservative
+  # restart classifier (`Kiln.Restart.classify/2`) and this query path
+  # can never silently diverge. The classification is derived from the
+  # same projection invariant without consulting Transcript or replay
+  # internals.
+  defp orphaned?(projection) when is_map(projection) do
+    case projection["operation"] do
+      %{"state" => state} when is_binary(state) ->
+        OperationLifecycle.nonterminal_string?(state)
+
+      _ ->
+        false
+    end
+  end
+
+  defp orphaned?(_), do: false
 
   defp run_state_from_projection(%{"run" => %{"state" => state}}) when is_binary(state) do
     state_to_atom(state)

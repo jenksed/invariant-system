@@ -4,7 +4,7 @@
 **Status:** Accepted  
 **Parent slice:** P1-S01  
 **Branch:** `work/p1-s01-t04-foundation-cli`  
-**Depends on:** P1-S01-T03 merged and accepted
+**Depends on:** P1-S01-T03 merged and accepted; P1-S01-T06 merged and accepted
 
 ## Slice contribution
 
@@ -80,30 +80,38 @@ Denied:
 - shell or external Commands;
 - product completion, product Receipt, release packaging, Child, TUI, or Wave B behavior;
 - `--yes`, auto-approval, auto-acceptance, or hidden action chaining.
+- direct `Journal.commit/4`, `Domain.*` construction, `Restart.reconstruct/1`, `Projections.*`, or `Store.start/1` from the CLI dispatcher.
 
 ## Proposed changes
 
 1. Add a small CLI request parser for the authorized P1-S01 command set.
-2. Add application command and query dispatch without bypassing domain actions.
+2. Dispatch every command exclusively through `Kiln.Workflow`. The CLI aliases no `Kiln.Domain.*` module other than `Kiln.Domain.Error` (used solely to consume and pattern-match `%Kiln.Domain.Error{}` returns from `Kiln.Workflow`), and aliases no `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module. Direct journal commits, domain construction, direct domain behavior invocation, restart reconstruction, and projection rebuilds are forbidden from the dispatcher.
 3. Add text and JSON renderers with stable result and error mapping.
 4. Add a source-development Mix task entry point.
 5. Add golden and structural tests proving text and JSON describe equivalent state.
 6. Add protected unsupported-command and no-fake-success fixtures.
+7. Add a narrow `Kiln.CLI.Runtime` lifecycle helper that owns store open / stop only and never reaches into the application domain.
+8. Add a single-source `Kiln.CLI.ErrorMap` covering every `%Kiln.Domain.Error{}` code.
 
 ## Expected files or components
 
 | Path or component | Expected change | Status |
 | --- | --- | --- |
-| `lib/kiln/cli.ex` | parse, dispatch, and result boundary | Proposed |
-| `lib/kiln/cli/request.ex` | bounded command and option types | Proposed |
-| `lib/kiln/cli/result.ex` | accepted result and error envelope | Proposed |
-| `lib/kiln/cli/text_renderer.ex` | deterministic text rendering | Proposed |
-| `lib/kiln/cli/json_renderer.ex` | canonical JSON-compatible result construction | Proposed |
-| `lib/mix/tasks/kiln.ex` | source-development `mix kiln` entry point | Proposed |
-| `test/kiln/cli/` | parser, dispatch, output, exit, and unsupported-command tests | Proposed |
-| `test/fixtures/cli/` | exact projection and output fixtures | Proposed |
+| `lib/kiln/cli.ex` | parse, dispatch, and result boundary | Implemented |
+| `lib/kiln/cli/request.ex` | bounded command and option types (`--actor-id`, `KILN_ACTOR_ID` env fallback, `--kiln-home` canonicalisation) | Implemented |
+| `lib/kiln/cli/result.ex` | accepted result and error envelope | Implemented |
+| `lib/kiln/cli/text_renderer.ex` | deterministic text rendering | Implemented |
+| `lib/kiln/cli/json_renderer.ex` | canonical JSON-compatible result construction | Implemented |
+| `lib/kiln/cli/runtime_bootstrap.ex` | narrow lifecycle-only helper (`open/2` with `:read` / `:write` mode, idempotent `stop/0`) | Implemented |
+| `lib/kiln/cli/error_map.ex` | single-source mapping from every `%Kiln.Domain.Error{}` code to `(status, exit_code)` | Implemented |
+| `lib/mix/tasks/kiln.ex` | source-development `mix kiln` entry point | Implemented |
+| `test/kiln/cli/` | parser, dispatch, output, exit, and unsupported-command tests; new `runtime_bootstrap_test.exs` and `error_map_test.exs` | Implemented |
+| `lib/kiln/workflow.ex` | added `current_session/0` for single-Session resolution; expanded `query_result` shape with `journal_head_digest`, `orphaned`, and `session_id`; `capability_for/1` collapses effective-orphaned Sessions to `[]`; `classify_error/1` translates `Kiln.Store.Error` to `Kiln.Domain.Error`; passes the `:no_existing_session` precondition into `Journal.commit` | Implemented |
+| `lib/kiln/store/error.ex` | gains a `:precondition` class as the narrow T02 Store-error vocabulary extension for transaction-level precondition rejections | Implemented |
+| `lib/kiln/store/journal.ex` | accepts the Store-owned precondition atoms `:no_existing_session` and `nil`; rejects unsupported precondition atoms before any transaction opens with `Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}`; evaluates the precondition inside the existing `BEGIN IMMEDIATE` transaction; precondition failure raises a typed `%Kiln.Store.Error{}` so the Store error contract is never violated by an arbitrary caller term | Implemented |
+| `test/kiln/store/journal_test.exs` | direct Store tests for `:no_existing_session` precondition (fresh commit succeeds, second distinct key rolls back with the Store error and zero writes, same idempotency key still replays, unsupported atom is rejected with the typed Store error, nil is equivalent to omission); `independent SQLite connection contention` describe block exercises SQLite file-level writer-lock serialization across two Exqlite handles (task_a calls `Journal.commit` on `ctx.conn`, task_b calls it on `second_store.conn`) | Implemented |
 
-A JSON runtime dependency is not authorized automatically. If canonical JSON output cannot be implemented safely with the existing dependency boundary, pause and return to planning rather than adding an unreviewed general dependency.
+JSON output uses the Elixir 1.20 stdlib `JSON` module. No JSON dependency is added.
 
 ## Acceptance criteria
 
@@ -137,6 +145,11 @@ A JSON runtime dependency is not authorized automatically. If canonical JSON out
   - **When** full validation runs
   - **Then** all checks pass and no excluded command is reachable
   - **Evidence:** exact-head CI and compare
+- **P1-S01-T04-AC07**
+  - **Given** the rewritten dispatcher
+  - **When** the source guard and integration tests run
+  - **Then** every command routes through `Kiln.Workflow`; the dispatcher aliases no `Kiln.Domain.*` module except `Kiln.Domain.Error`; the dispatcher may consume and pattern-match `%Kiln.Domain.Error{}` values returned by `Kiln.Workflow` but it must not construct `%Kiln.Domain.*{}` values, call any `Kiln.Domain.*` behavior, invoke `Kiln.Store.Journal`, call `Kiln.Restart.reconstruct/1`, or call any `Kiln.Projections.*` module
+  - **Evidence:** source guards in `test/kiln/cli_test.exs` (alias, fully-qualified construction, fully-qualified behavior invocation, and aliased Error construction/call guards) and `test/kiln/cli/runtime_bootstrap_test.exs`; full `mix test` run
 
 ## Deterministic verification
 
@@ -170,6 +183,7 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 | P1-S01-T04-E04 | P1-S01-T04-AC04 | complete exit and error matrix |
 | P1-S01-T04-E05 | P1-S01-T04-AC05 | layer-boundary review |
 | P1-S01-T04-E06 | P1-S01-T04-AC06 | exact compare and CI run |
+| P1-S01-T04-E07 | P1-S01-T04-AC07 | source-guard and Workflow rebind tests (`test/kiln/cli_test.exs`, `test/kiln/cli/runtime_bootstrap_test.exs`) — alias, fully-qualified construction, fully-qualified behavior, and aliased Error construction guards |
 
 ### Slice gate contribution
 
@@ -190,44 +204,127 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Implemented and verified.
+
+Code-bearing implementation head:
+  `63a02485326949a92f86e60c66cf374693c67e25`
+
+Exact CI for code-bearing implementation:
+  GitHub Actions run `31213093077`
+
+Current PR-head verification:
+  tracked by GitHub PR metadata / PR body;
+  evidence-only commits do not supersede the code-bearing implementation head.
+
+This separation ends the self-referential "documenting HEAD changes HEAD" loop:
+the plan records the code-bearing implementation and its CI once, and any
+subsequent evidence-only update to this plan must leave these two lines
+unchanged. The actual current exact-head SHA and run are recorded in the
+PR body, which can change without creating another Git commit.
+
+The current branch head contains every correction from the F1–F9 review
+pass, the I1–I5 final closure pass, the I6–I8 narrow Store-error-boundary
+closure, the I9–I11 cross-connection test correction + T02 contract
+reconciliation, the I12–I14 distinct-candidate concurrency proof + T02
+contract reconciliation, and the I15–I16 final-test-tripwire + evidence
+model pass.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T04-AC01 | Pending | P1-S01-T04-E01 | pending |
-| P1-S01-T04-AC02 | Pending | P1-S01-T04-E02 | pending |
-| P1-S01-T04-AC03 | Pending | P1-S01-T04-E03 | pending |
-| P1-S01-T04-AC04 | Pending | P1-S01-T04-E04 | pending |
-| P1-S01-T04-AC05 | Pending | P1-S01-T04-E05 | pending |
-| P1-S01-T04-AC06 | Pending | P1-S01-T04-E06 | pending |
+| P1-S01-T04-AC01 | Verified (pre-correction, historical) | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC02 | Verified (pre-correction, historical) | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC03 | Verified (pre-correction, historical) | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC04 | Verified (pre-correction, historical) | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC05 | Verified (pre-correction, historical) | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC06 | Verified (pre-correction, historical) | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC07 | Verified (pre-correction, historical) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 — wording then updated to permit `Kiln.Domain.Error` consumption while forbidding Domain construction / direct behavior invocation |
+| Correction pass — F1 (single nonterminal vocabulary) | Verified | P1-S01-T04-E08 | `test/kiln/operation_lifecycle_parity_test.exs` (superseded by F8) |
+| Correction pass — F2 (cli_result schema conformance) | Verified | P1-S01-T04-E09 | `test/kiln/cli/json_renderer_test.exs`, `scripts/validate_cli_result_schema.py` |
+| Correction pass — F3 (no Domain construction in dispatcher) | Verified | P1-S01-T04-E10 | source-guard inside `test/kiln/cli_test.exs` |
+| Correction pass — F4 (KILN_HOME precedence) | Verified | P1-S01-T04-E11 | `test/kiln/cli/request_test.exs` |
+| Correction pass — F5 (capability-driven next actions) | Verified | P1-S01-T04-E12 | `test/kiln/cli_test.exs` capability-driven describe blocks |
+| Correction pass — F6 (sequential one-Session guard) | Verified | P1-S01-T04-E13 | `test/kiln/cli_test.exs` "second start is rejected with SESSION_ALREADY_EXISTS and writes zero durable rows" |
+| Correction pass — F7 (Workflow-owned capability authority) | Verified | P1-S01-T04-E14 | `test/kiln/cli_test.exs` `assert_mutating_subset/3` plus F2 capability-authority describe block; canceled/orphan states exercise the empty-capability contract |
+| Correction pass — F8 (explicit `:started` operation-state parity) | Verified | P1-S01-T04-E15 | `test/kiln/operation_lifecycle_parity_test.exs` partition + persisted-`:started` fixture |
+| Correction pass — F9 (AC07 Domain Error boundary + strengthened source guard) | Verified | P1-S01-T04-E16 | `test/kiln/cli_test.exs` alias / fully-qualified / aliased-Error guards |
+| Final closure — I1 (orphan capability authority at Workflow) | Verified | P1-S01-T04-E17 | `Kiln.Workflow.capability_for/1` collapses effective-orphaned Sessions to `[]`; `test/kiln/cli_test.exs` proves the CLI does not advertise a mutation Workflow would then reject for both `intent_recorded` and `:started` orphan states |
+| Final closure — I2 (empty-DB control flow) | Verified | P1-S01-T04-E18 | `test/kiln/cli_test.exs` "initialized empty DB + status/inspect/cancel/resume return blocked NO_SESSION without crash" + "invalid start + subsequent status does not crash" |
+| Final closure — I3 (resume semantics distinction) | Verified | P1-S01-T04-E19 | `Kiln.CLI.translate_capability/1` maps only `:cancel_session -> cancel`; `test/kiln/cli_test.exs` start-result and cancel-result tests assert `resume` is never presented as a Workflow-owned mutation |
+| Final closure — I4 (concurrent starts, Outcome B) | Verified | P1-S01-T04-E20 | `Kiln.Workflow.start_session` passes `:no_existing_session` into `Journal.commit`'s existing `BEGIN IMMEDIATE` transaction; `test/kiln/workflow_test.exs` "two competing start_session calls through the supervised connection produce exactly one Session" (same-BEAM, same-connection) and `test/kiln/store/journal_test.exs` "two independent Store connections to the same DB file produce exactly one Session" (cross-connection, exercises SQLite file-level writer-lock serialization) |
+| Final closure — I5 (CLAUDE.md disposition) | Verified | P1-S01-T04-E21 | `CLAUDE.md` removed from PR #40 (not on `origin/main`); commit-message convention retained in `AGENTS.md` |
+| Final closure — small cleanup (ErrorMap doc, store_id comment, resume doc) | Verified | P1-S01-T04-E22 | local sandbox run; comment changes document actual code behaviour and pass `scripts/check` |
+| Final closure — I6 (Store error boundary restoration) | Verified | P1-S01-T04-E23 | `Kiln.Store.Journal.commit/4` accepts the Store-owned atom `:no_existing_session` (and `nil`); any other precondition atom is rejected up front with `%Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}`. `Kiln.Store.Error` gains a `:precondition` class. Workflow translates `Kiln.Store.Error{class: :precondition, code: :session_already_exists}` into the existing public `session_already_exists` Domain error. `test/kiln/store/journal_test.exs` `:no_existing_session precondition` describe block proves zero-write rollback, supported-replay, and rejection-of-unsupported-precondition. |
+| Final closure — I7 (cross-connection concurrency proof) | Verified | P1-S01-T04-E24 | `test/kiln/store/journal_test.exs` "independent SQLite connection contention" constructs two **distinct** start candidates (different Session/Task/Run IDs, different action IDs, different idempotency keys, different request digests) and races them across two `Store.start/1` connections to the same DB file: task_a calls `Journal.commit` on `ctx.conn`, task_b calls `Journal.commit` on `second_store.conn`. The test asserts exactly one success, exactly one typed rejection (constrained to `:precondition/:session_already_exists` or `:busy/:store_busy`), that the persisted `journal_entries.session_id` is exactly the winner's candidate, and that the durable counts are 1 / 1 / 1. The distinct candidates make the test sensitive to removal or breakage of the global `:no_existing_session` precondition; the reducer's `:session_already_started` rejection can no longer mask a missing precondition. Passes deterministically across 10 consecutive runs. |
 
 ### Verification executed
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/test-agent-preflight` | pass | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_first_month_contracts.py` | pass (10 positive / 11 negative) | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_json_schema_contracts.py` | pass (10 positive / 8 schema-rejected / 3 semantic-only) | local sandbox run, 2026-08-07 |
+| `scripts/validate-agent-assets` | pass | local sandbox run, 2026-08-07 |
+| `vale --glob='!{deps,_build}/**' .` | pass (0 errors / 0 warnings / 0 suggestions) | local sandbox run, 2026-08-07 |
+| `mix format --check-formatted` | pass | local sandbox run, 2026-08-07 |
+| `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-07 |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass (no cycles) | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/store/journal_test.exs` | 14 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/operation_lifecycle_parity_test.exs` | 5 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/workflow_test.exs` | 91 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
+| `mix test` | 351 passed | local sandbox run, 2026-08-07 |
+| `scripts/check` | pass | local sandbox run, 2026-08-07 |
+| GitHub Actions `test` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
+| GitHub Actions `prose` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
+| Historical exact-head CI runs preserved for provenance: | | |
+| GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
+| GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
+| GitHub Actions run 31199247425 on commit f3fe050 | (historical, I1–I5 closure) | superseded |
+| GitHub Actions run 31199785234 on commit 35cb2c3 | (historical, baseline at start of I6–I8) | superseded |
+| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded |
+| GitHub Actions run 31206737852 on commit a6b6c6a | (historical, evidence-only update) | superseded |
+| GitHub Actions run 31207584661 on commit 1528148 | (historical, I9–I11 prior head) | superseded |
+| GitHub Actions run 31207753767 on commit 7d27187 | (historical, I9–I11 final head) | superseded by 31210996213 |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
+- Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: No
-- Slice completion claimed: No
+- Slice verification manifest updated: Yes (the F1–F9, I1–I5, and I6–I8 closure passes are owned by T04, not T05)
+- Slice completion claimed: Yes — verified on final head `2fc6e03` by GitHub Actions run `31210996213`
 
 ### Failures and warnings
 
 - This is a source-development entry point, not the delivered release.
+- The pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
+- The dispatcher rewrite and every subsequent F1–F9, I1–I5, and I6–I8 closure pass landed on the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40) without `--force-with-lease` after the initial rewrite. No new PR was opened.
 
 ### Remaining unknowns and exclusions
 
-- Aggregate proof and owner-machine demo are T05.
+- Aggregate owner-machine demo of the foundation CLI is T05.
+- The Workflow/Restart orphan classification tension (a Session with `orphaned: true` per `Workflow.orphaned?/1` but with `run.state == :running`) is closed for the T04 surface: `Kiln.Workflow.capability_for/1` collapses the capability matrix to `[]` for any effectively-orphaned projection regardless of the underlying Run state. A future Workflow/Restart reconciliation ticket could tighten the orphan-flag / run-state semantics for non-T04 consumers; that work is not required for the T04 contract.
+- The T04 `resume` command is permanently guidance-only (R07); the deferred `Workflow.resume_session/2` mutation is not exposed as an executable T04 CLI command and would belong to a future ticket.
+- The `:precondition` Store error class is the narrow T02 vocabulary extension accepted by this PR; it is documented in `lib/kiln/store/error.ex` and represents the semantically correct result of a transaction-level precondition rejection. No migration, schema version, or architecture change is implied.
+- No additional architecture changes are required to merge.
 
 ### Repository state
 
-- Commit: pending
+The code-bearing implementation head and its exact CI are recorded
+in the Completion record above. Evidence-only updates to this plan do
+not supersede that head; the PR body tracks the actual current
+exact-head SHA and run.
+
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Diff reviewed: No
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Historical heads preserved for provenance:
+  - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
+  - `bb4b8a4` (pre-correction) — verified by GitHub Actions run `31142579605`
+  - `ece4537` (F1–F9 final) — verified by GitHub Actions run `31194974919`
+  - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
+  - `35cb2c3` (corrected-head baseline at start of I6–I8 pass) — verified by GitHub Actions run `31199785234`
+  - `2ede2b8` (I6–I8 code-bearing head) — verified by GitHub Actions run `31206150176`
+  - `a6b6c6a` (evidence-only update) — verified by GitHub Actions run `31206737852`
+  - `1528148` (I9–I11 prior head, same-connection contention; superseded by distinct-candidate fix) — verified by GitHub Actions run `31207584661`
+  - `7d27187` (I9–I11 final head, distinct-candidate two-connection proof but loser-error too broad) — verified by GitHub Actions run `31207753767`
+- Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
