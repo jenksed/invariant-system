@@ -1,0 +1,299 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.invocation-model",
+      "path": "arsenal/INVOCATION_MODEL.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets."
+    },
+    {
+      "id": "foundation.context-boundaries",
+      "path": "foundations/context_boundaries.md",
+      "category": "foundations",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Choose context transitions deliberately at phase boundaries while preserving primary reasoning when it still matters."
+    },
+    {
+      "id": "foundation.domain-language",
+      "path": "foundations/domain_language.md",
+      "category": "foundations",
+      "kind": "method",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Sharpen shared domain terminology and preserve only durable non-obvious decisions."
+    },
+    {
+      "id": "foundation.grilling",
+      "path": "foundations/grilling.md",
+      "category": "foundations",
+      "kind": "method",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Resolve consequential ambiguity through a dependency-aware decision-tree interview and current decision frontier."
+    },
+    {
+      "id": "foundation.rejected-decision-memory",
+      "path": "foundations/rejected_decision_memory.md",
+      "category": "foundations",
+      "kind": "method",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Preserve durable rejected concepts and their reasons so future requests are reconsidered rather than rediscovered."
+    },
+    {
+      "id": "foundation.wayfinding",
+      "path": "foundations/wayfinding.md",
+      "category": "foundations",
+      "kind": "method",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Orchestrate multi-session decision work through a destination, frontier, fog, dependency graph, and primary-source resolution records.",
+      "upstream": ["foundation.grilling", "foundation.domain-language"],
+      "downstream": ["agent.wayfind", "workflow.wayfind-to-delivery"]
+    },
+    {
+      "id": "prompt.agent-writing",
+      "path": "prompt_design/writing_for_agents.md",
+      "category": "prompt_design",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Write agent-facing documents with precise context pointers, progressive disclosure, completion criteria, and single sources of truth."
+    },
+    {
+      "id": "agent.arsenal-router",
+      "path": "agent_workflows/arsenal_router.md",
+      "category": "agent_workflows",
+      "kind": "router",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Route an outcome to the smallest Project Arsenal capability or workflow that actually fits."
+    },
+    {
+      "id": "agent.domain-questionnaire",
+      "path": "agent_workflows/domain_questionnaire.md",
+      "category": "agent_workflows",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Create a targeted questionnaire for a domain expert who owns facts or decisions unavailable to the current user and agent."
+    },
+    {
+      "id": "agent.grill",
+      "path": "agent_workflows/grill_decision_tree.md",
+      "category": "agent_workflows",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Run the decision-tree grilling method for ambiguity that can be resolved within one reliable working session.",
+      "upstream": ["foundation.grilling"],
+      "downstream": ["software.spec-from-context", "agent.wayfind"]
+    },
+    {
+      "id": "agent.rephrase-with-context",
+      "path": "agent_workflows/rephrase_with_context.md",
+      "category": "agent_workflows",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Repair a failed explanation by restoring the missing context and project vocabulary rather than repeating it verbosely."
+    },
+    {
+      "id": "agent.setup-project-arsenal",
+      "path": "agent_workflows/setup_project_arsenal.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Configure a repository so Arsenal workflows can discover tracker, domain, doctrine, and verification conventions without duplicating repository truth."
+    },
+    {
+      "id": "agent.triage-to-agent-ready",
+      "path": "agent_workflows/triage_to_agent_ready.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Move an incoming request through evidence-backed triage into a clear actionable state and durable agent brief when appropriate.",
+      "upstream": ["foundation.rejected-decision-memory", "foundation.grilling"],
+      "downstream": ["software.diagnose-bug", "agent.execution-plan"]
+    },
+    {
+      "id": "agent.wayfind",
+      "path": "agent_workflows/wayfind.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Chart or walk a Wayfinding map for large work whose dependent decisions cannot be resolved in one reliable session.",
+      "upstream": ["foundation.wayfinding", "foundation.grilling", "foundation.domain-language"],
+      "downstream": ["workflow.wayfind-to-delivery", "software.spec-from-context"]
+    },
+    {
+      "id": "software.architecture-deepening",
+      "path": "software_engineering/architecture_deepening_review.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Find evidence-backed opportunities to deepen module interfaces and compare multiple interface designs before refactoring.",
+      "upstream": ["foundation.domain-language", "foundation.grilling"]
+    },
+    {
+      "id": "software.code-review",
+      "path": "software_engineering/code_review_multi_axis.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Review a change independently for requirement fidelity, engineering quality, and verification evidence.",
+      "downstream": ["agent.independent-verification"]
+    },
+    {
+      "id": "software.diagnose-bug",
+      "path": "software_engineering/diagnose_bug_feedback_loop.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Diagnose hard bugs by first constructing a tight red-capable feedback loop, then minimizing, hypothesizing, probing, and regression-testing.",
+      "downstream": ["software.tdd", "software.architecture-deepening"]
+    },
+    {
+      "id": "software.human-setup-wizard",
+      "path": "software_engineering/human_setup_wizard.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Turn unavoidable human-only setup, credential, migration, or cutover procedures into gated and verifiable walkthroughs."
+    },
+    {
+      "id": "software.prototype",
+      "path": "software_engineering/prototype_to_answer_question.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Build the cheapest disposable artifact with enough fidelity to answer one explicit design question and preserve the resulting evidence."
+    },
+    {
+      "id": "software.resolve-merge-conflicts",
+      "path": "software_engineering/resolve_merge_conflicts_by_intent.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Resolve merge or rebase conflicts by reconstructing both sides' intent and validating the integrated behavior."
+    },
+    {
+      "id": "software.spec-from-context",
+      "path": "software_engineering/spec_from_resolved_context.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "composed",
+      "purpose": "Synthesize already-resolved conversation, Wayfinding, research, prototype, and repository evidence into a buildable specification without re-interviewing settled decisions.",
+      "upstream": ["agent.grill", "agent.wayfind", "foundation.domain-language"],
+      "downstream": ["software.tracer-tickets"]
+    },
+    {
+      "id": "software.tdd",
+      "path": "software_engineering/tdd_vertical_slice.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "agent",
+      "purpose": "Build behavior through seam-aware red-green vertical slices with refactor-resistant tests and continuous deterministic feedback."
+    },
+    {
+      "id": "software.tracer-tickets",
+      "path": "software_engineering/work_to_tracer_tickets.md",
+      "category": "software_engineering",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "composed",
+      "purpose": "Decompose a specification into dependency-aware vertical implementation slices and use expand-migrate-contract for genuinely wide refactors.",
+      "upstream": ["software.spec-from-context"],
+      "downstream": ["workflow.software-feature-delivery"]
+    },
+    {
+      "id": "workflow.recurring-loop-discovery",
+      "path": "workflows/recurring_loop_discovery.md",
+      "category": "workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Discover recurring real-world activity worth systematizing and define triggers, checkpoints, permissions, failure behavior, and completion evidence.",
+      "downstream": ["prompt.workflow-package-architect"]
+    },
+    {
+      "id": "workflow.wayfind-to-delivery",
+      "path": "workflows/wayfind_to_delivery.md",
+      "category": "workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Carry a foggy software effort from Wayfinding decisions through spec synthesis, tracer tickets, implementation, review, and evidence.",
+      "upstream": ["agent.wayfind", "foundation.wayfinding"],
+      "downstream": ["software.spec-from-context", "software.tracer-tickets", "workflow.software-feature-delivery"]
+    },
+    {
+      "id": "learning.stateful-workspace",
+      "path": "learning/stateful_learning_workspace.md",
+      "category": "learning",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Maintain a multi-session learning workspace around mission, trusted sources, learning records, reference artifacts, retrieval, and feedback loops.",
+      "downstream": ["learning.session-designer", "learning.socratic-tutor", "learning.study-guide-builder", "learning.portfolio-lab-architect"]
+    },
+    {
+      "id": "writing.fragment-mining",
+      "path": "writing/fragment_mining.md",
+      "category": "writing",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Extract heterogeneous raw writing material without prematurely forcing it into an outline or finished prose.",
+      "downstream": ["writing.beat-map", "writing.shape-from-fragments"]
+    },
+    {
+      "id": "writing.beat-map",
+      "path": "writing/beat_map.md",
+      "category": "writing",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Shape raw material into a purposeful reader journey of beats before paragraph-level drafting.",
+      "upstream": ["writing.fragment-mining"],
+      "downstream": ["writing.shape-from-fragments"]
+    },
+    {
+      "id": "writing.shape-from-fragments",
+      "path": "writing/shape_from_fragments.md",
+      "category": "writing",
+      "kind": "prompt",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Turn fragments and a beat map into coherent long-form prose progressively without inventing filler.",
+      "upstream": ["writing.fragment-mining", "writing.beat-map"],
+      "downstream": ["writing.chapter-transformation"]
+    },
+    {
+      "id": "source.mattpocock-skills",
+      "path": "docs/source_audits/mattpocock-skills.md",
+      "category": "source_audits",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Record the 2026-08-07 conceptual adoption audit of mattpocock/skills and the boundaries of Arsenal's adaptation."
+    }
+  ]
+}

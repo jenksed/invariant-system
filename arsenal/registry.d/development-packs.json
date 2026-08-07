@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "engineering.development-pack-contract",
+      "path": "engineering/development_packs/CONTRACT.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define the common contract for language/framework Development Packs that provide deterministic feedback, structural invariants, guardrails, and verification tiers."
+    }
+  ]
+}
