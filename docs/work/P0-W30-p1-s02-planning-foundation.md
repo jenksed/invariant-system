@@ -25,14 +25,16 @@ This package has one planning objective: make the next authorization decision be
 - The Repository has `AGENTS.md` as the detailed agent-development authority but no root `CLAUDE.md` entrypoint.
 - `AGENTS.md` contains a stale pre-authorization statement that says Phase 1 build authorization has not been issued even though Prompt 8-A authorized P1-S01.
 
-## Planning assumptions
+## Assumptions and unknowns
+
+### Assumptions
 
 - **P0-W30-A01:** P1-S01-T05 will remain implementation-only and will not absorb P1-S02 design or runtime code.
 - **P0-W30-A02:** Planning can proceed in parallel with T05 as long as it remains explicitly provisional and consumes T05 Evidence before authorization.
 - **P0-W30-A03:** The accepted P1-S02 dependency spine is directionally correct, but exact ticket cuts should remain open until P1-S01 closeout Evidence and focused P1-S02 planning resolve the major unknowns.
 - **P0-W30-A04:** The Engineering Doctrine should guide open choices without becoming a second roadmap, architecture document, or checklist bureaucracy.
 
-## Unknowns that must remain visible
+### Unknowns
 
 - **P0-W30-U01:** What P1-S01 owner-machine and aggregate Evidence will materially change P1-S02 recovery, durability, or command-execution planning?
 - **P0-W30-U02:** What is the smallest registered Command and Artifact substrate that proves correct process ownership, cancellation, cleanup, and exact-state binding on arm64 macOS?
@@ -71,13 +73,23 @@ The most relevant doctrine principles are:
 - **Separate concepts before separating processes:** use processes for the external provider, Command, and Pack lifecycles because they own live resources and cancellation, not because the corresponding domain concepts exist.
 - **Architecture should answer a failure mode / operability is part of correctness:** every new runtime mechanism in P1-S02 should be justified by a concrete failure and include diagnosis, interruption, cleanup, recovery, and unknown-state behavior.
 
-## Deliverables
+## Proposed changes
 
-1. `docs/ENGINEERING-DOCTRINE.md`, including its upstream provenance and adoption record.
-2. Root `CLAUDE.md` that delegates project authority to `AGENTS.md` and links the doctrine.
-3. A narrow `AGENTS.md` update that links the doctrine and states the current authorization boundary accurately.
-4. `docs/P1-S02-PLANNING-BASELINE.md` with the first planning decomposition and decision register.
-5. This work-package record.
+1. Add the Engineering Doctrine as the accepted default engineering decision framework, including its upstream provenance and adoption record.
+2. Add a concise root `CLAUDE.md` that delegates project authority to `AGENTS.md` and links the doctrine.
+3. Update `AGENTS.md` narrowly to link the doctrine and state the current authorization boundary accurately.
+4. Add the P1-S02 planning baseline with the first planning decomposition and decision register.
+5. Add this work-package record.
+
+## Expected files or components
+
+| Path or component | Result |
+| --- | --- |
+| `docs/ENGINEERING-DOCTRINE.md` | Added doctrine with its upstream provenance and adoption record |
+| `CLAUDE.md` | Added concise Claude entrypoint that imports and delegates to `AGENTS.md` |
+| `AGENTS.md` | Linked the doctrine and reconciled the authorization boundary |
+| `docs/P1-S02-PLANNING-BASELINE.md` | Added the slice-planning baseline and decision register |
+| `docs/work/P0-W30-p1-s02-planning-foundation.md` | Added this planning work package |
 
 ## Acceptance criteria
 
@@ -111,15 +123,18 @@ The most relevant doctrine principles are:
   - **Then** it contains only documentation, planning, and agent-entrypoint changes and no runtime implementation
   - **Evidence:** exact branch compare
 
-## Verification
+## Deterministic verification
 
 Minimum deterministic verification for this planning-only branch:
 
 ```bash
+scripts/agent-preflight
 scripts/test-agent-preflight
 scripts/validate-agent-assets
 vale --glob='!{deps,_build}/**' .
 ```
+
+`scripts/agent-preflight` validates this plan's own branch identification and required headings. `scripts/test-agent-preflight` exercises the preflight fixtures and does not inspect this plan, so passing it alone does not prove this plan conforms.
 
 If the branch cannot run these locally in the authoring environment, the pull request must report them as unexecuted rather than imply they passed. Repository CI remains authoritative for exact-head validation after a PR is opened.
 
@@ -131,6 +146,16 @@ A final review should also compare the branch against its exact base and confirm
 - P1-S02 remains explicitly unauthorized;
 - candidate ticket cuts are clearly provisional;
 - T05 remains the prerequisite closeout gate.
+
+## Required completion Evidence
+
+| Evidence ID | Criterion | Result |
+| --- | --- | --- |
+| P0-W30-E01 | P0-W30-AC01 | doctrine link and application guidance in `AGENTS.md` and `CLAUDE.md` |
+| P0-W30-E02 | P0-W30-AC02 | reconciled authorization section in `AGENTS.md` |
+| P0-W30-E03 | P0-W30-AC03 | cross-document compare against `docs/ROADMAP.md` and `docs/IMPLEMENTATION-SLICES.md` |
+| P0-W30-E04 | P0-W30-AC04 | candidate ticket-cut sections and their provisional status language |
+| P0-W30-E05 | P0-W30-AC05 | exact branch compare against `main` |
 
 ## Explicit exclusions
 
