@@ -153,8 +153,8 @@ defmodule Kiln.CLI do
   # the Workflow own journal writes, idempotency, request digests, and
   # state validation.
 
-  defp dispatch_start(%Request{options: opts, actor_id: actor_id} = request, _session) do
-    with {:ok, _} <- precheck_no_session(request),
+  defp dispatch_start(%Request{options: opts, actor_id: actor_id} = _request, _session) do
+    with :ok <- precheck_no_session(),
          {:ok, workflow_input} <- build_start_workflow_input(opts, actor_id) do
       case workflow_input do
         %Result{} = result ->
@@ -163,39 +163,51 @@ defmodule Kiln.CLI do
         workflow_opts when is_map(workflow_opts) ->
           case Workflow.start_session(workflow_opts) do
             {:ok, started} ->
-              {:ok,
-               Result.ok("start",
-                 data: %{
-                   session_id: started.session_id,
-                   task_id: started.task_id,
-                   root_run_id: started.run_id,
-                   objective: workflow_opts[:objective] || workflow_opts["objective"]
-                 },
-                 session_revision: started.session_revision,
-                 journal_digest: format_digest(started.projection_digest),
-                 next_actions: [
-                   Result.next_action("status", "show the current projection"),
-                   Result.next_action("inspect", "show the complete accepted state"),
-                   Result.next_action("cancel", "end the session safely if no work is in flight")
-                 ]
-               )}
+              case capability_next_actions(started.session_id) do
+                {:ok, mutating_actions} ->
+                  {:ok,
+                   Result.ok("start",
+                     data: %{
+                       session_id: started.session_id,
+                       task_id: started.task_id,
+                       root_run_id: started.run_id,
+                       objective: workflow_opts[:objective] || workflow_opts["objective"]
+                     },
+                     session_revision: started.session_revision,
+                     journal_digest: format_digest(started.projection_digest),
+                     next_actions: navigation_actions("start") ++ mutating_actions
+                   )}
+
+                {:error, %Error{} = error} ->
+                  {:error, error}
+              end
 
             {:error, %Error{} = error} ->
               {:error, error}
           end
       end
     else
+      {:error, %Result{} = result} -> {:error, result}
       {:error, %Error{} = error} -> {:error, error}
     end
   end
 
-  defp precheck_no_session(_request) do
+  # Sequential one-Session guard. Returns `:ok` when no Session exists so
+  # the caller can proceed, or `{:error, %Result{}}` carrying the blocked
+  # CLI result when a Session already exists. The control-flow convention
+  # `:ok | {:error, %Result{}}` is chosen so a `with` clause using the
+  # `:ok` head short-circuits on the existing-Session case before any
+  # durable input shaping, validation, or Workflow call runs; this is
+  # what stops a second `mix kiln start` from creating a second Session.
+  # A Workflow error during the lookup is returned as `{:error, %Error{}}`
+  # so the upstream dispatcher surfaces it through the standard mapping.
+  defp precheck_no_session do
     case Workflow.current_session() do
       {:ok, :empty} ->
-        {:ok, nil}
+        :ok
 
       {:ok, %{session_id: session_id}} ->
-        {:ok,
+        {:error,
          Result.error("start", :blocked,
            errors: [
              Result.to_error(%{
@@ -282,9 +294,9 @@ defmodule Kiln.CLI do
         {:ok, no_session_result("status")}
 
       {:ok, %{projection: projection, session_id: session_id} = result} ->
-        case advertised_actions_for(session_id) do
-          {:ok, advertised} ->
-            {:ok, status_result("status", projection, result, advertised)}
+        case capability_next_actions(session_id) do
+          {:ok, mutating_actions} ->
+            {:ok, status_result("status", projection, result, mutating: mutating_actions)}
 
           {:error, %Error{} = error} ->
             {:error, error}
@@ -295,12 +307,12 @@ defmodule Kiln.CLI do
     end
   end
 
-  defp status_result(command, projection, result, advertised_actions) do
-    opts = [
+  defp status_result(command, projection, result, opts) do
+    base_opts = [
       data: status_data(projection, result),
       session_revision: revision_from_projection(projection),
       journal_digest: format_digest(result.projection_digest),
-      next_actions: status_next_actions(projection, result, advertised_actions)
+      next_actions: status_next_actions(projection, result, Keyword.fetch!(opts, :mutating))
     ]
 
     if result.orphaned do
@@ -312,13 +324,13 @@ defmodule Kiln.CLI do
             message: "the Run has an unresolved external effect and requires reconciliation"
           })
         ],
-        data: opts[:data],
-        session_revision: opts[:session_revision],
-        journal_digest: opts[:journal_digest],
-        next_actions: opts[:next_actions]
+        data: base_opts[:data],
+        session_revision: base_opts[:session_revision],
+        journal_digest: base_opts[:journal_digest],
+        next_actions: base_opts[:next_actions]
       )
     else
-      Result.ok(command, opts)
+      Result.ok(command, base_opts)
     end
   end
 
@@ -339,36 +351,36 @@ defmodule Kiln.CLI do
     }
   end
 
-  defp status_next_actions(projection, result, advertised_actions) do
-    cond do
-      result.orphaned ->
-        [
-          Result.next_action("inspect", "review the unknown operation and orphan markers"),
-          Result.next_action("resume", "show the orphaned Run state")
-        ]
+  # Status emits `inspect` as the navigation suggestion; the Workflow-owned
+  # mutating capability set is appended unchanged. The orphan / pending-
+  # decision / active-operation branches emit only navigation suggestions
+  # because the Workflow capability matrix returns `[]` for those states.
+  defp status_next_actions(projection, result, mutating_actions) do
+    base =
+      cond do
+        result.orphaned ->
+          [
+            Result.next_action(
+              "inspect",
+              "review the unknown operation and orphan markers"
+            )
+          ]
 
-      get_in(projection, ["pending_decision"]) != nil ->
-        [
-          Result.next_action("inspect", "review the pending decision"),
-          Result.next_action("status", "show the waiting_for_user state")
-        ]
+        get_in(projection, ["pending_decision"]) != nil ->
+          [
+            Result.next_action("inspect", "review the pending decision")
+          ]
 
-      get_in(projection, ["operation"]) != nil ->
-        [
-          Result.next_action("inspect", "review the active external operation"),
-          Result.next_action("status", "show the running state")
-        ]
+        get_in(projection, ["operation"]) != nil ->
+          [
+            Result.next_action("inspect", "review the active external operation")
+          ]
 
-      true ->
-        base = [Result.next_action("inspect", "review the current state")]
+        true ->
+          [Result.next_action("inspect", "review the current state")]
+      end
 
-        capability_actions =
-          Enum.map(advertised_actions, fn action ->
-            Result.next_action(command_for(action), command_description(action))
-          end)
-
-        base ++ capability_actions
-    end
+    base ++ mutating_actions
   end
 
   # -- command: inspect --
@@ -384,9 +396,9 @@ defmodule Kiln.CLI do
         {:ok, no_session_result("inspect")}
 
       {:ok, %{projection: projection, session_id: session_id} = result} ->
-        case advertised_actions_for(session_id) do
-          {:ok, advertised} ->
-            {:ok, inspect_result("inspect", projection, result, advertised)}
+        case capability_next_actions(session_id) do
+          {:ok, mutating_actions} ->
+            {:ok, inspect_result("inspect", projection, result, mutating: mutating_actions)}
 
           {:error, %Error{} = error} ->
             {:error, error}
@@ -397,21 +409,15 @@ defmodule Kiln.CLI do
     end
   end
 
-  defp inspect_result(command, projection, result, advertised_actions) do
+  defp inspect_result(command, projection, result, opts) do
     data = inspect_data(projection, result)
+    mutating_actions = Keyword.fetch!(opts, :mutating)
 
-    base_actions = [Result.next_action("status", "show the current projection")]
-
-    capability_actions =
-      Enum.map(advertised_actions, fn action ->
-        Result.next_action(command_for(action), command_description(action))
-      end)
-
-    opts = [
+    base_opts = [
       data: data,
       session_revision: revision_from_projection(projection),
       journal_digest: format_digest(result.projection_digest),
-      next_actions: base_actions ++ capability_actions
+      next_actions: navigation_actions("inspect") ++ mutating_actions
     ]
 
     if result.orphaned do
@@ -424,12 +430,12 @@ defmodule Kiln.CLI do
           })
         ],
         data: data,
-        session_revision: opts[:session_revision],
-        journal_digest: opts[:journal_digest],
-        next_actions: opts[:next_actions]
+        session_revision: base_opts[:session_revision],
+        journal_digest: base_opts[:journal_digest],
+        next_actions: base_opts[:next_actions]
       )
     else
-      Result.ok(command, opts)
+      Result.ok(command, base_opts)
     end
   end
 
@@ -528,6 +534,13 @@ defmodule Kiln.CLI do
            expected_session_revision: expected_revision
          ) do
       {:ok, canceled} ->
+        # Cancel transitions the Run to `:canceled`, a terminal Run state.
+        # `Workflow.valid_next_actions/1` therefore advertises `[]` for the
+        # post-cancel Session; the cancel result contains only navigation
+        # suggestions (`status`, `inspect`) and never advertises `cancel`
+        # or `resume` even when the Workflow capability matrix would later
+        # be misconfigured, because the cancel result is constructed
+        # without consulting that matrix at all.
         {:ok,
          Result.ok("cancel",
            data: %{
@@ -539,10 +552,7 @@ defmodule Kiln.CLI do
            },
            session_revision: canceled.session_revision,
            journal_digest: format_digest(canceled.projection_digest),
-           next_actions: [
-             Result.next_action("status", "show the canceled state"),
-             Result.next_action("resume", "resume guidance for a new accepted start")
-           ]
+           next_actions: navigation_actions("cancel")
          )}
 
       {:error, %Error{code: :run_transition_not_allowed} = error} ->
@@ -573,12 +583,11 @@ defmodule Kiln.CLI do
 
   # -- command: resume --
   #
-  # Resume is bounded: it advertises the current Session and the
-  # Workflow's `valid_next_actions/1` set. When the matrix advertises
-  # `:resume_session`, it performs the single `Workflow.resume_session/2`
-  # mutation. Otherwise it does not perform any mutation; it returns a
-  # `:blocked` result describing the current state and the advertised
-  # next actions.
+  # Resume is guidance-only per T04-R07. It reads the current projection
+  # through `Workflow.current_session/0` and reports the Workflow's
+  # `valid_next_actions/1` set as bounded next-action suggestions. It
+  # performs no mutation; no journal write, no action commit, no
+  # projection rebuild is performed by this command.
 
   defp dispatch_resume(%Request{} = _request, _session) do
     case Workflow.current_session() do
@@ -588,9 +597,9 @@ defmodule Kiln.CLI do
       {:ok, %{projection: projection} = result} ->
         session_id = get_in(projection, ["session", "id"])
 
-        case Workflow.valid_next_actions(session_id) do
-          {:ok, advertised_actions} ->
-            {:ok, resume_report_result(projection, result, advertised_actions)}
+        case capability_next_actions(session_id) do
+          {:ok, mutating_actions} ->
+            {:ok, resume_report_result(projection, result, mutating: mutating_actions)}
 
           {:error, %Error{} = error} ->
             {:error, error}
@@ -601,7 +610,9 @@ defmodule Kiln.CLI do
     end
   end
 
-  defp resume_report_result(projection, result, advertised_actions) do
+  defp resume_report_result(projection, result, opts) do
+    mutating_actions = Keyword.fetch!(opts, :mutating)
+
     data = %{
       session_id: get_in(projection, ["session", "id"]),
       task_id: get_in(projection, ["task", "id"]),
@@ -610,7 +621,7 @@ defmodule Kiln.CLI do
       task_state: get_in(projection, ["task", "state"]),
       run_state: effective_run_state(projection, result),
       workflow_step: projection["workflow_step"],
-      next_actions: resume_next_actions(projection, result, advertised_actions)
+      next_actions: resume_next_actions(result, mutating_actions)
     }
 
     if result.orphaned do
@@ -637,33 +648,16 @@ defmodule Kiln.CLI do
     end
   end
 
-  defp resume_next_actions(_projection, result, advertised_actions) do
-    cond do
-      result.orphaned ->
-        [
-          Result.next_action("inspect", "review the unknown operation and orphan markers"),
-          Result.next_action("status", "show the orphaned Run state")
-        ]
+  defp resume_next_actions(result, mutating_actions) do
+    base =
+      if result.orphaned do
+        [Result.next_action("inspect", "review the unknown operation and orphan markers")]
+      else
+        [Result.next_action("inspect", "review the current state")]
+      end
 
-      true ->
-        base = [Result.next_action("inspect", "review the current state")]
-
-        capability_actions =
-          Enum.map(advertised_actions, fn action ->
-            Result.next_action(command_for(action), command_description(action))
-          end)
-
-        Enum.uniq(base ++ capability_actions)
-    end
+    Enum.uniq(base ++ mutating_actions)
   end
-
-  defp command_for(:resume_session), do: "resume"
-  defp command_for(:cancel_session), do: "cancel"
-  defp command_for(action) when is_atom(action), do: Atom.to_string(action)
-
-  defp command_description(:resume_session), do: "resume the Session"
-  defp command_description(:cancel_session), do: "cancel the Session explicitly"
-  defp command_description(action) when is_atom(action), do: "perform #{Atom.to_string(action)}"
 
   # -- error mapping --
 
@@ -782,15 +776,66 @@ defmodule Kiln.CLI do
   defp format_digest("sha256:" <> _ = digest), do: digest
   defp format_digest(digest) when is_binary(digest), do: "sha256:" <> digest
 
-  # Single source of truth for capability-driven `next_actions` output. The
-  # CLI never invents a `cancel` or `resume` suggestion; it consults the
-  # Workflow capability matrix and translates the bounded atoms the
-  # Workflow advertises into CLI command strings.
-  defp advertised_actions_for(session_id) when is_binary(session_id) do
+  # Single source of truth for capability-driven `next_actions` output.
+  # The CLI never invents a `cancel` or `resume` suggestion: it consults the
+  # Workflow capability matrix via `Workflow.valid_next_actions/1` and
+  # translates the bounded atoms the Workflow advertises into
+  # `Result.next_action` values through `translate_capability/1`. The
+  # mapping table below is the only place those atoms are turned into CLI
+  # strings, so a future Workflow capability that the CLI does not
+  # recognise is silently dropped rather than invented as a mutation. The
+  # terminal-state contract is therefore enforced both at the Workflow
+  # boundary (its capability matrix returns `[]`) and at the CLI boundary
+  # (no mapped atom ever reaches the renderer).
+  defp capability_next_actions(session_id) when is_binary(session_id) do
     case Workflow.valid_next_actions(session_id) do
-      {:ok, actions} -> {:ok, actions}
-      {:error, %Error{} = error} -> {:error, error}
+      {:ok, actions} ->
+        {:ok,
+         actions
+         |> Enum.map(&translate_capability/1)
+         |> Enum.reject(&is_nil/1)}
+
+      {:error, %Error{} = error} ->
+        {:error, error}
     end
+  end
+
+  defp translate_capability(:cancel_session),
+    do: Result.next_action("cancel", "cancel the Session explicitly")
+
+  defp translate_capability(:resume_session),
+    do: Result.next_action("resume", "resume the Session")
+
+  defp translate_capability(action) when is_atom(action), do: nil
+
+  # Presentation/navigation suggestions the CLI may emit independently
+  # because they describe how to navigate the CLI surface rather than how
+  # to mutate application state. `cancel` and `resume` are deliberately
+  # absent — they must always come from `capability_next_actions/1`.
+  defp navigation_actions("start") do
+    [
+      Result.next_action("status", "show the current projection"),
+      Result.next_action("inspect", "show the complete accepted state")
+    ]
+  end
+
+  defp navigation_actions("status") do
+    []
+  end
+
+  defp navigation_actions("inspect") do
+    [Result.next_action("status", "show the current projection")]
+  end
+
+  defp navigation_actions("cancel") do
+    [
+      Result.next_action("status", "show the canceled state"),
+      Result.next_action("inspect", "show the complete accepted state")
+    ]
+  end
+
+  defp navigation_actions("resume") do
+    [Result.next_action("inspect", "show the complete accepted state")]
   end
 
   # The Workflow exposes `orphaned: true` when the persisted projection

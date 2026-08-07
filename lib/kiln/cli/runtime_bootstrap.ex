@@ -85,8 +85,8 @@ defmodule Kiln.CLI.Runtime do
 
   # The CLI reuses one deterministic store_id per `--kiln-home` so that two
   # CLI invocations against the same KILN_HOME observe the same store_id in
-  # the metadata table. The random fallback exists only when the path itself
-  # cannot be normalised.
+  # the metadata table. The id is derived purely from the normalised path;
+  # there is no random fallback.
   defp deterministic_store_id(path) do
     "store_cli_" <> (:crypto.hash(:sha256, path) |> Base.encode16(case: :lower))
   end

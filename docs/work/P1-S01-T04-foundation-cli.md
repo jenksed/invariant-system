@@ -85,7 +85,7 @@ Denied:
 ## Proposed changes
 
 1. Add a small CLI request parser for the authorized P1-S01 command set.
-2. Dispatch every command exclusively through `Kiln.Workflow`. The CLI aliases no `Kiln.Domain.*`, `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module. Direct journal commits, domain construction, restart reconstruction, and projection rebuilds are forbidden from the dispatcher.
+2. Dispatch every command exclusively through `Kiln.Workflow`. The CLI aliases no `Kiln.Domain.*` module other than `Kiln.Domain.Error` (used solely to consume and pattern-match `%Kiln.Domain.Error{}` returns from `Kiln.Workflow`), and aliases no `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module. Direct journal commits, domain construction, direct domain behavior invocation, restart reconstruction, and projection rebuilds are forbidden from the dispatcher.
 3. Add text and JSON renderers with stable result and error mapping.
 4. Add a source-development Mix task entry point.
 5. Add golden and structural tests proving text and JSON describe equivalent state.
@@ -145,8 +145,8 @@ JSON output uses the Elixir 1.20 stdlib `JSON` module. No JSON dependency is add
 - **P1-S01-T04-AC07**
   - **Given** the rewritten dispatcher
   - **When** the source guard and integration tests run
-  - **Then** every command routes through `Kiln.Workflow` and the dispatcher aliases no `Kiln.Domain.*`, `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module
-  - **Evidence:** source guard in `test/kiln/cli_test.exs` and `test/kiln/cli/runtime_bootstrap_test.exs`; full `mix test` run
+  - **Then** every command routes through `Kiln.Workflow`; the dispatcher aliases no `Kiln.Domain.*` module except `Kiln.Domain.Error`; the dispatcher may consume and pattern-match `%Kiln.Domain.Error{}` values returned by `Kiln.Workflow` but it must not construct `%Kiln.Domain.*{}` values, call any `Kiln.Domain.*` behavior, invoke `Kiln.Store.Journal`, call `Kiln.Restart.reconstruct/1`, or call any `Kiln.Projections.*` module
+  - **Evidence:** source guards in `test/kiln/cli_test.exs` (alias, fully-qualified construction, fully-qualified behavior invocation, and aliased Error construction/call guards) and `test/kiln/cli/runtime_bootstrap_test.exs`; full `mix test` run
 
 ## Deterministic verification
 
@@ -180,7 +180,7 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 | P1-S01-T04-E04 | P1-S01-T04-AC04 | complete exit and error matrix |
 | P1-S01-T04-E05 | P1-S01-T04-AC05 | layer-boundary review |
 | P1-S01-T04-E06 | P1-S01-T04-AC06 | exact compare and CI run |
-| P1-S01-T04-E07 | P1-S01-T04-AC07 | source-guard and Workflow rebind tests (`test/kiln/cli_test.exs`, `test/kiln/cli/runtime_bootstrap_test.exs`) |
+| P1-S01-T04-E07 | P1-S01-T04-AC07 | source-guard and Workflow rebind tests (`test/kiln/cli_test.exs`, `test/kiln/cli/runtime_bootstrap_test.exs`) — alias, fully-qualified construction, fully-qualified behavior, and aliased Error construction guards |
 
 ### Slice gate contribution
 
@@ -204,13 +204,14 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 **Result:** Implemented; correction pass awaiting exact-head verification
 
 The earlier "Implemented and verified" claim was based on a GitHub Actions run
-(`31142579605`) that pre-dated the F1–F5 correction pass. The five review
-findings describe contract violations that the existing CI missed because the
-tests asserted the wrong thing or asserted nothing at all. The current
-branch head contains the F1–F5 fixes plus dedicated regression tests; the
-claim is downgraded to "Implemented; correction pass awaiting exact-head
-verification" until a fresh GitHub Actions run on the corrected head is
-observed.
+(`31142579605`) that pre-dated the F1–F5 correction pass and the follow-up
+review correction pass. The current branch head contains the F1–F5 fixes plus
+the follow-up correction pass (one-Session sequential invariant,
+Workflow-owned capability authority, explicit `:started` operation-state
+fixture, AC07 Domain Error boundary distinction, and three small comment /
+doc cleanups) plus dedicated regression tests for each; the claim is
+"Implemented; correction pass awaiting exact-head verification" until a
+fresh GitHub Actions run on the corrected head is observed.
 
 ### Acceptance status
 
@@ -222,12 +223,17 @@ observed.
 | P1-S01-T04-AC04 | Verified (pre-correction) | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
 | P1-S01-T04-AC05 | Verified (pre-correction) | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
 | P1-S01-T04-AC06 | Verified (pre-correction) | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC07 | Verified (pre-correction) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC07 | Verified (pre-correction) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 — wording then updated to permit `Kiln.Domain.Error` consumption while forbidding Domain construction / direct behavior invocation |
 | Correction pass — F1 (single nonterminal vocabulary) | Pending exact-head CI | P1-S01-T04-E08 | `test/kiln/operation_lifecycle_parity_test.exs` |
 | Correction pass — F2 (cli_result schema conformance) | Pending exact-head CI | P1-S01-T04-E09 | `test/kiln/cli/json_renderer_test.exs`, `scripts/validate_cli_result_schema.py` |
 | Correction pass — F3 (no Domain construction in dispatcher) | Pending exact-head CI | P1-S01-T04-E10 | source-guard inside `test/kiln/cli_test.exs` |
 | Correction pass — F4 (KILN_HOME precedence) | Pending exact-head CI | P1-S01-T04-E11 | `test/kiln/cli/request_test.exs` |
 | Correction pass — F5 (capability-driven next actions) | Pending exact-head CI | P1-S01-T04-E12 | `test/kiln/cli_test.exs` capability-driven describe blocks |
+| Correction pass — F6 (sequential one-Session guard) | Pending exact-head CI | P1-S01-T04-E13 | `test/kiln/cli_test.exs` "second start is rejected with SESSION_ALREADY_EXISTS and writes zero durable rows" — asserts nonzero exit, `:blocked` status, `SESSION_ALREADY_EXISTS`, unchanged journal/action/projection counts, and that `Workflow.current_session/0` resolves the original Session |
+| Correction pass — F7 (Workflow-owned capability authority) | Pending exact-head CI | P1-S01-T04-E14 | `test/kiln/cli_test.exs` `assert_mutating_subset/3` helper plus `F2 capability authority` describe block — asserts the CLI mutating suggestions are a subset of `Workflow.valid_next_actions/1` for `ready`, `running`, `waiting_for_user`, `canceled`, and the `intent_recorded` orphan fixture; asserts the cancel result contains no `cancel` and no `resume`; asserts `Workflow.valid_next_actions(session_id) == []` after cancel |
+| Correction pass — F8 (explicit `:started` operation-state parity) | Pending exact-head CI | P1-S01-T04-E15 | `test/kiln/operation_lifecycle_parity_test.exs` — `OperationLifecycle` partition test asserts every accepted operation state is classified correctly and the `Restart` and `Workflow` classifiers agree on the persisted `:started` fixture (intent → observe with `state: "started"`, `run_to: "running"`) |
+| Correction pass — F9 (AC07 Domain Error boundary + strengthened source guard) | Pending exact-head CI | P1-S01-T04-E16 | `test/kiln/cli_test.exs` — alias guard allows `Kiln.Domain.Error`, fully-qualified guard forbids any `Kiln.Domain.*` construction or behavior call, and the aliased-Error guard forbids `Error.<method>(...)` calls |
+| Correction pass — small cleanup (ErrorMap doc, store_id comment, resume doc) | Pending exact-head CI | P1-S01-T04-E17 | local sandbox run; the comment changes document actual code behaviour and are not separately gated by a CI job |
 
 ### Verification executed
 
@@ -241,16 +247,18 @@ observed.
 | `mix format --check-formatted` | pass | local sandbox run, 2026-08-07 |
 | `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-07 |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-07 |
-| `mix test` | 329 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/operation_lifecycle_parity_test.exs` | 5 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/cli` | 34 passed | local sandbox run, 2026-08-07 |
+| `mix test` | 341 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job | **not yet observed on corrected head** | — |
-| GitHub Actions `prose` job | **not yet observed on corrected head** | — |
+| GitHub Actions `test` job on corrected head | **not yet observed** | — |
+| GitHub Actions `prose` job on corrected head | **not yet observed** | — |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: Yes (the F1–F5 corrections are owned by T04, not T05)
+- Slice verification manifest updated: Yes (the F1–F9 corrections are owned by T04, not T05)
 - Slice completion claimed: Pending exact-head CI green on the correction pass
 
 ### Failures and warnings
@@ -259,17 +267,19 @@ observed.
 - This is a source-development entry point, not the delivered release.
 - The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
 - The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
-- The F1–F5 correction pass is queued behind a fresh `--force-with-lease` push on the same branch and PR.
+- The F1–F5 and F6–F9 correction passes are queued behind a fresh `--force-with-lease` push on the same branch and PR.
 
 ### Remaining unknowns and exclusions
 
 - Aggregate owner-machine demo of the foundation CLI is T05.
+- The detected-but-not-fixed Workflow/Restart orphan classification tension (a Session whose projection is `orphaned: true` because of a nonterminal operation but whose underlying Run state is still `running` therefore remains Workflow-advertised as `:cancel_session`) is out of scope for T04 and would belong to a future Workflow/Restart reconciliation ticket; the CLI correctly surfaces whatever the Workflow capability matrix advertises, and the assertion in F7 proves the CLI never invents a mutation Workflow does not.
 - No additional architecture changes are required to merge.
 
 ### Repository state
 
 - Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (pre-correction, verified by GitHub Actions run 31142579605)
-- Latest HEAD on `work/p1-s01-t04-foundation-cli`: correction-pass commits, not yet observed by GitHub Actions
+- Pre-correction-pass commit: 24fecd1257f82b312744337395c5f578af13bbf3 (F1–F5 + wording downgrade, not yet observed by GitHub Actions)
+- Latest HEAD on `work/p1-s01-t04-foundation-cli`: F6–F9 correction pass (sequential one-Session guard, capability authority extension, explicit `:started` fixture, AC07 boundary + source guard, three doc cleanups), not yet observed by GitHub Actions
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Exact CI run: GitHub Actions run 31142579605 on commit bb4b8a4 (pre-correction only)
 - Parent slice status after merge: P1-S01-T04 satisfied once exact-head CI on the corrected branch is green; P1-S01-T05 unblocked

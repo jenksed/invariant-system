@@ -5,9 +5,13 @@ defmodule Kiln.CLI.ErrorMap do
 
   The CLI is non-authoritative: every error originates from either the
   parser, the runtime bootstrap, or `Kiln.Workflow`. Each application-level
-  error code is mapped to exactly one `(status, exit_code)` pair; no two
-  codes share a `(status, exit_code)`; and every status is one of the
-  accepted CLI statuses from `Kiln.CLI.Result.statuses/0`.
+  error code is mapped to exactly one deterministic `(status, exit_code)`
+  pair; multiple semantically related codes may share the same
+  `(status, exit_code)` (for example every workflow blocked code maps to
+  `{:blocked, 4}`); and every status is one of the accepted CLI statuses
+  from `Kiln.CLI.Result.statuses/0`. The success pair `{:ok, 0}` is
+  reserved for the `Result.ok/2` constructor and is never emitted as an
+  error.
 
   Mapping rules:
 

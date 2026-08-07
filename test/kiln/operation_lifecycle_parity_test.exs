@@ -15,7 +15,7 @@ defmodule Kiln.OperationLifecycleParityTest do
 
   use ExUnit.Case, async: false
 
-  alias Kiln.{Restart, Workflow}
+  alias Kiln.{OperationLifecycle, Restart, Workflow}
   alias Kiln.Test.JournalBuilder, as: JB
 
   setup do
@@ -35,6 +35,55 @@ defmodule Kiln.OperationLifecycleParityTest do
     # A journal with an intent_recorded (no observation) entry is the canonical
     # nonterminal operation. Both consumers must classify it as orphaned.
     assert_parity_with_intent(dir, expected_orphaned: true)
+  end
+
+  test "Restart and Workflow agree on the orphan flag for the persisted started state",
+       %{dir: dir} do
+    # `:started` is the second nonterminal operation state and is the exact
+    # state omitted by the broken implementation that triggered the original
+    # review finding. The persisted journal below transitions the Run to
+    # `:running`, records the operation intent (`intent_recorded`), then
+    # records an observation with `state: "started"` and `run_to: "running"`
+    # so the reducer advances the operation to `:started` while leaving the
+    # Run in `:running`. Both consumers must classify this as orphaned.
+    assert_parity_with_started_operation(dir, expected_orphaned: true)
+  end
+
+  test "OperationLifecycle partitions every accepted operation state correctly" do
+    # The classifier is the single source of truth for which states are
+    # nonterminal. A drift in either direction (a state becoming
+    # nonterminal that the Restart or Workflow paths treat as terminal,
+    # or vice versa) fails this test before the partition can leak into
+    # the orphan classifiers.
+    canonical_states = OperationLifecycle.states()
+    canonical_nonterminal = OperationLifecycle.nonterminal_states()
+
+    canonical_terminal = canonical_states -- canonical_nonterminal
+
+    for state <- canonical_nonterminal do
+      assert OperationLifecycle.nonterminal?(state),
+             "#{inspect(state)} is in the canonical nonterminal set but the classifier returned false"
+
+      assert OperationLifecycle.nonterminal_string?(Atom.to_string(state)),
+             "#{inspect(state)} is in the canonical nonterminal set but the string classifier returned false"
+    end
+
+    for state <- canonical_terminal do
+      refute OperationLifecycle.nonterminal?(state),
+             "#{inspect(state)} is in the canonical terminal set but the classifier returned true"
+
+      refute OperationLifecycle.nonterminal_string?(Atom.to_string(state)),
+             "#{inspect(state)} is in the canonical terminal set but the string classifier returned true"
+    end
+
+    # An unknown atom or string must not be classified as nonterminal —
+    # silently treating an unknown state as orphaned would let a corrupt
+    # journal masquerade as an actionable Run.
+    refute OperationLifecycle.nonterminal?(:unknown)
+    refute OperationLifecycle.nonterminal?(:nonsense)
+    refute OperationLifecycle.nonterminal_string?("unknown")
+    refute OperationLifecycle.nonterminal_string?("not_a_state")
+    refute OperationLifecycle.nonterminal?(nil)
   end
 
   test "Restart and Workflow agree on the orphan flag for a terminal observation", %{dir: dir} do
@@ -60,6 +109,25 @@ defmodule Kiln.OperationLifecycleParityTest do
     d = JB.domain()
     {:ok, _} = JB.commit_start(store, d)
     {:ok, _} = JB.commit_operation_intent(store, d, 0, 7)
+    run_parity(store, d, expected_orphaned: expected)
+  end
+
+  # Construct a journal with a persisted operation in the `:started` state.
+  # The reducer requires `run.state == "running"` to accept an observation
+  # with `state: "started"`, so the sequence is:
+  #   start (rev 0, run=ready)
+  #   operation intent (rev 1, run=running, op=intent_recorded)
+  #   operation observe state="started" run_to="running" (rev 2, op=started)
+  # The operation intent itself transitions the Run from ready to running,
+  # so an explicit `commit_transition` is unnecessary and would race the
+  # reducer's own transition.
+  defp assert_parity_with_started_operation(parent_dir, expected_orphaned: expected) do
+    path = Path.join(parent_dir, "state-#{System.unique_integer([:positive])}.sqlite3")
+    store = JB.store(path)
+    d = JB.domain()
+    {:ok, _} = JB.commit_start(store, d)
+    {:ok, _} = JB.commit_operation_intent(store, d, 0, 4)
+    {:ok, _} = JB.commit_operation_observe(store, d, 1, 5, "started", "running")
     run_parity(store, d, expected_orphaned: expected)
   end
 
