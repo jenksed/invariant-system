@@ -1609,14 +1609,20 @@ defmodule Kiln.Workflow do
   defp source_from_status(_), do: :rebuilt
 
   # A Root Run is `orphaned` when its projection carries a non-nil
-  # operation whose state is `"unknown"`. The same classification
-  # appears in `Kiln.Restart.classify/2`; this boundary derives the
-  # flag from the same projection invariant without depending on the
-  # Restart module so the CLI does not have to alias it.
+  # operation whose state is nonterminal (e.g. `"intent_recorded"`).
+  # This matches `Kiln.Restart.classify/2` so the CLI does not have to
+  # alias the Restart module. The classification is derived from the
+  # same projection invariant without consulting Transcript or replay
+  # internals.
+  @nonterminal_operation_states ~w(intent_recorded requested awaiting_response)
+
   defp orphaned?(projection) when is_map(projection) do
     case projection["operation"] do
-      %{"state" => "unknown"} -> true
-      _ -> false
+      %{"state" => state} when is_binary(state) ->
+        state in @nonterminal_operation_states
+
+      _ ->
+        false
     end
   end
 

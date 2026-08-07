@@ -4,7 +4,7 @@
 **Status:** Accepted  
 **Parent slice:** P1-S01  
 **Branch:** `work/p1-s01-t04-foundation-cli`  
-**Depends on:** P1-S01-T03 merged and accepted
+**Depends on:** P1-S01-T03 merged and accepted; P1-S01-T06 merged and accepted
 
 ## Slice contribution
 
@@ -80,30 +80,35 @@ Denied:
 - shell or external Commands;
 - product completion, product Receipt, release packaging, Child, TUI, or Wave B behavior;
 - `--yes`, auto-approval, auto-acceptance, or hidden action chaining.
+- direct `Journal.commit/4`, `Domain.*` construction, `Restart.reconstruct/1`, `Projections.*`, or `Store.start/1` from the CLI dispatcher.
 
 ## Proposed changes
 
 1. Add a small CLI request parser for the authorized P1-S01 command set.
-2. Add application command and query dispatch without bypassing domain actions.
+2. Dispatch every command exclusively through `Kiln.Workflow`. The CLI aliases no `Kiln.Domain.*`, `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module. Direct journal commits, domain construction, restart reconstruction, and projection rebuilds are forbidden from the dispatcher.
 3. Add text and JSON renderers with stable result and error mapping.
 4. Add a source-development Mix task entry point.
 5. Add golden and structural tests proving text and JSON describe equivalent state.
 6. Add protected unsupported-command and no-fake-success fixtures.
+7. Add a narrow `Kiln.CLI.Runtime` lifecycle helper that owns store open / stop only and never reaches into the application domain.
+8. Add a single-source `Kiln.CLI.ErrorMap` covering every `%Kiln.Domain.Error{}` code.
 
 ## Expected files or components
 
 | Path or component | Expected change | Status |
 | --- | --- | --- |
-| `lib/kiln/cli.ex` | parse, dispatch, and result boundary | Proposed |
-| `lib/kiln/cli/request.ex` | bounded command and option types | Proposed |
-| `lib/kiln/cli/result.ex` | accepted result and error envelope | Proposed |
-| `lib/kiln/cli/text_renderer.ex` | deterministic text rendering | Proposed |
-| `lib/kiln/cli/json_renderer.ex` | canonical JSON-compatible result construction | Proposed |
-| `lib/mix/tasks/kiln.ex` | source-development `mix kiln` entry point | Proposed |
-| `test/kiln/cli/` | parser, dispatch, output, exit, and unsupported-command tests | Proposed |
-| `test/fixtures/cli/` | exact projection and output fixtures | Proposed |
+| `lib/kiln/cli.ex` | parse, dispatch, and result boundary | Implemented |
+| `lib/kiln/cli/request.ex` | bounded command and option types (`--actor-id`, `KILN_ACTOR_ID` env fallback, `--kiln-home` canonicalisation) | Implemented |
+| `lib/kiln/cli/result.ex` | accepted result and error envelope | Implemented |
+| `lib/kiln/cli/text_renderer.ex` | deterministic text rendering | Implemented |
+| `lib/kiln/cli/json_renderer.ex` | canonical JSON-compatible result construction | Implemented |
+| `lib/kiln/cli/runtime_bootstrap.ex` | narrow lifecycle-only helper (`open/2` with `:read` / `:write` mode, idempotent `stop/0`) | Implemented |
+| `lib/kiln/cli/error_map.ex` | single-source mapping from every `%Kiln.Domain.Error{}` code to `(status, exit_code)` | Implemented |
+| `lib/mix/tasks/kiln.ex` | source-development `mix kiln` entry point | Implemented |
+| `test/kiln/cli/` | parser, dispatch, output, exit, and unsupported-command tests; new `runtime_bootstrap_test.exs` and `error_map_test.exs` | Implemented |
+| `lib/kiln/workflow.ex` | added `current_session/0` for single-Session resolution; expanded `query_result` shape with `journal_head_digest`, `orphaned`, and `session_id` | Implemented |
 
-A JSON runtime dependency is not authorized automatically. If canonical JSON output cannot be implemented safely with the existing dependency boundary, pause and return to planning rather than adding an unreviewed general dependency.
+JSON output uses the Elixir 1.20 stdlib `JSON` module. No JSON dependency is added.
 
 ## Acceptance criteria
 
@@ -137,6 +142,11 @@ A JSON runtime dependency is not authorized automatically. If canonical JSON out
   - **When** full validation runs
   - **Then** all checks pass and no excluded command is reachable
   - **Evidence:** exact-head CI and compare
+- **P1-S01-T04-AC07**
+  - **Given** the rewritten dispatcher
+  - **When** the source guard and integration tests run
+  - **Then** every command routes through `Kiln.Workflow` and the dispatcher aliases no `Kiln.Domain.*`, `Kiln.Store.Journal`, `Kiln.Restart`, or `Kiln.Projections.*` module
+  - **Evidence:** source guard in `test/kiln/cli_test.exs` and `test/kiln/cli/runtime_bootstrap_test.exs`; full `mix test` run
 
 ## Deterministic verification
 
@@ -170,6 +180,7 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 | P1-S01-T04-E04 | P1-S01-T04-AC04 | complete exit and error matrix |
 | P1-S01-T04-E05 | P1-S01-T04-AC05 | layer-boundary review |
 | P1-S01-T04-E06 | P1-S01-T04-AC06 | exact compare and CI run |
+| P1-S01-T04-E07 | P1-S01-T04-AC07 | source-guard and Workflow rebind tests (`test/kiln/cli_test.exs`, `test/kiln/cli/runtime_bootstrap_test.exs`) |
 
 ### Slice gate contribution
 
@@ -190,28 +201,41 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Implemented but unverified (pending Workflow rebind on rewritten remote head)
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T04-AC01 | Pending | P1-S01-T04-E01 | pending |
-| P1-S01-T04-AC02 | Pending | P1-S01-T04-E02 | pending |
-| P1-S01-T04-AC03 | Pending | P1-S01-T04-E03 | pending |
-| P1-S01-T04-AC04 | Pending | P1-S01-T04-E04 | pending |
-| P1-S01-T04-AC05 | Pending | P1-S01-T04-E05 | pending |
-| P1-S01-T04-AC06 | Pending | P1-S01-T04-E06 | pending |
+| P1-S01-T04-AC01 | Implemented | P1-S01-T04-E01 | pending CI on rewritten head |
+| P1-S01-T04-AC02 | Implemented | P1-S01-T04-E02 | pending CI on rewritten head |
+| P1-S01-T04-AC03 | Implemented | P1-S01-T04-E03 | pending CI on rewritten head |
+| P1-S01-T04-AC04 | Implemented | P1-S01-T04-E04 | pending CI on rewritten head |
+| P1-S01-T04-AC05 | Implemented | P1-S01-T04-E05 | pending CI on rewritten head |
+| P1-S01-T04-AC06 | Implemented | P1-S01-T04-E06 | pending CI on rewritten head |
+| P1-S01-T04-AC07 | Implemented | P1-S01-T04-E07 | pending CI on rewritten head |
 
 ### Verification executed
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/test-agent-preflight` | pass | local sandbox run, 2026-08-06 |
+| `python3 scripts/validate_first_month_contracts.py` | pass | local sandbox run, 2026-08-06 |
+| `python3 scripts/validate_json_schema_contracts.py` | pass | local sandbox run, 2026-08-06 |
+| `scripts/validate-agent-assets` | pass | local sandbox run, 2026-08-06 |
+| `vale --glob='!{deps,_build}/**' .` | pass | local sandbox run, 2026-08-06 |
+| `mix format --check-formatted` | pass | local sandbox run, 2026-08-06 |
+| `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-06 |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-06 |
+| `mix test test/kiln/workflow_test.exs` | 90 passed | local sandbox run, 2026-08-06 |
+| `mix test test/kiln/cli` | 58 passed | local sandbox run, 2026-08-06 |
+| `mix test` | 312 passed | local sandbox run, 2026-08-06 |
+| `scripts/check` | pass | local sandbox run, 2026-08-06 |
+| GitHub CI on rewritten head | pending | to be observed after force-with-lease push |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
+- Ticket demo contribution: Implemented locally; not yet exercised on a fresh owner machine
 - Parent slice gate affected: P1-S01-G08 and G11
 - Slice verification manifest updated: No
 - Slice completion claimed: No
@@ -219,15 +243,17 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 ### Failures and warnings
 
 - This is a source-development entry point, not the delivered release.
+- The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
 
 ### Remaining unknowns and exclusions
 
 - Aggregate proof and owner-machine demo are T05.
+- GitHub CI for the rewritten head has not yet been observed; the completion record will be updated after the green run.
 
 ### Repository state
 
-- Commit: pending
+- Commit: pending push
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Diff reviewed: No
+- Diff reviewed: Yes (locally)
 - Exact CI run: pending
 - Parent slice status after merge: unchanged

@@ -255,6 +255,34 @@ defmodule Kiln.Test.JournalBuilder do
     action
   end
 
+  @doc "Build a domain action with explicit identifiers, used by tests that need to plant fixture state directly."
+  def test_action(
+        action_id,
+        session_id,
+        run_id,
+        expected_revision,
+        idempotency_key,
+        request_digest,
+        kind,
+        actor_id
+      ) do
+    Action.new(%{
+      id: action_id,
+      session_id: session_id,
+      run_id: run_id,
+      expected_session_revision: expected_revision,
+      idempotency_key: idempotency_key,
+      actor_kind: :system,
+      actor_id: actor_id,
+      kind: kind,
+      request_digest: request_digest,
+      payload: %{},
+      causation_action_id: nil,
+      correlation_id: nil,
+      requested_at: @at
+    })
+  end
+
   def entry(type, payload), do: %{type: type, payload_schema: type, payload: payload}
 
   def digest(byte) do

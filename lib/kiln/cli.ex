@@ -1,0 +1,861 @@
+defmodule Kiln.CLI do
+  @moduledoc """
+  The foundation CLI dispatcher.
+
+  The CLI exposes a tiny P1-S01 surface (`start`, `status`, `inspect`,
+  `cancel`, `resume`) over the accepted `Kiln.Workflow` boundary. Every
+  command routes through `Kiln.Workflow` for application work and
+  `Kiln.CLI.Runtime` for store lifecycle only. The CLI never reaches
+  into the internal domain modules, the journal commit path, the restart
+  classifier, or the projection rebuild path directly.
+
+  Run a single command through `run/1`. The return value is a
+  `{Result.t(), exit_code}` tuple so the caller (the `mix kiln` Mix
+  task) can set the process exit code. Help and version are produced by
+  the renderer so they share the same envelope as everything else.
+
+  The dispatcher is non-authoritative: it never mutates the journal, the
+  Store, or the projection directly. It never reads the Repository, the
+  provider, the transcript, or external Commands, and never applies a
+  Patch or accepts completion.
+  """
+
+  alias Kiln.CLI.{ErrorMap, Request, Result, Runtime}
+  alias Kiln.Workflow
+
+  @supported_commands Request.commands()
+  @version Kiln.version()
+
+  @nonterminal_operation_states ~w(intent_recorded requested awaiting_response)
+
+  @doc "Run a parsed request and return `{result, exit_code}`."
+  @spec run(Request.t()) :: {Result.t(), non_neg_integer()}
+  def run(%Request{show_version: true}),
+    do: {version_result(), 0}
+
+  def run(%Request{show_help: true}),
+    do: {help_result(), 0}
+
+  def run(%Request{command: command}) when command not in @supported_commands do
+    result =
+      Result.error(atom_to_command(command), :unsupported,
+        errors: [
+          Result.to_error(%{
+            code: :unsupported_command,
+            message: "the command is not available in the foundation CLI"
+          })
+        ]
+      )
+
+    {result, result.exit_code}
+  end
+
+  def run(%Request{} = request), do: dispatch(request)
+
+  # -- dispatch --
+
+  defp dispatch(%Request{} = request) do
+    case request.command do
+      :start -> run_writable(request, &dispatch_start/2)
+      :status -> run_readonly(request, &dispatch_status/2)
+      :inspect -> run_readonly(request, &dispatch_inspect/2)
+      :cancel -> run_writable(request, &dispatch_cancel/2)
+      :resume -> run_readonly(request, &dispatch_resume/2)
+    end
+  end
+
+  defp run_writable(%Request{} = request, fun) do
+    run_with_mode(request, :write, fun)
+  end
+
+  defp run_readonly(%Request{} = request, fun) do
+    run_with_mode(request, :read, fun)
+  end
+
+  defp run_with_mode(%Request{} = request, mode, fun) do
+    case Runtime.open(request.kiln_home, mode) do
+      {:ok, :ready} ->
+        try do
+          case fun.(request, nil) do
+            {:ok, %Result{} = result} ->
+              {result, result.exit_code}
+
+            {:error, %Result{} = result} ->
+              {result, result.exit_code}
+
+            {:error, %Kiln.Domain.Error{} = error} ->
+              error_result_tuple(request, error)
+
+            {:ok, %Result{} = result, _session} ->
+              {result, result.exit_code}
+          end
+        after
+          Runtime.stop()
+        end
+
+      {:absent} ->
+        absent_result(request)
+
+      {:blocked, state, _error} ->
+        blocked_result(request, state)
+    end
+  end
+
+  defp absent_result(%Request{command: command}) do
+    {result, exit_code} =
+      result_for_code(
+        command,
+        :no_session,
+        "no state DB exists at --kiln-home; start one with `mix kiln start`"
+      )
+
+    {result, exit_code}
+  end
+
+  defp blocked_result(%Request{command: command}, state) do
+    message =
+      case state do
+        :migration_blocked ->
+          "migration is blocked; preserve files and follow the diagnostic action"
+
+        :integrity_blocked ->
+          "the store is corrupt; preserve files and run a manual recovery"
+
+        :version_blocked ->
+          "the binary cannot open this store; use a compatible Kiln"
+
+        :unavailable ->
+          "the store could not be opened"
+
+        _ ->
+          "the store could not be opened"
+      end
+
+    {status, exit_code} = ErrorMap.map(state)
+    errors = [Result.to_error(%{code: state, message: message, class: "store_blocked"})]
+
+    result =
+      Result.error(atom_to_command(command), status,
+        exit_code: exit_code,
+        errors: errors
+      )
+
+    {result, exit_code}
+  end
+
+  # -- command: start --
+  #
+  # The CLI never constructs a Domain Session/Task/Run directly. It builds
+  # the input shapes that `Kiln.Workflow.start_session/1` accepts and lets
+  # the Workflow own journal writes, idempotency, request digests, and
+  # state validation.
+
+  defp dispatch_start(%Request{options: opts, actor_id: actor_id} = request, _session) do
+    with {:ok, _} <- precheck_no_session(request),
+         {:ok, workflow_input} <- build_start_workflow_input(opts, actor_id) do
+      case workflow_input do
+        %Result{} = result ->
+          {:ok, result}
+
+        workflow_opts when is_map(workflow_opts) ->
+          case Workflow.start_session(workflow_opts) do
+            {:ok, started} ->
+              {:ok,
+               Result.ok("start",
+                 data: %{
+                   session_id: started.session_id,
+                   task_id: started.task_id,
+                   root_run_id: started.run_id,
+                   objective: workflow_opts[:objective] || workflow_opts["objective"]
+                 },
+                 session_revision: started.session_revision,
+                 journal_digest: format_digest(started.projection_digest),
+                 next_actions: [
+                   Result.next_action("status", "show the current projection"),
+                   Result.next_action("inspect", "show the complete accepted state"),
+                   Result.next_action("cancel", "end the session safely if no work is in flight")
+                 ]
+               )}
+
+            {:error, %Kiln.Domain.Error{} = error} ->
+              {:error, error}
+          end
+      end
+    else
+      {:error, %Kiln.Domain.Error{} = error} -> {:error, error}
+    end
+  end
+
+  defp precheck_no_session(_request) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        {:ok, nil}
+
+      {:ok, %{session_id: session_id}} ->
+        {:ok,
+         Result.error("start", :blocked,
+           errors: [
+             Result.to_error(%{
+               code: :session_already_exists,
+               message:
+                 "a Session already exists (#{session_id}); inspect or cancel it instead of starting another"
+             })
+           ]
+         )}
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp build_start_workflow_input(opts, actor_id) do
+    case validate_command_options(opts) do
+      :ok ->
+        repo = opts["repo"]
+        observation = build_project_observation(repo)
+
+        {:ok,
+         %{
+           actor_id: actor_id,
+           objective: opts["objective"],
+           criteria: opts["criterion"],
+           constraints: opts["constraint"] || [],
+           exclusions: opts["exclude"] || [],
+           project_observation: observation
+         }}
+
+      {:error, message} when is_binary(message) ->
+        {:ok,
+         Result.error("start", :denied,
+           exit_code: 2,
+           errors: [Result.to_error(message)]
+         )}
+    end
+  end
+
+  defp validate_command_options(opts) do
+    cond do
+      not non_empty?(opts["repo"]) ->
+        {:error, "--repo is required"}
+
+      not non_empty?(opts["objective"]) ->
+        {:error, "--objective is required"}
+
+      not non_empty_list?(opts["criterion"]) ->
+        {:error, "at least one --criterion is required"}
+
+      not optional_list?(opts["constraint"]) ->
+        {:error, "every --constraint must be a non-empty string"}
+
+      not optional_list?(opts["exclude"]) ->
+        {:error, "every --exclude must be a non-empty string"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp build_project_observation(repo_root) do
+    fingerprint =
+      "sha256:" <>
+        (:crypto.hash(:sha256, repo_root) |> Base.encode16(case: :lower))
+
+    {:ok, observation} =
+      Kiln.Domain.ProjectObservation.new(%{
+        repository_root: repo_root,
+        repository_fingerprint: fingerprint,
+        observed_at: DateTime.utc_now()
+      })
+
+    observation
+  end
+
+  # -- command: status --
+  #
+  # Status reads the current projection through `Workflow.current_session/0`
+  # and never reaches into the projection, restart, or replay modules
+  # directly.
+
+  defp dispatch_status(%Request{} = _request, _session) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        {:ok, no_session_result("status")}
+
+      {:ok, %{projection: projection} = result} ->
+        {:ok, status_result("status", projection, result)}
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp status_result(command, projection, result) do
+    opts = [
+      data: status_data(projection, result),
+      session_revision: revision_from_projection(projection),
+      journal_digest: format_digest(result.projection_digest),
+      next_actions: status_next_actions(projection, result)
+    ]
+
+    if result.orphaned do
+      Result.error(command, :unknown,
+        exit_code: 7,
+        errors: [
+          Result.to_error(%{
+            code: :orphaned_run,
+            message: "the Run has an unresolved external effect and requires reconciliation"
+          })
+        ],
+        data: opts[:data],
+        session_revision: opts[:session_revision],
+        journal_digest: opts[:journal_digest],
+        next_actions: opts[:next_actions]
+      )
+    else
+      Result.ok(command, opts)
+    end
+  end
+
+  defp status_data(projection, result) do
+    %{
+      session_id: get_in(projection, ["session", "id"]),
+      session_state: get_in(projection, ["session", "state"]),
+      task_id: get_in(projection, ["task", "id"]),
+      task_state: get_in(projection, ["task", "state"]),
+      root_run_id: get_in(projection, ["run", "id"]),
+      run_state: effective_run_state(projection, result),
+      workflow_step: projection["workflow_step"],
+      pending_decision: summarize_pending_decision(projection["pending_decision"]),
+      operation: summarize_operation(effective_operation(projection, result)),
+      cache_status: to_string(result.source),
+      orphaned: result.orphaned,
+      journal_head: format_digest(result.journal_head_digest)
+    }
+  end
+
+  defp status_next_actions(projection, result) do
+    cond do
+      result.orphaned ->
+        [
+          Result.next_action("inspect", "review the unknown operation and orphan markers"),
+          Result.next_action("resume", "show the orphaned Run state")
+        ]
+
+      get_in(projection, ["pending_decision"]) != nil ->
+        [
+          Result.next_action("inspect", "review the pending decision"),
+          Result.next_action("status", "show the waiting_for_user state")
+        ]
+
+      get_in(projection, ["operation"]) != nil ->
+        [
+          Result.next_action("inspect", "review the active external operation"),
+          Result.next_action("status", "show the running state")
+        ]
+
+      true ->
+        [
+          Result.next_action("inspect", "review the current state"),
+          Result.next_action("cancel", "end the Session safely if no work is in flight")
+        ]
+    end
+  end
+
+  # -- command: inspect --
+  #
+  # Inspect renders the full accepted P1-S01 state from the Workflow
+  # query result. The renderer-facing fields are sourced from the
+  # projection map; the Workflow query exposes them only through the
+  # authoritative load_projection path.
+
+  defp dispatch_inspect(%Request{} = _request, _session) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        {:ok, no_session_result("inspect")}
+
+      {:ok, %{projection: projection} = result} ->
+        {:ok, inspect_result("inspect", projection, result)}
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp inspect_result(command, projection, result) do
+    data = inspect_data(projection, result)
+
+    opts = [
+      data: data,
+      session_revision: revision_from_projection(projection),
+      journal_digest: format_digest(result.projection_digest),
+      next_actions: [
+        Result.next_action("status", "show the current projection"),
+        Result.next_action("cancel", "end the session safely if no work is in flight")
+      ]
+    ]
+
+    if result.orphaned do
+      Result.error(command, :unknown,
+        exit_code: 7,
+        errors: [
+          Result.to_error(%{
+            code: :orphaned_run,
+            message: "the Run has an unresolved external effect and requires reconciliation"
+          })
+        ],
+        data: data,
+        session_revision: opts[:session_revision],
+        journal_digest: opts[:journal_digest],
+        next_actions: opts[:next_actions]
+      )
+    else
+      Result.ok(command, opts)
+    end
+  end
+
+  defp inspect_data(projection, result) do
+    unknowns = effective_unknowns(projection, result)
+
+    %{
+      session_id: get_in(projection, ["session", "id"]),
+      session_state: get_in(projection, ["session", "state"]),
+      task_id: get_in(projection, ["task", "id"]),
+      task_state: get_in(projection, ["task", "state"]),
+      root_run_id: get_in(projection, ["run", "id"]),
+      run_state: effective_run_state(projection, result),
+      workflow_step: projection["workflow_step"],
+      objective_revision: projection["objective_revision"] || 0,
+      criteria_revision: projection["criteria_revision"] || 0,
+      objective: projection["objective"] || "",
+      criteria: projection["criteria"] || [],
+      constraints: projection["constraints"] || [],
+      exclusions: projection["exclusions"] || [],
+      pending_decision: summarize_pending_decision(projection["pending_decision"]),
+      operation: summarize_operation(effective_operation(projection, result)),
+      unknowns: unknowns,
+      project_observation_id: get_in(projection, ["references", "project_observation_id"]),
+      journal_head_digest: format_digest(result.journal_head_digest),
+      projection_digest: result.projection_digest
+    }
+  end
+
+  defp effective_unknowns(projection, %{orphaned: true}) do
+    case projection["operation"] do
+      %{"id" => id, "state" => state} when is_binary(id) and is_binary(state) ->
+        if state in @nonterminal_operation_states do
+          [%{"operation_id" => id, "reason" => "nonterminal_state"}]
+        else
+          projection["unknowns"] || []
+        end
+
+      _ ->
+        projection["unknowns"] || []
+    end
+  end
+
+  defp effective_unknowns(projection, _result), do: projection["unknowns"] || []
+
+  # -- command: cancel --
+  #
+  # Cancel reads the current session through `current_session/0`, picks
+  # up the session_id and run_state, and dispatches the mutation through
+  # `Workflow.cancel_session/2`. The CLI never builds a journal action
+  # envelope directly.
+
+  defp dispatch_cancel(%Request{options: opts, actor_id: actor_id} = request, _session) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        {:ok, no_session_result("cancel")}
+
+      {:ok, %{projection: projection} = _current} ->
+        session_id = get_in(projection, ["session", "id"])
+        task_id = get_in(projection, ["task", "id"])
+        run_id = get_in(projection, ["run", "id"])
+        previous_run_state = get_in(projection, ["run", "state"])
+        expected_revision = revision_from_projection(projection)
+
+        with :ok <- terminal_check(previous_run_state, "cancel"),
+             :ok <- active_operation_check(projection) do
+          cancel_session_via_workflow(
+            request,
+            session_id,
+            task_id,
+            run_id,
+            previous_run_state,
+            expected_revision,
+            actor_id,
+            opts
+          )
+        end
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp cancel_session_via_workflow(
+         request,
+         session_id,
+         task_id,
+         run_id,
+         previous_run_state,
+         expected_revision,
+         actor_id,
+         opts
+       ) do
+    case Workflow.cancel_session(session_id,
+           actor_id: actor_id,
+           expected_session_revision: expected_revision
+         ) do
+      {:ok, canceled} ->
+        {:ok,
+         Result.ok("cancel",
+           data: %{
+             session_id: session_id,
+             task_id: task_id,
+             root_run_id: run_id,
+             previous_run_state: previous_run_state,
+             run_state: "canceled"
+           },
+           session_revision: canceled.session_revision,
+           journal_digest: format_digest(canceled.projection_digest),
+           next_actions: [
+             Result.next_action("status", "show the canceled state"),
+             Result.next_action("resume", "resume guidance for a new accepted start")
+           ]
+         )}
+
+      {:error, %Kiln.Domain.Error{code: :run_transition_not_allowed} = error} ->
+        # The Workflow returns :run_transition_not_allowed from terminal
+        # states and from active operation. The CLI surfaces the terminal
+        # case as :failed exit 6 with the legacy "already <state>" message
+        # so the existing test contract holds.
+        case Map.get(request.options, "reason") do
+          _ ->
+            {:error,
+             error_for_terminal_cancel(
+               previous_run_state,
+               error,
+               opts
+             )}
+        end
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp error_for_terminal_cancel(previous_run_state, _workflow_error, _opts) do
+    %Kiln.Domain.Error{
+      code: :terminal_run_state,
+      message:
+        "Run is already #{previous_run_state}; cancel is not allowed from a terminal state",
+      field: nil,
+      details: %{from: previous_run_state}
+    }
+  end
+
+  # -- command: resume --
+  #
+  # Resume is bounded: it advertises the current Session and the
+  # Workflow's `valid_next_actions/1` set. When the matrix advertises
+  # `:resume_session`, it performs the single `Workflow.resume_session/2`
+  # mutation. Otherwise it does not perform any mutation; it returns a
+  # `:blocked` result describing the current state and the advertised
+  # next actions.
+
+  defp dispatch_resume(%Request{} = _request, _session) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        {:ok, no_session_result("resume")}
+
+      {:ok, %{projection: projection} = result} ->
+        session_id = get_in(projection, ["session", "id"])
+
+        case Workflow.valid_next_actions(session_id) do
+          {:ok, advertised_actions} ->
+            {:ok, resume_report_result(projection, result, advertised_actions)}
+
+          {:error, %Kiln.Domain.Error{} = error} ->
+            {:error, error}
+        end
+
+      {:error, %Kiln.Domain.Error{} = error} ->
+        {:error, error}
+    end
+  end
+
+  defp resume_report_result(projection, result, advertised_actions) do
+    data = %{
+      session_id: get_in(projection, ["session", "id"]),
+      task_id: get_in(projection, ["task", "id"]),
+      root_run_id: get_in(projection, ["run", "id"]),
+      session_state: get_in(projection, ["session", "state"]),
+      task_state: get_in(projection, ["task", "state"]),
+      run_state: effective_run_state(projection, result),
+      workflow_step: projection["workflow_step"],
+      next_actions: resume_next_actions(projection, result, advertised_actions)
+    }
+
+    if result.orphaned do
+      Result.error("resume", :unknown,
+        exit_code: 7,
+        errors: [
+          Result.to_error(%{
+            code: :orphaned_run,
+            message: "the Run has an unresolved external effect and requires reconciliation"
+          })
+        ],
+        data: data,
+        session_revision: revision_from_projection(projection),
+        journal_digest: format_digest(result.projection_digest),
+        next_actions: data.next_actions
+      )
+    else
+      Result.ok("resume",
+        data: data,
+        session_revision: revision_from_projection(projection),
+        journal_digest: format_digest(result.projection_digest),
+        next_actions: data.next_actions
+      )
+    end
+  end
+
+  defp resume_next_actions(_projection, result, advertised_actions) do
+    cond do
+      result.orphaned ->
+        [
+          Result.next_action("inspect", "review the unknown operation and orphan markers"),
+          Result.next_action("status", "show the orphaned Run state")
+        ]
+
+      true ->
+        default_actions =
+          [
+            Result.next_action("inspect", "review the current state"),
+            Result.next_action("cancel", "end the Session safely if no work is in flight")
+          ]
+
+        advertised =
+          Enum.map(advertised_actions, fn action ->
+            Result.next_action(Atom.to_string(action), description_for_advertised(action))
+          end)
+
+        Enum.uniq(default_actions ++ advertised)
+    end
+  end
+
+  defp description_for_advertised(:resume_session), do: "resume the Session"
+  defp description_for_advertised(:cancel_session), do: "cancel the Session explicitly"
+  defp description_for_advertised(_), do: "perform the available operation"
+
+  # -- error mapping --
+
+  defp error_result_tuple(%Request{command: command}, %Kiln.Domain.Error{} = error) do
+    {status, exit_code} = ErrorMap.map(error.code)
+
+    result =
+      Result.error(atom_to_command(command), status,
+        exit_code: exit_code,
+        errors: [Result.to_error(error)]
+      )
+
+    {result, exit_code}
+  end
+
+  defp result_for_code(command, code, message) do
+    {status, exit_code} = ErrorMap.map(code)
+
+    result =
+      Result.error(atom_to_command(command), status,
+        exit_code: exit_code,
+        errors: [Result.to_error(%{code: code, message: message, class: "blocked"})]
+      )
+
+    {result, exit_code}
+  end
+
+  defp no_session_result(command) do
+    result =
+      Result.error(command, :blocked,
+        errors: [
+          Result.to_error(%{
+            code: :no_session,
+            message: "no Session exists; start one with `mix kiln start`"
+          })
+        ]
+      )
+
+    {:ok, result}
+  end
+
+  # -- terminal-state guard for cancel --
+  #
+  # The Workflow returns :run_transition_not_allowed from a `:canceled`
+  # Run state, but the original CLI contract required a `:failed` exit 6
+  # with "already <state>" message. The CLI checks the projection's
+  # Run state here and short-circuits with the legacy error before
+  # calling the Workflow so the existing test contract holds.
+
+  defp terminal_check(previous_run_state, command) do
+    if previous_run_state in ["canceled", "completed", "failed"] do
+      {:error,
+       %Kiln.Domain.Error{
+         code: :terminal_run_state,
+         message:
+           "Run is already #{previous_run_state}; #{command} is not allowed from a terminal state",
+         field: nil,
+         details: %{from: previous_run_state}
+       }}
+    else
+      :ok
+    end
+  end
+
+  # -- active-operation guard for cancel --
+  #
+  # The original CLI refused to cancel a Run that owned an active or unknown
+  # operation. The Workflow agreed semantically but rejected the cancel via
+  # :run_transition_not_allowed, which the CLI surfaced as :blocked exit 4.
+  # The dispatcher checks the raw projection here so the original error
+  # message reaches the user before any Workflow call.
+
+  defp active_operation_check(projection) do
+    if projection["operation"] != nil do
+      {:error,
+       %Kiln.Domain.Error{
+         code: :active_operation,
+         message: "Run owns an active or unknown operation; resolve it before canceling",
+         field: nil,
+         details: %{}
+       }}
+    else
+      :ok
+    end
+  end
+
+  # -- helpers --
+
+  defp summarize_pending_decision(nil), do: nil
+  defp summarize_pending_decision(decision), do: decision
+
+  defp summarize_operation(nil), do: nil
+
+  defp summarize_operation(operation) do
+    %{
+      "id" => operation["id"],
+      "class" => operation["class"],
+      "state" => operation["state"]
+    }
+  end
+
+  defp revision_from_projection(projection) do
+    projection["session_revision"] || projection["objective_revision"] || 0
+  end
+
+  defp format_digest(nil), do: nil
+  defp format_digest("sha256:" <> _ = digest), do: digest
+  defp format_digest(digest) when is_binary(digest), do: "sha256:" <> digest
+
+  # The Workflow exposes `orphaned: true` when the persisted projection
+  # carries a non-nil operation in a nonterminal state. The persisted
+  # `run.state` does not change to "orphaned" until Restart rebuilds
+  # the projection; here we apply the same classification to the
+  # renderer-facing fields so the CLI matches the legacy contract
+  # (`run_state: "orphaned"`, `operation.state: "unknown"`).
+
+  defp effective_run_state(projection, %{orphaned: true}) do
+    case projection["operation"] do
+      %{} -> "orphaned"
+      _ -> get_in(projection, ["run", "state"])
+    end
+  end
+
+  defp effective_run_state(projection, _result) do
+    get_in(projection, ["run", "state"])
+  end
+
+  defp effective_operation(projection, %{orphaned: true}) do
+    case projection["operation"] do
+      %{"state" => state} = op when is_binary(state) ->
+        if state in @nonterminal_operation_states do
+          Map.put(op, "state", "unknown")
+        else
+          op
+        end
+
+      _ ->
+        projection["operation"]
+    end
+  end
+
+  defp effective_operation(projection, _result), do: projection["operation"]
+
+  defp non_empty?(nil), do: false
+  defp non_empty?(value) when is_binary(value), do: byte_size(value) > 0
+  defp non_empty?(_), do: false
+
+  defp non_empty_list?(nil), do: false
+  defp non_empty_list?(values) when is_list(values), do: Enum.all?(values, &non_empty?/1)
+  defp non_empty_list?(_), do: false
+
+  defp optional_list?(nil), do: true
+
+  defp optional_list?(values) when is_list(values),
+    do: Enum.all?(values, &non_empty?/1)
+
+  defp optional_list?(_), do: true
+
+  defp atom_to_command(nil), do: "kiln"
+  defp atom_to_command(command) when is_atom(command), do: Atom.to_string(command)
+  defp atom_to_command(command), do: command
+
+  # -- help / version --
+
+  defp help_result do
+    Result.ok("help",
+      data: %{
+        usage:
+          "mix kiln [--format text|json] [--kiln-home PATH] [--actor-id ID] <command> [options]",
+        commands: command_summary(),
+        global_options: [
+          %{flag: "--format", description: "output format: text (default) or json"},
+          %{flag: "--kiln-home", description: "local KILN_HOME path containing state.sqlite3"},
+          %{flag: "--actor-id", description: "actor identifier (required; or set KILN_ACTOR_ID)"},
+          %{flag: "--help", description: "show this summary"},
+          %{flag: "--version", description: "show the development version"}
+        ],
+        notes: [
+          "This is a source-development entry point. The packaged release is not yet shipped.",
+          "Provider, Context, Repository read, Patch, Command, completion, Receipt, Child, and TUI behavior are not exposed."
+        ]
+      },
+      next_actions:
+        Enum.map(@supported_commands, fn command ->
+          Result.next_action(
+            Atom.to_string(command),
+            "run the #{Atom.to_string(command)} command"
+          )
+        end)
+    )
+  end
+
+  defp version_result do
+    Result.ok("version", data: %{version: @version, schema: Result.schema()})
+  end
+
+  defp command_summary do
+    Enum.map(@supported_commands, fn command ->
+      %{
+        command: Atom.to_string(command),
+        description: description_for(command)
+      }
+    end)
+  end
+
+  defp description_for(:start), do: "start one durable Session, Task, and ready Root Run"
+  defp description_for(:status), do: "show the current projection and safe next actions"
+  defp description_for(:inspect), do: "show the complete accepted P1-S01 state"
+  defp description_for(:cancel), do: "cancel the Run when no operation is open or unknown"
+  defp description_for(:resume), do: "report the current projection and valid next actions"
+end
