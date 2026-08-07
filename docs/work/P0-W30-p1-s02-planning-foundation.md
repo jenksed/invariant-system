@@ -56,7 +56,7 @@ This package has one planning objective: make the next authorization decision be
 - **P0-W30-R08:** Keep all candidate P1-S02 ticket names, cuts, and sequencing explicitly provisional until a later authorization/adjudication step accepts them.
 - **P0-W30-R09:** Do not add product runtime code, dependencies, migrations, schemas, protocol implementations, Pack implementations, provider code, Commands, Artifacts, or tests for P1-S02.
 - **P0-W30-R10:** Require P1-S01-T05 Evidence to be consumed before any P1-S02 implementation authorization.
-- **P0-W30-R11:** Record the doctrine's upstream source, adopted commit, tracked version, and authority boundary inside `docs/ENGINEERING-DOCTRINE.md`, and enforce that record with an existing deterministic development check rather than prose convention alone.
+- **P0-W30-R11:** Record the doctrine's upstream source, adopted commit, tracked version, and authority boundary inside `docs/ENGINEERING-DOCTRINE.md`. Deterministic enforcement of that record is deferred to the development-tooling work package so this package stays documentation-only.
 
 ## Doctrine application to this planning package
 
@@ -77,8 +77,7 @@ The most relevant doctrine principles are:
 2. Root `CLAUDE.md` that delegates project authority to `AGENTS.md` and links the doctrine.
 3. A narrow `AGENTS.md` update that links the doctrine and states the current authorization boundary accurately.
 4. `docs/P1-S02-PLANNING-BASELINE.md` with the first planning decomposition and decision register.
-5. A `scripts/validate-agent-assets` check that keeps the doctrine version and provenance record present.
-6. This work-package record.
+5. This work-package record.
 
 ## Acceptance criteria
 
@@ -109,14 +108,8 @@ The most relevant doctrine principles are:
 - **P0-W30-AC05**
   - **Given** this branch diff
   - **When** it is compared with its base
-  - **Then** it contains only documentation, planning, agent-entrypoint, and development-agent validation changes, and no product runtime implementation
+  - **Then** it contains only documentation, planning, and agent-entrypoint changes and no runtime implementation
   - **Evidence:** exact branch compare
-
-- **P0-W30-AC06**
-  - **Given** the adopted Engineering Doctrine
-  - **When** `scripts/validate-agent-assets` runs
-  - **Then** it fails when the doctrine does not declare a semantic Doctrine-Version or does not record upstream provenance and adoption
-  - **Evidence:** `scripts/validate-agent-assets` output plus deliberate negative-case runs
 
 ## Verification
 
@@ -132,8 +125,7 @@ If the branch cannot run these locally in the authoring environment, the pull re
 
 A final review should also compare the branch against its exact base and confirm:
 
-- no product source, dependency, migration, runtime Schema, or test files changed;
-- the only executable change is the development-agent validation check for doctrine provenance;
+- no source, dependency, migration, runtime Schema, or test files changed;
 - doctrine links resolve;
 - the doctrine records its upstream source and adopted version;
 - P1-S02 remains explicitly unauthorized;
@@ -154,4 +146,4 @@ A final review should also compare the branch against its exact base and confirm
 
 **Result:** In progress
 
-The package is complete only after the doctrine and its provenance record, both entrypoint links, authorization reconciliation, the P1-S02 planning baseline, the doctrine provenance check, and an exact branch review that finds no product runtime change are present.
+The package is complete only after the doctrine and its provenance record, both entrypoint links, authorization reconciliation, the P1-S02 planning baseline, and an exact documentation-only branch review are present.

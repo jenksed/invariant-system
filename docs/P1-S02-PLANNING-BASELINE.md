@@ -433,7 +433,7 @@ Planning is ready for adjudication when the project can explain, for every propo
 - the exact prerequisite Evidence;
 - the failure mode the new mechanism addresses;
 - the minimum durable concepts it introduces;
-- that the ticket fits one bounded implementation context instead of requiring an accumulated multi-session transcript;
+- how the ticket fits one bounded implementation context;
 - the live resources that require process ownership;
 - the Capability and security boundary;
 - how current Repository state is bound;

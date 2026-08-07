@@ -77,18 +77,7 @@ invariant_id=KILN-INV-014
 grep -Eq "^### ${invariant_id}:" "$invariant_file" ||
   fail "required development-agent invariant ${invariant_id} is missing from ${invariant_file}"
 
-doctrine_file=docs/ENGINEERING-DOCTRINE.md
-
-[[ -f "$doctrine_file" ]] || fail "engineering doctrine file is missing: $doctrine_file"
-grep -Eq '^Doctrine-Version: [0-9]+\.[0-9]+\.[0-9]+$' "$doctrine_file" ||
-  fail "${doctrine_file} does not declare a semantic Doctrine-Version"
-grep -Fqx '## Provenance and adoption' "$doctrine_file" ||
-  fail "${doctrine_file} does not record upstream doctrine provenance and adoption"
-
-doctrine_version=$(sed -n 's/^Doctrine-Version: //p' "$doctrine_file" | head -1)
-
 printf 'validate-agent-assets: pass\n'
 printf 'skills: %s\n' "${#skills[@]}"
 printf 'specialist agents: %s\n' "${#agents[@]}"
 printf 'prompt templates: %s\n' "${#prompts[@]}"
-printf 'doctrine version: %s\n' "$doctrine_version"

@@ -14,7 +14,7 @@ Doctrine-Version: 1.0.0
 
 Kiln adopts this doctrine from Project Arsenal instead of authoring it locally. The numbered principles, the decision heuristics, and the meta-principle below are adopted without local modification. The status, scope, authority boundary, and Kiln application guidance in this file are Kiln-local.
 
-Project Arsenal is reusable engineering material for building Kiln. It is not a Kiln runtime component, not a Kiln dependency, and it holds no authority over Kiln scope, ADRs, invariants, or the accepted work plan. Arsenal vocabulary is not Kiln domain vocabulary; Kiln domain terms come only from Kiln documents. An agent working in Kiln does not need to read Project Arsenal to apply this doctrine.
+Project Arsenal is reusable engineering material for building Kiln. It is not a Kiln runtime component, not a Kiln dependency, and it holds no authority over Kiln scope, ADRs, invariants, or the accepted work plan. Arsenal vocabulary is not Kiln domain vocabulary; Kiln domain terms come only from Kiln documents. For example, a Development Pack in Kiln is the product concept defined under `quality-compiler/`, not the Arsenal asset that shares the name. An agent working in Kiln does not need to read Project Arsenal to apply this doctrine.
 
 Record intentional divergence from the upstream text in this section with its reason, and change the Doctrine-Version when upstream text is deliberately re-adopted. Undocumented drift is a defect.
 
