@@ -28,43 +28,54 @@ A user-provided transcript explaining Wayfinder was also treated as primary desi
 
 | Source capability | Arsenal direction |
 |---|---|
-| `diagnosing-bugs` | Feedback-loop-first bug diagnosis with a red-capable reproduction gate. |
-| `tdd` | Seam-aware red/green vertical slices with behavior-focused tests. |
-| `code-review` | Independent review axes so spec correctness cannot hide standards failures or vice versa. |
-| `prototype` | Throwaway artifact explicitly tied to one design question, retained only as evidence. |
-| `to-spec` | Synthesize already-resolved conversation/map decisions; do not re-interview settled questions. |
-| `to-tickets` | Tracer-bullet implementation slices with dependency edges; use expand/migrate/contract for wide refactors. |
-| `implement` | Keep orchestration thin and delegate discipline to reusable implementation, TDD, review, and verification primitives. |
-| `improve-codebase-architecture` + `codebase-design` | Architecture deepening review using explicit seams, interface leverage, locality, and multiple design alternatives. |
+| `diagnosing-bugs` | `software_engineering/diagnose_bug_feedback_loop.md` — feedback-loop-first diagnosis with a red-capable reproduction gate. |
+| `tdd` | `software_engineering/tdd_vertical_slice.md` — seam-aware red/green vertical slices with behavior-focused tests. |
+| `code-review` | `software_engineering/code_review_multi_axis.md` — independent review axes so spec correctness cannot hide standards/evidence failures. |
+| `prototype` | `software_engineering/prototype_to_answer_question.md` — disposable artifact tied to one design question and retained only as useful evidence. |
+| `to-spec` | `software_engineering/spec_from_resolved_context.md` — synthesize already-resolved conversation/map decisions rather than re-interview settled questions. |
+| `to-tickets` | `software_engineering/work_to_tracer_tickets.md` — tracer-bullet implementation slices with dependency edges and expand/migrate/contract for wide refactors. |
+| `implement` | Existing feature-delivery workflows remain thin and delegate discipline to implementation, TDD, review, and verification primitives. |
+| `improve-codebase-architecture` + `codebase-design` | `software_engineering/architecture_deepening_review.md` — explicit seams, interface leverage/locality, and multiple design alternatives. |
 | `research` | Strong overlap with Arsenal research assets; retain primary-source preference and durable cited findings. |
-| `resolving-merge-conflicts` | Resolve by original intent/evidence, not by mechanically choosing lines. |
-| `wizard` | Convert unavoidable human-only procedures into explicit, gated, verifiable walkthroughs. |
-| `triage` | State-machine triage, claim verification, agent-ready briefs, and rejected-decision memory. |
-| `to-questionnaire` | Externalize knowledge gaps to the person who owns the missing domain facts; interview the send, not the unknown subject. |
-| `wait-what` | Lightweight re-explanation capability using project vocabulary; useful but intentionally tiny. |
+| `resolving-merge-conflicts` | `software_engineering/resolve_merge_conflicts_by_intent.md` — resolve by original intent/evidence, not by mechanically choosing lines. |
+| `wizard` | `software_engineering/human_setup_wizard.md` — convert unavoidable human-only procedures into explicit, gated, verifiable walkthroughs. |
+| `triage` | `agent_workflows/triage_to_agent_ready.md` — state-machine triage, claim verification, agent-ready briefs, and rejected-decision memory. |
+| `to-questionnaire` | `agent_workflows/domain_questionnaire.md` — externalize knowledge gaps to the person who owns them; interview the send, not the unknown subject. |
+| `wait-what` | `agent_workflows/rephrase_with_context.md` — intentionally tiny context-restoring re-explanation capability. |
 | `handoff` | Strong overlap with Arsenal session handoff; preserve pointer-not-duplication and portability principles. |
-| `ask-matt` | Arsenal router should map goals to workflows without becoming the implementation of those workflows. |
+| `ask-matt` | `agent_workflows/arsenal_router.md` maps goals to workflows without becoming the implementation of those workflows. |
+| repo setup | `agent_workflows/setup_project_arsenal.md` discovers project conventions before adding pointers/configuration. |
 
 ## Learning and writing patterns that fit
 
 | Source capability | Arsenal treatment |
 |---|---|
-| `teach` | Stateful learning workspace: mission, trusted resources, learning records, lessons, reference artifacts, retrieval practice, and feedback loops. |
-| `loop-me` | Recurring-loop discovery should feed Arsenal's workflow-package architecture: identify repeated activity, trigger, checkpoints, and late HITL review. |
-| `writing-fragments` | Preserve as a distinct raw-material collection phase for long-form writing. |
-| `writing-beats` | Preserve journey/beat planning as a distinct structure phase. |
-| `writing-shape` | Preserve paragraph-level shaping as a separate synthesis phase. |
-| `scaffold-exercises` | Overlaps Arsenal portfolio/lab and learning-session assets; borrow exercise scaffolding principles rather than a duplicate canonical prompt initially. |
+| `teach` | `learning/stateful_learning_workspace.md` — mission, trusted resources, learning records, reference artifacts, retrieval practice, and feedback loops. |
+| `loop-me` | `workflows/recurring_loop_discovery.md` feeds Arsenal's workflow-package architecture: repeated activity, trigger, checkpoints, permissions, failure behavior, and evidence. |
+| `writing-fragments` | `writing/fragment_mining.md` preserves a distinct raw-material collection phase. |
+| `writing-beats` | `writing/beat_map.md` preserves reader-journey/beat planning as a distinct structure phase. |
+| `writing-shape` | `writing/shape_from_fragments.md` preserves progressive paragraph/section shaping as a separate synthesis phase. |
+| `scaffold-exercises` | Overlaps Arsenal portfolio/lab and learning-session assets; borrow exercise-scaffolding principles rather than create a second canonical prompt initially. |
 
-## Infrastructure ideas to carry forward
+## Infrastructure patterns adopted through Development Packs
 
-- A repo-local setup workflow that discovers tracker, domain-doc, verification, and policy conventions rather than hardcoding them.
+`engineering/development_packs/CONTRACT.md` is the common home for the transferable ideas behind source infrastructure skills.
+
+- **Git guardrails** → safe mutation guardrails should be structural hooks/permissions where the harness supports them.
+- **Pre-commit setup** → fast, deterministic local feedback belongs in an inner-loop tier; slow/flaky checks move to later verification/CI.
+- **Typecheck/test/format orchestration** → every pack should expose obvious inner-loop, slice-gate, and completion-gate verification.
+- **TypeScript deep-module setup** → architecture/package-boundary enforcement is valuable when native tooling can enforce a real invariant, but the concrete rule belongs in the relevant language pack.
+- **Repo-local setup** → installers inspect existing tooling and preserve conventions rather than installing duplicates.
+- **Agent guidance** → pack docs should point at deterministic machinery rather than restate what config/scripts already reveal.
+
+## Other repository-architecture ideas retained
+
 - Thin orchestrators over reusable primitives.
-- Explicit lifecycle buckets; Arsenal already models this through registry status rather than directory placement.
+- Explicit lifecycle buckets; Arsenal models this through registry status rather than directory placement.
 - Deterministic install/integrity checks and a future selective installer/synchronizer.
-- Git guardrails implemented structurally (hooks/permissions) where the harness supports them.
-- Pre-commit/typecheck/test feedback loops as Development Pack machinery rather than prose-only rules.
-- Language-specific deep-module enforcement belongs in Development Packs, not Arsenal's universal core.
+- User-invoked vs model-invoked behavior represented as harness-neutral invocation metadata.
+- Shared reference is single-sourced and reached by pointers.
+- Source/provenance audits are explicit so adaptation boundaries remain inspectable.
 
 ## Do not import as canonical Arsenal assets
 
@@ -72,6 +83,7 @@ A user-provided transcript explaining Wayfinder was also treated as primary desi
 - Claude-specific background-handoff mechanics as a universal contract; preserve the portable handoff concept instead.
 - Exact GitHub label names, plugin manifests, docs publishing conventions, or Matt's setup file layout.
 - A mandatory Wayfinding process for ordinary scoped work. Wayfinding is explicitly for genuine multi-session fog.
+- A language-specific deep-module rule in universal Arsenal core; that belongs in a Development Pack with ecosystem-native enforcement.
 
 ## Architectural takeaway
 
@@ -83,4 +95,4 @@ The strongest idea in the source repository is not any individual prompt. It is 
 4. durable project state;
 5. deterministic tooling around the prompts.
 
-Project Arsenal should push that separation further by making the reusable method independent of the eventual skill/runtime packaging.
+Project Arsenal pushes that separation one layer further: the reusable method is independent of its eventual skill, CLI, plugin, or Kiln runtime packaging.
