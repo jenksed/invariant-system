@@ -43,6 +43,62 @@ post-review changes is captured in `Completion record` below.
 ### Second-pass revision (post-review)
 
 A second PR-42 review of the revised commit surfaced five further
+correctness gaps that were corrected in a follow-up pass (the third-pass
+regression-evidence tightening described under `Failures and warnings`
+is the closer of the same review).
+
+### Fourth-pass revision (post-review)
+
+A fourth PR-42 review surfaced three HIGH issues plus a merge blocker
+that were corrected in a follow-up pass:
+
+1. **Replay bound to head, not target action (HIGH).** The replay
+   used by `Kiln.Store.Journal.commit/4` rebuilt the Session from the
+   entire journal and compared the stored result against the head
+   projection. A retry of an older action after later actions had
+   committed (e.g. `start → resume → retry original start`) replayed
+   the *head* projection and digest, so the retry could not be
+   distinguished from the latest commit and the stored
+   `session_revision`/`projection_digest` appeared consistent by
+   accident. The revision adds `Replay.rebuild_for_action/3` which
+   validates the full journal, walks every batch with
+   `apply_batches_with_snapshots/2`, stamps each snapshot with
+   `Session.stamp/3` so its digest matches the digest the journal
+   wrote at commit time, and returns the report whose
+   `projection`, `session_revision`, `projection_digest`, and
+   `action_boundary` describe the Session at the target action's
+   commit point. `Replay.report/0` and `Journal.replay/0` now expose
+   both `projection` (target) and `head_projection`; missing target
+   `action_id` returns `{:error, %{code: :target_action_not_found, ...}}`.
+2. **Stored `task_id`/`run_id` format-checked but not
+   authority-checked (HIGH).** The replay-boundary validators
+   accepted any well-formed `task_id` or `run_id`. A stored result
+   whose `task_id` was another Session's task_id (or whose `run_id`
+   was another Run) was accepted because the value passed format
+   validation alone. The revision adds `require_task_id_matches_boundary/2`
+   and `require_run_id_matches_boundary/2`, which extract the
+   authoritative `task.id` and `run.id` from the target projection
+   via `authoritative_id/2` and reject any stored value that
+   disagrees (`:corrupt_result`). Two new corruption tests
+   (`wrong-but-validly-formatted task_id`, `wrong-but-validly-formatted
+   run_id`) exercise each field independently.
+3. **`classify_commit/3` lacked exception rescue (HIGH).** The
+   `commit/4` path wrapped `Connection.transaction/2` in a rescue
+   that converted operational errors into
+   `%Error{class: :unknown, code: :transaction_failed}`. The
+   sibling `classify_commit/3` raised on the same operational
+   failure modes, leaking an `Exqlite.Error` to callers. The
+   revision adds the matching rescue and reuses
+   `transaction_error/1` to surface the same envelope.
+4. **CI merge blocker: `mix format --check-formatted` failing.**
+   GitHub CI flagged formatting violations in
+   `lib/kiln/workflow.ex`, `test/kiln/store/migrations_test.exs`, and
+   the freshly modified `lib/kiln/journal/replay.ex`. The revision
+   runs `mix format` across the changed surface and re-verifies the
+   full local CI gate (`mix format --check-formatted`,
+   `mix compile --warnings-as-errors`, `mix test`) before pushing.
+
+A second PR-42 review of the revised commit surfaced five further
 correctness gaps that were corrected in a follow-up pass:
 
 1. **Action-boundary binding on replay (HIGH).** A well-formed but
@@ -343,8 +399,8 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
 | `mix format --check-formatted` | 0 | clean after the revision's `mix format` pass |
 | `mix compile --warnings-as-errors` | 0 | 30 files compiled; 0 warnings |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | No cycles found |
-| `mix test test/kiln/workflow_test.exs` | 0 | 83 tests, 83 passed (49 originals + 34 regression tests across AC01-AC15; 13 added in the second-pass review) |
-| `mix test` | 0 | 247 tests, 247 passed across the full suite (234 prior + 13 second-pass regression tests) |
+| `mix test test/kiln/workflow_test.exs` | 0 | 87 tests, 87 passed (49 originals + 38 regression tests across AC01-AC15; 13 second-pass + 4 fourth-pass) |
+| `mix test` | 0 | 251 tests, 251 passed across the full suite (234 prior + 13 second-pass + 4 fourth-pass regression tests) |
 
 ### Demo and slice status
 
@@ -372,6 +428,11 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
     4. **Migration specific duplicate-key code.** The v1→v2 upgrade now returns `:duplicate_global_idempotency_keys` with structured `details.duplicates: [%{idempotency_key, session_ids}]` instead of a generic `:apply_failed`. `reject_duplicate_idempotency_keys/3` pre-detects the duplicates in a read-only query, guarded by `action_commits_table_exists?/1` so a fresh-store first migration skips the check entirely. The migration SQL comment spells out operator remediation: per-key deduplication, removal of associated journal entries, and retry of the migration.
     5. **Valid v1 fixture with replay-safety proof.** The previous fixture planted rows in `action_commits` directly with fake digests and no associated `journal_entries`, which could not actually be replayed through `Replay.rebuild/2`. The new `seed_v1_session!/4` fixture writes a real `journal_entries` row whose `payload_digest` equals `Kiln.Store.Canonical.digest("session_started/v1", payload)` (unprefixed) and a real `action_commits` row whose `result_digest` equals `Kiln.Store.Canonical.digest("action_result/v1", result)` (unprefixed) and whose `request_digest` is `"sha256:" <> payload_digest` (prefixed). The test asserts `Replay.rebuild/2` returns `{:ok, report}` with the seeded projection both *before* and *after* the v2 upgrade.
     6. **Regression-evidence assertions tightened.** The capability matrix helper now captures `journal_entries`, `action_commits`, and `session_projections` row counts *after* the source state is reached and asserts all three counts are unchanged on rejection. The restart durability tests now assert zero additional rows of all three kinds and compare the entire returned result map (`assert replayed == first`). The timestamp suite now covers explicit-then-omitted and omitted-then-explicit conflicts. The idempotency conflict suite now covers changed `constraints`, `exclusions`, `repository_fingerprint`, `observed_at`, cancel-vs-resume and resume-vs-cancel cross-operation reuse, transition-revision conflicts on cancel and resume, actor-id conflicts on cancel, and cross-Session key reuse.
+- **Fourth-pass PR-42 review.** Three HIGH issues and one merge blocker were corrected in the follow-up commit:
+    1. **Replay at target action.** Added `Replay.rebuild_for_action/3` which validates the full journal but returns the snapshot at the target `action_id`. Added `apply_batches_with_snapshots/2` / `apply_batch_with_snapshot/3` which stamp each snapshot with `Session.stamp(projection, last_revision, last_sequence)` so its `projection_digest` matches what the journal computed at commit time. Added `pick_snapshot/2` (returns `:target_action_not_found` when the action_id is absent) and `build_report/3` (exposes both `projection` (target) and `head_projection`). `Journal.replay/0` and `Journal.replayed_result/1` thread `target_projection` through; `replay_boundary_valid?/3` now takes `action_id` and calls `rebuild_for_action/3`. New AC08 regression tests: `start → resume → retry original start replays the start result exactly` and `start → resume → cancel → retry original resume replays the resume result exactly`.
+    2. **Authority-check task_id and run_id.** Added `require_task_id_matches_boundary/2` and `require_run_id_matches_boundary/2` plus the shared `authoritative_id/2` walker. The fresh-commit path passes `target_projection: nil` and the replayed path passes `target_projection: replayed.target_projection`; both validators skip when no projection is available and reject with `:corrupt_result` when the stored value disagrees with the target projection's `task.id` or `run.id`. New AC15 regression tests: `a stored result with a wrong but validly-formatted task_id is rejected` and `a stored result with a wrong but validly-formatted run_id is rejected`.
+    3. **`classify_commit/3` exception rescue.** Wrapped `Connection.transaction/2` in `rescue` and routed the exception through `transaction_error/1`, matching the operational-error treatment already used by `commit/4`. Non-Error reasons now surface as `%Error{class: :unknown, code: :transaction_failed}`.
+    4. **CI merge blocker.** Ran `mix format` across the changed surface (workflow, journal, replay, migrations test, workflow test) and re-verified the local CI gate (`mix format --check-formatted`, `mix compile --warnings-as-errors`, `mix test`) before pushing.
 
 ### Remaining unknowns and exclusions
 
@@ -381,7 +442,7 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
 ### Repository state
 
 - Branch: `work/p1-s01-t06-workflow-surface`
-- Commit: pending
+- Commit: pushed (`a766992` after the fourth-pass fixes)
 - Diff reviewed: Yes (full re-run of all deterministic verification gates; results captured above).
 - Implementation note: capability matrix narrowed from the originally proposed `:ready`/`:running`/`:waiting_for_user`/`:orphaned` to `:ready`/`:running` to match the P1-S01-T06 slice. The new migration (`0002_action_commits_idempotency.sql`) bumps the store version from 1 to 2; the store and migrations test suites were updated to match.
 - Parent slice status after merge: enables P1-S01-T04 (foundation CLI) and contributes to P1-S01-T05 (slice gate)
