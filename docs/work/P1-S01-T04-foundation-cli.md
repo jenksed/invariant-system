@@ -246,10 +246,13 @@ The current branch head contains every correction from the F1–F9 review pass p
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-07 |
 | `mix test test/kiln/operation_lifecycle_parity_test.exs` | 5 passed | local sandbox run, 2026-08-07 |
 | `mix test test/kiln/cli` | 34 passed | local sandbox run, 2026-08-07 |
-| `mix test` | 341 passed | local sandbox run, 2026-08-07 |
+| `mix test` | 345 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on corrected head | success | GitHub Actions run 31194756348 on commit 37e7ac6 |
-| GitHub Actions `prose` job on corrected head | success | GitHub Actions run 31194756348 on commit 37e7ac6 |
+| GitHub Actions `test` job on final corrected head | success | GitHub Actions run 31199247425 on commit f3fe050 |
+| GitHub Actions `prose` job on final corrected head | success | GitHub Actions run 31199247425 on commit f3fe050 |
+| Historical exact-head CI runs preserved for provenance: | | |
+| GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded by f3fe050 |
+| GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9) | superseded by f3fe050 |
 
 ### Demo and slice status
 
