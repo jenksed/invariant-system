@@ -257,21 +257,22 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 | `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
 | `mix test` | 351 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
-| GitHub Actions `prose` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
+| GitHub Actions `test` job on final head | success | GitHub Actions run 31207584661 on commit 1528148 |
+| GitHub Actions `prose` job on final head | success | GitHub Actions run 31207584661 on commit 1528148 |
 | Historical exact-head CI runs preserved for provenance: | | |
 | GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
 | GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
 | GitHub Actions run 31199247425 on commit f3fe050 | (historical, I1–I5 closure) | superseded |
 | GitHub Actions run 31199785234 on commit 35cb2c3 | (historical, baseline at start of I6–I8) | superseded |
-| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded by 31206737852 |
+| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded |
+| GitHub Actions run 31206737852 on commit a6b6c6a | (historical, evidence-only update) | superseded by 31207584661 |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
 - Slice verification manifest updated: Yes (the F1–F9, I1–I5, and I6–I8 closure passes are owned by T04, not T05)
-- Slice completion claimed: Yes — verified on final head `a6b6c6a` by GitHub Actions run `31206737852`
+- Slice completion claimed: Yes — verified on final head `1528148` by GitHub Actions run `31207584661`
 
 ### Failures and warnings
 
@@ -289,8 +290,8 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 
 ### Repository state
 
-- **Final implementation head:** `a6b6c6a07603e51940bc9e3df42aeb550cc23e54` — documentation-only update on top of the I6–I8 code-bearing head `2ede2b8`. Verified by GitHub Actions run `31206737852` (both `test` and `prose` jobs green).
-- **Code-bearing implementation head:** `2ede2b887adf3394e8633756851eb555bbe6aea3` — the I6–I8 narrow closure that introduced the bounded `:no_existing_session` precondition inside `Journal.commit`'s `BEGIN IMMEDIATE` transaction and the `:precondition` Store error class. Verified by GitHub Actions run `31206150176`.
+- **Final implementation head:** `15281482e42379cafac6582320c63c88a6d33046` — the I9–I11 narrow closure that corrected the cross-connection concurrency test, documented the `:precondition` Store error class extension, and reconciled the completion record. Verified by GitHub Actions run `31207584661` (both `test` and `prose` jobs green).
+- **Code-bearing implementation head:** `2ede2b887adf3394e8633756851eb555bbe6aea3` — the I6–I8 narrow closure that introduced the bounded `:no_existing_session` precondition and the `:precondition` Store error class. Verified by GitHub Actions run `31206150176`.
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
@@ -299,5 +300,6 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
   - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
   - `35cb2c3` (corrected-head baseline at start of I6–I8 pass) — verified by GitHub Actions run `31199785234`
   - `2ede2b8` (I6–I8 code-bearing head) — verified by GitHub Actions run `31206150176`
-  - `a6b6c6a` (current final head, evidence-only update) — verified by GitHub Actions run `31206737852` ← **final**
+  - `a6b6c6a` (evidence-only update) — verified by GitHub Actions run `31206737852`
+  - `1528148` (I9–I11 code-bearing head, test-correction + evidence reconciliation) — verified by GitHub Actions run `31207584661` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
