@@ -86,6 +86,7 @@ defmodule Kiln.Workflow do
 
   alias Kiln.Domain.{Action, Error, Id, ProjectObservation, Session, Transition}
   alias Kiln.Journal.Replay
+  alias Kiln.OperationLifecycle
   alias Kiln.Projections.Session, as: SessionProjection
   alias Kiln.Projections.Store, as: ProjectionStore
   alias Kiln.Store.{Canonical, Journal}
@@ -1609,17 +1610,16 @@ defmodule Kiln.Workflow do
   defp source_from_status(_), do: :rebuilt
 
   # A Root Run is `orphaned` when its projection carries a non-nil
-  # operation whose state is nonterminal (e.g. `"intent_recorded"`).
-  # This matches `Kiln.Restart.classify/2` so the CLI does not have to
-  # alias the Restart module. The classification is derived from the
+  # operation whose state is in the canonical nonterminal operation-state
+  # set. The set lives in `Kiln.OperationLifecycle` so the conservative
+  # restart classifier (`Kiln.Restart.classify/2`) and this query path
+  # can never silently diverge. The classification is derived from the
   # same projection invariant without consulting Transcript or replay
   # internals.
-  @nonterminal_operation_states ~w(intent_recorded requested awaiting_response)
-
   defp orphaned?(projection) when is_map(projection) do
     case projection["operation"] do
       %{"state" => state} when is_binary(state) ->
-        state in @nonterminal_operation_states
+        OperationLifecycle.nonterminal_string?(state)
 
       _ ->
         false

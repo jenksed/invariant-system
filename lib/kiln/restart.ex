@@ -16,10 +16,9 @@ defmodule Kiln.Restart do
   """
 
   alias Kiln.Journal.Replay
+  alias Kiln.OperationLifecycle
   alias Kiln.Projections.{Session, Store}
   alias Kiln.Store.Connection
-
-  @nonterminal_operation_states ["intent_recorded", "started"]
 
   @type reconstruction :: %{
           session_id: String.t(),
@@ -104,7 +103,10 @@ defmodule Kiln.Restart do
   end
 
   defp nonterminal?(nil), do: false
-  defp nonterminal?(operation), do: operation["state"] in @nonterminal_operation_states
+
+  defp nonterminal?(operation) do
+    OperationLifecycle.nonterminal_string?(operation["state"])
+  end
 
   defp orphan(projection, operation) do
     projection
