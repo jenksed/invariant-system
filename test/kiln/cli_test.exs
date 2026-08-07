@@ -453,7 +453,12 @@ defmodule Kiln.CLITest do
     code = strip_comments(source)
 
     forbidden = [
-      ~r/alias\s+Kiln\.Domain\b/,
+      # The CLI may *consume* `%Kiln.Domain.Error{}` returns from
+      # `Kiln.Workflow` via `alias Kiln.Domain.Error` and `%Error{}`
+      # pattern matching. Construction is forbidden by the second
+      # source-guard test below. Any other `Kiln.Domain.*` alias is
+      # forbidden here.
+      ~r/alias\s+Kiln\.Domain\.(?!Error\b)\w+/,
       ~r/alias\s+Kiln\.Projections\b/,
       ~r/alias\s+Kiln\.Restart\b/,
       ~r/alias\s+Kiln\.Store\.Journal\b/,
@@ -468,6 +473,28 @@ defmodule Kiln.CLITest do
     for fragment <- forbidden do
       refute code =~ fragment,
              "cli.ex must not depend on #{inspect(fragment)}"
+    end
+  end
+
+  # The CLI is allowed to *consume* `%Kiln.Domain.Error{}` returns from
+  # `Kiln.Workflow`. It must never *construct* Domain values itself. The
+  # guard below forbids every fully-qualified `Kiln.Domain.*` reference
+  # (struct literal, `.new/1`, or any other call) so the architectural
+  # rule is enforced by tests, not by convention.
+  test "source guard: dispatcher never references Kiln.Domain.* fully-qualified" do
+    source = File.read!("lib/kiln/cli.ex")
+    code = strip_comments(source)
+
+    forbidden = [
+      ~r/%Kiln\.Domain\.Error\{/,
+      ~r/%Kiln\.Domain\.\w+\{/,
+      ~r/Kiln\.Domain\.\w+\.new\(/,
+      ~r/Kiln\.Domain\.\w+\.from_/
+    ]
+
+    for fragment <- forbidden do
+      refute code =~ fragment,
+             "cli.ex must not construct any Kiln.Domain.* value (#{inspect(fragment)})"
     end
   end
 
@@ -658,4 +685,81 @@ defmodule Kiln.CLITest do
   catch
     :exit, _reason -> :ok
   end
+
+  # -- F5 capability-driven next-actions --
+
+  describe "capability-driven next_actions (Workflow capability matrix)" do
+    test "ready Run advertises both cancel and resume in status output", %{dir: dir} do
+      {_, 0} = CLI.run(start_request(dir))
+
+      {status_result, 0} = CLI.run(parse_request(dir, :status))
+
+      actions = actions_in(status_result)
+      assert "inspect" in actions
+      assert "cancel" in actions
+      assert "resume" in actions
+    end
+
+    test "running Run advertises cancel but not resume in status output", %{dir: dir} do
+      {start_result, 0} = CLI.run(start_request(dir))
+      session_id = start_result.data.session_id
+      run_id = start_result.data.root_run_id
+
+      {:ready, store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_cli_test",
+          now: @now
+        )
+
+      on_exit(fn -> stop(store.conn) end)
+      commit_transition(store, session_id, run_id, "ready", "running", 0)
+
+      {status_result, 0} = CLI.run(parse_request(dir, :status))
+
+      actions = actions_in(status_result)
+      assert "cancel" in actions
+      refute "resume" in actions
+    end
+
+    test "waiting_for_user Run advertises neither cancel nor resume", %{dir: dir} do
+      {start_result, 0} = CLI.run(start_request(dir))
+      session_id = start_result.data.session_id
+      run_id = start_result.data.root_run_id
+
+      {:ready, store} =
+        Store.start(
+          path: Path.join(dir, "state.sqlite3"),
+          store_id: "store_cli_test",
+          now: @now
+        )
+
+      on_exit(fn -> stop(store.conn) end)
+      commit_transition(store, session_id, run_id, "ready", "running", 0)
+      commit_pending_decision(store, session_id, run_id, decision_id(:approval), 1)
+
+      {status_result, 0} = CLI.run(parse_request(dir, :status))
+
+      actions = actions_in(status_result)
+      refute "cancel" in actions
+      refute "resume" in actions
+    end
+
+    test "canceled Run offers neither cancel nor resume", %{dir: dir} do
+      {_, 0} = CLI.run(start_request(dir))
+      {_, 0} = CLI.run(parse_request(dir, :cancel))
+
+      {status_result, 0} = CLI.run(parse_request(dir, :status))
+
+      actions = actions_in(status_result)
+      refute "cancel" in actions
+      refute "resume" in actions
+    end
+  end
+
+  defp actions_in(%Result{next_actions: next_actions}) do
+    Enum.map(next_actions, & &1.action)
+  end
+
+  defp actions_in(_other), do: []
 end

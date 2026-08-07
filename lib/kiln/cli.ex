@@ -21,12 +21,15 @@ defmodule Kiln.CLI do
   """
 
   alias Kiln.CLI.{ErrorMap, Request, Result, Runtime}
+  alias Kiln.Domain.Error
+  alias Kiln.OperationLifecycle
   alias Kiln.Workflow
 
   @supported_commands Request.commands()
   @version Kiln.version()
 
-  @nonterminal_operation_states ~w(intent_recorded requested awaiting_response)
+  @nonterminal_operation_states OperationLifecycle.nonterminal_states()
+                                |> Enum.map(&Atom.to_string/1)
 
   @doc "Run a parsed request and return `{result, exit_code}`."
   @spec run(Request.t()) :: {Result.t(), non_neg_integer()}
@@ -83,7 +86,7 @@ defmodule Kiln.CLI do
             {:error, %Result{} = result} ->
               {result, result.exit_code}
 
-            {:error, %Kiln.Domain.Error{} = error} ->
+            {:error, %Error{} = error} ->
               error_result_tuple(request, error)
 
             {:ok, %Result{} = result, _session} ->
@@ -177,12 +180,12 @@ defmodule Kiln.CLI do
                  ]
                )}
 
-            {:error, %Kiln.Domain.Error{} = error} ->
+            {:error, %Error{} = error} ->
               {:error, error}
           end
       end
     else
-      {:error, %Kiln.Domain.Error{} = error} -> {:error, error}
+      {:error, %Error{} = error} -> {:error, error}
     end
   end
 
@@ -203,7 +206,7 @@ defmodule Kiln.CLI do
            ]
          )}
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
@@ -260,14 +263,11 @@ defmodule Kiln.CLI do
       "sha256:" <>
         (:crypto.hash(:sha256, repo_root) |> Base.encode16(case: :lower))
 
-    {:ok, observation} =
-      Kiln.Domain.ProjectObservation.new(%{
-        repository_root: repo_root,
-        repository_fingerprint: fingerprint,
-        observed_at: DateTime.utc_now()
-      })
-
-    observation
+    %{
+      repository_root: repo_root,
+      repository_fingerprint: fingerprint,
+      observed_at: DateTime.utc_now()
+    }
   end
 
   # -- command: status --
@@ -281,20 +281,26 @@ defmodule Kiln.CLI do
       {:ok, :empty} ->
         {:ok, no_session_result("status")}
 
-      {:ok, %{projection: projection} = result} ->
-        {:ok, status_result("status", projection, result)}
+      {:ok, %{projection: projection, session_id: session_id} = result} ->
+        case advertised_actions_for(session_id) do
+          {:ok, advertised} ->
+            {:ok, status_result("status", projection, result, advertised)}
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+          {:error, %Error{} = error} ->
+            {:error, error}
+        end
+
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
 
-  defp status_result(command, projection, result) do
+  defp status_result(command, projection, result, advertised_actions) do
     opts = [
       data: status_data(projection, result),
       session_revision: revision_from_projection(projection),
       journal_digest: format_digest(result.projection_digest),
-      next_actions: status_next_actions(projection, result)
+      next_actions: status_next_actions(projection, result, advertised_actions)
     ]
 
     if result.orphaned do
@@ -333,7 +339,7 @@ defmodule Kiln.CLI do
     }
   end
 
-  defp status_next_actions(projection, result) do
+  defp status_next_actions(projection, result, advertised_actions) do
     cond do
       result.orphaned ->
         [
@@ -354,10 +360,14 @@ defmodule Kiln.CLI do
         ]
 
       true ->
-        [
-          Result.next_action("inspect", "review the current state"),
-          Result.next_action("cancel", "end the Session safely if no work is in flight")
-        ]
+        base = [Result.next_action("inspect", "review the current state")]
+
+        capability_actions =
+          Enum.map(advertised_actions, fn action ->
+            Result.next_action(command_for(action), command_description(action))
+          end)
+
+        base ++ capability_actions
     end
   end
 
@@ -373,25 +383,35 @@ defmodule Kiln.CLI do
       {:ok, :empty} ->
         {:ok, no_session_result("inspect")}
 
-      {:ok, %{projection: projection} = result} ->
-        {:ok, inspect_result("inspect", projection, result)}
+      {:ok, %{projection: projection, session_id: session_id} = result} ->
+        case advertised_actions_for(session_id) do
+          {:ok, advertised} ->
+            {:ok, inspect_result("inspect", projection, result, advertised)}
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+          {:error, %Error{} = error} ->
+            {:error, error}
+        end
+
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
 
-  defp inspect_result(command, projection, result) do
+  defp inspect_result(command, projection, result, advertised_actions) do
     data = inspect_data(projection, result)
+
+    base_actions = [Result.next_action("status", "show the current projection")]
+
+    capability_actions =
+      Enum.map(advertised_actions, fn action ->
+        Result.next_action(command_for(action), command_description(action))
+      end)
 
     opts = [
       data: data,
       session_revision: revision_from_projection(projection),
       journal_digest: format_digest(result.projection_digest),
-      next_actions: [
-        Result.next_action("status", "show the current projection"),
-        Result.next_action("cancel", "end the session safely if no work is in flight")
-      ]
+      next_actions: base_actions ++ capability_actions
     ]
 
     if result.orphaned do
@@ -488,7 +508,7 @@ defmodule Kiln.CLI do
           )
         end
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
@@ -525,7 +545,7 @@ defmodule Kiln.CLI do
            ]
          )}
 
-      {:error, %Kiln.Domain.Error{code: :run_transition_not_allowed} = error} ->
+      {:error, %Error{code: :run_transition_not_allowed} = error} ->
         # The Workflow returns :run_transition_not_allowed from terminal
         # states and from active operation. The CLI surfaces the terminal
         # case as :failed exit 6 with the legacy "already <state>" message
@@ -540,19 +560,15 @@ defmodule Kiln.CLI do
              )}
         end
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
 
   defp error_for_terminal_cancel(previous_run_state, _workflow_error, _opts) do
-    %Kiln.Domain.Error{
-      code: :terminal_run_state,
-      message:
-        "Run is already #{previous_run_state}; cancel is not allowed from a terminal state",
-      field: nil,
-      details: %{from: previous_run_state}
-    }
+    cli_native_error_result("cancel", :terminal_run_state, %{
+      from: previous_run_state
+    })
   end
 
   # -- command: resume --
@@ -576,11 +592,11 @@ defmodule Kiln.CLI do
           {:ok, advertised_actions} ->
             {:ok, resume_report_result(projection, result, advertised_actions)}
 
-          {:error, %Kiln.Domain.Error{} = error} ->
+          {:error, %Error{} = error} ->
             {:error, error}
         end
 
-      {:error, %Kiln.Domain.Error{} = error} ->
+      {:error, %Error{} = error} ->
         {:error, error}
     end
   end
@@ -630,28 +646,28 @@ defmodule Kiln.CLI do
         ]
 
       true ->
-        default_actions =
-          [
-            Result.next_action("inspect", "review the current state"),
-            Result.next_action("cancel", "end the Session safely if no work is in flight")
-          ]
+        base = [Result.next_action("inspect", "review the current state")]
 
-        advertised =
+        capability_actions =
           Enum.map(advertised_actions, fn action ->
-            Result.next_action(Atom.to_string(action), description_for_advertised(action))
+            Result.next_action(command_for(action), command_description(action))
           end)
 
-        Enum.uniq(default_actions ++ advertised)
+        Enum.uniq(base ++ capability_actions)
     end
   end
 
-  defp description_for_advertised(:resume_session), do: "resume the Session"
-  defp description_for_advertised(:cancel_session), do: "cancel the Session explicitly"
-  defp description_for_advertised(_), do: "perform the available operation"
+  defp command_for(:resume_session), do: "resume"
+  defp command_for(:cancel_session), do: "cancel"
+  defp command_for(action) when is_atom(action), do: Atom.to_string(action)
+
+  defp command_description(:resume_session), do: "resume the Session"
+  defp command_description(:cancel_session), do: "cancel the Session explicitly"
+  defp command_description(action) when is_atom(action), do: "perform #{Atom.to_string(action)}"
 
   # -- error mapping --
 
-  defp error_result_tuple(%Request{command: command}, %Kiln.Domain.Error{} = error) do
+  defp error_result_tuple(%Request{command: command}, %Error{} = error) do
     {status, exit_code} = ErrorMap.map(error.code)
 
     result =
@@ -662,6 +678,28 @@ defmodule Kiln.CLI do
 
     {result, exit_code}
   end
+
+  # Build a CLI-owned `Result` for an internal guard code. The CLI never
+  # constructs `%Kiln.Domain.Error{}` directly; it picks a CLI-native code
+  # atom that the ErrorMap already maps to a `{status, exit_code}` pair.
+  defp cli_native_error_result(command, code, details) do
+    {status, exit_code} = ErrorMap.map(code)
+
+    Result.error(atom_to_command(command), status,
+      exit_code: exit_code,
+      errors: [
+        Result.to_error(%{code: code, message: message_for(code, details), details: details})
+      ]
+    )
+  end
+
+  defp message_for(:terminal_run_state, %{from: from}),
+    do: "Run is already #{from}; cancel is not allowed from a terminal state"
+
+  defp message_for(:active_operation, _),
+    do: "Run owns an active or unknown operation; resolve it before canceling"
+
+  defp message_for(code, _details), do: Atom.to_string(code)
 
   defp result_for_code(command, code, message) do
     {status, exit_code} = ErrorMap.map(code)
@@ -699,14 +737,7 @@ defmodule Kiln.CLI do
 
   defp terminal_check(previous_run_state, command) do
     if previous_run_state in ["canceled", "completed", "failed"] do
-      {:error,
-       %Kiln.Domain.Error{
-         code: :terminal_run_state,
-         message:
-           "Run is already #{previous_run_state}; #{command} is not allowed from a terminal state",
-         field: nil,
-         details: %{from: previous_run_state}
-       }}
+      {:error, cli_native_error_result(command, :terminal_run_state, %{from: previous_run_state})}
     else
       :ok
     end
@@ -722,13 +753,7 @@ defmodule Kiln.CLI do
 
   defp active_operation_check(projection) do
     if projection["operation"] != nil do
-      {:error,
-       %Kiln.Domain.Error{
-         code: :active_operation,
-         message: "Run owns an active or unknown operation; resolve it before canceling",
-         field: nil,
-         details: %{}
-       }}
+      {:error, cli_native_error_result("cancel", :active_operation, %{})}
     else
       :ok
     end
@@ -756,6 +781,17 @@ defmodule Kiln.CLI do
   defp format_digest(nil), do: nil
   defp format_digest("sha256:" <> _ = digest), do: digest
   defp format_digest(digest) when is_binary(digest), do: "sha256:" <> digest
+
+  # Single source of truth for capability-driven `next_actions` output. The
+  # CLI never invents a `cancel` or `resume` suggestion; it consults the
+  # Workflow capability matrix and translates the bounded atoms the
+  # Workflow advertises into CLI command strings.
+  defp advertised_actions_for(session_id) when is_binary(session_id) do
+    case Workflow.valid_next_actions(session_id) do
+      {:ok, actions} -> {:ok, actions}
+      {:error, %Error{} = error} -> {:error, error}
+    end
+  end
 
   # The Workflow exposes `orphaned: true` when the persisted projection
   # carries a non-nil operation in a nonterminal state. The persisted
