@@ -707,18 +707,21 @@ defmodule Kiln.CLI do
     {result, exit_code}
   end
 
+  # Returns a plain `%Result{}` (no `{:ok, _}` tag) so the caller owns
+  # the success-tag wrapping. This avoids the nested-`{:ok, {:ok, ...}}`
+  # shape that previously broke `run_with_mode/3` for the initialized-
+  # but-empty DB case (a write-mode CLI command that creates the store
+  # but fails input validation, leaving a populated empty DB that a
+  # subsequent read-only command hits).
   defp no_session_result(command) do
-    result =
-      Result.error(command, :blocked,
-        errors: [
-          Result.to_error(%{
-            code: :no_session,
-            message: "no Session exists; start one with `mix kiln start`"
-          })
-        ]
-      )
-
-    {:ok, result}
+    Result.error(command, :blocked,
+      errors: [
+        Result.to_error(%{
+          code: :no_session,
+          message: "no Session exists; start one with `mix kiln start`"
+        })
+      ]
+    )
   end
 
   # -- terminal-state guard for cancel --
@@ -800,13 +803,20 @@ defmodule Kiln.CLI do
     end
   end
 
+  # Maps Workflow application capability atoms to T04 CLI executable
+  # mutations. The mapping is intentionally narrow: T04 exposes exactly
+  # one executable CLI mutation, `cancel`, which performs
+  # `Workflow.cancel_session/2`. T04 `resume` is guidance-only per R07;
+  # mapping `:resume_session -> "resume"` would tell the user to execute
+  # a command that does not perform `Workflow.resume_session/2`. The
+  # `:resume_session` atom is therefore not translated into a CLI
+  # next-action; the user can still invoke `mix kiln resume` directly
+  # for guidance, but it is not advertised as a Workflow-authorized
+  # executable mutation.
   defp translate_capability(:cancel_session),
     do: Result.next_action("cancel", "cancel the Session explicitly")
 
-  defp translate_capability(:resume_session),
-    do: Result.next_action("resume", "resume the Session")
-
-  defp translate_capability(action) when is_atom(action), do: nil
+  defp translate_capability(_other_application_atom), do: nil
 
   # Presentation/navigation suggestions the CLI may emit independently
   # because they describe how to navigate the CLI surface rather than how

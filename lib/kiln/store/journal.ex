@@ -151,6 +151,7 @@ defmodule Kiln.Store.Journal do
     now = Keyword.get(opts, :now, utc_now())
     result_map = Keyword.get(opts, :result, %{})
     result_schema = Keyword.get(opts, :result_schema, @default_result_schema)
+    precondition = Keyword.get(opts, :precondition)
 
     outcome =
       Connection.transaction(conn, fn tx ->
@@ -177,7 +178,23 @@ defmodule Kiln.Store.Journal do
             DBConnection.rollback(tx, {:transaction_failed, error})
 
           :none ->
-            commit_new(tx, action, entries, result_map, result_schema, now, opts)
+            # The optional `:precondition` runs inside the same
+            # `BEGIN IMMEDIATE` transaction as the commit itself. The
+            # first-month contract forbids committing a second Session
+            # once a first one exists; without this check, two
+            # concurrent Workflow.start_session calls — each having
+            # observed `:empty` from a pre-check that ran outside the
+            # authoritative transaction — could each pass the
+            # idempotency-key classifier (different keys) and each
+            # commit a fresh Session. The precondition is the durable
+            # one-Session guard.
+            case precondition_check(tx, precondition) do
+              :ok ->
+                commit_new(tx, action, entries, result_map, result_schema, now, opts)
+
+              {:error, reason} ->
+                DBConnection.rollback(tx, {:precondition, reason})
+            end
         end
       end)
 
@@ -192,6 +209,7 @@ defmodule Kiln.Store.Journal do
       {:error, {:journal_invalid, error}} -> {:error, error}
       {:error, {:transaction_failed, %Error{} = error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
+      {:error, {:precondition, reason}} -> {:error, reason}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
   rescue
@@ -336,6 +354,18 @@ defmodule Kiln.Store.Journal do
   # is not part of the lookup key, so a `start_session` retry that has not
   # yet resolved the original `session_id` can still find the prior commit
   # (P1-S01-T06).
+  # A precondition is either `nil` (no check), or a one-arity function
+  # that runs inside the `BEGIN IMMEDIATE` transaction and returns
+  # `:ok` or `{:error, term}`. SQLite-level writer serialization means
+  # any concurrent commit is blocked until this transaction commits or
+  # rolls back, so a precondition that queries the journal observes the
+  # authoritative post-serialization state. The term returned from
+  # `{:error, term}` becomes the rollback reason and propagates out of
+  # `commit/4` unchanged, so callers typically return
+  # `{:error, %Kiln.Domain.Error{}}`.
+  defp precondition_check(_tx, nil), do: :ok
+  defp precondition_check(tx, fun) when is_function(fun, 1), do: fun.(tx)
+
   defp read_commit(tx, idempotency_key) do
     case Connection.query!(
            tx,

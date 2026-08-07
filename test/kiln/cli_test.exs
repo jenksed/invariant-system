@@ -443,6 +443,95 @@ defmodule Kiln.CLITest do
     refute File.exists?(state_path)
   end
 
+  # I2 regression: an initialized-but-empty state DB (a write-mode CLI
+  # command created the store and then failed input validation, leaving
+  # the DB populated with no Session) must surface the same NO_SESSION
+  # blocked result for every read-only command. The previous
+  # `no_session_result/1` returned a tagged `{:ok, %Result{}}` shape
+  # that callers re-wrapped, producing a nested-`{:ok, {:ok, ...}}`
+  # shape `run_with_mode/3` could not accept. The fix makes the helper
+  # return a plain `%Result{}` and proves the four read-only commands
+  # never crash against the empty-DB shape.
+  test "initialized empty DB + status/inspect/cancel/resume return blocked NO_SESSION without crash",
+       %{dir: dir} do
+    state_path = Path.join(dir, "state.sqlite3")
+
+    {:ready, store} =
+      Store.start(path: state_path, store_id: "store_cli_test", now: @now)
+
+    on_exit(fn -> stop(store.conn) end)
+    stop(store.conn)
+
+    assert File.exists?(state_path), "the empty DB must exist before the read-only commands"
+
+    for command <- [:status, :inspect, :cancel, :resume] do
+      {result, code} = CLI.run(parse_request(dir, command))
+
+      assert code == 4,
+             "#{command} must exit 4 (blocked) against an initialized empty DB, got #{code}"
+
+      assert result.status == :blocked,
+             "#{command} must report :blocked against an initialized empty DB, got #{result.status}"
+
+      assert hd(result.errors).code == "NO_SESSION",
+             "#{command} must surface NO_SESSION against an initialized empty DB"
+    end
+
+    # Durable state must remain empty: no Session, no journal entries,
+    # no action commits, no projections.
+    with_store(dir, fn store ->
+      assert count(store.conn, "journal_entries") == 0
+      assert count(store.conn, "action_commits") == 0
+      assert count(store.conn, "session_projections") == 0
+    end)
+  end
+
+  test "invalid start + subsequent status does not crash and surfaces NO_SESSION",
+       %{dir: dir} do
+    # Realistic empty-store path: an input-validation failure leaves a
+    # populated empty DB. A subsequent status must not crash. The
+    # parser rejects the empty-objective case at parse time so we use
+    # a valid-shape-but-zero-criterion set instead, which the
+    # dispatcher validates inside `build_start_workflow_input/2` and
+    # rejects with a structured denied result rather than reaching
+    # `Workflow.start_session/1`.
+    case Request.parse([
+           "--kiln-home",
+           dir,
+           "--actor-id",
+           @actor,
+           "start",
+           "--repo",
+           "/tmp/repo",
+           "--objective",
+           "bounded objective",
+           "--criterion",
+           ""
+         ]) do
+      {:error, _error} ->
+        :ok
+
+      {:ok, request} ->
+        {result, _code} = CLI.run(request)
+
+        assert result.status == :denied or result.status == :blocked,
+               "an invalid start must be denied or blocked, got #{inspect(result.status)}"
+    end
+
+    state_path_after = Path.join(dir, "state.sqlite3")
+
+    if File.exists?(state_path_after) do
+      {result, code} = CLI.run(parse_request(dir, :status))
+
+      assert code == 4
+      assert result.status == :blocked
+      assert hd(result.errors).code == "NO_SESSION"
+    else
+      refute File.exists?(state_path_after),
+             "the empty-store path must not create the DB file"
+    end
+  end
+
   test "missing --actor-id returns a structured USAGE_ERROR" do
     assert {:error, error} = Request.parse(["--kiln-home=/tmp/x", "status"])
     assert error.code == "USAGE_ERROR"
@@ -532,6 +621,7 @@ defmodule Kiln.CLITest do
   # -- helpers --
 
   defp operation_id(:active), do: opaque_id(:operation, 0xA1)
+  defp operation_id(:started), do: opaque_id(:operation, 0xB1)
   defp decision_id(:approval), do: opaque_id(:decision, 0xD1)
 
   defp opaque_id(kind, byte) do
@@ -784,6 +874,11 @@ defmodule Kiln.CLITest do
     [[entries], [commits], [projections]]
   end
 
+  defp count(conn, table) do
+    [[value]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
+    value
+  end
+
   # Open a fresh `Kiln.Store.Connection` registration, run `fun` with the
   # store, and stop the connection on exit. This is the standard
   # "I need direct Workflow access for one assertion" harness used by the
@@ -852,7 +947,8 @@ defmodule Kiln.CLITest do
   defp capability_command_for(action) when is_atom(action), do: Atom.to_string(action)
 
   describe "capability-driven next_actions (Workflow capability matrix)" do
-    test "ready Run advertises both cancel and resume in status output", %{dir: dir} do
+    test "ready Run advertises cancel as the only executable mutation in status output",
+         %{dir: dir} do
       {_, 0} = CLI.run(start_request(dir))
 
       {status_result, 0} = CLI.run(parse_request(dir, :status))
@@ -860,7 +956,9 @@ defmodule Kiln.CLITest do
       actions = actions_in(status_result)
       assert "inspect" in actions
       assert "cancel" in actions
-      assert "resume" in actions
+
+      refute "resume" in actions,
+             "T04 `resume` is guidance-only; the CLI must not advertise it as an executable mutation even when the Workflow capability matrix includes :resume_session"
     end
 
     test "running Run advertises cancel but not resume in status output", %{dir: dir} do
@@ -938,18 +1036,22 @@ defmodule Kiln.CLITest do
          %{dir: dir} do
       {start_result, 0} = CLI.run(start_request(dir))
 
-      # The matrix currently advertises only cancel/resume. A future
-      # capability added to Workflow without updating the CLI helper must
-      # be silently dropped by the CLI rather than invented as a
-      # suggestion. This test asserts the current invariant: the only
-      # mutating strings the CLI may emit are exactly the strings the
-      # matrix maps to atoms.
+      # The matrix currently advertises :cancel_session and
+      # :resume_session. T04 exposes exactly one executable CLI mutation,
+      # `cancel` (which performs `Workflow.cancel_session/2`); T04
+      # `resume` is guidance-only. The start result therefore advertises
+      # only `cancel` as a Workflow-owned executable mutation; `resume`
+      # is not advertised as a next action even though the Workflow
+      # matrix includes :resume_session.
       cli_mutating_strings =
         start_result.next_actions
         |> Enum.map(& &1.action)
-        |> Enum.filter(&(&1 in ["cancel", "resume"]))
+        |> Enum.filter(&(&1 == "cancel"))
 
-      assert Enum.sort(cli_mutating_strings) == ["cancel", "resume"]
+      assert Enum.sort(cli_mutating_strings) == ["cancel"]
+
+      refute "resume" in Enum.map(start_result.next_actions, & &1.action),
+             "T04 resume is guidance-only and must not be advertised as an executable mutation"
     end
 
     test "cancel result contains no cancel and no resume even though Workflow advertised them",
@@ -1089,19 +1191,19 @@ defmodule Kiln.CLITest do
         commit_intent(store, session_id, run_id, operation_id(:active), 0)
       end)
 
-      # The persisted journal in this fixture records an operation intent
-      # without a terminal observation, so the operation state is
+      # The persisted journal in this fixture records an operation
+      # intent without a terminal observation, so the operation state is
       # `intent_recorded` (nonterminal). Workflow.orphaned?/1 returns
       # true so the CLI renderer surfaces this Session as orphaned.
-      # However, the reducer still advanced the Run state to `running`
-      # (the intent transition is accepted), and the Workflow capability
-      # matrix therefore advertises `:cancel_session` for the same
-      # Session. The CLI must consult Workflow and surface cancel — the
-      # bug the F2 correction fixes is the inverse, where the CLI
-      # advertises a mutation Workflow does not.
+      # Even though the reducer advanced the Run state to `running`, the
+      # effective orphan classification collapses the capability matrix
+      # to `[]` so the CLI does not advertise a mutation Workflow would
+      # then reject. This is the I1 orphan-capability contract.
       with_store(dir, fn _store ->
         {:ok, advertised} = Workflow.valid_next_actions(session_id)
-        assert advertised == [:cancel_session]
+
+        assert advertised == [],
+               "Workflow must advertise no capabilities for an effective-orphaned Session"
       end)
 
       {status_result, 7} = CLI.run(parse_request(dir, :status))
@@ -1119,16 +1221,94 @@ defmodule Kiln.CLITest do
       resume_actions = actions_in(resume_result)
 
       # status/inspect/resume are navigation suggestions and stay
-      # present; cancel matches Workflow's authority; resume must never
-      # be advertised because the Workflow capability matrix excludes it
-      # for the underlying run state.
-      assert "cancel" in status_actions
+      # present; cancel must not be advertised because the effective
+      # orphan state forbids the mutation; resume is guidance-only and
+      # is not advertised as a Workflow-owned mutation.
+      refute "cancel" in status_actions
       refute "resume" in status_actions
-      assert "cancel" in inspect_actions
+      refute "cancel" in inspect_actions
       refute "resume" in inspect_actions
-      assert "cancel" in resume_actions
+      refute "cancel" in resume_actions
       refute "resume" in resume_actions
     end
+
+    test "started-state orphan Session: status/inspect/resume advertise no mutation",
+         %{dir: dir} do
+      {start_result, 0} = CLI.run(start_request(dir))
+      session_id = start_result.data.session_id
+      run_id = start_result.data.root_run_id
+      op_id = operation_id(:started)
+
+      # The operation intent itself transitions Run from ready to running.
+      # Advancing the Run state explicitly first would race the reducer's
+      # own transition (the intent entry would observe ready->ready, not
+      # ready->running, and the reducer would reject it).
+      with_store(dir, fn store ->
+        commit_intent(store, session_id, run_id, op_id, 0)
+      end)
+
+      # Advance the persisted operation to the `:started` state. The
+      # reducer requires run.state == "running" (the intent already
+      # brought us there) and payload.run.to == "running".
+      with_store(dir, fn store ->
+        commit_started_observation(store, session_id, run_id, op_id, 1)
+      end)
+
+      with_store(dir, fn _store ->
+        {:ok, advertised} = Workflow.valid_next_actions(session_id)
+
+        assert advertised == [],
+               "Workflow must advertise no capabilities for an effective-orphaned Session " <>
+                 "in the persisted `:started` state"
+      end)
+
+      {status_result, 7} = CLI.run(parse_request(dir, :status))
+      {inspect_result, 7} = CLI.run(parse_request(dir, :inspect))
+      {resume_result, 7} = CLI.run(parse_request(dir, :resume))
+
+      refute "cancel" in actions_in(status_result)
+      refute "resume" in actions_in(status_result)
+      refute "cancel" in actions_in(inspect_result)
+      refute "resume" in actions_in(inspect_result)
+      refute "cancel" in actions_in(resume_result)
+      refute "resume" in actions_in(resume_result)
+    end
+  end
+
+  # Commit an `external_operation_observed/v1` entry with state="started"
+  # bound to the same operation_id the intent committed. The journal
+  # helper `commit_operation_observe/6` hard-codes a fresh operation_id,
+  # so this helper shares the intent's id to keep the projection coherent.
+  defp commit_started_observation(store, session_id, run_id, op_id, expected_revision) do
+    idempotency_key = "idem_" <> String.duplicate("3", 32)
+    request_digest = "sha256:" <> String.duplicate("e", 64)
+
+    {:ok, action_id} =
+      Id.generate(:action, fn 16 -> :binary.copy(<<expected_revision + 13>>, 16) end)
+
+    {:ok, action} =
+      JB.test_action(
+        action_id,
+        session_id,
+        run_id,
+        expected_revision,
+        idempotency_key,
+        request_digest,
+        :observe_operation,
+        "kiln:workflow"
+      )
+
+    entry = %{
+      type: "external_operation_observed/v1",
+      payload_schema: "external_operation_observed/v1",
+      payload: %{
+        "operation" => %{"id" => op_id, "state" => "started"},
+        "run" => %{"to" => "running"},
+        "workflow_step" => "intent"
+      }
+    }
+
+    {:ok, _} = Journal.commit(store.conn, action, [entry], now: @now)
   end
 
   defp actions_in(%Result{next_actions: next_actions}) do

@@ -346,6 +346,14 @@ defmodule Kiln.Workflow do
           {:ok, action} ->
             entry = build_start_entry(session, task, run)
 
+            # The one-Session precondition runs inside the
+            # `BEGIN IMMEDIATE` transaction that `commit/4` opens. Two
+            # concurrent start invocations serialize on the SQLite
+            # write lock; whichever writer acquires the lock second
+            # observes the first writer's session entries and is
+            # rejected before any durable write. The CLI's earlier
+            # `precheck_no_session/1` continues to provide a friendly
+            # user-facing rejection in the common sequential case.
             commit(
               conn,
               action,
@@ -353,7 +361,8 @@ defmodule Kiln.Workflow do
               result_map,
               &start_result_from_stored/1,
               expected_revision: 0,
-              session_id: session.id
+              session_id: session.id,
+              precondition: &ensure_one_session_txn/1
             )
 
           {:error, _} = error ->
@@ -362,6 +371,30 @@ defmodule Kiln.Workflow do
 
       {:error, _} = error ->
         error
+    end
+  end
+
+  # Single-Session precondition evaluated inside the journal's
+  # `BEGIN IMMEDIATE` transaction. The first month contract is "exactly
+  # one durable Session"; this guard is the authoritative enforcement
+  # at the journal boundary so a concurrent writer that passed its
+  # pre-check by racing the first commit cannot commit a second
+  # Session. The check is bypassed for replays of the same idempotency
+  # key because `Journal.commit/4` routes those to the replay branch
+  # before evaluating `:precondition`.
+  defp ensure_one_session_txn(tx) do
+    case Replay.sessions(tx) do
+      [] ->
+        :ok
+
+      _existing ->
+        {:error,
+         Error.new(
+           :session_already_exists,
+           "a Session already exists in the journal; the first-month contract forbids a second",
+           nil,
+           %{}
+         )}
     end
   end
 
@@ -471,6 +504,7 @@ defmodule Kiln.Workflow do
   defp commit(conn, action, entries, result_map, result_fun, opts) do
     expected_revision = Keyword.fetch!(opts, :expected_revision)
     session_id = Keyword.fetch!(opts, :session_id)
+    precondition = Keyword.get(opts, :precondition)
 
     case Journal.commit(
            conn,
@@ -478,7 +512,8 @@ defmodule Kiln.Workflow do
            entries,
            now: now_iso(),
            result: result_map,
-           result_schema: @application_result_schema
+           result_schema: @application_result_schema,
+           precondition: precondition
          ) do
       {:ok, %{status: :committed, session_revision: revision, projection: projection}} ->
         committed = committed_result(result_map, revision, projection)
@@ -573,10 +608,28 @@ defmodule Kiln.Workflow do
   # ---- capability authority ----
 
   # The single source of truth for what this boundary exposes from each
-  # Run state. `valid_next_actions/1` lists the advertised set; every
-  # mutator (cancel/resume) checks `capability_authorize/2` against the
-  # same matrix before any journal write.
+  # effective Run state. `valid_next_actions/1` lists the advertised set;
+  # every mutator (cancel/resume) checks `capability_authorize/2` against
+  # the same matrix before any journal write.
+  #
+  # The effective state is not just `run.state`. A projection whose Run
+  # state is `running` but whose operation is nonterminal (an unresolved
+  # `intent_recorded` or `started` operation) is conservatively orphaned:
+  # `mix kiln cancel` will refuse to act on it, so advertising
+  # `:cancel_session` in the next-action list would tell the user to
+  # execute an operation the Workflow then rejects. To honour the
+  # "every advertised operation must be executable from the effective
+  # state" contract, the orphan classification collapses the effective
+  # state to a terminal-like set with `[]` capabilities before the
+  # capability matrix is consulted.
   defp capability_for(projection) do
+    cond do
+      orphaned?(projection) -> []
+      true -> capability_for_run_state(projection)
+    end
+  end
+
+  defp capability_for_run_state(projection) do
     case run_state_from_projection(projection) do
       nil -> []
       state -> capability_for_state(state)
