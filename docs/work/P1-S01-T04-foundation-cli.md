@@ -297,13 +297,14 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 
 ### Repository state
 
-- Code-bearing implementation head (final): the new SHA after this pass pushes the I6–I8 Store-error-boundary correction. Will be recorded once the exact-head CI completes green on the push.
-- Current PR head at start of this pass: `35cb2c33118fa3d730a6ab6de1fb4a646a5b43e1`, verified by GitHub Actions run `31199785234` (both `test` and `prose` jobs green). Superseded by the new code-bearing head once this pass pushes and CI completes.
+- **Code-bearing implementation head (final):** `2ede2b887adf3394e8633756851eb555bbe6aea3` — verified by GitHub Actions run `31206150176` on this commit (both `test` and `prose` jobs green).
+- **Current PR head at start of this pass:** `35cb2c33118fa3d730a6ab6de1fb4a646a5b43e1`, verified by GitHub Actions run `31199785234`. Superseded by `2ede2b8`.
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
   - `bb4b8a4` (pre-correction) — verified by GitHub Actions run `31142579605`
   - `ece4537` (F1–F9 final) — verified by GitHub Actions run `31194974919`
   - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
-  - `35cb2c3` (corrected-head baseline at start of this pass) — verified by GitHub Actions run `31199785234`
+  - `35cb2c3` (corrected-head baseline at start of I6–I8 pass) — verified by GitHub Actions run `31199785234`
+  - `2ede2b8` (I6–I8 closure) — verified by GitHub Actions run `31206150176` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
