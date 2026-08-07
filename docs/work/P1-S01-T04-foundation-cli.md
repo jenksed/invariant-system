@@ -201,51 +201,65 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ## Completion record
 
-**Result:** Implemented and verified
+**Result:** Implemented; correction pass awaiting exact-head verification
+
+The earlier "Implemented and verified" claim was based on a GitHub Actions run
+(`31142579605`) that pre-dated the F1–F5 correction pass. The five review
+findings describe contract violations that the existing CI missed because the
+tests asserted the wrong thing or asserted nothing at all. The current
+branch head contains the F1–F5 fixes plus dedicated regression tests; the
+claim is downgraded to "Implemented; correction pass awaiting exact-head
+verification" until a fresh GitHub Actions run on the corrected head is
+observed.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T04-AC01 | Verified | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC02 | Verified | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC03 | Verified | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC04 | Verified | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC05 | Verified | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC06 | Verified | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
-| P1-S01-T04-AC07 | Verified | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC01 | Verified (pre-correction) | P1-S01-T04-E01 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC02 | Verified (pre-correction) | P1-S01-T04-E02 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC03 | Verified (pre-correction) | P1-S01-T04-E03 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC04 | Verified (pre-correction) | P1-S01-T04-E04 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC05 | Verified (pre-correction) | P1-S01-T04-E05 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC06 | Verified (pre-correction) | P1-S01-T04-E06 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| P1-S01-T04-AC07 | Verified (pre-correction) | P1-S01-T04-E07 | GitHub Actions run 31142579605 on commit bb4b8a4 |
+| Correction pass — F1 (single nonterminal vocabulary) | Pending exact-head CI | P1-S01-T04-E08 | `test/kiln/operation_lifecycle_parity_test.exs` |
+| Correction pass — F2 (cli_result schema conformance) | Pending exact-head CI | P1-S01-T04-E09 | `test/kiln/cli/json_renderer_test.exs`, `scripts/validate_cli_result_schema.py` |
+| Correction pass — F3 (no Domain construction in dispatcher) | Pending exact-head CI | P1-S01-T04-E10 | source-guard inside `test/kiln/cli_test.exs` |
+| Correction pass — F4 (KILN_HOME precedence) | Pending exact-head CI | P1-S01-T04-E11 | `test/kiln/cli/request_test.exs` |
+| Correction pass — F5 (capability-driven next actions) | Pending exact-head CI | P1-S01-T04-E12 | `test/kiln/cli_test.exs` capability-driven describe blocks |
 
 ### Verification executed
 
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| `scripts/test-agent-preflight` | pass | local sandbox run, 2026-08-06 |
-| `python3 scripts/validate_first_month_contracts.py` | pass | local sandbox run, 2026-08-06 |
-| `python3 scripts/validate_json_schema_contracts.py` | pass | local sandbox run, 2026-08-06 |
-| `scripts/validate-agent-assets` | pass | local sandbox run, 2026-08-06 |
-| `vale --glob='!{deps,_build}/**' .` | pass | local sandbox run, 2026-08-06 |
-| `mix format --check-formatted` | pass | local sandbox run, 2026-08-06 |
-| `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-06 |
-| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-06 |
-| `mix test test/kiln/workflow_test.exs` | 90 passed | local sandbox run, 2026-08-06 |
-| `mix test test/kiln/cli` | 58 passed | local sandbox run, 2026-08-06 |
-| `mix test` | 312 passed | local sandbox run, 2026-08-06 |
-| `scripts/check` | pass | local sandbox run, 2026-08-06 |
-| GitHub Actions `test` job | success | https://github.com/jenksed/kiln/actions/runs/31142579605/job/92755364548 |
-| GitHub Actions `prose` job | success | https://github.com/jenksed/kiln/actions/runs/31142579605/job/92755364587 |
+| `scripts/test-agent-preflight` | pass | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_first_month_contracts.py` | pass | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_json_schema_contracts.py` | pass | local sandbox run, 2026-08-07 |
+| `scripts/validate-agent-assets` | pass | local sandbox run, 2026-08-07 |
+| `vale --glob='!{deps,_build}/**' .` | pass | local sandbox run, 2026-08-07 |
+| `mix format --check-formatted` | pass | local sandbox run, 2026-08-07 |
+| `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-07 |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-07 |
+| `mix test` | 329 passed | local sandbox run, 2026-08-07 |
+| `scripts/check` | pass | local sandbox run, 2026-08-07 |
+| GitHub Actions `test` job | **not yet observed on corrected head** | — |
+| GitHub Actions `prose` job | **not yet observed on corrected head** | — |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: Yes
-- Slice completion claimed: Yes (foundation CLI)
+- Slice verification manifest updated: Yes (the F1–F5 corrections are owned by T04, not T05)
+- Slice completion claimed: Pending exact-head CI green on the correction pass
 
 ### Failures and warnings
 
+- Pre-correction "Verified" claim is downgraded until the corrected head has a green GitHub Actions run.
 - This is a source-development entry point, not the delivered release.
 - The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
 - The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
+- The F1–F5 correction pass is queued behind a fresh `--force-with-lease` push on the same branch and PR.
 
 ### Remaining unknowns and exclusions
 
@@ -254,8 +268,8 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 
 ### Repository state
 
-- Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (implementation + tests + plan, verified by GitHub Actions run 31142579605)
-- Documentation update commit: this edit lands on top of bb4b8a4 as the new branch head
+- Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (pre-correction, verified by GitHub Actions run 31142579605)
+- Latest HEAD on `work/p1-s01-t04-foundation-cli`: correction-pass commits, not yet observed by GitHub Actions
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Exact CI run: GitHub Actions run 31142579605 on commit bb4b8a4
-- Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
+- Exact CI run: GitHub Actions run 31142579605 on commit bb4b8a4 (pre-correction only)
+- Parent slice status after merge: P1-S01-T04 satisfied once exact-head CI on the corrected branch is green; P1-S01-T05 unblocked
