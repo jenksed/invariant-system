@@ -64,6 +64,13 @@ defmodule Kiln.Store.Journal do
       do_classify(tx, idempotency_key, request_digest)
     end)
     |> normalize_classify_outcome()
+  rescue
+    # A raised `Connection.query!` or any other exception inside the
+    # classifier must not escape into the public workflow functions;
+    # the same operational-error treatment `commit/4` already uses
+    # applies here, so callers see one error envelope shape.
+    exception ->
+      {:error, transaction_error(Exception.message(exception))}
   end
 
   # `classify_commit` is invoked both with a fresh transaction and from within
@@ -94,7 +101,8 @@ defmodule Kiln.Store.Journal do
           result_schema: String.t(),
           result: map(),
           boundary: Replay.action_boundary() | nil,
-          rebuild_digest: String.t() | nil
+          rebuild_digest: String.t() | nil,
+          target_projection: map() | nil
         }
 
   @doc """
@@ -386,7 +394,8 @@ defmodule Kiln.Store.Journal do
       result_schema: commit.result_schema,
       result: commit.result,
       boundary: report.action_boundary,
-      rebuild_digest: report.projection_digest
+      rebuild_digest: report.projection_digest,
+      target_projection: report.projection
     }
   end
 
@@ -435,7 +444,7 @@ defmodule Kiln.Store.Journal do
              )}
 
           true ->
-            case replay_boundary_valid?(tx, commit.session_id) do
+            case replay_boundary_valid?(tx, commit.session_id, commit.action_id) do
               {:ok, report} ->
                 {:replay, commit_to_replay(commit, report)}
 
@@ -451,12 +460,24 @@ defmodule Kiln.Store.Journal do
   # request cannot succeed after its journal rows have been deleted or corrupted.
   # This runs inside the same `BEGIN IMMEDIATE` transaction as the replay lookup
   # so a concurrent tamper cannot interleave between the two reads. The
-  # replay-boundary check uses the stored `session_id` so the retry's
-  # freshly generated session identifier cannot collide with the original.
-  defp replay_boundary_valid?(tx, session_id) do
-    case Replay.rebuild(tx, session_id) do
+  # replay-boundary check uses the stored `session_id` and `action_id` so the
+  # replay returns the projection and boundary *at the target action's commit
+  # point*, not the Session's current head. A retry of a start action that
+  # happened before a later resume or cancel must replay the start action's
+  # original revision and projection digest, not the head's.
+  defp replay_boundary_valid?(tx, session_id, action_id) do
+    case Replay.rebuild_for_action(tx, session_id, action_id) do
       {:ok, report} ->
         {:ok, report}
+
+      {:error, %{code: :target_action_not_found, detail: detail}} ->
+        {:error,
+         Error.new(
+           :integrity,
+           :target_action_not_found,
+           "stored action_id is not present in the authoritative journal",
+           Map.put(detail, :session_id, session_id)
+         )}
 
       {:error, block} ->
         {:error,
@@ -466,6 +487,7 @@ defmodule Kiln.Store.Journal do
            "duplicate replay found the stored action boundary invalid",
            %{
              session_id: session_id,
+             action_id: action_id,
              block: block
            }
          )}
@@ -737,7 +759,8 @@ defmodule Kiln.Store.Journal do
          result_schema: result_schema,
          session_id: session_id,
          boundary: boundary,
-         rebuild_digest: rebuild_digest
+         rebuild_digest: rebuild_digest,
+         target_projection: target_projection
        }) do
     %{
       status: :replayed,
@@ -748,7 +771,8 @@ defmodule Kiln.Store.Journal do
       result: decoded,
       result_schema: result_schema,
       boundary: boundary,
-      rebuild_digest: rebuild_digest
+      rebuild_digest: rebuild_digest,
+      target_projection: target_projection
     }
   end
 

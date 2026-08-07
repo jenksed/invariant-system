@@ -437,7 +437,12 @@ defmodule Kiln.Workflow do
           result: committed,
           result_schema: @application_result_schema,
           boundary: fresh_boundary,
-          rebuild_digest: rebuild_digest
+          rebuild_digest: rebuild_digest,
+          # The fresh-commit path does not need an authority check against
+          # the replay's target projection because the journal just wrote
+          # the result with the freshly computed values; pass nil so the
+          # validators skip the projection-based identity comparison.
+          target_projection: nil
         }
 
         case result_fun.(replay) do
@@ -452,16 +457,21 @@ defmodule Kiln.Workflow do
         # map cannot leak through the replay path. Use the stored
         # `session_id` so the retry's freshly generated candidate never
         # collides with the original Session under a concurrent retry race.
-        # `boundary` and `rebuild_digest` are carried by the journal's
-        # replay tuple and bind the stored result to its exact action
-        # boundary inside the journal.
+        # `boundary`, `rebuild_digest`, and `target_projection` are carried
+        # by the journal's replay tuple and bind the stored result to its
+        # exact action boundary inside the journal. `target_projection` is
+        # the projection at the target action's commit point (not the
+        # Session's current head) so identity fields (task_id, run_id)
+        # can be authority-checked against the durable state at the time
+        # of the stored action.
         replay = %{
           session_id: stored_session_id,
           action_id: action.id,
           result: string_keyed_to_atom(stored_result),
           result_schema: Map.get(replayed, :result_schema),
           boundary: Map.get(replayed, :boundary),
-          rebuild_digest: Map.get(replayed, :rebuild_digest)
+          rebuild_digest: Map.get(replayed, :rebuild_digest),
+          target_projection: Map.get(replayed, :target_projection)
         }
 
         case result_fun.(replay) do
@@ -835,7 +845,10 @@ defmodule Kiln.Workflow do
       "started_at_source" => Atom.to_string(normalized.started_at_source),
       "started_at" => started_at_digest_value(normalized),
       "project_observation" =>
-        project_observation_digest_data(normalized.project_observation, normalized.observation_id_source)
+        project_observation_digest_data(
+          normalized.project_observation,
+          normalized.observation_id_source
+        )
     }
 
     encode_request_digest(attrs)
@@ -1032,6 +1045,7 @@ defmodule Kiln.Workflow do
     result = replay.result
     boundary = replay.boundary
     rebuild_digest = replay.rebuild_digest
+    target_projection = replay.target_projection
     expected_schema = @application_result_schema
 
     with :ok <- require_application_result_schema(replay.result_schema, expected_schema),
@@ -1044,11 +1058,17 @@ defmodule Kiln.Workflow do
          :ok <- require_projection_digest(result),
          :ok <- require_action_boundary(replay.session_id, result.action_id, boundary),
          :ok <- require_revision_matches_boundary(result.session_revision, boundary),
-         :ok <- require_digest_matches_rebuild(result.projection_digest, rebuild_digest) do
+         :ok <- require_digest_matches_rebuild(result.projection_digest, rebuild_digest),
+         :ok <- require_task_id_matches_boundary(result.task_id, target_projection),
+         :ok <- require_run_id_matches_boundary(result.run_id, target_projection) do
       require_stored_session_matches_id(replay.session_id, result.session_id)
     end
   end
 
+  # Same as `validate_stored_start_result/1` minus the identity validators
+  # that the transition result map never carries. The replay-boundary
+  # authority check on the stored action_id, revision, digest, and schema
+  # still applies, but task_id/run_id are not in the transition result.
   defp validate_stored_transition_result(public_relation, replay) do
     result = replay.result
     boundary = replay.boundary
@@ -1116,11 +1136,14 @@ defmodule Kiln.Workflow do
     if actual == expected do
       :ok
     else
-      corrupt_result_error("stored result_schema is not the workflow application-result schema", %{
-        reason: :corrupt_result_schema,
-        expected: expected,
-        actual: actual
-      })
+      corrupt_result_error(
+        "stored result_schema is not the workflow application-result schema",
+        %{
+          reason: :corrupt_result_schema,
+          expected: expected,
+          actual: actual
+        }
+      )
     end
   end
 
@@ -1200,6 +1223,94 @@ defmodule Kiln.Workflow do
 
       true ->
         :ok
+    end
+  end
+
+  # The stored task_id must equal the task id the rebuild produced at the
+  # target action boundary. Format-only validation (require_valid_task_id)
+  # accepts any well-formed Kiln identifier; this check binds the value to
+  # the authoritative projection so a stored result containing the correct
+  # action_id, revision, and digest but a different validly-formatted task_id
+  # is still rejected. The fresh-commit path passes nil because the journal
+  # already wrote the result with the freshly computed values; skip the
+  # projection lookup in that case.
+  defp require_task_id_matches_boundary(_stored_task_id, nil), do: :ok
+
+  defp require_task_id_matches_boundary(stored_task_id, target_projection) do
+    authoritative_task_id = authoritative_id(target_projection, ["task", "id"])
+
+    cond do
+      is_nil(authoritative_task_id) ->
+        corrupt_result_error(
+          "no authoritative task_id is available at the target action boundary",
+          %{reason: :corrupt_result_boundary, field: :task_id}
+        )
+
+      stored_task_id != authoritative_task_id ->
+        corrupt_result_error(
+          "stored result task_id disagrees with the authoritative task_id at the target action boundary",
+          %{
+            reason: :corrupt_result_boundary,
+            field: :task_id,
+            stored_task_id: stored_task_id,
+            authoritative_task_id: authoritative_task_id
+          }
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  # The stored run_id must equal the run id the rebuild produced at the
+  # target action boundary. Format-only validation (require_valid_run_id)
+  # accepts any well-formed Kiln identifier; this check binds the value to
+  # the authoritative projection so a stored result containing the correct
+  # action_id, revision, and digest but a different validly-formatted run_id
+  # is still rejected. The fresh-commit path passes nil because the journal
+  # already wrote the result with the freshly computed values; skip the
+  # projection lookup in that case.
+  defp require_run_id_matches_boundary(_stored_run_id, nil), do: :ok
+
+  defp require_run_id_matches_boundary(stored_run_id, target_projection) do
+    authoritative_run_id = authoritative_id(target_projection, ["run", "id"])
+
+    cond do
+      is_nil(authoritative_run_id) ->
+        corrupt_result_error(
+          "no authoritative run_id is available at the target action boundary",
+          %{reason: :corrupt_result_boundary, field: :run_id}
+        )
+
+      stored_run_id != authoritative_run_id ->
+        corrupt_result_error(
+          "stored result run_id disagrees with the authoritative run_id at the target action boundary",
+          %{
+            reason: :corrupt_result_boundary,
+            field: :run_id,
+            stored_run_id: stored_run_id,
+            authoritative_run_id: authoritative_run_id
+          }
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  # Walk the projection map by string key path to extract the authoritative
+  # identity at the target action's commit point. Returns `nil` when the
+  # path is absent or any intermediate value is not a map.
+  defp authoritative_id(projection, path) when is_map(projection) do
+    Enum.reduce_while(path, projection, fn key, acc ->
+      case is_map(acc) and Map.get(acc, key) do
+        nil -> {:halt, nil}
+        value -> {:cont, value}
+      end
+    end)
+    |> case do
+      value when is_binary(value) -> value
+      _ -> nil
     end
   end
 

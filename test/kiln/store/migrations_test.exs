@@ -415,7 +415,15 @@ defmodule Kiln.Store.MigrationsTest do
          first_sequence, last_sequence, result_schema, result, result_digest, committed_at)
       VALUES (?1, ?2, ?3, ?4, 0, ?7, ?7, 'action_result/v1', ?5, ?6, '2026-07-29T00:00:00Z')
       """,
-      [action_id, session_id, idempotency_key, request_digest, result_text, result_digest, first_sequence]
+      [
+        action_id,
+        session_id,
+        idempotency_key,
+        request_digest,
+        result_text,
+        result_digest,
+        first_sequence
+      ]
     )
 
     :ok

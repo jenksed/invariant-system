@@ -669,6 +669,108 @@ defmodule Kiln.WorkflowTest do
       assert is_binary(replayed.projection_digest) and byte_size(replayed.projection_digest) > 0
     end
 
+    test "start → resume → retry original start replays the start result exactly",
+         %{store: store} do
+      start_key = unique_idempotency_key()
+      resume_key = unique_idempotency_key()
+
+      start_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: start_key
+      ]
+
+      assert {:ok, start} = Workflow.start_session(start_opts)
+      assert start.session_revision == 0
+      assert start.run_state == :ready
+
+      assert {:ok, resume} =
+               Workflow.resume_session(start.session_id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: resume_key
+               )
+
+      assert resume.session_revision == 1
+      assert resume.run_state == :running
+
+      before_entries = count(store.conn, "journal_entries")
+      before_commits = count(store.conn, "action_commits")
+
+      # The retry must return the original start result (revision 0, ready)
+      # even though the Session has since advanced to revision 1, running.
+      assert {:ok, replayed} = Workflow.start_session(start_opts)
+      assert replayed == start
+
+      assert count(store.conn, "journal_entries") == before_entries,
+             "retried start after a later resume must not add journal entries"
+
+      assert count(store.conn, "action_commits") == before_commits,
+             "retried start after a later resume must not add action_commits"
+    end
+
+    test "start → resume → cancel → retry original resume replays the resume result exactly",
+         %{store: store} do
+      start_key = unique_idempotency_key()
+      resume_key = unique_idempotency_key()
+
+      start_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: start_key
+      ]
+
+      assert {:ok, start} = Workflow.start_session(start_opts)
+
+      assert {:ok, resume} =
+               Workflow.resume_session(start.session_id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: resume_key
+               )
+
+      assert resume.session_revision == 1
+      assert resume.run_state == :running
+
+      cancel_key = unique_idempotency_key()
+
+      assert {:ok, cancel} =
+               Workflow.cancel_session(start.session_id,
+                 expected_session_revision: 1,
+                 actor_id: "user:local",
+                 idempotency_key: cancel_key
+               )
+
+      assert cancel.session_revision == 2
+      assert cancel.run_state == :canceled
+
+      before_entries = count(store.conn, "journal_entries")
+      before_commits = count(store.conn, "action_commits")
+
+      # The retry must return the original resume result (revision 1,
+      # running) even though the Session has since advanced to revision 2,
+      # canceled. The replay boundary is the resume action's commit point,
+      # not the Session's current head.
+      assert {:ok, replayed} =
+               Workflow.resume_session(start.session_id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: resume_key
+               )
+
+      assert replayed == resume
+
+      assert count(store.conn, "journal_entries") == before_entries,
+             "retried resume after a later cancel must not add journal entries"
+
+      assert count(store.conn, "action_commits") == before_commits,
+             "retried resume after a later cancel must not add action_commits"
+    end
+
     test "an idempotency conflict returns :idempotency_conflict without writing", %{
       store: store
     } do
@@ -2009,6 +2111,86 @@ defmodule Kiln.WorkflowTest do
           "task_id" => "tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "run_id" => "run_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "action_id" => "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "session_revision" => first.session_revision,
+          "run_state" => "ready",
+          "projection_digest" => rebuild_digest
+        }
+      )
+
+      assert {:error, %Error{code: :corrupt_result}} = Workflow.start_session(opts)
+    end
+
+    test "a stored result with a wrong but validly-formatted task_id is rejected",
+         %{store: _store} do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      rebuild_digest = first.projection_digest
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      # Replace ONLY the task_id with a different validly-formatted Kiln
+      # identifier; keep everything else (action_id, run_id, session_id,
+      # revision, run_state, projection_digest) matching the boundary. The
+      # stored result_digest is recomputed against the new payload so the
+      # format/digest checks pass. The replay-boundary authority check on
+      # task_id must catch the mismatch.
+      __MODULE__.CorruptHelpers.replace_stored_result_with_correct_format(
+        %{conn: conn},
+        first.session_id,
+        %{
+          "session_id" => first.session_id,
+          "task_id" => "tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "run_id" => first.run_id,
+          "action_id" => first.action_id,
+          "session_revision" => first.session_revision,
+          "run_state" => "ready",
+          "projection_digest" => rebuild_digest
+        }
+      )
+
+      assert {:error, %Error{code: :corrupt_result}} = Workflow.start_session(opts)
+    end
+
+    test "a stored result with a wrong but validly-formatted run_id is rejected",
+         %{store: _store} do
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      rebuild_digest = first.projection_digest
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      # Replace ONLY the run_id with a different validly-formatted Kiln
+      # identifier; keep everything else (action_id, task_id, session_id,
+      # revision, run_state, projection_digest) matching the boundary. The
+      # stored result_digest is recomputed against the new payload so the
+      # format/digest checks pass. The replay-boundary authority check on
+      # run_id must catch the mismatch.
+      __MODULE__.CorruptHelpers.replace_stored_result_with_correct_format(
+        %{conn: conn},
+        first.session_id,
+        %{
+          "session_id" => first.session_id,
+          "task_id" => first.task_id,
+          "run_id" => "run_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "action_id" => first.action_id,
           "session_revision" => first.session_revision,
           "run_state" => "ready",
           "projection_digest" => rebuild_digest
