@@ -462,3 +462,7 @@ Domain-contract work must also use the accepted Schema validation command after 
 - Roadmap status must match implementation Evidence.
 - Distinguish accepted, integrated, proposed, implemented, verified, accepted work, and delivered state.
 - Prefer omission over unsupported or low-relevance content.
+
+## Commit message convention
+
+Commit messages describe the change; they do not attribute the change to a coding agent. Do not append `Co-Authored-By:` trailers for Claude or any other AI coding tool, and do not reference the assistant in the subject or body. The branch, the work-package plan, the PR body, and the completion record already carry authorship.
