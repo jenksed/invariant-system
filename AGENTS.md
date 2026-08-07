@@ -14,6 +14,8 @@ Development-agent Skills, prompts, and specialist definitions help build Kiln. T
 
 ## Current authority order
 
+Apply `docs/ENGINEERING-DOCTRINE.md` as the default engineering decision framework when accepted project authority leaves a material choice open. The doctrine does not authorize scope, reverse an ADR or invariant, or supersede an accepted work plan.
+
 Before material planning or implementation work, read in this order:
 
 1. `docs/PLANNING-COMPLETION-BASELINE.md` for planning status and blockers;
@@ -30,37 +32,29 @@ Before material planning or implementation work, read in this order:
 
 Historical baselines, earlier roadmaps, work records, and merged pull-request descriptions preserve provenance. They do not override current authority.
 
-## Planning-completion boundary
+## Current authorization boundary
 
-Build authorization has not been issued.
+Prompt 8-A authorizes only P1-S01 and its accepted T01 through T05 sequence. Follow `docs/ROADMAP.md`, the current accepted ticket plan, and exact prerequisite Evidence to determine which P1-S01 ticket may proceed.
 
-Do not begin Phase 1 implementation until:
+P1-S02 is planned but not authorized. Planning and evidence gathering for P1-S02 may refine future decisions, but no P1-S02 runtime implementation begins until P1-S01-T05 passes its aggregate gate, demo, P1-S01-V01, and owner-machine Evidence and a later explicit authorization accepts the P1-S02 implementation package.
 
-- Prompt 3 reconciles implementation and scaffolding;
-- Prompt 4 defines the required planning-round register;
-- required focused rounds complete;
-- Prompt 6 adds justified conformance changes;
-- Prompt 7 completes the independent adversarial review;
-- Prompt 8 adjudicates findings and authorizes construction.
-
-A named first ticket, passing planning CI, JSON Schema, or detailed specification does not authorize implementation.
+A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, or proposed ticket sequence does not authorize implementation by itself.
 
 ## Required start sequence
 
 Before planned work:
 
-1. run `scripts/agent-preflight` when the current branch grammar is supported;
+1. run `scripts/test-agent-preflight` when applicable to the current branch class;
 2. stop and report a known conformance mismatch rather than bypass the check;
 3. read the accepted plan;
-4. list applicable ADRs and `KILN-INV-*` identifiers;
-5. inspect current source, tests, Git state, and dependency direction;
-6. distinguish current behavior from proposed behavior;
-7. state the expected mutation surface;
-8. state narrow verification and the complete required gate.
+4. read `docs/ENGINEERING-DOCTRINE.md` when the work contains material engineering choices not already decided by accepted authority;
+5. list applicable ADRs and `KILN-INV-*` identifiers;
+6. inspect current source, tests, Git state, and dependency direction;
+7. distinguish current behavior from proposed behavior;
+8. state the expected mutation surface;
+9. state narrow verification and the complete required gate.
 
-Current `scripts/agent-preflight` is known to enforce obsolete P0 work-package grammar and headings. Prompt 3 and Prompt 6 must reconcile it before Phase 1 tickets begin.
-
-Use the `kiln-work-package` Skill only after its current compatibility has been evaluated by Prompt 3.
+Use project-local Skills only when their behavior is compatible with the current branch grammar, accepted plan, and current Repository authority. Repository authority outranks a stale Skill default.
 
 ## Non-negotiable product principles
 
@@ -181,7 +175,7 @@ Do not use arbitrary sleeps for synchronization.
 
 Use `mix xref callers`, `mix xref trace`, and compile-connected cycle checks when shared boundaries change.
 
-For Elixir and OTP work, read `docs/ELIXIR-OTP-ENGINEERING.md` and use `kiln-elixir-otp` after Prompt 3 confirms its compatibility.
+For Elixir and OTP work, read `docs/ELIXIR-OTP-ENGINEERING.md` and use `kiln-elixir-otp` only when its current behavior is compatible with the accepted work plan.
 
 ## Domain rules
 
@@ -437,18 +431,16 @@ If required verification cannot run, report `implemented but unverified`.
 ## Standard current checks
 
 ```bash
-scripts/agent-preflight
+scripts/test-agent-preflight
 scripts/validate-agent-assets
-vale .
+vale --glob='!{deps,_build}/**' .
 mix format --check-formatted
 mix compile --warnings-as-errors
 mix xref graph --format cycles --label compile-connected --fail-above 0
 mix test
 ```
 
-A passing obsolete preflight test proves only that obsolete behavior still exists.
-
-Domain-contract work must also use the accepted Schema validation command after Prompt 3 and Prompt 6 establish it. Current Schema files alone do not prove runtime implementation.
+Domain-contract work must also run the accepted Schema validation commands applicable to its current plan. Schema files alone do not prove runtime implementation.
 
 ## Documentation rules
 
