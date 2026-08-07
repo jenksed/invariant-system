@@ -251,8 +251,8 @@ fresh GitHub Actions run on the corrected head is observed.
 | `mix test test/kiln/cli` | 34 passed | local sandbox run, 2026-08-07 |
 | `mix test` | 341 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on corrected head | **not yet observed** | — |
-| GitHub Actions `prose` job on corrected head | **not yet observed** | — |
+| GitHub Actions `test` job on corrected head | success | GitHub Actions run 31194756348 on commit 37e7ac6 |
+| GitHub Actions `prose` job on corrected head | success | GitHub Actions run 31194756348 on commit 37e7ac6 |
 
 ### Demo and slice status
 
@@ -278,8 +278,11 @@ fresh GitHub Actions run on the corrected head is observed.
 ### Repository state
 
 - Implementation commit: bb4b8a465341a237a4a56aa2f1c239282717ea1f (pre-correction, verified by GitHub Actions run 31142579605)
-- Pre-correction-pass commit: 24fecd1257f82b312744337395c5f578af13bbf3 (F1–F5 + wording downgrade, not yet observed by GitHub Actions)
-- Latest HEAD on `work/p1-s01-t04-foundation-cli`: F6–F9 correction pass (sequential one-Session guard, capability authority extension, explicit `:started` fixture, AC07 boundary + source guard, three doc cleanups), not yet observed by GitHub Actions
+- Pre-correction-pass commit: 24fecd1257f82b312744337395c5f578af13bbf3 (F1–F5 + wording downgrade, superseded by the F6–F9 pass)
+- F6–F9 correction-pass commit: c1d7830 (sequential one-Session guard, capability authority extension, explicit `:started` fixture, AC07 boundary + source guard, three doc cleanups)
+- Convention-docs commit: 37e7ac6 (commit-message convention added to `AGENTS.md` and `CLAUDE.md`; included in the corrected-head CI run because the docs pass-gate depends on it)
+- Latest HEAD on `work/p1-s01-t04-foundation-cli`: 37e7ac6, verified by GitHub Actions run 31194756348
 - Branch: `work/p1-s01-t04-foundation-cli`
-- Exact CI run: GitHub Actions run 31142579605 on commit bb4b8a4 (pre-correction only)
-- Parent slice status after merge: P1-S01-T04 satisfied once exact-head CI on the corrected branch is green; P1-S01-T05 unblocked
+- Exact CI run on the corrected head: GitHub Actions run 31194756348 on commit 37e7ac6 (both `test` and `prose` jobs green)
+- Pre-correction CI run (kept for provenance): GitHub Actions run 31142579605 on commit bb4b8a4
+- Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
