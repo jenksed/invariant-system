@@ -127,8 +127,10 @@ defmodule Kiln.CLI.RequestTest do
   end
 
   test "rejects --kiln-home whose next value happens to look like a command" do
+    # The parser now rejects any relative literal value (CLI contract).
+    # The word "status" is not an absolute path.
     assert {:error, error} = Request.parse(["--kiln-home", "status"])
-    assert error.message =~ "actor_id"
+    assert error.message =~ "absolute"
   end
 
   test "rejects --format with an unsupported value" do
@@ -217,31 +219,27 @@ defmodule Kiln.CLI.RequestTest do
 
   # -- kiln_home canonicalisation --
 
-  test "canonicalises --kiln-home to an absolute normalised path" do
-    cwd = File.cwd!()
-
-    assert {:ok, request} =
+  test "rejects relative --kiln-home with a structured USAGE_ERROR" do
+    assert {:error, error} =
              Request.parse([
                "--kiln-home=./relative/path",
                "--actor-id=test-actor",
                "status"
              ])
 
-    assert request.kiln_home == Path.absname("./relative/path", cwd)
-    assert Path.type(request.kiln_home) == :absolute
+    assert error.code == "USAGE_ERROR"
+    assert error.message =~ "absolute"
   end
 
-  test "collapses `..` segments in --kiln-home" do
-    cwd = File.cwd!()
-
+  test "collapses `..` segments inside an absolute --kiln-home" do
     assert {:ok, request} =
              Request.parse([
-               "--kiln-home=./a/b/../c",
+               "--kiln-home=/tmp/a/b/../c",
                "--actor-id=test-actor",
                "status"
              ])
 
-    assert request.kiln_home == Path.absname("./a/c", cwd)
+    assert request.kiln_home == "/tmp/a/c"
   end
 
   test "preserves an already-absolute --kiln-home path" do
@@ -253,5 +251,73 @@ defmodule Kiln.CLI.RequestTest do
              ])
 
     assert request.kiln_home == "/tmp/already/absolute"
+  end
+
+  # KILN_HOME precedence: explicit flag → KILN_HOME env → default home.
+  # The dispatcher must never receive a `nil` `kiln_home`.
+
+  describe "KILN_HOME precedence (CLI-AND-LOCAL-DELIVERY-CONTRACT.md §3.1)" do
+    test "falls back to KILN_HOME env when --kiln-home is absent" do
+      env = fn "KILN_HOME" -> "/tmp/from-kiln-home-env" end
+
+      assert {:ok, request} =
+               Request.parse(
+                 ["--actor-id=test-actor", "status"],
+                 env
+               )
+
+      assert request.kiln_home == "/tmp/from-kiln-home-env"
+    end
+
+    test "explicit --kiln-home overrides KILN_HOME env" do
+      env = fn "KILN_HOME" -> "/tmp/from-env" end
+
+      assert {:ok, request} =
+               Request.parse(
+                 ["--kiln-home=/tmp/explicit", "--actor-id=test-actor", "status"],
+                 env
+               )
+
+      assert request.kiln_home == "/tmp/explicit"
+    end
+
+    test "falls back to ~/Library/Application Support/Kiln when env is unset" do
+      env = fn _ -> nil end
+
+      assert {:ok, request} =
+               Request.parse(
+                 ["--actor-id=test-actor", "status"],
+                 env
+               )
+
+      assert request.kiln_home ==
+               Path.expand("~/Library/Application Support/Kiln") |> Path.absname()
+    end
+
+    test "blank KILN_HOME env falls back to default" do
+      env = fn "KILN_HOME" -> "" end
+
+      assert {:ok, request} =
+               Request.parse(
+                 ["--actor-id=test-actor", "status"],
+                 env
+               )
+
+      assert request.kiln_home ==
+               Path.expand("~/Library/Application Support/Kiln") |> Path.absname()
+    end
+
+    test "relative KILN_HOME env is rejected with a structured USAGE_ERROR" do
+      env = fn "KILN_HOME" -> "relative/path" end
+
+      assert {:error, error} =
+               Request.parse(
+                 ["--actor-id=test-actor", "status"],
+                 env
+               )
+
+      assert error.code == "USAGE_ERROR"
+      assert error.message =~ "--kiln-home"
+    end
   end
 end

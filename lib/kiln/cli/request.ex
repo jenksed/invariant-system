@@ -18,14 +18,24 @@ defmodule Kiln.CLI.Request do
   absent or blank, the parser returns a structured `USAGE_ERROR` so the
   dispatcher never silently defaults to a placeholder actor.
 
-  `--kiln-home` is canonicalised to an absolute, normalised path before
-  the request is returned.
+  `--kiln-home` resolution follows `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md`:
+    1. explicit `--kiln-home PATH` (absolute, normalised; relative rejected);
+    2. `KILN_HOME` environment variable (absolute; relative rejected);
+    3. default `~/Library/Application Support/Kiln` (canonicalised).
+
+  The resolved `kiln_home` is canonicalised to an absolute, normalised path
+  before the request is returned. A `nil` `kiln_home` never reaches the
+  dispatcher.
   """
 
   alias Kiln.CLI.Result
 
   @supported_commands [:start, :status, :inspect, :cancel, :resume]
   @command_lookup Map.new(@supported_commands, &{Atom.to_string(&1), &1})
+
+  # The accepted default home directory. Matches
+  # `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md` §3.1 rule 9.
+  @default_kiln_home "~/Library/Application Support/Kiln"
 
   @enforce_keys [:command]
   defstruct command: nil,
@@ -53,8 +63,21 @@ defmodule Kiln.CLI.Request do
   @doc "Parse argv into a request or a structured usage error."
   @spec parse([String.t()]) :: {:ok, t()} | {:error, Result.error()}
   def parse(argv) when is_list(argv) do
+    parse(argv, fn key -> System.get_env(key) end)
+  end
+
+  @doc """
+  Parse argv with an injected environment reader.
+
+  `env_reader` is `fn atom -> String.t() | nil end`. It exists so tests can
+  drive the KILN_HOME / KILN_ACTOR_ID fallback deterministically without
+  mutating the process environment.
+  """
+  @spec parse([String.t()], (atom() -> String.t() | nil)) ::
+          {:ok, t()} | {:error, Result.error()}
+  def parse(argv, env_reader) when is_list(argv) and is_function(env_reader, 1) do
     case tokenize(argv) do
-      {:ok, tokens} -> decode(tokens)
+      {:ok, tokens} -> decode(tokens, env_reader)
       {:error, _} = error -> error
     end
   end
@@ -101,7 +124,7 @@ defmodule Kiln.CLI.Request do
 
   # -- decode --
 
-  defp decode(tokens) do
+  defp decode(tokens, env_reader) do
     tokens = consume_value_flags(tokens, [])
 
     {globals, rest} =
@@ -115,14 +138,16 @@ defmodule Kiln.CLI.Request do
       end)
 
     with {:ok, %__MODULE__{} = global_opts} <- decode_globals(globals, base_request()) do
-      cond do
-        global_opts.show_help or global_opts.show_version ->
-          {:ok, global_opts}
+      with {:ok, %__MODULE__{} = global_opts} <- resolve_kiln_home(global_opts, env_reader) do
+        cond do
+          global_opts.show_help or global_opts.show_version ->
+            {:ok, global_opts}
 
-        true ->
-          with {:ok, %__MODULE__{} = global_opts} <- resolve_actor_id(global_opts) do
-            decode_command_into(global_opts, rest)
-          end
+          true ->
+            with {:ok, %__MODULE__{} = global_opts} <- resolve_actor_id(global_opts, env_reader) do
+              decode_command_into(global_opts, rest)
+            end
+        end
       end
     end
   end
@@ -290,13 +315,15 @@ defmodule Kiln.CLI.Request do
     do: usage("--kiln-home requires a path value")
 
   defp validate_kiln_home(value) when is_binary(value) do
-    if Path.type(value) in [:absolute, :volumerelative, :relative] do
-      cond do
-        String.contains?(value, "\0") -> usage("--kiln-home contains a NUL byte")
-        true -> {:ok, canonicalise_path(value)}
-      end
-    else
-      usage("--kiln-home must be a local path")
+    cond do
+      String.contains?(value, "\0") ->
+        usage("--kiln-home contains a NUL byte")
+
+      Path.type(value) != :absolute ->
+        usage("--kiln-home must be an absolute path")
+
+      true ->
+        {:ok, canonicalise_path(value)}
     end
   end
 
@@ -327,12 +354,12 @@ defmodule Kiln.CLI.Request do
   # only after the explicit flag has been honoured; an explicit `--actor-id ""`
   # still fails the validate_actor_id check above. A blank env value fails
   # the same way; there is no implicit default.
-  defp resolve_actor_id(%__MODULE__{actor_id: actor_id} = request)
+  defp resolve_actor_id(%__MODULE__{actor_id: actor_id} = request, _env_reader)
        when is_binary(actor_id) and byte_size(actor_id) > 0,
        do: {:ok, request}
 
-  defp resolve_actor_id(%__MODULE__{actor_id: nil} = request) do
-    case System.get_env("KILN_ACTOR_ID") do
+  defp resolve_actor_id(%__MODULE__{actor_id: nil} = request, env_reader) do
+    case env_reader.("KILN_ACTOR_ID") do
       nil ->
         usage("an actor_id is required (pass --actor-id or set KILN_ACTOR_ID)")
 
@@ -348,7 +375,45 @@ defmodule Kiln.CLI.Request do
     end
   end
 
-  defp resolve_actor_id(%__MODULE__{} = request), do: {:ok, request}
+  defp resolve_actor_id(%__MODULE__{} = request, _env_reader), do: {:ok, request}
+
+  # Resolve `kiln_home` from explicit flag → `KILN_HOME` env →
+  # `@default_kiln_home`. Every layer is canonicalised via
+  # `validate_kiln_home/1` so a relative env value is rejected with the
+  # same USAGE_ERROR as a relative flag value. The resolved value is
+  # always an absolute, normalised path; `nil` never reaches the
+  # dispatcher.
+  defp resolve_kiln_home(%__MODULE__{kiln_home: path} = request, _env_reader)
+       when is_binary(path) and byte_size(path) > 0,
+       do: {:ok, request}
+
+  defp resolve_kiln_home(%__MODULE__{kiln_home: nil} = request, env_reader) do
+    case env_reader.("KILN_HOME") do
+      nil ->
+        apply_default_kiln_home(request)
+
+      "" ->
+        apply_default_kiln_home(request)
+
+      value ->
+        case validate_kiln_home(value) do
+          {:ok, path} -> {:ok, %{request | kiln_home: path}}
+          {:error, _} = error -> error
+        end
+    end
+  end
+
+  # The default uses `~` which `Path.type/1` reports as `:relative` until
+  # expanded. The default itself is trusted (it ships in source); only
+  # the *user-supplied* flag/env path is rejected when relative.
+  defp apply_default_kiln_home(%__MODULE__{} = request) do
+    canonical =
+      @default_kiln_home
+      |> Path.expand()
+      |> Path.absname()
+
+    {:ok, %{request | kiln_home: canonical}}
+  end
 
   defp usage(message), do: usage_result(message)
 
