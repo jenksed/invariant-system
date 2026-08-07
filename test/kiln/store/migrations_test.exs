@@ -120,7 +120,7 @@ defmodule Kiln.Store.MigrationsTest do
              "the v2 upgrade must create the global idempotency_key unique index"
     end
 
-    test "a populated v1 store with cross-session duplicate idempotency_keys rejects migration 2",
+    test "a populated v1 store with cross-session duplicate idempotency_keys rejects migration 2 with structured details",
          %{dir: dir} do
       v1 = build_v1_store(dir)
 
@@ -136,8 +136,24 @@ defmodule Kiln.Store.MigrationsTest do
         request_digest: "sha256:02"
       })
 
-      assert {:error, %{class: :migration, code: :apply_failed}} =
-               Migrations.migrate(v1.conn, now: "2026-08-01T00:00:00Z")
+      assert {:error,
+              %{
+                class: :migration,
+                code: :duplicate_global_idempotency_keys,
+                details: %{
+                  duplicates: [
+                    %{
+                      idempotency_key: "idem_0000000000000000000000000000000a",
+                      session_ids: session_ids
+                    }
+                  ]
+                }
+              }} = Migrations.migrate(v1.conn, now: "2026-08-01T00:00:00Z")
+
+      assert Enum.sort(session_ids) == [
+               "ses_00000000000000000000000000000001",
+               "ses_00000000000000000000000000000002"
+             ]
 
       assert Migrations.current_version(v1.conn) == 1,
              "a failed v2 upgrade must not advance the state migration version"
@@ -168,7 +184,7 @@ defmodule Kiln.Store.MigrationsTest do
         request_digest: "sha256:02"
       })
 
-      {:error, %{class: :migration, code: :apply_failed}} =
+      {:error, %{class: :migration, code: :duplicate_global_idempotency_keys}} =
         Migrations.migrate(v1.conn, now: "2026-08-01T00:00:00Z")
 
       insert_v1_action_commit(v1.conn, %{
@@ -179,6 +195,38 @@ defmodule Kiln.Store.MigrationsTest do
 
       assert count_action_commits(v1.conn) == 3
       assert Migrations.current_version(v1.conn) == 1
+    end
+
+    test "a valid v1 store with distinct per-session idempotency_keys upgrades and remains replayable",
+         %{dir: dir} do
+      v1 = build_v1_store(dir)
+      alias Kiln.Journal.Replay
+
+      session_one = "ses_00000000000000000000000000000001"
+      session_two = "ses_00000000000000000000000000000002"
+
+      seed_v1_session!(v1.conn, session_one, "idem_0000000000000000000000000000000c", 1)
+      seed_v1_session!(v1.conn, session_two, "idem_0000000000000000000000000000000d", 2)
+
+      # Before the upgrade the rebuild must already succeed.
+      assert {:ok, report_one} = Replay.rebuild(v1.conn, session_one)
+      assert report_one.projection["session"]["id"] == session_one
+
+      assert {:ok, report_two} = Replay.rebuild(v1.conn, session_two)
+      assert report_two.projection["session"]["id"] == session_two
+
+      assert {:ok, %{version: 2, applied_now: [2]}} =
+               Migrations.migrate(v1.conn, now: "2026-08-01T00:00:00Z")
+
+      # After the upgrade the rebuild must still succeed; this is the
+      # post-upgrade replay contract the durable migration promises.
+      assert {:ok, report_one_after} = Replay.rebuild(v1.conn, session_one)
+      assert report_one_after.projection["session"]["id"] == session_one
+      assert report_one_after.projection_digest == report_one.projection_digest
+
+      assert {:ok, report_two_after} = Replay.rebuild(v1.conn, session_two)
+      assert report_two_after.projection["session"]["id"] == session_two
+      assert report_two_after.projection_digest == report_two.projection_digest
     end
   end
 
@@ -274,6 +322,103 @@ defmodule Kiln.Store.MigrationsTest do
   defp count_action_commits(conn) do
     [[n]] = Connection.query!(conn, "SELECT count(*) FROM action_commits")
     n
+  end
+
+  # Plant a minimal but valid v1 session: one journal entry
+  # (session_started/v1) and one action_commit with the given idempotency
+  # key and a request digest that matches the entry payload. The session
+  # id, task id, run id, action id, and idempotency key are all
+  # well-formed opaque identifiers; the request digest is a real
+  # canonical digest of the entry payload, so `Replay.rebuild/2` accepts
+  # it before and after the v2 upgrade.
+  defp seed_v1_session!(conn, session_id, idempotency_key, first_sequence) do
+    # Derive per-session opaque identifiers from the session_id tail so the
+    # two seeded sessions get distinct action_id, task_id, run_id, and
+    # root_run_id values without any randomness that would invalidate the
+    # fixture on retry. Each tail is 8 hex chars; we pad to 32 hex chars
+    # so the resulting identifier matches the opaque-identifier shape
+    # (`<prefix>_<32 lowercase hex>`).
+    # Pad the 8-hex tail to 32 hex chars by repeating it four times. Each
+    # session_id has a distinct 8-hex tail (00000001 vs 00000002) so the
+    # resulting identifiers are distinct and valid opaque Kiln ids.
+    tail = String.slice(session_id, -8..-1)
+    hex32 = String.duplicate(tail, 4)
+    task_id = "tsk_" <> hex32
+    run_id = "run_" <> hex32
+    action_id = "act_" <> hex32
+    # The reducer requires `run.root_run_id == run.id` for the first action
+    # (no parent run to inherit from). Using the same identifier for both
+    # satisfies the invariant without inventing new fake IDs.
+    root_run_id = run_id
+
+    payload = %{
+      "session" => %{"id" => session_id, "state" => "active"},
+      "task" => %{"id" => task_id, "state" => "in_progress"},
+      "run" => %{"id" => run_id, "state" => "ready", "root_run_id" => root_run_id},
+      "workflow_step" => "intent",
+      "objective" => "valid v1 fixture",
+      "criteria" => ["The focused test passes"],
+      "constraints" => [],
+      "exclusions" => [],
+      "objective_revision" => 0,
+      "criteria_revision" => 0,
+      "references" => %{}
+    }
+
+    payload_schema = "session_started/v1"
+    payload_text = Kiln.Store.Canonical.encode(payload)
+    payload_digest = Kiln.Store.Canonical.digest(payload_schema, payload)
+    request_digest = "sha256:" <> payload_digest
+
+    Connection.query!(
+      conn,
+      """
+      INSERT INTO journal_entries
+        (entry_id, entry_schema, entry_type, payload_schema, session_id, session_revision,
+         action_id, actor_kind, actor_id, idempotency_key, request_digest,
+         causation_entry_id, correlation_id, recorded_at, sequence, payload, payload_digest)
+      VALUES (?1, 'journal_entry/v1', 'session_started/v1', ?8, ?2, 0,
+              ?3, 'local_user', 'user:local', ?4, ?5, NULL, NULL, '2026-07-29T00:00:00Z', ?9, ?6, ?7)
+      """,
+      [
+        Kiln.Store.Uuid.v7(),
+        session_id,
+        action_id,
+        idempotency_key,
+        request_digest,
+        payload_text,
+        payload_digest,
+        payload_schema,
+        first_sequence
+      ]
+    )
+
+    result_map = %{
+      session_id: session_id,
+      task_id: task_id,
+      run_id: run_id,
+      action_id: action_id,
+      session_revision: 0,
+      run_state: "ready",
+      projection_digest: "sha256:" <> String.duplicate("0", 64)
+    }
+
+    result_schema = "action_result/v1"
+    result_text = Kiln.Store.Canonical.encode(result_map)
+    result_digest = Kiln.Store.Canonical.digest(result_schema, result_map)
+
+    Connection.query!(
+      conn,
+      """
+      INSERT INTO action_commits
+        (action_id, session_id, idempotency_key, request_digest, expected_session_revision,
+         first_sequence, last_sequence, result_schema, result, result_digest, committed_at)
+      VALUES (?1, ?2, ?3, ?4, 0, ?7, ?7, 'action_result/v1', ?5, ?6, '2026-07-29T00:00:00Z')
+      """,
+      [action_id, session_id, idempotency_key, request_digest, result_text, result_digest, first_sequence]
+    )
+
+    :ok
   end
 
   defp stop(conn) do

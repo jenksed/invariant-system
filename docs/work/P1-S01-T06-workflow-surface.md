@@ -40,6 +40,75 @@ plan, the module documentation, and the PR evidence so they describe
 and enforce the same contract. The full set of design decisions and
 post-review changes is captured in `Completion record` below.
 
+### Second-pass revision (post-review)
+
+A second PR-42 review of the revised commit surfaced five further
+correctness gaps that were corrected in a follow-up pass:
+
+1. **Action-boundary binding on replay (HIGH).** A well-formed but
+   false stored result could still replay because the workflow's
+   validator did not bind the stored `action_id`, identifier formats,
+   `task_id`/`run_id`, `session_revision`, `projection_digest`, or
+   `result_schema` to the authoritative action boundary produced by
+   the rebuild. The revision adds `action_boundary` and
+   `rebuild_digest` fields to `Replay.report/0` and `Journal.replay/0`
+   and adds a set of replay-boundary validators in
+   `Kiln.Workflow` (`require_valid_session_id`, `require_valid_task_id`,
+   `require_valid_run_id`, `require_valid_action_id`,
+   `require_application_result_schema`, `require_action_boundary`,
+   `require_revision_matches_boundary`,
+   `require_digest_matches_rebuild`) that reject any stored result
+   whose fields disagree with the authoritative boundary.
+2. **Caller-supplied `ProjectObservation.id` excluded from
+   idempotency digest (HIGH).** Two caller-supplied
+   `ProjectObservation` structs that differed only by `id` produced
+   the same idempotency digest and replayed instead of conflicting.
+   The revision distinguishes the two sources via
+   `resolve_project_observation_map/1` (`:caller | :generated`) and
+   `build_start_request_digest/1` and includes the `id` in the
+   digest only when it is caller-supplied.
+3. **Classifier API inconsistency (MEDIUM).** `lookup_commit/3`
+   documented `{:error, %Kiln.Store.Error{}}` but returned
+   `{:conflict, error}`; `normalize_classify_outcome/1` could
+   raise `CaseClauseError` on non-Error reasons; `classify_commit/3`
+   and `classify_in_transaction/2` were duplicate implementations.
+   The revision collapses them into a single `do_classify/3`,
+   fixes `lookup_commit/3` to return `{:error, error}`, and wraps
+   non-Error reasons in
+   `%Error{class: :unknown, code: :transaction_failed}`.
+4. **Migration v1→v2 failure too generic (MEDIUM).** A v1 store with
+   cross-session duplicate `idempotency_keys` returned
+   `:apply_failed` and tests used fixture rows without journal
+   entries, invalid request-digest shapes, and an empty result with
+   a fake digest. The revision returns the specific
+   `:duplicate_global_idempotency_keys` code with structured
+   `details.duplicates: [%{idempotency_key, session_ids}]` and
+   replaces the fixtures with a valid v1 store whose seed session
+   commits a real `journal_entries` row whose `payload_digest` and
+   `result_digest` are the canonical `Kiln.Store.Canonical.digest/2`
+   outputs of the seeded payloads. The new test verifies
+   `Replay.rebuild/2` succeeds before and after the upgrade so the
+   post-upgrade replay contract is enforced.
+5. **PR evidence overstates regression coverage (MEDIUM).** The
+   capability matrix helper asserted rejection but did not count
+   `journal_entries` and `action_commits` rows before and after the
+   rejected call; the restart durability tests counted only
+   `journal_entries` rows and did not assert zero additional
+   `action_commits` / `session_projections` rows; the restart tests
+   did not compare the entire returned result map; the timestamp
+   suite did not test explicit-then-omitted or omitted-then-explicit
+   conflicts; the idempotency conflict suite covered mainly changed
+   `actor_id` / `criteria` / `started_at`. The revision tightens
+   the matrix helper to capture row counts after the source state
+   is reached and assert zero writes on rejection (covering all
+   three row kinds), tightens the restart tests to compare the
+   entire returned result map and count all three row kinds, and
+   adds the missing explicit-then-omitted and omitted-then-explicit
+   timestamp tests, the missing `constraints` / `exclusions` /
+   `repository_fingerprint` / `observed_at` conflict tests, the
+   missing cancel-vs-resume and resume-vs-cancel cross-operation
+   conflict tests, and the missing cross-Session key-reuse test.
+
 ## Slice contribution
 
 P1-S01 enables one durable Root Session that survives restart and can be inspected through a minimal CLI. Before the foundation CLI can dispatch its five supported commands (start, status, inspect, cancel, resume), Kiln requires one public application boundary so that the CLI, a future TUI, ACP, and other clients consume shared application semantics rather than reaching into `Kiln.Domain.*` or `Kiln.Store.*` directly.
@@ -274,8 +343,8 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
 | `mix format --check-formatted` | 0 | clean after the revision's `mix format` pass |
 | `mix compile --warnings-as-errors` | 0 | 30 files compiled; 0 warnings |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | No cycles found |
-| `mix test test/kiln/workflow_test.exs` | 0 | 49 tests, 49 passed (33 originals + 16 regression tests for AC08-AC11) |
-| `mix test` | 0 | 209 tests, 209 passed across the full suite (193 prior + 16 regression) |
+| `mix test test/kiln/workflow_test.exs` | 0 | 83 tests, 83 passed (49 originals + 34 regression tests across AC01-AC15; 13 added in the second-pass review) |
+| `mix test` | 0 | 247 tests, 247 passed across the full suite (234 prior + 13 second-pass regression tests) |
 
 ### Demo and slice status
 
@@ -296,6 +365,13 @@ P1-S01-D01 user-visible path (T06 portion): an integration test exercising start
     3. **Public functions raised exceptions for invalid input.** Replaced `String.to_existing_atom/1` with a bounded `@run_state_to_atom` map; added normalize/validate helpers (`normalize_start_opts/1`, `normalize_transition_opts/1`, `require_actor_id_map/1`, `require_nonempty_string_map/3`, `require_string_list_map/4`, `optional_string_list_map/3`, `require_session_id_format/1`); ensured every public function returns `{:error, %Error{}}` for malformed input. Removed the broad `rescue _ -> ...` that converted integrity failures into `{:ok, _}`-shaped envelopes.
     4. **Result shape contradictions.** The first implementation omitted `:action_id` from the start result and returned `projection_digest: nil` on replay. The result map now contains the seven stable fields; `projection_digest` and `session_revision` are stamped into the stored application result by the journal before write so an idempotent replay returns the durable values verbatim. The request digest is bound to caller-controlled input only (the auto-generated `started_at` and the auto-generated `ProjectObservation.id` are excluded) so retries with the same `idempotency_key` produce identical request digests.
     5. **Plan / docs / tests / implementation drift.** Tightened the moduledoc of `resume_session/2`, updated AC01 to include `:action_id`, updated AC05 to reflect the actual capability matrix, updated `Expected files or components` to include the new migration, journal edits, and revised test files, and updated `Completion record` with the new evidence IDs.
+- **Second-pass PR-42 review.** Five further gaps surfaced and were corrected in the follow-up commit:
+    1. **Action-boundary binding on replay.** A well-formed but false stored result could still replay because the workflow's validator did not bind stored `action_id`, identifier formats, `task_id`/`run_id`, `session_revision`, `projection_digest`, or `result_schema` to the authoritative action boundary the rebuild produced. Added `action_boundary` to `Replay.report/0` and `Journal.replay/0` and a set of replay-boundary validators in `Kiln.Workflow` (`require_valid_session_id`, `require_valid_task_id`, `require_valid_run_id`, `require_valid_action_id`, `require_application_result_schema`, `require_action_boundary`, `require_revision_matches_boundary`, `require_digest_matches_rebuild`).
+    2. **Caller-supplied `ProjectObservation.id` distinguished.** Two distinct caller-supplied `ProjectObservation` structs shared an idempotency digest because the auto-generated `id` was excluded from it. The revision makes `id` participation conditional via `resolve_project_observation_map/1` (`:caller | :generated`) and `build_start_request_digest/1`, so caller-supplied ids participate in the digest and auto-generated ids do not.
+    3. **Classifier API unified.** `lookup_commit/3` documented `{:error, %Kiln.Store.Error{}}` but returned `{:conflict, error}`; `normalize_classify_outcome/1` could raise `CaseClauseError`; `classify_commit/3` and `classify_in_transaction/2` were duplicates. Collapsed into a single `do_classify/3`; `lookup_commit/3` now returns `{:error, error}`; non-Error reasons are wrapped in `%Error{class: :unknown, code: :transaction_failed}`.
+    4. **Migration specific duplicate-key code.** The v1→v2 upgrade now returns `:duplicate_global_idempotency_keys` with structured `details.duplicates: [%{idempotency_key, session_ids}]` instead of a generic `:apply_failed`. `reject_duplicate_idempotency_keys/3` pre-detects the duplicates in a read-only query, guarded by `action_commits_table_exists?/1` so a fresh-store first migration skips the check entirely. The migration SQL comment spells out operator remediation: per-key deduplication, removal of associated journal entries, and retry of the migration.
+    5. **Valid v1 fixture with replay-safety proof.** The previous fixture planted rows in `action_commits` directly with fake digests and no associated `journal_entries`, which could not actually be replayed through `Replay.rebuild/2`. The new `seed_v1_session!/4` fixture writes a real `journal_entries` row whose `payload_digest` equals `Kiln.Store.Canonical.digest("session_started/v1", payload)` (unprefixed) and a real `action_commits` row whose `result_digest` equals `Kiln.Store.Canonical.digest("action_result/v1", result)` (unprefixed) and whose `request_digest` is `"sha256:" <> payload_digest` (prefixed). The test asserts `Replay.rebuild/2` returns `{:ok, report}` with the seeded projection both *before* and *after* the v2 upgrade.
+    6. **Regression-evidence assertions tightened.** The capability matrix helper now captures `journal_entries`, `action_commits`, and `session_projections` row counts *after* the source state is reached and asserts all three counts are unchanged on rejection. The restart durability tests now assert zero additional rows of all three kinds and compare the entire returned result map (`assert replayed == first`). The timestamp suite now covers explicit-then-omitted and omitted-then-explicit conflicts. The idempotency conflict suite now covers changed `constraints`, `exclusions`, `repository_fingerprint`, `observed_at`, cancel-vs-resume and resume-vs-cancel cross-operation reuse, transition-revision conflicts on cancel and resume, actor-id conflicts on cancel, and cross-Session key reuse.
 
 ### Remaining unknowns and exclusions
 

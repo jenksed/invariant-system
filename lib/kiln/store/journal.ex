@@ -61,45 +61,7 @@ defmodule Kiln.Store.Journal do
           | {:error, Error.t()}
   def classify_commit(conn, idempotency_key, request_digest) do
     Connection.transaction(conn, fn tx ->
-      case read_commit(tx, idempotency_key) do
-        :none ->
-          :none
-
-        {:found, commit} ->
-          cond do
-            commit.request_digest != request_digest ->
-              {:conflict,
-               Error.new(
-                 :idempotency_conflict,
-                 :idempotency_conflict,
-                 "idempotency key reused with a different request",
-                 %{
-                   idempotency_key: idempotency_key,
-                   stored_request_digest: commit.request_digest,
-                   submitted_request_digest: request_digest,
-                   stored_session_id: commit.session_id
-                 }
-               )}
-
-            not valid_stored_result?(commit) ->
-              {:error,
-               Error.new(
-                 :integrity,
-                 :corrupt_result,
-                 "stored idempotency result is corrupt",
-                 %{
-                   idempotency_key: idempotency_key,
-                   session_id: commit.session_id
-                 }
-               )}
-
-            true ->
-              case replay_boundary_valid?(tx, commit.session_id) do
-                :ok -> {:replay, commit_to_replay(commit)}
-                {:error, %Error{} = error} -> {:error, error}
-              end
-          end
-      end
+      do_classify(tx, idempotency_key, request_digest)
     end)
     |> normalize_classify_outcome()
   end
@@ -107,9 +69,22 @@ defmodule Kiln.Store.Journal do
   # `classify_commit` is invoked both with a fresh transaction and from within
   # `commit/4`'s transaction. `Connection.transaction/2` returns the bare value
   # when not nested, but DBConnection's nested mode returns `{:ok, value}` or
-  # `{:error, reason}`. Normalize both shapes so callers see one shape.
+  # `{:error, reason}`. Normalize both shapes so callers see one shape. Any
+  # reason that is not already a `%Kiln.Store.Error{}` is wrapped in one so
+  # the public contract always returns an error envelope.
   defp normalize_classify_outcome({:ok, value}), do: value
-  defp normalize_classify_outcome({:error, reason}), do: {:error, reason}
+
+  defp normalize_classify_outcome({:error, %Error{} = error}), do: {:error, error}
+
+  defp normalize_classify_outcome({:error, reason}) do
+    {:error,
+     Error.new(
+       :unknown,
+       :transaction_failed,
+       "the classify transaction did not commit",
+       %{reason: inspect(reason)}
+     )}
+  end
 
   @typedoc "Validated stored commit returned to a successful replay caller."
   @type replay :: %{
@@ -117,7 +92,9 @@ defmodule Kiln.Store.Journal do
           action_id: String.t(),
           request_digest: String.t(),
           result_schema: String.t(),
-          result: map()
+          result: map(),
+          boundary: Replay.action_boundary() | nil,
+          rebuild_digest: String.t() | nil
         }
 
   @doc """
@@ -148,8 +125,8 @@ defmodule Kiln.Store.Journal do
     case classify_commit(conn, idempotency_key, request_digest) do
       :none -> :none
       {:replay, replay} -> {:ok, replay}
-      {:conflict, _} = conflict -> conflict
-      {:error, _} = error -> error
+      {:conflict, %Error{} = error} -> {:error, error}
+      {:error, %Error{} = error} -> {:error, error}
     end
   end
 
@@ -182,11 +159,14 @@ defmodule Kiln.Store.Journal do
           {:conflict, _} ->
             DBConnection.rollback(tx, {:idempotency_conflict})
 
-          {:corrupt_result, error} ->
+          {:error, %Error{class: :integrity, code: :corrupt_result} = error} ->
             DBConnection.rollback(tx, {:corrupt_result, error})
 
           {:error, %Error{class: :integrity, code: :journal_invalid} = error} ->
             DBConnection.rollback(tx, {:journal_invalid, error})
+
+          {:error, %Error{} = error} ->
+            DBConnection.rollback(tx, {:transaction_failed, error})
 
           :none ->
             commit_new(tx, action, entries, result_map, result_schema, now, opts)
@@ -202,6 +182,7 @@ defmodule Kiln.Store.Journal do
       {:error, {:cache_corrupt, error}} -> {:error, error}
       {:error, {:cache_invalid_metadata, error}} -> {:error, error}
       {:error, {:journal_invalid, error}} -> {:error, error}
+      {:error, {:transaction_failed, %Error{} = error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
@@ -397,41 +378,69 @@ defmodule Kiln.Store.Journal do
       Canonical.digest(commit.result_schema, commit.result) == commit.result_digest
   end
 
-  defp commit_to_replay(commit) do
+  defp commit_to_replay(commit, report) do
     %{
       session_id: commit.session_id,
       action_id: commit.action_id,
       request_digest: commit.request_digest,
       result_schema: commit.result_schema,
-      result: commit.result
+      result: commit.result,
+      boundary: report.action_boundary,
+      rebuild_digest: report.projection_digest
     }
   end
 
-  # In-transaction classifier used by `commit/4`. Mirrors `classify_commit/3`
-  # but does not open a nested transaction. The replay-boundary check uses the
-  # stored `session_id` so the retry's freshly generated session identifier
-  # cannot collide with the original.
+  # In-transaction classifier used by `commit/4`. Delegates to `do_classify/3`
+  # so both the pre-lookup (`classify_commit/3`) and the in-transaction paths
+  # share one classifier implementation. The `commit/4` plumbing maps the
+  # canonical `{:conflict, _}` and `{:error, _}` shapes to the legacy
+  # `:corrupt_result` and `{:journal_invalid, _}` rollback tuples it has
+  # always emitted, so existing behavior is preserved.
   defp classify_in_transaction(tx, action) do
-    case read_commit(tx, action.idempotency_key) do
+    do_classify(tx, action.idempotency_key, action.request_digest)
+  end
+
+  # Single classification algorithm. Runs against either a fresh
+  # `Connection.transaction` (in `classify_commit/3`) or the active transaction
+  # inside `commit/4`. Returns one of:
+  #
+  #   `:none` — no commit exists for the supplied key.
+  #   `{:replay, replay}` — a stored commit whose request digest matches and
+  #     whose authoritative Session journal validates. `replay.session_id` is
+  #     the stored Session, never a freshly generated one.
+  #   `{:conflict, %Error{}}` — the stored digest differs from the request.
+  #   `{:error, %Error{}}` — the stored result fails its recorded
+  #     result_digest, or the authoritative journal for the stored session_id
+  #     is missing, corrupt, truncated, or inconsistent.
+  defp do_classify(tx, idempotency_key, request_digest) do
+    case read_commit(tx, idempotency_key) do
       :none ->
         :none
 
       {:found, commit} ->
         cond do
-          commit.request_digest != action.request_digest ->
-            {:conflict, conflict_error(action)}
+          commit.request_digest != request_digest ->
+            {:conflict, idempotency_conflict_error(commit, idempotency_key, request_digest)}
 
           not valid_stored_result?(commit) ->
-            {:corrupt_result,
-             Error.new(:integrity, :corrupt_result, "stored idempotency result is corrupt", %{
-               session_id: commit.session_id,
-               idempotency_key: action.idempotency_key
-             })}
+            {:error,
+             Error.new(
+               :integrity,
+               :corrupt_result,
+               "stored idempotency result is corrupt",
+               %{
+                 idempotency_key: idempotency_key,
+                 session_id: commit.session_id
+               }
+             )}
 
           true ->
             case replay_boundary_valid?(tx, commit.session_id) do
-              :ok -> {:replay, commit_to_replay(commit)}
-              {:error, error} -> {:error, error}
+              {:ok, report} ->
+                {:replay, commit_to_replay(commit, report)}
+
+              {:error, %Error{} = error} ->
+                {:error, error}
             end
         end
     end
@@ -446,8 +455,8 @@ defmodule Kiln.Store.Journal do
   # freshly generated session identifier cannot collide with the original.
   defp replay_boundary_valid?(tx, session_id) do
     case Replay.rebuild(tx, session_id) do
-      {:ok, _report} ->
-        :ok
+      {:ok, report} ->
+        {:ok, report}
 
       {:error, block} ->
         {:error,
@@ -723,14 +732,23 @@ defmodule Kiln.Store.Journal do
     )
   end
 
-  defp replayed_result(%{result: decoded, session_id: session_id}) do
+  defp replayed_result(%{
+         result: decoded,
+         result_schema: result_schema,
+         session_id: session_id,
+         boundary: boundary,
+         rebuild_digest: rebuild_digest
+       }) do
     %{
       status: :replayed,
       session_id: session_id,
       session_revision: nil,
       last_sequence: nil,
       projection: nil,
-      result: decoded
+      result: decoded,
+      result_schema: result_schema,
+      boundary: boundary,
+      rebuild_digest: rebuild_digest
     }
   end
 
@@ -749,6 +767,20 @@ defmodule Kiln.Store.Journal do
       %{
         idempotency_key: action.idempotency_key,
         session_id: action.session_id
+      }
+    )
+  end
+
+  defp idempotency_conflict_error(commit, idempotency_key, request_digest) do
+    Error.new(
+      :idempotency_conflict,
+      :idempotency_conflict,
+      "idempotency key reused with a different request",
+      %{
+        idempotency_key: idempotency_key,
+        stored_request_digest: commit.request_digest,
+        submitted_request_digest: request_digest,
+        stored_session_id: commit.session_id
       }
     )
   end

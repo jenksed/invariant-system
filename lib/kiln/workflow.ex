@@ -427,24 +427,41 @@ defmodule Kiln.Workflow do
          ) do
       {:ok, %{status: :committed, session_revision: revision, projection: projection}} ->
         committed = committed_result(result_map, revision, projection)
-        replay = %{session_id: action.session_id, action_id: action.id, result: committed}
+        rebuild_digest = projection_digest_of(projection)
+
+        fresh_boundary = fresh_action_boundary(action, revision, rebuild_digest)
+
+        replay = %{
+          session_id: action.session_id,
+          action_id: action.id,
+          result: committed,
+          result_schema: @application_result_schema,
+          boundary: fresh_boundary,
+          rebuild_digest: rebuild_digest
+        }
 
         case result_fun.(replay) do
           {:ok, _} = ok -> ok
           {:error, %Error{} = error} -> {:error, error}
         end
 
-      {:ok, %{status: :replayed, result: stored_result, session_id: stored_session_id}} ->
+      {:ok, %{status: :replayed, result: stored_result, session_id: stored_session_id} = replayed} ->
         # The journal already validated the stored boundary against the
         # authoritative journal; convert the stored result into the public
         # shape and re-validate semantic completeness so a corrupt stored
         # map cannot leak through the replay path. Use the stored
         # `session_id` so the retry's freshly generated candidate never
         # collides with the original Session under a concurrent retry race.
+        # `boundary` and `rebuild_digest` are carried by the journal's
+        # replay tuple and bind the stored result to its exact action
+        # boundary inside the journal.
         replay = %{
           session_id: stored_session_id,
           action_id: action.id,
-          result: string_keyed_to_atom(stored_result)
+          result: string_keyed_to_atom(stored_result),
+          result_schema: Map.get(replayed, :result_schema),
+          boundary: Map.get(replayed, :boundary),
+          rebuild_digest: Map.get(replayed, :rebuild_digest)
         }
 
         case result_fun.(replay) do
@@ -565,7 +582,8 @@ defmodule Kiln.Workflow do
          {:ok, constraints} <- optional_string_list_map(opts, :constraints, :constraints),
          {:ok, exclusions} <- optional_string_list_map(opts, :exclusions, :exclusions),
          {:ok, started_at, started_at_source} <- require_started_at_map(opts),
-         {:ok, project_observation} <- resolve_project_observation_map(opts),
+         {:ok, project_observation, observation_id_source} <-
+           resolve_project_observation_map(opts),
          {:ok, idempotency_key_input} <- optional_idempotency_key_map(opts) do
       {:ok,
        %{
@@ -577,6 +595,7 @@ defmodule Kiln.Workflow do
          started_at: started_at,
          started_at_source: started_at_source,
          project_observation: project_observation,
+         observation_id_source: observation_id_source,
          idempotency_key: idempotency_key_input
        }}
     end
@@ -696,13 +715,24 @@ defmodule Kiln.Workflow do
     end
   end
 
+  # Caller-supplied `%ProjectObservation{}` structs carry an explicit `id`
+  # that becomes the durable `project_observation_id` referenced by the
+  # Session journal; two distinct caller ids therefore represent distinct
+  # durable observations and must produce distinct request digests. Map
+  # inputs (or omitted maps inside the struct) have their id generated
+  # internally by `ProjectObservation.new/1`; that generated id participates
+  # only as a one-shot value for this request and is excluded from the
+  # digest so two identical map inputs replay idempotently.
   defp resolve_project_observation_map(opts) do
     case Map.fetch(opts, :project_observation) do
       {:ok, %ProjectObservation{} = value} ->
-        {:ok, value}
+        {:ok, value, :caller}
 
       {:ok, attrs} when is_map(attrs) ->
-        ProjectObservation.new(attrs)
+        case ProjectObservation.new(attrs) do
+          {:ok, observation} -> {:ok, observation, :generated}
+          {:error, _} = error -> error
+        end
 
       :error ->
         {:error,
@@ -804,7 +834,8 @@ defmodule Kiln.Workflow do
       "exclusions" => normalized.exclusions,
       "started_at_source" => Atom.to_string(normalized.started_at_source),
       "started_at" => started_at_digest_value(normalized),
-      "project_observation" => project_observation_digest_data(normalized.project_observation)
+      "project_observation" =>
+        project_observation_digest_data(normalized.project_observation, normalized.observation_id_source)
     }
 
     encode_request_digest(attrs)
@@ -839,10 +870,23 @@ defmodule Kiln.Workflow do
     {:ok, "sha256:" <> Base.encode16(raw, case: :lower)}
   end
 
-  defp project_observation_digest_data(%ProjectObservation{} = po) do
-    # Exclude `id` because the ProjectObservation constructor generates a
-    # fresh opaque id per call; including it would defeat idempotency for
-    # callers that pass an identical observation map twice.
+  # When the caller supplied a `%ProjectObservation{}` directly, its `id` is
+  # the durable `project_observation_id` referenced by the Session journal;
+  # two distinct ids therefore represent distinct durable observations and
+  # must produce distinct digests so a retry cannot replay the wrong session.
+  # When the observation was constructed from a map, `id` was generated
+  # internally and is excluded so two identical map inputs replay
+  # idempotently.
+  defp project_observation_digest_data(%ProjectObservation{} = po, :caller) do
+    %{
+      "id" => po.id,
+      "repository_root" => po.repository_root,
+      "repository_fingerprint" => po.repository_fingerprint,
+      "observed_at" => DateTime.to_iso8601(po.observed_at)
+    }
+  end
+
+  defp project_observation_digest_data(%ProjectObservation{} = po, :generated) do
     %{
       "repository_root" => po.repository_root,
       "repository_fingerprint" => po.repository_fingerprint,
@@ -978,46 +1022,211 @@ defmodule Kiln.Workflow do
     transition_result_from_stored(public_relation, replay)
   end
 
+  # The stored application result is the cached answer, but the rebuild is
+  # the source of truth. The validators below prove that every identifier,
+  # the revision, the projection digest, and the schema in the stored result
+  # all match the authoritative rebuild produced by `Journal.replay/2`.
+  # A stored result that passes its own digest check but disagrees with the
+  # rebuild is a boundary violation and must never be returned as `{:ok, _}`.
   defp validate_stored_start_result(replay) do
     result = replay.result
+    boundary = replay.boundary
+    rebuild_digest = replay.rebuild_digest
+    expected_schema = @application_result_schema
 
-    with :ok <- require_nonempty_string(result, :session_id),
-         :ok <- require_nonempty_string(result, :task_id),
-         :ok <- require_nonempty_string(result, :run_id),
-         :ok <- require_nonempty_string(result, :action_id),
+    with :ok <- require_application_result_schema(replay.result_schema, expected_schema),
+         :ok <- require_valid_session_id(result.session_id),
+         :ok <- require_valid_task_id(result.task_id),
+         :ok <- require_valid_run_id(result.run_id),
+         :ok <- require_valid_action_id(result.action_id),
          :ok <- require_non_neg_integer(result, :session_revision),
          :ok <- require_run_state(result, "ready"),
-         :ok <- require_projection_digest(result) do
+         :ok <- require_projection_digest(result),
+         :ok <- require_action_boundary(replay.session_id, result.action_id, boundary),
+         :ok <- require_revision_matches_boundary(result.session_revision, boundary),
+         :ok <- require_digest_matches_rebuild(result.projection_digest, rebuild_digest) do
       require_stored_session_matches_id(replay.session_id, result.session_id)
     end
   end
 
   defp validate_stored_transition_result(public_relation, replay) do
     result = replay.result
+    boundary = replay.boundary
+    rebuild_digest = replay.rebuild_digest
+    expected_schema = @application_result_schema
 
-    with :ok <- require_nonempty_string(result, :session_id),
-         :ok <- require_nonempty_string(result, :action_id),
+    with :ok <- require_application_result_schema(replay.result_schema, expected_schema),
+         :ok <- require_valid_session_id(result.session_id),
+         :ok <- require_valid_action_id(result.action_id),
          :ok <- require_non_neg_integer(result, :session_revision),
          :ok <- require_run_state(result, Atom.to_string(target_state_for(public_relation))),
-         :ok <- require_projection_digest(result) do
+         :ok <- require_projection_digest(result),
+         :ok <- require_action_boundary(replay.session_id, result.action_id, boundary),
+         :ok <- require_revision_matches_boundary(result.session_revision, boundary),
+         :ok <- require_digest_matches_rebuild(result.projection_digest, rebuild_digest) do
       require_stored_session_matches_id(replay.session_id, result.session_id)
     end
   end
 
-  defp require_nonempty_string(result, field) do
-    case Map.fetch(result, field) do
-      {:ok, value} when is_binary(value) and byte_size(value) > 0 ->
-        :ok
-
-      _ ->
-        {:error,
-         Error.new(
-           :corrupt_result,
-           "stored result is missing a required identifier",
-           nil,
-           %{reason: :corrupt_result, field: field}
-         )}
+  defp require_valid_session_id(value) do
+    if Id.valid?(:session, value) do
+      :ok
+    else
+      corrupt_result_error("stored result session_id is not a valid session identifier", %{
+        field: :session_id
+      })
     end
+  end
+
+  defp require_valid_task_id(value) do
+    if Id.valid?(:task, value) do
+      :ok
+    else
+      corrupt_result_error("stored result task_id is not a valid task identifier", %{
+        field: :task_id
+      })
+    end
+  end
+
+  defp require_valid_run_id(value) do
+    if Id.valid?(:run, value) do
+      :ok
+    else
+      corrupt_result_error("stored result run_id is not a valid run identifier", %{
+        field: :run_id
+      })
+    end
+  end
+
+  defp require_valid_action_id(value) do
+    if Id.valid?(:action, value) do
+      :ok
+    else
+      corrupt_result_error("stored result action_id is not a valid action identifier", %{
+        field: :action_id
+      })
+    end
+  end
+
+  # The stored result must carry the same result_schema the workflow writes.
+  # An attacker (or a buggy migration) that re-encodes the result under a
+  # different schema could otherwise produce a result the workflow refuses to
+  # decode, but one that still digest-matches under its own scheme.
+  defp require_application_result_schema(actual, expected) do
+    if actual == expected do
+      :ok
+    else
+      corrupt_result_error("stored result_schema is not the workflow application-result schema", %{
+        reason: :corrupt_result_schema,
+        expected: expected,
+        actual: actual
+      })
+    end
+  end
+
+  # The stored action_id must match the action boundary the journal rebuild
+  # produced for the stored session_id. A stored result that agrees with its
+  # own digest but disagrees with the authoritative action boundary is a
+  # tampering signal and must not be returned as a success.
+  defp require_action_boundary(session_id, stored_action_id, boundary) do
+    cond do
+      is_nil(boundary) ->
+        corrupt_result_error(
+          "stored session has no authoritative action boundary",
+          %{reason: :corrupt_result_boundary, session_id: session_id}
+        )
+
+      stored_action_id != boundary.action_id ->
+        corrupt_result_error(
+          "stored result action_id disagrees with the authoritative action boundary",
+          %{
+            reason: :corrupt_result_boundary,
+            stored_action_id: stored_action_id,
+            boundary_action_id: boundary.action_id
+          }
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  # The stored session_revision must equal the revision at the action
+  # boundary the rebuild produced. A revision that disagrees with the rebuild
+  # is a tampering signal even when the stored digest matches.
+  defp require_revision_matches_boundary(stored_revision, boundary) do
+    cond do
+      is_nil(boundary) ->
+        corrupt_result_error(
+          "stored session has no authoritative action boundary",
+          %{reason: :corrupt_result_boundary}
+        )
+
+      stored_revision != boundary.last_revision ->
+        corrupt_result_error(
+          "stored result session_revision disagrees with the authoritative action boundary",
+          %{
+            reason: :corrupt_result_boundary,
+            stored_session_revision: stored_revision,
+            boundary_last_revision: boundary.last_revision
+          }
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  # The stored projection_digest must equal the digest the journal rebuild
+  # produced at the same action boundary. A stored digest that disagrees with
+  # the authoritative rebuild is a tampering signal.
+  defp require_digest_matches_rebuild(stored_digest, rebuild_digest) do
+    cond do
+      is_nil(rebuild_digest) ->
+        corrupt_result_error(
+          "no authoritative rebuild digest is available",
+          %{reason: :corrupt_result_boundary}
+        )
+
+      stored_digest != rebuild_digest ->
+        corrupt_result_error(
+          "stored result projection_digest disagrees with the authoritative rebuild digest",
+          %{
+            reason: :corrupt_result_boundary,
+            stored_projection_digest: stored_digest,
+            rebuild_digest: rebuild_digest
+          }
+        )
+
+      true ->
+        :ok
+    end
+  end
+
+  defp corrupt_result_error(message, detail) do
+    {:error, Error.new(:corrupt_result, message, nil, Map.put(detail, :reason, :corrupt_result))}
+  end
+
+  # The fresh-commit path has not yet passed through `Replay.rebuild`, but the
+  # journal has just stamped the freshly computed projection into
+  # `session_projections` and the rebuilt digest is the digest of that very
+  # projection. Construct a synthetic boundary that matches what the journal
+  # would have produced if the classifier had looked the row up after the
+  # commit. `last_revision` is the just-committed session revision; the
+  # remaining fields mirror the columns `action_commits` just wrote, so the
+  # binding validators see the same authoritative values the replay path
+  # would have produced.
+  defp fresh_action_boundary(action, last_revision, _projection_digest) do
+    %{
+      action_id: action.id,
+      idempotency_key: action.idempotency_key,
+      request_digest: action.request_digest,
+      first_sequence: nil,
+      last_sequence: nil,
+      expected_session_revision: action.expected_session_revision,
+      first_revision: last_revision,
+      last_revision: last_revision
+    }
   end
 
   defp require_non_neg_integer(result, field) do

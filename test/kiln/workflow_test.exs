@@ -1044,17 +1044,22 @@ defmodule Kiln.WorkflowTest do
           name: Kiln.Store.Connection
         )
 
+      conn = Process.whereis(Kiln.Store.Connection)
+      before_entries = count(conn, "journal_entries")
+      before_commits = count(conn, "action_commits")
+      before_projections = count(conn, "session_projections")
+
       assert {:ok, replayed} = Workflow.start_session(opts)
+      assert replayed == first
 
-      assert replayed.session_id == first.session_id
-      assert replayed.task_id == first.task_id
-      assert replayed.run_id == first.run_id
-      assert replayed.action_id == first.action_id
-      assert replayed.session_revision == first.session_revision
-      assert replayed.projection_digest == first.projection_digest
+      assert count(conn, "journal_entries") == before_entries,
+             "start retry after restart must not add journal entries"
 
-      count_after_restart = count(Process.whereis(Kiln.Store.Connection), "journal_entries")
-      assert count_after_restart == 1
+      assert count(conn, "action_commits") == before_commits,
+             "start retry after restart must not add action_commits"
+
+      assert count(conn, "session_projections") == before_projections,
+             "start retry after restart must not add session_projections"
     end
 
     test "an idempotent cancel retry survives a store process restart and returns the same action_id",
@@ -1091,10 +1096,25 @@ defmodule Kiln.WorkflowTest do
           name: Kiln.Store.Connection
         )
 
+      # Capture row counts after the restart, before the retry, so we can
+      # prove the replay added zero writes and that the result equals the
+      # original in every observable field.
+      conn = Process.whereis(Kiln.Store.Connection)
+      before_entries = count(conn, "journal_entries")
+      before_commits = count(conn, "action_commits")
+      before_projections = count(conn, "session_projections")
+
       assert {:ok, replayed} = Workflow.cancel_session(d.session.id, cancel_opts)
-      assert replayed.action_id == first.action_id
-      assert replayed.run_state == :canceled
-      assert replayed.session_revision == first.session_revision
+      assert replayed == first
+
+      assert count(conn, "journal_entries") == before_entries,
+             "cancel retry after restart must not add journal entries"
+
+      assert count(conn, "action_commits") == before_commits,
+             "cancel retry after restart must not add action_commits"
+
+      assert count(conn, "session_projections") == before_projections,
+             "cancel retry after restart must not add session_projections"
     end
 
     test "an idempotent resume retry survives a store process restart", %{
@@ -1134,10 +1154,22 @@ defmodule Kiln.WorkflowTest do
           name: Kiln.Store.Connection
         )
 
+      conn = Process.whereis(Kiln.Store.Connection)
+      before_entries = count(conn, "journal_entries")
+      before_commits = count(conn, "action_commits")
+      before_projections = count(conn, "session_projections")
+
       assert {:ok, replayed} = Workflow.resume_session(d.session.id, resume_opts)
-      assert replayed.action_id == first.action_id
-      assert replayed.run_state == :running
-      assert replayed.session_revision == first.session_revision
+      assert replayed == first
+
+      assert count(conn, "journal_entries") == before_entries,
+             "resume retry after restart must not add journal entries"
+
+      assert count(conn, "action_commits") == before_commits,
+             "resume retry after restart must not add action_commits"
+
+      assert count(conn, "session_projections") == before_projections,
+             "resume retry after restart must not add session_projections"
     end
 
     test "the workflow still answers query_session after a restart", %{
@@ -1326,6 +1358,62 @@ defmodule Kiln.WorkflowTest do
       assert count(store.conn, "journal_entries") == before_entries
     end
 
+    test "an explicit started_at followed by an omitted started_at is a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      first_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key,
+        started_at: @at
+      ]
+
+      assert {:ok, _} = Workflow.start_session(first_opts)
+      before_entries = count(store.conn, "journal_entries")
+
+      second_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:error, %Error{code: :idempotency_conflict}} = Workflow.start_session(second_opts)
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "an omitted started_at followed by an explicit started_at is a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      first_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, _} = Workflow.start_session(first_opts)
+      before_entries = count(store.conn, "journal_entries")
+
+      second_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key,
+        started_at: @at
+      ]
+
+      assert {:error, %Error{code: :idempotency_conflict}} = Workflow.start_session(second_opts)
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
     test "omitted started_at and two concurrent retries are still idempotent (auto-generated timestamps are excluded from the digest)",
          %{store: store} do
       key = unique_idempotency_key()
@@ -1359,6 +1447,374 @@ defmodule Kiln.WorkflowTest do
                  actor_id: "user:local",
                  started_at: "2026-07-29T13:30:00Z"
                )
+    end
+
+    test "two caller-supplied ProjectObservation structs with different ids are a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      # Build two distinct caller-supplied ProjectObservation structs sharing
+      # the same fingerprint, root, and observed_at. The first is committed;
+      # the second must conflict with it because its id is different and that
+      # id is the durable project_observation_id the Session will reference.
+      {:ok, first_observation} =
+        Kiln.Domain.ProjectObservation.new(%{
+          repository_root: "/tmp/kiln-fixture",
+          repository_fingerprint: @fingerprint,
+          observed_at: @at
+        })
+
+      {:ok, second_observation} =
+        Kiln.Domain.ProjectObservation.new(%{
+          repository_root: "/tmp/kiln-fixture",
+          repository_fingerprint: @fingerprint,
+          observed_at: @at
+        })
+
+      refute first_observation.id == second_observation.id
+
+      first_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: first_observation,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, _} = Workflow.start_session(first_opts)
+      before_entries = count(store.conn, "journal_entries")
+
+      second_opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: second_observation,
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(second_opts)
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with changed start constraints is a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 constraints: ["Stay on Linux"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 constraints: ["Stay on macOS"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with changed start exclusions is a conflict, not a replay",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 exclusions: ["Do not refactor unrelated modules"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 exclusions: ["Do not touch session storage"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with a different repository_fingerprint is a conflict",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: %{
+                   repository_root: "/tmp/kiln-fixture",
+                   repository_fingerprint:
+                     "sha256:00000000000000000000000000000000000000000000000000000000000000aa",
+                   observed_at: @at
+                 },
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: %{
+                   repository_root: "/tmp/kiln-fixture",
+                   repository_fingerprint:
+                     "sha256:00000000000000000000000000000000000000000000000000000000000000bb",
+                   observed_at: @at
+                 },
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with a different observed_at is a conflict",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: %{
+                   repository_root: "/tmp/kiln-fixture",
+                   repository_fingerprint: @fingerprint,
+                   observed_at: @at
+                 },
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: %{
+                   repository_root: "/tmp/kiln-fixture",
+                   repository_fingerprint: @fingerprint,
+                   observed_at: ~U[2026-07-29 14:00:00Z]
+                 },
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "a cancel idempotency_key reused for resume_session is a conflict, not a replay",
+         %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, first} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert first.run_state == :canceled
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.resume_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "a resume idempotency_key reused for cancel_session is a conflict, not a replay",
+         %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, first} =
+               Workflow.resume_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert first.run_state == :running
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "a transition idempotency_key reused for cancel_session is a conflict, not a replay",
+         %{store: store, d: d} do
+      # There is no public transition operation; the public surface is
+      # cancel_session and resume_session. Cross-operation key reuse is
+      # already covered by the resume-then-cancel test above. This test
+      # covers the inverse (cancel-key reused after another cancel against
+      # a different in-flight revision), exercising that the digest
+      # includes `expected_session_revision` as a per-operation field.
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 1,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key reused across two distinct Sessions is a conflict on the second",
+         %{store: store} do
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.start_session(
+                 objective: "Correct one bounded defect",
+                 criteria: ["The focused test passes"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+      before_sessions = count(store.conn, "session_projections")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.start_session(
+                 objective: "A different objective",
+                 criteria: ["Different criteria"],
+                 project_observation: observation(),
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+      assert count(store.conn, "session_projections") == before_sessions
+    end
+
+    test "the same idempotency_key with a changed expected_session_revision on cancel is a conflict",
+         %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 99,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with a changed actor_id on cancel is a conflict",
+         %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.cancel_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:different",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
+    end
+
+    test "the same idempotency_key with a changed expected_session_revision on resume is a conflict",
+         %{store: store, d: d} do
+      {:ok, _} = JB.commit_start(store, d)
+
+      key = unique_idempotency_key()
+
+      assert {:ok, _} =
+               Workflow.resume_session(d.session.id,
+                 expected_session_revision: 0,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      before_entries = count(store.conn, "journal_entries")
+
+      assert {:error, %Error{code: :idempotency_conflict}} =
+               Workflow.resume_session(d.session.id,
+                 expected_session_revision: 99,
+                 actor_id: "user:local",
+                 idempotency_key: key
+               )
+
+      assert count(store.conn, "journal_entries") == before_entries
     end
   end
 
@@ -1520,6 +1976,47 @@ defmodule Kiln.WorkflowTest do
       assert {:error, %Error{code: code}} = Workflow.start_session(opts)
       assert code in [:integrity, :corrupt_result]
     end
+
+    test "a stored result with validly-formatted but incorrect values is rejected",
+         %{store: _store} do
+      # Commit a real start_session action so the rebuild boundary is real.
+      key = unique_idempotency_key()
+
+      opts = [
+        objective: "Correct one bounded defect",
+        criteria: ["The focused test passes"],
+        project_observation: observation(),
+        actor_id: "user:local",
+        idempotency_key: key
+      ]
+
+      assert {:ok, first} = Workflow.start_session(opts)
+      rebuild_digest = first.projection_digest
+
+      conn = Process.whereis(Kiln.Store.Connection)
+
+      # Replace the stored result with one that passes its own digest check
+      # (every field has the right Kiln identifier shape, the projection
+      # digest is recomputed against the new payload, the run state matches,
+      # and the revision is non-negative) but disagrees with the
+      # authoritative action boundary the rebuild produced. The replay
+      # validators must reject it.
+      __MODULE__.CorruptHelpers.replace_stored_result_with_correct_format(
+        %{conn: conn},
+        first.session_id,
+        %{
+          "session_id" => first.session_id,
+          "task_id" => "tsk_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "run_id" => "run_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "action_id" => "act_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "session_revision" => first.session_revision,
+          "run_state" => "ready",
+          "projection_digest" => rebuild_digest
+        }
+      )
+
+      assert {:error, %Error{code: :corrupt_result}} = Workflow.start_session(opts)
+    end
   end
 
   # ---- helpers ----
@@ -1660,6 +2157,13 @@ defmodule Kiln.WorkflowTest do
           d.session.id
       end
 
+    # Capture row counts AFTER the start has been committed and any
+    # transitions to reach the source state have run; the matrix assertion
+    # below is about the rejected operation specifically, not the setup.
+    before_entries = count(conn, "journal_entries")
+    before_commits = count(conn, "action_commits")
+    before_projections = count(conn, "session_projections")
+
     expected_revision = current_revision_for(session_id)
 
     args = [
@@ -1680,8 +2184,23 @@ defmodule Kiln.WorkflowTest do
                "expected #{op} from #{state} to succeed; got #{inspect(result)}"
 
       :error ->
+        # The capability matrix rejection must prove zero writes. The
+        # `before_*` counts were captured after the start (and any
+        # transitions needed to reach the source state) so we measure only
+        # the rejected operation.
         assert {:error, %Error{}} = result,
                "expected #{op} from #{state} to fail; got #{inspect(result)}"
+
+        conn = Process.whereis(Kiln.Store.Connection)
+
+        assert count(conn, "journal_entries") == before_entries,
+               "rejected #{op} from #{state} must not add journal entries"
+
+        assert count(conn, "action_commits") == before_commits,
+               "rejected #{op} from #{state} must not add action_commits"
+
+        assert count(conn, "session_projections") == before_projections,
+               "rejected #{op} from #{state} must not add session_projections"
     end
   end
 
@@ -1702,6 +2221,16 @@ defmodule Kiln.WorkflowTest do
       swap_stored_result(store, session_id, fn decoded ->
         Map.delete(decoded, field_to_key(field))
       end)
+    end
+
+    # Replaces the stored result with a fully-formed map (all identifier
+    # shapes are valid, the run state matches the operation, the projection
+    # digest is recomputed against the new payload) but whose identifier
+    # values disagree with the authoritative journal action boundary. The
+    # replay-boundary validators must reject this on the basis of the
+    # boundary mismatch even though the stored digest matches.
+    def replace_stored_result_with_correct_format(store, session_id, new_decoded) do
+      swap_stored_result(store, session_id, fn _decoded -> new_decoded end)
     end
 
     defp field_to_key(field) when is_atom(field), do: Atom.to_string(field)

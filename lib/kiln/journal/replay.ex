@@ -25,6 +25,17 @@ defmodule Kiln.Journal.Replay do
   alias Kiln.Projections.Session
   alias Kiln.Store.{Canonical, Connection}
 
+  @type action_boundary :: %{
+          action_id: String.t(),
+          idempotency_key: String.t(),
+          request_digest: String.t(),
+          first_sequence: non_neg_integer(),
+          last_sequence: non_neg_integer(),
+          expected_session_revision: non_neg_integer(),
+          first_revision: non_neg_integer(),
+          last_revision: non_neg_integer()
+        }
+
   @type report :: %{
           session_id: String.t() | nil,
           projection: Session.t() | nil,
@@ -34,7 +45,8 @@ defmodule Kiln.Journal.Replay do
           action_count: non_neg_integer(),
           entry_count: non_neg_integer(),
           projection_digest: String.t() | nil,
-          journal_head_digest: String.t() | nil
+          journal_head_digest: String.t() | nil,
+          action_boundary: action_boundary() | nil
         }
 
   @type block :: %{code: atom(), boundary: non_neg_integer() | nil, detail: map()}
@@ -333,7 +345,8 @@ defmodule Kiln.Journal.Replay do
       entries: 0,
       first_sequence: nil,
       last_sequence: nil,
-      head: []
+      head: [],
+      head_batch: nil
     }
 
     batches
@@ -357,7 +370,8 @@ defmodule Kiln.Journal.Replay do
             entries: acc.entries + length(batch.entries),
             first_sequence: acc.first_sequence || batch.first_sequence,
             last_sequence: batch.last_sequence,
-            head: head
+            head: head,
+            head_batch: batch
         }}}
     else
       {:error, _} = error -> {:halt, error}
@@ -473,6 +487,7 @@ defmodule Kiln.Journal.Replay do
 
   defp finish({:ok, acc}, session_id) do
     projection = Session.stamp(acc.projection, acc.prev_revision, acc.last_sequence)
+    boundary = boundary_from_batch(acc.head_batch)
 
     {:ok,
      %{
@@ -484,11 +499,31 @@ defmodule Kiln.Journal.Replay do
        action_count: acc.actions,
        entry_count: acc.entries,
        projection_digest: Session.digest(projection),
-       journal_head_digest: head_digest(acc.head)
+       journal_head_digest: head_digest(acc.head),
+       action_boundary: boundary
      }}
   end
 
   defp finish({:error, _} = error, _session_id), do: error
+
+  defp boundary_from_batch(%{
+         commit: commit,
+         first_sequence: first_sequence,
+         last_sequence: last_sequence,
+         first_revision: first_revision,
+         last_revision: last_revision
+       }) do
+    %{
+      action_id: commit.action_id,
+      idempotency_key: commit.idempotency_key,
+      request_digest: commit.request_digest,
+      first_sequence: first_sequence,
+      last_sequence: last_sequence,
+      expected_session_revision: commit.expected_session_revision,
+      first_revision: first_revision,
+      last_revision: last_revision
+    }
+  end
 
   defp empty_report(session_id) do
     %{
@@ -500,7 +535,8 @@ defmodule Kiln.Journal.Replay do
       action_count: 0,
       entry_count: 0,
       projection_digest: nil,
-      journal_head_digest: nil
+      journal_head_digest: nil,
+      action_boundary: nil
     }
   end
 
