@@ -6,6 +6,18 @@ Doctrine-Version: 1.0.0
 **Scope:** Planning, design, implementation, review, and verification decisions  
 **Authority boundary:** This doctrine does not authorize product scope, override accepted ADRs or invariants, or supersede an accepted work plan. It resolves choices that remain open inside those authorities.
 
+## Provenance and adoption
+
+**Upstream source:** `engineering/doctrine/ENGINEERING_DOCTRINE.md` in `project-arsenal` (`git@github.com:jenksed/project-arsenal.git`)  
+**Adopted at upstream commit:** `2e704fe1ef2dfd5142625c6987c04b9c4de6cea0`  
+**Tracked version:** the `Doctrine-Version` declared at the top of this file, which matches the upstream version at that commit
+
+Kiln adopts this doctrine from Project Arsenal instead of authoring it locally. The numbered principles, the decision heuristics, and the meta-principle below are adopted without local modification. The status, scope, authority boundary, and Kiln application guidance in this file are Kiln-local.
+
+Project Arsenal is reusable engineering material for building Kiln. It is not a Kiln runtime component, not a Kiln dependency, and it holds no authority over Kiln scope, ADRs, invariants, or the accepted work plan. Arsenal vocabulary is not Kiln domain vocabulary; Kiln domain terms come only from Kiln documents. An agent working in Kiln does not need to read Project Arsenal to apply this doctrine.
+
+Record intentional divergence from the upstream text in this section with its reason, and change the Doctrine-Version when upstream text is deliberately re-adopted. Undocumented drift is a defect.
+
 ## Applying this doctrine in Kiln
 
 Use the doctrine when a material engineering choice is still open after current scope, architecture, ADRs, invariants, and the accepted work plan are applied.

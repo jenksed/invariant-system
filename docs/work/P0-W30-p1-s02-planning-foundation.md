@@ -3,7 +3,7 @@
 **Document type:** Planning work package  
 **Status:** In progress  
 **Branch:** `work/p0-w30-p1-s02-planning-foundation`  
-**Base:** current P1-S01-T04 head pending merge  
+**Base:** merged P1-S01-T04 lineage, now contained in `main`  
 **Planning target:** P1-S02 Evidence-backed Single-Run Change Alpha plus QC0/QC1  
 **Implementation authorization:** None; this work package does not authorize P1-S02 implementation
 
@@ -15,7 +15,8 @@ This package has one planning objective: make the next authorization decision be
 
 ## Observed current state
 
-- P1-S01-T04 is implemented on PR #40 and is approaching merge.
+- P1-S01-T04 merged through pull request #40, and its final head is contained in `main`.
+- This branch was cut from an earlier P1-S01-T04 commit, so it does not yet contain the final T04 commits that reached `main`. The pull request still targets the merged `work/p1-s01-t04-foundation-cli` branch and must be retargeted to `main`, after this branch incorporates `main`, before normal review.
 - P1-S01-T05 remains the accepted final durable-foundation ticket and must produce the aggregate gate, restart demo, owner-machine Evidence, and P1-S01-V01.
 - P1-S02 is already named and scoped at the slice level in `docs/ROADMAP.md` and `docs/IMPLEMENTATION-SLICES.md`.
 - P1-S02 is explicitly planned but not authorized.
@@ -55,6 +56,7 @@ This package has one planning objective: make the next authorization decision be
 - **P0-W30-R08:** Keep all candidate P1-S02 ticket names, cuts, and sequencing explicitly provisional until a later authorization/adjudication step accepts them.
 - **P0-W30-R09:** Do not add product runtime code, dependencies, migrations, schemas, protocol implementations, Pack implementations, provider code, Commands, Artifacts, or tests for P1-S02.
 - **P0-W30-R10:** Require P1-S01-T05 Evidence to be consumed before any P1-S02 implementation authorization.
+- **P0-W30-R11:** Record the doctrine's upstream source, adopted commit, tracked version, and authority boundary inside `docs/ENGINEERING-DOCTRINE.md`, and enforce that record with an existing deterministic development check rather than prose convention alone.
 
 ## Doctrine application to this planning package
 
@@ -71,11 +73,12 @@ The most relevant doctrine principles are:
 
 ## Deliverables
 
-1. `docs/ENGINEERING-DOCTRINE.md`.
+1. `docs/ENGINEERING-DOCTRINE.md`, including its upstream provenance and adoption record.
 2. Root `CLAUDE.md` that delegates project authority to `AGENTS.md` and links the doctrine.
 3. A narrow `AGENTS.md` update that links the doctrine and states the current authorization boundary accurately.
 4. `docs/P1-S02-PLANNING-BASELINE.md` with the first planning decomposition and decision register.
-5. This work-package record.
+5. A `scripts/validate-agent-assets` check that keeps the doctrine version and provenance record present.
+6. This work-package record.
 
 ## Acceptance criteria
 
@@ -106,8 +109,14 @@ The most relevant doctrine principles are:
 - **P0-W30-AC05**
   - **Given** this branch diff
   - **When** it is compared with its base
-  - **Then** it contains only documentation, planning, and agent-entrypoint changes and no runtime implementation
+  - **Then** it contains only documentation, planning, agent-entrypoint, and development-agent validation changes, and no product runtime implementation
   - **Evidence:** exact branch compare
+
+- **P0-W30-AC06**
+  - **Given** the adopted Engineering Doctrine
+  - **When** `scripts/validate-agent-assets` runs
+  - **Then** it fails when the doctrine does not declare a semantic Doctrine-Version or does not record upstream provenance and adoption
+  - **Evidence:** `scripts/validate-agent-assets` output plus deliberate negative-case runs
 
 ## Verification
 
@@ -123,8 +132,10 @@ If the branch cannot run these locally in the authoring environment, the pull re
 
 A final review should also compare the branch against its exact base and confirm:
 
-- no source, dependency, migration, runtime Schema, or test files changed;
+- no product source, dependency, migration, runtime Schema, or test files changed;
+- the only executable change is the development-agent validation check for doctrine provenance;
 - doctrine links resolve;
+- the doctrine records its upstream source and adopted version;
 - P1-S02 remains explicitly unauthorized;
 - candidate ticket cuts are clearly provisional;
 - T05 remains the prerequisite closeout gate.
@@ -143,4 +154,4 @@ A final review should also compare the branch against its exact base and confirm
 
 **Result:** In progress
 
-The package is complete only after the doctrine, both entrypoint links, authorization reconciliation, P1-S02 planning baseline, and exact documentation-only branch review are present.
+The package is complete only after the doctrine and its provenance record, both entrypoint links, authorization reconciliation, the P1-S02 planning baseline, the doctrine provenance check, and an exact branch review that finds no product runtime change are present.

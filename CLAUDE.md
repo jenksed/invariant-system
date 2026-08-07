@@ -2,9 +2,11 @@
 
 This file is a concise entrypoint for Claude-based development in Kiln. It does not duplicate project authority.
 
+@AGENTS.md
+
 ## Start here
 
-1. Read `AGENTS.md` completely.
+1. Read `AGENTS.md` completely; Claude Code loads it through the `@AGENTS.md` import above.
 2. Read `docs/ENGINEERING-DOCTRINE.md` as the default engineering decision framework.
 3. Follow the authority order, current authorization boundary, branch discipline, verification requirements, and accepted work plan defined by `AGENTS.md`.
 4. Read the subject documents, ADRs, invariants, source, tests, and Evidence required by the current work package before making material changes.
