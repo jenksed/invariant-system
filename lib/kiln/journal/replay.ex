@@ -25,6 +25,17 @@ defmodule Kiln.Journal.Replay do
   alias Kiln.Projections.Session
   alias Kiln.Store.{Canonical, Connection}
 
+  @type action_boundary :: %{
+          action_id: String.t(),
+          idempotency_key: String.t(),
+          request_digest: String.t(),
+          first_sequence: non_neg_integer(),
+          last_sequence: non_neg_integer(),
+          expected_session_revision: non_neg_integer(),
+          first_revision: non_neg_integer(),
+          last_revision: non_neg_integer()
+        }
+
   @type report :: %{
           session_id: String.t() | nil,
           projection: Session.t() | nil,
@@ -34,7 +45,8 @@ defmodule Kiln.Journal.Replay do
           action_count: non_neg_integer(),
           entry_count: non_neg_integer(),
           projection_digest: String.t() | nil,
-          journal_head_digest: String.t() | nil
+          journal_head_digest: String.t() | nil,
+          action_boundary: action_boundary() | nil
         }
 
   @type block :: %{code: atom(), boundary: non_neg_integer() | nil, detail: map()}
@@ -72,6 +84,157 @@ defmodule Kiln.Journal.Replay do
          {:ok, batches} <- build_batches(entries, commits) do
       apply_batches(session_id, batches)
     end
+  end
+
+  @doc """
+  Rebuild the projection for `session_id` and return the snapshot taken
+  immediately after the batch whose `action_id` matches `target_action_id`.
+
+  The full Session journal is validated first: every batch and entry is
+  checked against its declared bounds, identifiers, digests, and accepted
+  schema. The journal must remain coherent end-to-end; a corrupt batch
+  after the target action still blocks the replay with an integrity
+  error, because trusting a partial journal would let a future
+  modification mask tampering with the target action itself.
+
+  On success, returns a report whose `projection`, `session_revision`,
+  `projection_digest`, and `action_boundary` describe the Session at the
+  target action's commit point — *not* the Session's current head. The
+  remaining report fields (`first_sequence`, `last_sequence`,
+  `action_count`, `entry_count`, `journal_head_digest`) describe the
+  full journal so callers can compare the target position to the head.
+
+  Returns:
+
+    * `{:ok, report}` when the full journal validates and the target
+      action exists.
+    * `{:error, %{code: :target_action_not_found, ...}}` when the target
+      action_id is not present in the Session's `action_commits`.
+    * `{:error, block}` for any other replay failure.
+  """
+  @spec rebuild_for_action(Connection.conn(), String.t(), String.t()) ::
+          {:ok, report()} | {:error, block() | %{code: atom(), detail: map()}}
+  def rebuild_for_action(conn, session_id, target_action_id) do
+    entries = load_entries(conn, session_id)
+    commits = load_commits(conn, session_id)
+
+    with :ok <- validate_numeric(entries, commits),
+         {:ok, batches} <- build_batches(entries, commits),
+         {:ok, acc} <- apply_batches_with_snapshots(session_id, batches),
+         {:ok, snapshot} <- pick_snapshot(acc, target_action_id) do
+      {:ok, build_report(session_id, acc, snapshot)}
+    end
+  end
+
+  defp apply_batches_with_snapshots(session_id, batches) do
+    initial = %{
+      projection: nil,
+      prev_revision: nil,
+      prev_sequence: nil,
+      actions: 0,
+      entries: 0,
+      first_sequence: nil,
+      last_sequence: nil,
+      head: [],
+      head_batch: nil,
+      snapshots: []
+    }
+
+    batches
+    |> Enum.reduce_while({:ok, initial}, fn batch, acc ->
+      apply_batch_with_snapshot(session_id, batch, acc)
+    end)
+    |> case do
+      {:ok, acc} -> {:ok, acc}
+      {:error, _} = error -> error
+    end
+  end
+
+  defp apply_batch_with_snapshot(session_id, batch, {:ok, acc}) do
+    with :ok <- check_batch_revision(batch, acc.prev_revision),
+         :ok <- check_batch_sequence(batch, acc.prev_sequence),
+         {:ok, projection, head} <-
+           reduce_batch(session_id, acc.projection, batch.entries, acc.head) do
+      # Stamp the projection with this batch's commit revision and last
+      # sequence so its digest matches the digest the journal computed when
+      # it wrote the action_commits row. The journal stamps the projection
+      # at commit time; the snapshot must use the same shape or the
+      # replay-boundary digest comparison will spuriously fail.
+      stamped = Session.stamp(projection, batch.last_revision, batch.last_sequence)
+
+      snapshot = %{
+        action_id: batch.commit.action_id,
+        projection: stamped,
+        session_revision: batch.last_revision,
+        last_sequence: batch.last_sequence,
+        first_sequence: batch.first_sequence,
+        boundary: boundary_from_batch(batch)
+      }
+
+      {:cont,
+       {:ok,
+        %{
+          acc
+          | projection: projection,
+            prev_revision: batch.last_revision,
+            prev_sequence: batch.last_sequence,
+            actions: acc.actions + 1,
+            entries: acc.entries + length(batch.entries),
+            first_sequence: acc.first_sequence || batch.first_sequence,
+            last_sequence: batch.last_sequence,
+            head: head,
+            head_batch: batch,
+            snapshots: [snapshot | acc.snapshots]
+        }}}
+    else
+      {:error, _} = error -> {:halt, error}
+    end
+  end
+
+  defp pick_snapshot(acc, target_action_id) do
+    # Snapshots are accumulated head-first; the target action may be at any
+    # position, so search the full list. The list is bounded by the number
+    # of action_commits rows in the Session, so the search cost is O(N) in
+    # action count, never in journal row count.
+    case Enum.find(acc.snapshots, fn snap -> snap.action_id == target_action_id end) do
+      nil ->
+        {:error,
+         %{
+           code: :target_action_not_found,
+           detail: %{
+             session_id: get_session_id_from_acc(acc),
+             target_action_id: target_action_id
+           }
+         }}
+
+      snapshot ->
+        {:ok, snapshot}
+    end
+  end
+
+  defp get_session_id_from_acc(_acc), do: nil
+
+  defp build_report(session_id, acc, snapshot) do
+    head_projection = Session.stamp(acc.projection, acc.prev_revision, acc.last_sequence)
+
+    %{
+      session_id: session_id,
+      # The target-action projection is what callers (replay-boundary
+      # validators) need to compare against the stored application result.
+      # The head projection is exposed as a secondary view so callers can
+      # observe how the Session has advanced since the target action.
+      projection: snapshot.projection,
+      head_projection: head_projection,
+      session_revision: snapshot.session_revision,
+      first_sequence: acc.first_sequence,
+      last_sequence: acc.last_sequence,
+      action_count: acc.actions,
+      entry_count: acc.entries,
+      projection_digest: Session.digest(snapshot.projection),
+      head_projection_digest: Session.digest(head_projection),
+      journal_head_digest: head_digest(acc.head),
+      action_boundary: snapshot.boundary
+    }
   end
 
   # Every persisted revision and sequence used in arithmetic or ordering must be
@@ -333,7 +496,8 @@ defmodule Kiln.Journal.Replay do
       entries: 0,
       first_sequence: nil,
       last_sequence: nil,
-      head: []
+      head: [],
+      head_batch: nil
     }
 
     batches
@@ -357,7 +521,8 @@ defmodule Kiln.Journal.Replay do
             entries: acc.entries + length(batch.entries),
             first_sequence: acc.first_sequence || batch.first_sequence,
             last_sequence: batch.last_sequence,
-            head: head
+            head: head,
+            head_batch: batch
         }}}
     else
       {:error, _} = error -> {:halt, error}
@@ -473,6 +638,7 @@ defmodule Kiln.Journal.Replay do
 
   defp finish({:ok, acc}, session_id) do
     projection = Session.stamp(acc.projection, acc.prev_revision, acc.last_sequence)
+    boundary = boundary_from_batch(acc.head_batch)
 
     {:ok,
      %{
@@ -484,11 +650,31 @@ defmodule Kiln.Journal.Replay do
        action_count: acc.actions,
        entry_count: acc.entries,
        projection_digest: Session.digest(projection),
-       journal_head_digest: head_digest(acc.head)
+       journal_head_digest: head_digest(acc.head),
+       action_boundary: boundary
      }}
   end
 
   defp finish({:error, _} = error, _session_id), do: error
+
+  defp boundary_from_batch(%{
+         commit: commit,
+         first_sequence: first_sequence,
+         last_sequence: last_sequence,
+         first_revision: first_revision,
+         last_revision: last_revision
+       }) do
+    %{
+      action_id: commit.action_id,
+      idempotency_key: commit.idempotency_key,
+      request_digest: commit.request_digest,
+      first_sequence: first_sequence,
+      last_sequence: last_sequence,
+      expected_session_revision: commit.expected_session_revision,
+      first_revision: first_revision,
+      last_revision: last_revision
+    }
+  end
 
   defp empty_report(session_id) do
     %{
@@ -500,7 +686,8 @@ defmodule Kiln.Journal.Replay do
       action_count: 0,
       entry_count: 0,
       projection_digest: nil,
-      journal_head_digest: nil
+      journal_head_digest: nil,
+      action_boundary: nil
     }
   end
 

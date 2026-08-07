@@ -37,6 +37,108 @@ defmodule Kiln.Store.Journal do
         }
 
   @doc """
+  Classify an idempotency key as `:none`, `{:replay, ...}`, `{:conflict, ...}`,
+  or `{:error, %Error{}}` using the stored action boundary and the authoritative
+  Session journal.
+
+  This helper is the single authority used by both the workflow's pre-lookup
+  (`lookup_commit/3`) and the in-transaction duplicate handler in `commit/4`.
+  A `{:replay, ...}` outcome is returned only after the stored `session_id`'s
+  journal is rebuilt and validates, so a stored application result can never
+  be replayed over a deleted, corrupt, or truncated authoritative journal.
+
+  `request_digest` is the digest the caller computed from its own request
+  attributes; the stored digest is what the journal actually accepted.
+
+  Runs in its own `BEGIN IMMEDIATE` transaction when called outside another
+  transaction so the lookup and the journal replay share one consistent view.
+  Inside `commit/4` the caller passes the active transaction.
+  """
+  @spec classify_commit(Connection.conn(), String.t(), String.t()) ::
+          :none
+          | {:replay, replay()}
+          | {:conflict, Error.t()}
+          | {:error, Error.t()}
+  def classify_commit(conn, idempotency_key, request_digest) do
+    Connection.transaction(conn, fn tx ->
+      do_classify(tx, idempotency_key, request_digest)
+    end)
+    |> normalize_classify_outcome()
+  rescue
+    # A raised `Connection.query!` or any other exception inside the
+    # classifier must not escape into the public workflow functions;
+    # the same operational-error treatment `commit/4` already uses
+    # applies here, so callers see one error envelope shape.
+    exception ->
+      {:error, transaction_error(Exception.message(exception))}
+  end
+
+  # `classify_commit` is invoked both with a fresh transaction and from within
+  # `commit/4`'s transaction. `Connection.transaction/2` returns the bare value
+  # when not nested, but DBConnection's nested mode returns `{:ok, value}` or
+  # `{:error, reason}`. Normalize both shapes so callers see one shape. Any
+  # reason that is not already a `%Kiln.Store.Error{}` is wrapped in one so
+  # the public contract always returns an error envelope.
+  defp normalize_classify_outcome({:ok, value}), do: value
+
+  defp normalize_classify_outcome({:error, %Error{} = error}), do: {:error, error}
+
+  defp normalize_classify_outcome({:error, reason}) do
+    {:error,
+     Error.new(
+       :unknown,
+       :transaction_failed,
+       "the classify transaction did not commit",
+       %{reason: inspect(reason)}
+     )}
+  end
+
+  @typedoc "Validated stored commit returned to a successful replay caller."
+  @type replay :: %{
+          session_id: String.t(),
+          action_id: String.t(),
+          request_digest: String.t(),
+          result_schema: String.t(),
+          result: map(),
+          boundary: Replay.action_boundary() | nil,
+          rebuild_digest: String.t() | nil,
+          target_projection: map() | nil
+        }
+
+  @doc """
+  Look up an existing commit by `idempotency_key` alone.
+
+  Returns:
+
+    * `{:ok, replay}` — a stored commit whose request digest matches and whose
+      authoritative Session journal validates. `replay.session_id` is the
+      stored Session, never a freshly generated one. `replay.result` is the
+      decoded application result.
+    * `:none` — no commit exists for the supplied key.
+    * `{:error, %Error{code: :idempotency_conflict}}` — the stored digest differs.
+    * `{:error, %Error{code: :corrupt_result}}` — the stored result fails its
+      recorded result_digest.
+    * `{:error, %Error{class: :integrity, code: :journal_invalid}}` — the
+      authoritative journal for the stored `session_id` is missing, corrupt,
+      truncated, or inconsistent.
+
+  The caller uses this to short-circuit a transition validation when a prior
+  commit already accepted the same request. `commit/4` performs the same
+  classification inside its own `BEGIN IMMEDIATE` transaction so a check/use
+  race cannot interleave between the lookup and the eventual write.
+  """
+  @spec lookup_commit(Connection.conn(), String.t(), String.t()) ::
+          {:ok, replay()} | :none | {:error, Error.t()}
+  def lookup_commit(conn, idempotency_key, request_digest) do
+    case classify_commit(conn, idempotency_key, request_digest) do
+      :none -> :none
+      {:replay, replay} -> {:ok, replay}
+      {:conflict, %Error{} = error} -> {:error, error}
+      {:error, %Error{} = error} -> {:error, error}
+    end
+  end
+
+  @doc """
   Commit `action` with its `entries` in one immediate transaction.
 
   Options: `:result` (application result map, default `%{}`), `:result_schema`,
@@ -52,21 +154,27 @@ defmodule Kiln.Store.Journal do
 
     outcome =
       Connection.transaction(conn, fn tx ->
-        case existing_commit(tx, action) do
-          {:replay, stored} ->
-            # A duplicate replay must validate the stored action boundary
-            # against the authoritative journal before returning the prior
-            # result, so a deleted or corrupt journal cannot masquerade as
-            # accepted recorded truth (R04). The replay still happens before
-            # any regenerated caller entries are decoded, so a valid duplicate
-            # never fails on caller-entry shape.
-            replay_boundary_valid?(tx, action, stored)
+        case classify_in_transaction(tx, action) do
+          {:replay, replay} ->
+            # The classifier already validated the stored action boundary
+            # against the authoritative journal, so a deleted or corrupt
+            # journal cannot masquerade as accepted recorded truth (R04).
+            # The replay uses the stored session_id (carried in `replay`),
+            # so a retry's freshly generated session identifier cannot
+            # collide with the original.
+            {:replayed, replay}
 
           {:conflict, _} ->
             DBConnection.rollback(tx, {:idempotency_conflict})
 
-          {:corrupt_result, error} ->
+          {:error, %Error{class: :integrity, code: :corrupt_result} = error} ->
             DBConnection.rollback(tx, {:corrupt_result, error})
+
+          {:error, %Error{class: :integrity, code: :journal_invalid} = error} ->
+            DBConnection.rollback(tx, {:journal_invalid, error})
+
+          {:error, %Error{} = error} ->
+            DBConnection.rollback(tx, {:transaction_failed, error})
 
           :none ->
             commit_new(tx, action, entries, result_map, result_schema, now, opts)
@@ -75,13 +183,14 @@ defmodule Kiln.Store.Journal do
 
     case outcome do
       {:ok, {:committed, data}} -> {:ok, data}
-      {:ok, {:replayed, stored}} -> {:ok, replayed_result(stored)}
+      {:ok, {:replayed, replay}} -> {:ok, replayed_result(replay)}
       {:error, {:idempotency_conflict}} -> {:error, conflict_error(action)}
       {:error, {:invalid_entry, error}} -> {:error, error}
       {:error, {:corrupt_result, error}} -> {:error, error}
       {:error, {:cache_corrupt, error}} -> {:error, error}
       {:error, {:cache_invalid_metadata, error}} -> {:error, error}
       {:error, {:journal_invalid, error}} -> {:error, error}
+      {:error, {:transaction_failed, %Error{} = error}} -> {:error, error}
       {:error, {:stale, current}} -> {:error, stale_error(action, current)}
       {:error, reason} -> {:error, transaction_error(reason)}
     end
@@ -180,12 +289,22 @@ defmodule Kiln.Store.Journal do
       {:ok, projection} ->
         upsert_projection(tx, action.session_id, projection, now)
 
+        # Stamp the freshly computed revision and projection digest into
+        # the stored application result so an idempotent replay returns
+        # both verbatim instead of the placeholder values. The result_map
+        # keys are atom-keyed; the canonical encoder accepts both atom
+        # and string keys, so the same JSON is produced regardless.
+        result_with_truth =
+          result_map
+          |> Map.put(:session_revision, new_revision)
+          |> Map.put(:projection_digest, Session.digest(projection))
+
         write_action_commit(
           tx,
           action,
           first_sequence,
           last_sequence,
-          result_map,
+          result_with_truth,
           result_schema,
           now
         )
@@ -198,7 +317,7 @@ defmodule Kiln.Store.Journal do
            session_revision: new_revision,
            last_sequence: last_sequence,
            projection: projection,
-           result: result_map
+           result: result_with_truth
          }}
 
       {:error, %{code: code, detail: detail}} ->
@@ -209,29 +328,129 @@ defmodule Kiln.Store.Journal do
     end
   end
 
-  defp existing_commit(tx, action) do
+  # Idempotency lookup is performed by `idempotency_key` alone (the JSON
+  # `action_commits` table enforces global uniqueness on
+  # `idempotency_key`). The stored `session_id` is returned so the caller can
+  # perform the replay-boundary validation against the original session
+  # rather than the retry's freshly generated one. The retry's `session_id`
+  # is not part of the lookup key, so a `start_session` retry that has not
+  # yet resolved the original `session_id` can still find the prior commit
+  # (P1-S01-T06).
+  defp read_commit(tx, idempotency_key) do
     case Connection.query!(
            tx,
-           "SELECT request_digest, result_schema, result, result_digest FROM action_commits WHERE session_id = ?1 AND idempotency_key = ?2",
-           [action.session_id, action.idempotency_key]
+           """
+           SELECT action_id, session_id, request_digest, result_schema, result, result_digest
+           FROM action_commits
+           WHERE idempotency_key = ?1
+           """,
+           [idempotency_key]
          ) do
       [] ->
         :none
 
-      [[digest, result_schema, result, result_digest]] ->
-        cond do
-          digest != action.request_digest ->
-            {:conflict, digest}
+      [[action_id, session_id, request_digest, result_schema, result, result_digest]] ->
+        case safe_decode(result) do
+          {:ok, decoded} ->
+            {:found,
+             %{
+               action_id: action_id,
+               session_id: session_id,
+               request_digest: request_digest,
+               result_schema: result_schema,
+               result: decoded,
+               result_digest: result_digest
+             }}
 
-          not valid_stored_result?(result_schema, result, result_digest) ->
-            {:corrupt_result,
-             Error.new(:integrity, :corrupt_result, "stored idempotency result is corrupt", %{
-               session_id: action.session_id,
-               idempotency_key: action.idempotency_key
-             })}
+          :error ->
+            # Treat an unparseable stored result as corrupt; never silently
+            # accept an undecodable replay.
+            {:found,
+             %{
+               action_id: action_id,
+               session_id: session_id,
+               request_digest: request_digest,
+               result_schema: result_schema,
+               result: nil,
+               result_digest: result_digest,
+               result_unparseable: true
+             }}
+        end
+    end
+  end
+
+  defp valid_stored_result?(%{result_unparseable: true}), do: false
+
+  defp valid_stored_result?(commit) do
+    is_map(commit.result) and
+      Canonical.digest(commit.result_schema, commit.result) == commit.result_digest
+  end
+
+  defp commit_to_replay(commit, report) do
+    %{
+      session_id: commit.session_id,
+      action_id: commit.action_id,
+      request_digest: commit.request_digest,
+      result_schema: commit.result_schema,
+      result: commit.result,
+      boundary: report.action_boundary,
+      rebuild_digest: report.projection_digest,
+      target_projection: report.projection
+    }
+  end
+
+  # In-transaction classifier used by `commit/4`. Delegates to `do_classify/3`
+  # so both the pre-lookup (`classify_commit/3`) and the in-transaction paths
+  # share one classifier implementation. The `commit/4` plumbing maps the
+  # canonical `{:conflict, _}` and `{:error, _}` shapes to the legacy
+  # `:corrupt_result` and `{:journal_invalid, _}` rollback tuples it has
+  # always emitted, so existing behavior is preserved.
+  defp classify_in_transaction(tx, action) do
+    do_classify(tx, action.idempotency_key, action.request_digest)
+  end
+
+  # Single classification algorithm. Runs against either a fresh
+  # `Connection.transaction` (in `classify_commit/3`) or the active transaction
+  # inside `commit/4`. Returns one of:
+  #
+  #   `:none` — no commit exists for the supplied key.
+  #   `{:replay, replay}` — a stored commit whose request digest matches and
+  #     whose authoritative Session journal validates. `replay.session_id` is
+  #     the stored Session, never a freshly generated one.
+  #   `{:conflict, %Error{}}` — the stored digest differs from the request.
+  #   `{:error, %Error{}}` — the stored result fails its recorded
+  #     result_digest, or the authoritative journal for the stored session_id
+  #     is missing, corrupt, truncated, or inconsistent.
+  defp do_classify(tx, idempotency_key, request_digest) do
+    case read_commit(tx, idempotency_key) do
+      :none ->
+        :none
+
+      {:found, commit} ->
+        cond do
+          commit.request_digest != request_digest ->
+            {:conflict, idempotency_conflict_error(commit, idempotency_key, request_digest)}
+
+          not valid_stored_result?(commit) ->
+            {:error,
+             Error.new(
+               :integrity,
+               :corrupt_result,
+               "stored idempotency result is corrupt",
+               %{
+                 idempotency_key: idempotency_key,
+                 session_id: commit.session_id
+               }
+             )}
 
           true ->
-            {:replay, %{result_schema: result_schema, result: result}}
+            case replay_boundary_valid?(tx, commit.session_id, commit.action_id) do
+              {:ok, report} ->
+                {:replay, commit_to_replay(commit, report)}
+
+              {:error, %Error{} = error} ->
+                {:error, error}
+            end
         end
     end
   end
@@ -240,36 +459,38 @@ defmodule Kiln.Store.Journal do
   # Validate the authoritative Session journal before returning it, so a duplicate
   # request cannot succeed after its journal rows have been deleted or corrupted.
   # This runs inside the same `BEGIN IMMEDIATE` transaction as the replay lookup
-  # so a concurrent tamper cannot interleave between the two reads.
-  defp replay_boundary_valid?(tx, action, stored) do
-    case Replay.rebuild(tx, action.session_id) do
-      {:ok, _report} ->
-        {:replayed, stored}
+  # so a concurrent tamper cannot interleave between the two reads. The
+  # replay-boundary check uses the stored `session_id` and `action_id` so the
+  # replay returns the projection and boundary *at the target action's commit
+  # point*, not the Session's current head. A retry of a start action that
+  # happened before a later resume or cancel must replay the start action's
+  # original revision and projection digest, not the head's.
+  defp replay_boundary_valid?(tx, session_id, action_id) do
+    case Replay.rebuild_for_action(tx, session_id, action_id) do
+      {:ok, report} ->
+        {:ok, report}
+
+      {:error, %{code: :target_action_not_found, detail: detail}} ->
+        {:error,
+         Error.new(
+           :integrity,
+           :target_action_not_found,
+           "stored action_id is not present in the authoritative journal",
+           Map.put(detail, :session_id, session_id)
+         )}
 
       {:error, block} ->
-        DBConnection.rollback(
-          tx,
-          {:journal_invalid,
-           Error.new(
-             :integrity,
-             :journal_invalid,
-             "duplicate replay found the stored action boundary invalid",
-             %{
-               session_id: action.session_id,
-               idempotency_key: action.idempotency_key,
-               block: block
-             }
-           )}
-        )
-    end
-  end
-
-  # A stored idempotency result must decode and match its recorded digest before
-  # it is replayed, so corrupt durable result data cannot crash or mislead.
-  defp valid_stored_result?(result_schema, result, result_digest) do
-    case safe_decode(result) do
-      {:ok, decoded} -> Canonical.digest(result_schema, decoded) == result_digest
-      :error -> false
+        {:error,
+         Error.new(
+           :integrity,
+           :journal_invalid,
+           "duplicate replay found the stored action boundary invalid",
+           %{
+             session_id: session_id,
+             action_id: action_id,
+             block: block
+           }
+         )}
     end
   end
 
@@ -533,13 +754,25 @@ defmodule Kiln.Store.Journal do
     )
   end
 
-  defp replayed_result(%{result: result_json}) do
+  defp replayed_result(%{
+         result: decoded,
+         result_schema: result_schema,
+         session_id: session_id,
+         boundary: boundary,
+         rebuild_digest: rebuild_digest,
+         target_projection: target_projection
+       }) do
     %{
       status: :replayed,
+      session_id: session_id,
       session_revision: nil,
       last_sequence: nil,
       projection: nil,
-      result: JSON.decode!(result_json)
+      result: decoded,
+      result_schema: result_schema,
+      boundary: boundary,
+      rebuild_digest: rebuild_digest,
+      target_projection: target_projection
     }
   end
 
@@ -558,6 +791,20 @@ defmodule Kiln.Store.Journal do
       %{
         idempotency_key: action.idempotency_key,
         session_id: action.session_id
+      }
+    )
+  end
+
+  defp idempotency_conflict_error(commit, idempotency_key, request_digest) do
+    Error.new(
+      :idempotency_conflict,
+      :idempotency_conflict,
+      "idempotency key reused with a different request",
+      %{
+        idempotency_key: idempotency_key,
+        stored_request_digest: commit.request_digest,
+        submitted_request_digest: request_digest,
+        stored_session_id: commit.session_id
       }
     )
   end
