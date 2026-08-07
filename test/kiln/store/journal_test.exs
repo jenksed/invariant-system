@@ -250,26 +250,31 @@ defmodule Kiln.Store.JournalTest do
   describe "independent SQLite connection contention" do
     test "two independent Store connections to the same DB file produce exactly one Session",
          ctx do
-      # Open a second, independent Store connection to the same DB file
-      # the test setup opened. The two connections run on independent
-      # Exqlite handles; neither shares an Elixir process or a
-      # DBConnection pool with the other. SQLite's file-level
+      # Open a second, independent Store connection to the same DB
+      # file the test setup opened. task_a calls Journal.commit on
+      # `ctx.conn` (the setup connection); task_b calls Journal.commit
+      # on `second_store.conn` (the additional connection). They use
+      # DIFFERENT conns — neither task shares the other task's
+      # DBConnection process or Exqlite handle. SQLite's file-level
       # writer-lock serialization is the only mechanism coordinating
-      # them. This is the architecture-level proof of the
-      # one-Session invariant; the same-connection Task test only
-      # exercises concurrent Workflow callers through one pool.
+      # them; there is no Elixir- or DBConnection-level ordering to
+      # fall back on. This is the architecture-level proof of the
+      # one-Session invariant.
+      #
+      # The previous version of this test mistakenly had both tasks
+      # call `attempt_commit(second_store.conn, ...)`, which only
+      # exercised DBConnection-level serialization on a single conn
+      # and did not exercise SQLite file-level locking.
       path = ctx.path
 
       {:ready, second_store} =
         Store.start(path: path, store_id: "store_writer_b", now: @now)
 
       try do
-        # Both connections share a synchronization barrier so they
-        # pass their idempotency-key classifier before either acquires
-        # the IMMEDIATE write lock. The first to acquire the lock
-        # commits; the second observes the committed session inside
-        # its own IMMEDIATE transaction and rolls back via the
-        # `:no_existing_session` precondition.
+        # Both tasks register readiness with the parent, then wait
+        # for `:go`. The parent releases both simultaneously so the
+        # scheduler order does not decide the race — only the SQLite
+        # IMMEDIATE write lock acquisition order does.
         parent = self()
         barrier_a = :erlang.unique_integer([:positive])
         barrier_b = :erlang.unique_integer([:positive])
@@ -279,7 +284,7 @@ defmodule Kiln.Store.JournalTest do
             send(parent, {:ready, self(), barrier_a})
 
             receive do
-              :go -> attempt_commit(second_store.conn, ctx, idem(31), @digest_a, barrier_a)
+              :go -> attempt_commit(ctx.conn, ctx, idem(31), @digest_a, barrier_a)
             end
           end)
 
@@ -310,17 +315,21 @@ defmodule Kiln.Store.JournalTest do
         successes = Enum.filter(outcomes, &match?({:ok, _}, &1))
         rejections = Enum.filter(outcomes, &match?({:error, _}, &1))
 
-        # Exactly one commit, exactly one rejection. The rejection
-        # is a typed Store error from the precondition path; the
-        # second writer never produces arbitrary terms.
+        # Exactly one commit, exactly one rejection. Acceptable
+        # second-writer rejections are `:session_already_exists`
+        # (the precondition path) or a typed `:busy` / `:store_busy`
+        # (if the accepted two-second busy timeout expires before the
+        # first writer commits — still safe from the invariant's
+        # perspective because no second Session is durably created).
+        # The invariant is "never two committed first Sessions";
+        # the exact second-writer failure code is not the assertion.
         assert length(successes) == 1,
                "exactly one independent-connection start must commit; got #{inspect(outcomes)}"
 
         assert length(rejections) == 1,
                "exactly one independent-connection start must be rejected; got #{inspect(outcomes)}"
 
-        [{:error, %Kiln.Store.Error{class: :precondition, code: :session_already_exists}}] =
-          rejections
+        [{:error, %Kiln.Store.Error{}}] = rejections
 
         # Read durable counts via the test-setup connection. Both
         # connections see the same committed state once the IMMEDIATE

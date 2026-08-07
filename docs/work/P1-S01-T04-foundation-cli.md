@@ -106,7 +106,10 @@ Denied:
 | `lib/kiln/cli/error_map.ex` | single-source mapping from every `%Kiln.Domain.Error{}` code to `(status, exit_code)` | Implemented |
 | `lib/mix/tasks/kiln.ex` | source-development `mix kiln` entry point | Implemented |
 | `test/kiln/cli/` | parser, dispatch, output, exit, and unsupported-command tests; new `runtime_bootstrap_test.exs` and `error_map_test.exs` | Implemented |
-| `lib/kiln/workflow.ex` | added `current_session/0` for single-Session resolution; expanded `query_result` shape with `journal_head_digest`, `orphaned`, and `session_id` | Implemented |
+| `lib/kiln/workflow.ex` | added `current_session/0` for single-Session resolution; expanded `query_result` shape with `journal_head_digest`, `orphaned`, and `session_id`; `capability_for/1` collapses effective-orphaned Sessions to `[]`; `classify_error/1` translates `Kiln.Store.Error` to `Kiln.Domain.Error`; passes the `:no_existing_session` precondition into `Journal.commit` | Implemented |
+| `lib/kiln/store/error.ex` | gains a `:precondition` class as the narrow T02 Store-error vocabulary extension for transaction-level precondition rejections | Implemented |
+| `lib/kiln/store/journal.ex` | accepts the Store-owned precondition atoms `:no_existing_session` and `nil`; rejects unsupported precondition atoms before any transaction opens with `Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}`; evaluates the precondition inside the existing `BEGIN IMMEDIATE` transaction; precondition failure raises a typed `%Kiln.Store.Error{}` so the Store error contract is never violated by an arbitrary caller term | Implemented |
+| `test/kiln/store/journal_test.exs` | direct Store tests for `:no_existing_session` precondition (fresh commit succeeds, second distinct key rolls back with the Store error and zero writes, same idempotency key still replays, unsupported atom is rejected with the typed Store error, nil is equivalent to omission); `independent SQLite connection contention` describe block exercises SQLite file-level writer-lock serialization across two Exqlite handles (task_a calls `Journal.commit` on `ctx.conn`, task_b calls it on `second_store.conn`) | Implemented |
 
 JSON output uses the Elixir 1.20 stdlib `JSON` module. No JSON dependency is added.
 
@@ -241,64 +244,53 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
 | `scripts/test-agent-preflight` | pass | local sandbox run, 2026-08-07 |
-| `python3 scripts/validate_first_month_contracts.py` | pass | local sandbox run, 2026-08-07 |
-| `python3 scripts/validate_json_schema_contracts.py` | pass | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_first_month_contracts.py` | pass (10 positive / 11 negative) | local sandbox run, 2026-08-07 |
+| `python3 scripts/validate_json_schema_contracts.py` | pass (10 positive / 8 schema-rejected / 3 semantic-only) | local sandbox run, 2026-08-07 |
 | `scripts/validate-agent-assets` | pass | local sandbox run, 2026-08-07 |
-| `vale --glob='!{deps,_build}/**' .` | pass | local sandbox run, 2026-08-07 |
+| `vale --glob='!{deps,_build}/**' .` | pass (0 errors / 0 warnings / 0 suggestions) | local sandbox run, 2026-08-07 |
 | `mix format --check-formatted` | pass | local sandbox run, 2026-08-07 |
 | `mix compile --warnings-as-errors` | pass | local sandbox run, 2026-08-07 |
-| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass | local sandbox run, 2026-08-07 |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | pass (no cycles) | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/store/journal_test.exs` | 14 passed | local sandbox run, 2026-08-07 |
 | `mix test test/kiln/operation_lifecycle_parity_test.exs` | 5 passed | local sandbox run, 2026-08-07 |
-| `mix test test/kiln/cli` | 34 passed | local sandbox run, 2026-08-07 |
-| `mix test` | 345 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/workflow_test.exs` | 91 passed | local sandbox run, 2026-08-07 |
+| `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
+| `mix test` | 351 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on final corrected head | success | GitHub Actions run 31199247425 on commit f3fe050 |
-| GitHub Actions `prose` job on final corrected head | success | GitHub Actions run 31199247425 on commit f3fe050 |
+| GitHub Actions `test` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
+| GitHub Actions `prose` job on final head | success | GitHub Actions run 31206737852 on commit a6b6c6a |
 | Historical exact-head CI runs preserved for provenance: | | |
-| GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded by f3fe050 |
-| GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9) | superseded by f3fe050 |
+| GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
+| GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
+| GitHub Actions run 31199247425 on commit f3fe050 | (historical, I1–I5 closure) | superseded |
+| GitHub Actions run 31199785234 on commit 35cb2c3 | (historical, baseline at start of I6–I8) | superseded |
+| GitHub Actions run 31206150176 on commit 2ede2b8 | (historical, I6–I8 code-bearing head) | superseded by 31206737852 |
 
 ### Demo and slice status
 
 - Ticket demo contribution: Implemented locally; aggregate owner-machine demo is T05
 - Parent slice gate affected: P1-S01-G08 and G11
-- Slice verification manifest updated: Yes (the F1–F9 corrections and I1–I5 closure pass are owned by T04, not T05)
-- Slice completion claimed: Yes — verified on final corrected head `f3fe050` by GitHub Actions run `31199247425`
+- Slice verification manifest updated: Yes (the F1–F9, I1–I5, and I6–I8 closure passes are owned by T04, not T05)
+- Slice completion claimed: Yes — verified on final head `a6b6c6a` by GitHub Actions run `31206737852`
 
 ### Failures and warnings
 
-- Pre-correction "Verified" claim is downgraded to "historical" — superseded by exact-head CI on `f3fe050`.
 - This is a source-development entry point, not the delivered release.
-- The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
-- The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
-- The F1–F5, F6–F9, and I1–I5 correction passes landed sequentially on the same branch and PR.
-
-### Remaining unknowns and exclusions
-
-- Aggregate owner-machine demo of the foundation CLI is T05.
-- The orphan-capability authority is now correctly enforced at the Workflow boundary (I1); the previously documented "Workflow/Restart orphan classification tension" is closed for the T04 surface. A future Workflow/Restart reconciliation ticket may further tighten the orphan-flag / run-state semantics for non-T04 consumers.
-- The T04 `resume` command is permanently guidance-only (R07); the deferred Workflow `Workflow.resume_session/2` mutation is not exposed as an executable CLI command and would belong to a future ticket.
-- No additional architecture changes are required to merge.
-
-### Failures and warnings
-
-- Pre-correction "Verified" claim is downgraded until the corrected head has a green GitHub Actions run.
-- This is a source-development entry point, not the delivered release.
-- The previous pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag `archive/pr40-pre-workflow` and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
-- The dispatcher rewrite landed as a `--force-with-lease` push onto the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40). No new PR was opened.
-- The F1–F5 and F6–F9 correction passes are queued behind a fresh `--force-with-lease` push on the same branch and PR.
+- The pre-T06 remote head (`b15aaaa5d5634f72984da4877ae1b7a07f0d6b86`) was archived as tag and branch `archive/pr40-pre-workflow` before the rewrite commits landed.
+- The dispatcher rewrite and every subsequent F1–F9, I1–I5, and I6–I8 closure pass landed on the same branch (`work/p1-s01-t04-foundation-cli`) and PR (#40) without `--force-with-lease` after the initial rewrite. No new PR was opened.
 
 ### Remaining unknowns and exclusions
 
 - Aggregate owner-machine demo of the foundation CLI is T05.
 - The Workflow/Restart orphan classification tension (a Session with `orphaned: true` per `Workflow.orphaned?/1` but with `run.state == :running`) is closed for the T04 surface: `Kiln.Workflow.capability_for/1` collapses the capability matrix to `[]` for any effectively-orphaned projection regardless of the underlying Run state. A future Workflow/Restart reconciliation ticket could tighten the orphan-flag / run-state semantics for non-T04 consumers; that work is not required for the T04 contract.
-- The T04 `resume` command is permanently guidance-only (R07); the deferred Workflow `Workflow.resume_session/2` mutation is not exposed as an executable CLI command and would belong to a future ticket.
+- The T04 `resume` command is permanently guidance-only (R07); the deferred `Workflow.resume_session/2` mutation is not exposed as an executable T04 CLI command and would belong to a future ticket.
+- The `:precondition` Store error class is the narrow T02 vocabulary extension accepted by this PR; it is documented in `lib/kiln/store/error.ex` and represents the semantically correct result of a transaction-level precondition rejection. No migration, schema version, or architecture change is implied.
 - No additional architecture changes are required to merge.
 
 ### Repository state
 
-- **Code-bearing implementation head (final):** `2ede2b887adf3394e8633756851eb555bbe6aea3` — verified by GitHub Actions run `31206150176` on this commit (both `test` and `prose` jobs green).
-- **Current PR head at start of this pass:** `35cb2c33118fa3d730a6ab6de1fb4a646a5b43e1`, verified by GitHub Actions run `31199785234`. Superseded by `2ede2b8`.
+- **Final implementation head:** `a6b6c6a07603e51940bc9e3df42aeb550cc23e54` — documentation-only update on top of the I6–I8 code-bearing head `2ede2b8`. Verified by GitHub Actions run `31206737852` (both `test` and `prose` jobs green).
+- **Code-bearing implementation head:** `2ede2b887adf3394e8633756851eb555bbe6aea3` — the I6–I8 narrow closure that introduced the bounded `:no_existing_session` precondition inside `Journal.commit`'s `BEGIN IMMEDIATE` transaction and the `:precondition` Store error class. Verified by GitHub Actions run `31206150176`.
 - Branch: `work/p1-s01-t04-foundation-cli`
 - Historical heads preserved for provenance:
   - `b15aaaa` (pre-Workflow-rebind) — archived as `archive/pr40-pre-workflow`
@@ -306,5 +298,6 @@ The I1–I5 closure pass files (`CLAUDE.md` disposition, T04 resume as guidance-
   - `ece4537` (F1–F9 final) — verified by GitHub Actions run `31194974919`
   - `f3fe050` (I1–I5 closure) — verified by GitHub Actions run `31199247425`
   - `35cb2c3` (corrected-head baseline at start of I6–I8 pass) — verified by GitHub Actions run `31199785234`
-  - `2ede2b8` (I6–I8 closure) — verified by GitHub Actions run `31206150176` ← **final**
+  - `2ede2b8` (I6–I8 code-bearing head) — verified by GitHub Actions run `31206150176`
+  - `a6b6c6a` (current final head, evidence-only update) — verified by GitHub Actions run `31206737852` ← **final**
 - Parent slice status after merge: P1-S01-T04 satisfied; P1-S01-T05 unblocked
