@@ -61,6 +61,8 @@ Implement one supervised direct Exqlite connection and one-writer store that ato
 - **P1-S01-T02-R14:** The journal shall not store complete transcript content, Artifact payloads, secrets, hidden reasoning, or Repository source.
 - **P1-S01-T02-R15:** Store errors shall distinguish busy, integrity, migration, future-version, revision, idempotency-conflict, I/O, and unknown failures.
 
+  Post-acceptance contract extension — P1-S01-T04 / PR #40: the Store error vocabulary additionally includes `:precondition` for Store-owned transaction precondition failures (e.g. the first-month one-Session guard evaluated inside `Kiln.Store.Journal.commit/4`'s `BEGIN IMMEDIATE` transaction). The `:precondition` class preserves the `Kiln.Store.Error` boundary: it is owned by the Store layer, callers consume it through `%Kiln.Store.Error{}`, and translation to the caller's application error vocabulary happens at the caller's own boundary. No migration, schema version, or persistence format change results.
+
 ## Security boundary
 
 Allowed:
