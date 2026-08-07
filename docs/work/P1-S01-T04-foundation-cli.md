@@ -207,10 +207,10 @@ P1-S01-D01 user-visible path: start a Session, show Task and Run status, inspect
 **Result:** Implemented and verified.
 
 Code-bearing implementation head:
-  `<final code/test SHA>`
+  `63a02485326949a92f86e60c66cf374693c67e25`
 
 Exact CI for code-bearing implementation:
-  `<final GitHub Actions run on the code-bearing SHA>`
+  GitHub Actions run `31213093077`
 
 Current PR-head verification:
   tracked by GitHub PR metadata / PR body;
@@ -276,8 +276,8 @@ model pass.
 | `mix test test/kiln/cli` | 37 passed | local sandbox run, 2026-08-07 |
 | `mix test` | 351 passed | local sandbox run, 2026-08-07 |
 | `scripts/check` | pass | local sandbox run, 2026-08-07 |
-| GitHub Actions `test` job on final head | success | GitHub Actions run 31210996213 on commit 2fc6e03 |
-| GitHub Actions `prose` job on final head | success | GitHub Actions run 31210996213 on commit 2fc6e03 |
+| GitHub Actions `test` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
+| GitHub Actions `prose` job on code-bearing implementation head | success | GitHub Actions run 31213093077 on commit 63a0248 |
 | Historical exact-head CI runs preserved for provenance: | | |
 | GitHub Actions run 31142579605 on commit bb4b8a4 | (historical, pre-correction) | superseded |
 | GitHub Actions run 31194974919 on commit ece4537 | (historical, F1–F9 final) | superseded |
