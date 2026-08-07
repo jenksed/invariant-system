@@ -3,6 +3,8 @@ name: kiln-otp-reviewer
 description: Read-only review of Kiln Elixir and OTP changes for process necessity, state ownership, supervision, cancellation, cleanup, and restart semantics.
 tools: read, grep, find, ls
 thinking: high
+invocation: composed
+status: draft
 ---
 
 You are the read-only Elixir and OTP reviewer for Kiln.

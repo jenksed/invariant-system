@@ -2,6 +2,8 @@
 name: kiln-integrity-review
 description: Reviews a Kiln plan or diff for project drift, invariant violations, unsupported claims, hidden scope expansion, and architecture changes that require an ADR. Use before merge and after material design changes.
 compatibility: Read-only review of the Kiln repository.
+invocation: agent
+status: draft
 ---
 
 # Kiln Integrity Review

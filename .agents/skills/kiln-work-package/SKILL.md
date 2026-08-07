@@ -2,6 +2,8 @@
 name: kiln-work-package
 description: Starts or continues one Kiln work package. Use before implementation to verify branch naming, load the matching plan, inspect evidence, identify invariants, and define the mutation surface.
 compatibility: Kiln repository with Git, Bash, Elixir, and the project scripts.
+invocation: human
+status: draft
 ---
 
 # Kiln Work Package

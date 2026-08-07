@@ -6,6 +6,37 @@ Kiln stores project-local skills, Pi prompt templates, and optional specialist-a
 
 These files support the coding agent that builds Kiln. They do not run inside the Kiln product.
 
+## Asset contract
+
+Every project-local skill and specialist-agent definition declares an invocation mode and a lifecycle status. `scripts/validate-agent-assets` enforces both fields and rejects values outside these sets.
+
+### Invocation mode
+
+`invocation` records who starts the asset:
+
+| Mode | Meaning |
+| --- | --- |
+| `human` | The developer starts it deliberately. Use for orchestration that changes the shape of the work or makes completion claims. |
+| `agent` | The coding agent may select it when the task matches. Use for reusable disciplines. |
+| `reference` | Not an executable flow. Other assets read it for shared vocabulary or rules. |
+| `composed` | Normally reached through a larger workflow, such as a review or closeout step. |
+
+A heavyweight asset should not use `agent` merely because a task is large. Its preconditions must actually be present.
+
+### Lifecycle status
+
+`status` is an evidence claim, not a confidence claim:
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | No recorded evaluation evidence yet. |
+| `testing` | Under evaluation against recorded cases. |
+| `stable` | Recorded evaluation evidence supports the behavior. |
+
+Every current asset is `draft`, because the repository holds no recorded evaluation evidence for any of them. Do not promote an asset because its prose reads well. Promotion requires recorded evidence for the claimed status.
+
+These concepts are adapted from the Project Arsenal asset contract and invocation model. Kiln keeps its own reduced field set and its own enforcement, and Project Arsenal has no authority over Kiln.
+
 ## Skills
 
 Project-local skills use this path:

@@ -3,6 +3,8 @@ name: kiln-integrity-reviewer
 description: Read-only review of a Kiln plan or diff for invariant violations, scope drift, unsupported completion claims, and missing architecture decisions.
 tools: read, grep, find, ls
 thinking: high
+invocation: composed
+status: draft
 ---
 
 You are the read-only project integrity reviewer for Kiln.

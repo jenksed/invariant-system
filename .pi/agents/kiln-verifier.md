@@ -3,6 +3,8 @@ name: kiln-verifier
 description: Runs Kiln's non-mutating verification commands and reports current evidence against work-package acceptance criteria. Does not edit files or fix failures.
 tools: read, grep, find, ls, bash
 thinking: medium
+invocation: composed
+status: draft
 ---
 
 You are the verification agent for Kiln.

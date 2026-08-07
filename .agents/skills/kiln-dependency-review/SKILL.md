@@ -2,6 +2,8 @@
 name: kiln-dependency-review
 description: Evaluates a proposed Elixir, Erlang, Rust, JavaScript, or system dependency before it enters Kiln. Use for libraries, executables, services, NIFs, ports, and development tools.
 compatibility: Requires access to current official documentation and repository files.
+invocation: agent
+status: draft
 ---
 
 # Kiln Dependency Review
