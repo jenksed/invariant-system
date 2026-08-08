@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+guard_endpoint
+"$PACK_DIR/scripts/wait-ready" >/dev/null
+
+mkdir -p "$ARTIFACT_DIR"
+input="$ARTIFACT_DIR/input.txt"
+result="$ARTIFACT_DIR/result.json"
+printf 'project-arsenal floci golden path\n' > "$input"
+
+expected_sha="$(python3 - "$input" <<'PY'
+import hashlib, pathlib, sys
+print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
+PY
+)"
+expected_bytes="$(python3 - "$input" <<'PY'
+import pathlib, sys
+print(len(pathlib.Path(sys.argv[1]).read_bytes()))
+PY
+)"
+
+input_bucket="arsenal-floci-input"
+result_bucket="arsenal-floci-results"
+queue_name="arsenal-floci-work"
+key="golden/input.txt"
+result_key="processed/${key}.json"
+
+aws_local s3 cp "$input" "s3://$input_bucket/$key" >/dev/null
+queue_url="$(aws_local sqs get-queue-url --queue-name "$queue_name" --query QueueUrl --output text)"
+message="$(python3 - "$input_bucket" "$key" <<'PY'
+import json, sys
+print(json.dumps({"bucket": sys.argv[1], "key": sys.argv[2]}, separators=(",", ":")))
+PY
+)"
+aws_local sqs send-message --queue-url "$queue_url" --message-body "$message" >/dev/null
+
+deadline=$((SECONDS + ${FLOCI_TRACER_TIMEOUT_SECONDS:-120}))
+until aws_local s3api head-object --bucket "$result_bucket" --key "$result_key" >/dev/null 2>&1; do
+  if (( SECONDS >= deadline )); then
+    printf 'timed out waiting for Lambda result object s3://%s/%s\n' \
+      "$result_bucket" "$result_key" >&2
+    compose logs --no-color >&2 || true
+    exit 1
+  fi
+  sleep 1
+done
+
+aws_local s3 cp "s3://$result_bucket/$result_key" "$result" >/dev/null
+
+python3 - "$result" "$input_bucket" "$key" "$expected_bytes" "$expected_sha" <<'PY'
+import json, pathlib, sys
+path, bucket, key, expected_bytes, expected_sha = sys.argv[1:]
+doc=json.loads(pathlib.Path(path).read_text())
+assert doc["bucket"] == bucket, doc
+assert doc["key"] == key, doc
+assert doc["bytes"] == int(expected_bytes), doc
+assert doc["sha256"] == expected_sha, doc
+print(json.dumps(doc, sort_keys=True))
+PY
+
+printf 'golden path: PASS\n'
