@@ -32,6 +32,16 @@ jobs:
             engineering/development_packs/floci/azure/tracer.py \
             engineering/development_packs/floci/gcp/tracer.py \
             engineering/development_packs/floci/oci/tracer.py
+      - name: Render catalog candidate
+        run: |
+          python3 scripts/arsenal_audit.py --write-catalog
+          python3 - <<'PY'
+          import base64, pathlib
+          data = pathlib.Path('CATALOG.md').read_bytes()
+          print('CATALOG_B64_BEGIN')
+          print(base64.b64encode(data).decode())
+          print('CATALOG_B64_END')
+          PY
       - name: Prove four-provider routing and ambiguity stop
         run: |
           r=engineering/development_packs/floci/providers/scripts/resolve-provider
