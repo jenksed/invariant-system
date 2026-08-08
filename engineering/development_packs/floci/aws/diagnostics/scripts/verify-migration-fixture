@@ -38,6 +38,15 @@ blocker_rc=$?
 set -e
 [[ "$blocker_rc" -eq 2 ]] || { printf 'expected --fail-on-blocker exit 2, got %s\n' "$blocker_rc" >&2; exit 1; }
 
+legacy_init="$LEGACY_DIR/init/ready.d/01-seed.sh"
+migrated_init="$MIGRATED_DIR/init/ready.d/01-seed.sh"
+cmp -s "$legacy_init" "$migrated_init" || {
+  echo 'migrated init script diverged from the retained LocalStack compatibility fixture' >&2
+  diff -u "$legacy_init" "$migrated_init" >&2 || true
+  exit 1
+}
+printf 'LocalStack init script retained byte-for-byte: PASS\n'
+
 compose=(docker compose -p flc03migration -f "$MIGRATED_DIR/docker-compose.yml")
 cleanup() {
   "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -77,7 +86,8 @@ cat >"$ARTIFACT_DIR/migration-receipt.md" <<'EOF'
 - Runtime: pinned Floci `1.5.34-compat` unless explicitly overridden.
 - Compatibility path: `/etc/localstack/init/ready.d` retained intentionally.
 - Compatibility environment: `PERSISTENCE=1` retained and exercised.
-- Init tooling: compat-image `aws` command executed the seed fixture.
+- Init script compatibility: PASS; LocalStack fixture retained byte-for-byte.
+- Init tooling: released Floci `awslocal` wrapper forced the local endpoint for all AWS CLI operations.
 - LocalStack-compatible init endpoint: PASS.
 - S3 seeded bucket assertion: PASS.
 - SQS seeded queue assertion: PASS.
