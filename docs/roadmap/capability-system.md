@@ -409,11 +409,12 @@ Execution ladder:
 
 ```text
 pure deterministic function
+→ repository read
 → in-process test
 → local process
-→ container
+→ local container
 → real local dependency
-→ emulator
+→ local emulator
 → local cluster
 → disposable remote sandbox
 → shared non-production
