@@ -70,46 +70,57 @@ Acceptance evidence is produced by the FLC-01 completion gate and GitHub Actions
 
 **Goal:** turn Floci into a repeatable infrastructure preflight and isolated CI cloud.
 
-Deliverables:
+**Implementation status:** delivered by the runnable IaC pack under `engineering/development_packs/floci/aws/iac/` and `agent_workflows/validate_iac_with_floci.md`. Terraform, OpenTofu, CloudFormation, and two-runtime isolation are exercised in CI. Snapshot acceleration is capability-gated because the released AWS server observed during validation does not implement the CLI-documented snapshot route.
+
+Delivered:
 
 - Terraform/OpenTofu detection and endpoint adaptation;
 - CloudFormation local path where supported;
 - `validate_iac_with_floci` workflow;
 - ephemeral per-job CI template;
-- init-hook/fixture conventions for CI;
-- snapshot acceleration policy + implementation example;
+- fixture conventions for CI;
+- capability-gated snapshot acceleration policy;
 - artifact/evidence collection from failed CI runs;
-- clean teardown including Floci-managed volumes/containers when relevant.
+- clean teardown including Floci-managed state boundaries.
 
-Acceptance examples:
+Acceptance evidence includes:
 
-- a supported IaC fixture can provision from zero in CI;
-- the gate asserts post-provision state, not merely `apply` exit zero;
+- supported IaC fixtures provision from zero in CI;
+- post-provision state is asserted independently rather than trusting `apply` exit zero;
 - the fidelity receipt names provider-only checks that IaC emulation cannot prove;
-- parallel CI jobs do not share state.
+- parallel Floci runtimes do not share state;
+- unsupported snapshot capability is explicit evidence and does not weaken the authoritative clean provision/assert/destroy lifecycle.
 
 ## FLC-03 — Migration, reproduction, and diagnosis
 
 **Goal:** make Floci useful for existing systems and incident/bug investigation, not only greenfield development.
 
-Deliverables:
+**Implementation status:** delivered on the FLC-03 reference branch by `engineering/development_packs/floci/aws/diagnostics/` plus four agent workflows. Lifecycle status remains `draft` until evaluation/stabilization earns stronger claims.
+
+Delivered:
 
 - `migrate_localstack_to_floci` workflow;
-- LocalStack configuration inventory and compatibility mapping;
+- deterministic LocalStack configuration inventory and compatibility classification;
 - init-script migration/compat strategy;
+- behavior-level migration acceptance matrix;
 - `reproduce_cloud_bug_locally` workflow;
 - `diagnose_floci_environment` workflow;
-- fidelity-gap audit workflow;
+- operation-level fidelity-gap audit workflow;
 - state capture/minimization pattern for cloud bug reproduction;
 - inspection/logging evidence guidance;
-- migration acceptance matrix that checks behavior after image/config changes.
+- a LocalStack-shaped compatibility fixture that preserves supported compatibility surfaces;
+- a deliberately blocked legacy fixture proving unsupported `LAMBDA_REMOTE_DOCKER` is caught before runtime replacement;
+- a red/green SQS reproduction tracer with minimized synthetic state and evidence receipt;
+- CI gates for inventory, migration compatibility, endpoint fail-closed behavior, and red/green reproduction.
 
-Acceptance examples:
+Acceptance target:
 
 - migration never reduces to blind image-name replacement;
 - LocalStack-specific environment/config assumptions are enumerated;
 - unsupported differences become explicit migration blockers or redesign decisions;
-- a remote symptom can be reduced to a versioned local fixture when Floci supports the relevant path.
+- a sanitized remote-style symptom can be reduced to a versioned local fixture when Floci supports the relevant operation path;
+- the reproduction signal is red-capable and a nearby one-change control turns it green;
+- local diagnosis classifies boundary, runtime, fixture, application, fidelity, provider-only, or unknown outcomes instead of guessing.
 
 ## FLC-04 — Multi-cloud overlays
 
@@ -199,9 +210,9 @@ Do not start with:
 
 ## Immediate next slice
 
-After FLC-01 is accepted, authorize **FLC-02 — IaC and CI**.
+After FLC-03 is accepted, authorize **FLC-04 — Multi-cloud overlays**.
 
-FLC-02 should reuse the FLC-01 endpoint guard, deterministic readiness/reset, provenance, fidelity ledger, and receipt machinery rather than create a second local-cloud path. Its new proof target is infrastructure provisioning and isolated parallel CI.
+FLC-04 should use Azure as the first tracer unless real project demand changes the order. Its purpose is not merely to add another emulator: it must prove that the universal Local Cloud foundations, fidelity ledger, fixture discipline, and verification tiers do not secretly require AWS concepts.
 
 ## Program completion criterion
 
