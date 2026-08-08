@@ -345,34 +345,39 @@ See the canonical [`capability-system roadmap`](docs/roadmap/capability-system.m
 
 ---
 
-## Capability is the next technical primitive
+## Capability Contract v2
 
-**Status: BUILDING TOWARD (ARS-01).**
+**Status: AVAILABLE (ARS-01).**
 
-Today Arsenal has a machine-readable Asset Contract, typed assets, relationships, invocation modes, lifecycle states, routers, workflows, Development Packs, and deterministic audit infrastructure.
-
-Next, Arsenal will add a richer behavioral **Capability Contract**.
-
-Working definition:
-
-> A Capability is a versioned representation of a useful outcome, including what it needs, what authority it requires, how it should be approached, where it may operate, and what evidence is necessary before success can be claimed.
-
-Conceptually:
+Arsenal now has two deliberately separate machine-readable layers:
 
 ```text
-identity + version
-purpose
-inputs + outputs
-preconditions
-context + method
-authority + forbidden authority
-execution substrate
-verification + evidence
-evaluation suite
-provenance + compatibility + lifecycle
+Asset
+  = registered repository artifact/package metadata
+
+Capability
+  = versioned behavioral contract for achieving a useful outcome
 ```
 
-The existing [`arsenal/ASSET_CONTRACT.md`](arsenal/ASSET_CONTRACT.md) remains the current artifact metadata contract. Capability Contract v2 will extend the system behaviorally rather than pretending the distinction already ships.
+[`arsenal/ASSET_CONTRACT.md`](arsenal/ASSET_CONTRACT.md) remains authoritative for repository artifact identity, paths, kinds, lifecycle, invocation metadata, and relationships.
+
+[`arsenal/CAPABILITY_CONTRACT.md`](arsenal/CAPABILITY_CONTRACT.md) now defines behavior: identity/version, public names and aliases, inputs/outputs, preconditions, context, registered implementation assets, authority, mutation class, execution surfaces, verification, evidence, evaluation, provenance, compatibility, and capability lifecycle.
+
+Canonical capability definitions are fragmented under [`arsenal/capabilities/`](arsenal/capabilities/) so capabilities and Development Packs can evolve independently without recreating one giant manifest.
+
+ARS-01 models nine initial capabilities:
+
+- Repository Truth;
+- Pressure Test, preserving Grill/Grilling aliases;
+- Recon, preserving Wayfind/Wayfinding aliases;
+- Diagnose;
+- TDD;
+- Review;
+- Verify;
+- Resume;
+- Local Cloud Feature Delivery as the execution-backed tracer.
+
+The Local Cloud contract requires local-cloud authority while forbidding remote-cloud and production mutation by default. All nine capability lifecycle states remain `draft` / `unassessed`; ARS-02 Arsenal Bench must earn stronger lifecycle claims through evaluation evidence.
 
 ---
 
@@ -404,7 +409,7 @@ The architecture is the reason the public promise can become durable. It is not 
 ### AVAILABLE
 
 - machine-readable asset registry + generated catalog;
-- Asset Contract and invocation model;
+- Asset Contract, Capability Contract v2, and invocation model;
 - Engineering Doctrine and repository templates;
 - Repository Truth;
 - Repository Truth Agent Skills distribution pilot + Codex project-local installer;
@@ -419,7 +424,6 @@ The architecture is the reason the public promise can become durable. It is not 
 
 ### BUILDING TOWARD
 
-- Capability Contract v2;
 - Arsenal Bench and executable evaluation infrastructure;
 - compiler / harness exports;
 - capability graph;
@@ -478,6 +482,8 @@ python3 scripts/arsenal_audit.py --write-catalog
 
 - [`CATALOG.md`](CATALOG.md) — generated full asset catalog
 - [`arsenal/ASSET_CONTRACT.md`](arsenal/ASSET_CONTRACT.md) — current asset metadata and integrity contract
+- [`arsenal/CAPABILITY_CONTRACT.md`](arsenal/CAPABILITY_CONTRACT.md) — behavioral capability contract and lifecycle rules
+- [`arsenal/capabilities/`](arsenal/capabilities/) — canonical fragmented capability set
 - [`arsenal/INVOCATION_MODEL.md`](arsenal/INVOCATION_MODEL.md) — harness-neutral invocation semantics
 - [`engineering/doctrine/CORE.md`](engineering/doctrine/CORE.md) — compact engineering doctrine
 - [`engineering/doctrine/ENGINEERING_DOCTRINE.md`](engineering/doctrine/ENGINEERING_DOCTRINE.md) — full doctrine and tradeoffs

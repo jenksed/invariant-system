@@ -11,6 +11,33 @@ The merged registry is the canonical metadata view for reusable Project Arsenal 
 
 Every registry file must use the same schema version.
 
+## Asset vs capability
+
+The Asset Contract and Capability Contract have deliberately different responsibilities.
+
+```text
+Asset
+  = a registered repository artifact or package
+
+Capability
+  = a versioned behavioral contract for achieving a useful outcome
+```
+
+This document remains authoritative for artifact identity, repository path, kind, asset lifecycle, invocation metadata, and asset-to-asset relationships.
+
+Behavioral capability definitions live under `arsenal/capabilities/*.json` and are governed by `arsenal/CAPABILITY_CONTRACT.md`.
+
+Rules across the boundary:
+
+1. Not every registered asset is a capability. Templates, references, doctrines, source briefs, schemas, and distribution artifacts may exist only as assets.
+2. A capability references registered asset IDs for implementation and provenance rather than replacing the Asset Registry.
+3. One capability may compose several assets; one asset may support more than one capability.
+4. Capability `display_name` and compatibility aliases may evolve without rewriting stable asset IDs.
+5. Asset lifecycle and capability lifecycle are separate evidence claims. Neither automatically promotes the other.
+6. Harness/distribution packages remain assets or derived artifacts; they do not become the canonical behavioral definition merely because a harness can discover them.
+
+This separation lets Project Arsenal evolve behavioral contracts without destabilizing repository identity and lets future compilers generate multiple harness packages from one canonical capability definition.
+
 ## Required fields
 
 Every registered asset must define:
