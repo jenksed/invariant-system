@@ -40,6 +40,7 @@ The tracer manually sends a work item to SQS after uploading the S3 object. It d
 - `env.floci.example` — synthetic host-side AWS environment.
 - `init/ready.d/10-seed.py` — source-controlled seed fixture.
 - `lambda/handler.py` — Lambda fixture.
+- `scripts/start` — resolves Docker-socket group access, starts Floci, waits for ready.
 - `scripts/aws-local` — fail-closed AWS CLI wrapper.
 - `scripts/wait-ready` — waits for `completed.ready == true`.
 - `scripts/reset` — clears emulator state and reapplies the fixture.
@@ -53,11 +54,14 @@ The tracer manually sends a work item to SQS after uploading the S3 object. It d
 ## Host prerequisites
 
 - Docker Engine with Compose v2;
+- a local Unix Docker socket at `/var/run/docker.sock` for the Docker-backed Lambda tracer;
 - `curl`;
 - Python 3;
 - AWS CLI.
 
 The runtime pulls the Lambda Python 3.13 image on first execution.
+
+Floci runs non-root. `scripts/start` and `scripts/verify-completion` read the host Docker socket's numeric GID and add that GID as a supplemental group to the Floci container. This avoids assuming that the host's `docker` group uses the same numeric ID everywhere and avoids running Floci as root merely to reach the socket.
 
 ## Start
 
@@ -65,8 +69,7 @@ From this directory:
 
 ```bash
 cp env.floci.example .env.floci
-docker compose --env-file .env.floci -f docker-compose.floci.yml up -d
-./scripts/wait-ready
+./scripts/start
 ./scripts/verify-inner
 ```
 
@@ -108,13 +111,15 @@ For strongest completion evidence, `verify-completion` destroys the Compose inst
 
 ## Endpoint safety
 
-`scripts/aws-local` refuses execution unless the endpoint is exactly the approved local endpoint (default `http://localhost:4566`). It sets synthetic credentials directly and neutralizes profile/config credential discovery.
+`scripts/aws-local` refuses execution when `AWS_ENDPOINT_URL` is absent or differs from the approved local endpoint (default `http://localhost:4566`). Explicit process environment overrides the repository env file, so an unsafe caller override cannot be silently masked by `.env.floci`. The wrapper sets synthetic credentials directly and neutralizes profile/config credential discovery.
 
 Application tests adopted from this pack must apply the same fail-closed principle. A passing wrapper cannot make unrelated application code safe by itself.
 
 ## CI profile
 
 Project Arsenal exercises this template in `.github/workflows/floci-aws-golden-path.yml`.
+
+The CI gate specifically proves both a missing endpoint and a public AWS endpoint are refused before starting Floci. It then reconstructs the runtime from zero and executes the Docker-backed tracer.
 
 Downstream repositories may copy the workflow shape, but should preserve their own task runner and only install the checks they need.
 
