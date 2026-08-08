@@ -40,6 +40,7 @@ compose() {
 
 ensure_tools() {
   local missing=0
+  local tool
   for tool in docker curl python3; do
     if ! command -v "$tool" >/dev/null 2>&1; then
       printf 'missing required tool: %s\n' "$tool" >&2
