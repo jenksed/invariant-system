@@ -1,0 +1,59 @@
+name: Floci Capability Routing + Composed Delivery
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/floci-composed-delivery-ci.yml"
+      - "agent_workflows/local_cloud_router.md"
+      - "agent_workflows/arsenal_router.md"
+      - "agent_workflows/reproduce_cloud_bug_locally.md"
+      - "agent_workflows/diagnose_floci_environment.md"
+      - "workflows/floci_first_cloud_feature_delivery.md"
+      - "workflows/software_feature_delivery.md"
+      - "engineering/development_packs/floci/providers/**"
+      - "engineering/development_packs/floci/evaluation/**"
+      - "engineering/development_packs/floci/ROADMAP.md"
+      - "arsenal/registry.d/floci-composed-delivery.json"
+  workflow_dispatch:
+
+jobs:
+  routing-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate routing scripts
+        run: |
+          python3 -m py_compile \
+            engineering/development_packs/floci/providers/scripts/route-local-cloud-capability.py \
+            engineering/development_packs/floci/evaluation/verify_flc05_routing.py
+          python3 -m json.tool engineering/development_packs/floci/evaluation/flc05_cases.json >/dev/null
+
+      - name: Run FLC-05 routing evaluation
+        run: python3 engineering/development_packs/floci/evaluation/verify_flc05_routing.py
+
+      - name: Validate Arsenal registry and catalog
+        run: python3 scripts/arsenal_audit.py
+
+      - name: Validate receipt
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path(".floci-artifacts/flc05-routing-receipt.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert data["verdict"] == "PASS"
+          assert data["case_count"] >= 18
+          assert data["unsupported_route_count"] >= 4
+          assert data["automatic_real_cloud_fallback"] is False
+          assert data["requires_explicit_real_cloud_authorization"] is True
+          assert all(case["pass"] for case in data["cases"])
+          print("FLC-05 receipt: PASS")
+          PY
+
+      - name: Upload FLC-05 routing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f05-routing-evidence
+          path: .floci-artifacts/flc05-routing-receipt.json
+          if-no-files-found: error

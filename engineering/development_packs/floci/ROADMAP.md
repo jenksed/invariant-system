@@ -161,27 +161,50 @@ Acceptance evidence includes:
 
 **Goal:** make Local Cloud Engineering naturally composable with the rest of Project Arsenal.
 
-Deliverables:
+**Implementation status:** delivered by the Local Cloud router, Floci-first cloud feature delivery workflow, deterministic provider/capability router, provider-neutral diagnosis/reproduction adaptations, and FLC-05 routing evaluation. Lifecycle status remains `draft` until FLC-06 evaluation/stabilization earns stronger claims.
 
-- `agent_workflows/local_cloud_router.md`;
-- `workflows/floci_first_cloud_feature_delivery.md`;
-- integration with repository-truth audit, TDD, diagnosis, tracer tickets, code review, independent verification, and handoff;
-- routing rules for emulator vs real-cloud escalation;
-- lifecycle/evaluation cases for the Floci capabilities.
+Delivered:
 
-Candidate route:
+- `agent_workflows/local_cloud_router.md` with `ROUTED`, `AMBIGUOUS`, `UNKNOWN`, `UNSUPPORTED_ROUTE`, and `ESCALATION_REVIEW` outcomes;
+- `workflows/floci_first_cloud_feature_delivery.md` composing repository truth, provider routing, execution boundaries, tracer tickets, TDD/diagnosis, provider-local execution, slice gates, review, independent verification, escalation, and handoff;
+- integration from `agent_workflows/arsenal_router.md` and `workflows/software_feature_delivery.md` into the Local Cloud specialization;
+- deterministic `route-local-cloud-capability.py` that combines an explicitly interpreted work kind with FLC-04 provider resolution;
+- provider/capability availability enforcement so a resolved cloud cannot borrow a specialization that only exists for another provider;
+- provider-neutral adaptation of cloud-bug reproduction and environment diagnosis while retaining AWS-specific reference implementations where they are actually AWS-specific;
+- explicit current support boundaries: feature delivery, bug reproduction, environment diagnosis, fidelity audit, review, and provider-proof routing across AWS/Azure/GCP/OCI; IaC validation and LocalStack migration remain AWS-only;
+- provider-only proof routed to `ESCALATION_REVIEW` rather than automatic real-cloud execution;
+- 18 deterministic routing/evaluation cases and CI evidence receipt;
+- registry/catalog integration at 126 registered assets across 8 registry files.
+
+Delivered route:
 
 ```text
 repository truth
 → detect cloud dependency
-→ resolve provider + operation fidelity
-→ configure local execution boundary
-→ fixture + implementation/TDD
+→ resolve provider
+→ verify provider/capability availability
+→ resolve operation fidelity
+→ configure lowest-blast-radius execution boundary
+→ fixture + implementation/TDD or diagnosis
 → slice gate
+→ multi-axis review
 → independent verification
-→ provider-only escalation if required
+→ provider-only escalation review if required
 → evidence handoff
 ```
+
+Acceptance evidence includes:
+
+- all four providers route normal feature delivery into the composed Floci-first workflow;
+- GCP cloud-bug reproduction and Azure environment diagnosis route through provider-neutralized workflows rather than AWS-shaped assumptions;
+- AWS IaC and LocalStack migration route to their existing specialized packs;
+- non-AWS IaC and LocalStack-migration combinations return `UNSUPPORTED_ROUTE` / exit `5` instead of borrowing AWS-only machinery;
+- ambiguous provider evidence returns exit `3` and unknown provider evidence exit `4`;
+- explicit provider selection can resolve a repository with no provider fingerprint;
+- provider-only proof returns `ESCALATION_REVIEW` and still requires explicit authorization;
+- every route preserves `automatic_real_cloud_fallback=false`;
+- routed capability paths are existence-checked and the composed workflow is checked for required delegation pointers;
+- FLC-03 and FLC-04 regressions remain authoritative for the diagnostic and provider layers FLC-05 composes.
 
 ## FLC-06 — Evaluation and stabilization
 
@@ -198,6 +221,7 @@ Evaluation matrix should include:
 - IaC apply that succeeds locally but leaves a provider-only acceptance claim;
 - snapshot invalidated by emulator version change;
 - multi-cloud routing case;
+- resolved provider plus unsupported higher-level specialization stopped before execution;
 - agent attempt to request real credentials when local execution is sufficient.
 
 Promotion requires repeated success across representative harness/model combinations and deterministic audit evidence where applicable.
@@ -216,9 +240,9 @@ Do not start with:
 
 ## Immediate next slice
 
-After FLC-04 is accepted, authorize **FLC-05 — Capability routing and composed delivery**.
+After FLC-05 is accepted, authorize **FLC-06 — Evaluation and stabilization**.
 
-FLC-05 should compose the provider router and Floci execution packs with Arsenal's repository-truth, TDD, diagnosis, verification, and handoff capabilities so cloud-dependent feature work naturally follows the lowest-blast-radius evidence path.
+FLC-06 should test the complete Local Cloud routing and evidence system against adversarial, unsupported, dirty-state, migration, provider-fidelity, multi-cloud, and credential-escalation cases across representative harness/model combinations, then promote only the assets that actually earn stronger lifecycle claims.
 
 ## Program completion criterion
 
