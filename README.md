@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-07 unifies capability, proof-gate, executable-world, evaluation, and verification receipts through the **Evidence Observatory / Agent Flight Recorder**, so successful and failed runs can be reconstructed without private chain-of-thought capture.
+**Next:** ARS-08 builds the **Trust & Authority Plane**, making capability/package provenance, requested authority, escalation, quarantine, and third-party competence review explicit before imported behavior can become trusted execution.
 
 ---
 
@@ -429,12 +429,12 @@ The architecture is the reason the public promise can become durable. It is not 
 - deterministic capability compiler + `.arsenal.lock` competence lockfile + proof-carrying Repository Truth Agent Skills package;
 - Capability Graph + Capability Gap Preflight with canonical/lock inventories, implementation checks, qualification gates, and safe authority profiles;
 - Execution Substrate Contract + Reality Budget with proof-property selection, declared availability, fidelity limitations, and explicit escalation boundaries;
-- Dagger / Executable World Pack with proof-gated execution, deterministic replay, explicit host-input boundaries, and normal Arsenal evidence.
+- Dagger / Executable World Pack with proof-gated execution, deterministic replay, explicit host-input boundaries, and normal Arsenal evidence;
+- Evidence Observatory / Agent Flight Recorder with source-addressed receipts, stable run fingerprints, metadata-first privacy, evidence-bound outcomes, and OpenTelemetry-compatible mapping.
 
 ### BUILDING TOWARD
 
-- Evidence Observatory / Agent Flight Recorder;
-- trust and authority.
+- trust and authority + third-party competence audit.
 
 ### FRONTIER
 

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "arsenal.observability.metadata-first-content-off",
+  "default": "deny-content",
+  "record": {
+    "allowed_metadata": [
+      "canonical identifiers",
+      "versions",
+      "repository SHA",
+      "content digests",
+      "byte and token counts when observed",
+      "authority identifiers",
+      "tool identifiers and verdicts",
+      "evidence references",
+      "claim scopes",
+      "limitations"
+    ],
+    "forbidden_fields": [
+      "prompt",
+      "prompt_body",
+      "system_prompt",
+      "system_instructions",
+      "completion",
+      "completion_body",
+      "reasoning",
+      "chain_of_thought",
+      "secret",
+      "secret_value",
+      "environment_dump"
+    ]
+  },
+  "future_content_capture": {
+    "supported_in_v0": false,
+    "requires_separate_explicit_policy": true
+  }
+}
