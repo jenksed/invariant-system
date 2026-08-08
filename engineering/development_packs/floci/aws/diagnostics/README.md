@@ -177,6 +177,12 @@ Avoid global TRACE by default. Diagnostic artifacts can contain payloads and ide
 
 Existing FLC-01 and FLC-02 workflows remain regression authority for the underlying local cloud execution surface.
 
+## Multi-cloud handoff
+
+This diagnostic pack is AWS/LocalStack-specific. Before applying its migration inventory or AWS endpoint probes to a repository whose provider is uncertain, resolve the provider with `agent_workflows/route_local_cloud_provider.md` or `../../providers/scripts/resolve-provider`.
+
+FLC-04 shares the diagnostic **method** across providers—fail-closed boundary checks, readiness, provider-shaped operations, operation-level fidelity, receipts, and narrow escalation—but it does not make LocalStack migration rules, `awslocal`, SQS examples, or AWS credentials universal cloud concepts.
+
 ## Completion evidence
 
 A FLC-03 completion receipt should name:
