@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_tools
+guard_endpoint
+mkdir -p "$ARTIFACT_DIR"
+
+cleanup() {
+  compose logs --no-color >"$ARTIFACT_DIR/floci.log" 2>&1 || true
+}
+trap cleanup EXIT
+
+compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+compose pull
+compose up -d
+"$PACK_DIR/scripts/wait-ready"
+"$PACK_DIR/scripts/verify-inner"
+"$PACK_DIR/scripts/run-tracer"
+
+info="$(curl -fsS "$AWS_ENDPOINT_URL/_floci/info")"
+version="$(python3 - "$info" <<'PY'
+import json, sys
+print(json.loads(sys.argv[1]).get("version", "unknown"))
+PY
+)"
+container_id="$(compose ps -q floci)"
+image_id="$(docker inspect --format '{{.Image}}' "$container_id")"
+repo_digests="$(docker image inspect "$FLOCI_IMAGE" --format '{{json .RepoDigests}}' 2>/dev/null || printf '[]')"
+resolved_digest="$(python3 - "$repo_digests" <<'PY'
+import json, sys
+items=json.loads(sys.argv[1])
+print(items[0] if items else "unavailable")
+PY
+)"
+
+receipt="$ARTIFACT_DIR/completion-receipt.md"
+cat >"$receipt" <<EOF
+# FLC-01 Local Cloud Completion Receipt
+
+- Provider: AWS (emulated locally)
+- Floci image tag: \`$FLOCI_IMAGE\`
+- Floci reported version: \`$version\`
+- Container image ID: \`$image_id\`
+- Pulled repo digest: \`$resolved_digest\`
+- Endpoint: \`$AWS_ENDPOINT_URL\`
+- Storage/reset mode: memory; zero-state Compose rebuild
+- Fixture: \`init/ready.d/10-seed.py\` + \`lambda/handler.py\`
+- Readiness: \`GET /_floci/init\` with \`completed.ready == true\`
+- Golden path: PASS — S3 input -> explicit SQS work item -> Lambda ESM -> S3 result
+- State assertion: result bucket/key, byte count, and SHA-256 asserted
+- Fidelity ledger: \`FIDELITY_LEDGER.md\`
+- Real-cloud evidence: none
+- Remaining provider-only verification: IAM authorization semantics, quotas, regional behavior, AWS timing/eventual consistency, Lambda isolation parity, billing
+- Cleanup evidence: logical reset is available via \`scripts/reset\`; this gate began from \`docker compose down --volumes\`
+EOF
+
+printf 'floci aws completion gate: PASS\n'
+printf 'receipt: %s\n' "$receipt"
