@@ -37,7 +37,7 @@
       "id": "proof.local-cloud.local-boundary",
       "capability_id": "capability.local-cloud-feature-delivery",
       "verification_requirement_id": "local_boundary",
-      "required_traits": ["cloud-api-integration", "emulated-provider-behavior", "network-boundary-observation"],
+      "required_traits": ["cloud-api-integration", "network-boundary-observation", "provider-behavior-observation"],
       "minimum_isolation": "container",
       "minimum_reproducibility": "resettable"
     },
