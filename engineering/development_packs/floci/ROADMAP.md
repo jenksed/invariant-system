@@ -34,34 +34,37 @@ Exit criteria:
 
 **Goal:** make one normal AWS-backed feature deliverable end to end through Floci with deterministic evidence.
 
-Recommended tracer path:
+**Implementation status:** delivered by the runnable AWS reference pack under `engineering/development_packs/floci/aws/` and the `agent_workflows/adopt_floci_in_repo.md` workflow. Lifecycle status remains `draft` until the later evaluation/stabilization program earns a stronger claim.
 
-`S3 object → SQS event/work item → Lambda or application consumer → observable result`
+Implemented tracer path:
 
-The exact first fixture may be adjusted after repository-level validation, but it should exercise both simple modeled services and at least one container/execution boundary if practical.
+`S3 input object → explicit SQS work item → Lambda SQS event-source mapping → S3 result object`
 
-Deliverables:
+The first fixture intentionally exercises both modeled services and a Docker-backed execution boundary. The S3-to-SQS hop is explicit rather than claiming S3 notification semantics.
 
-- `adopt_floci_in_repo` workflow/prompt;
+Delivered:
+
+- `adopt_floci_in_repo` workflow;
 - repository environment discovery rules;
-- safe AWS endpoint wrapper/profile;
+- safe AWS endpoint wrapper/profile behavior;
 - version-pinned Docker Compose template;
 - native/compat image choice rule;
-- deterministic `ready` wait command/script;
+- deterministic `ready` wait command;
 - source-controlled seed fixture;
-- reset/cleanup command;
-- inner/slice/completion gate scripts or templates;
-- AWS fidelity-ledger template populated for the tracer path;
-- evidence receipt template exercised on the tracer path;
-- CI-ready ephemeral profile.
+- reset/reseed command;
+- inner/slice/completion gate scripts;
+- AWS fidelity ledger populated for the tracer path;
+- evidence receipt schema and generated completion receipt;
+- CI-ready ephemeral profile;
+- CI guard that proves a public AWS endpoint is refused.
 
-Acceptance examples:
+Acceptance evidence is produced by the FLC-01 completion gate and GitHub Actions workflow:
 
-- a fresh repository can install the pack without overwriting equivalent existing tooling;
-- local SDK/CLI calls fail closed when the expected Floci endpoint is absent;
-- clean-state replay produces the same asserted result;
-- exact Floci version/digest is captured at the completion gate;
-- unsupported semantics are visible in the ledger.
+- the pack is inspect-first and does not authorize overwriting equivalent repository tooling;
+- local AWS CLI calls fail closed when the endpoint is not the approved loopback Floci endpoint;
+- clean-state replay asserts the same result content by bucket/key, byte count, and SHA-256;
+- the completion receipt captures the pinned image tag, Floci-reported version, container image ID, and pulled repo digest when available;
+- unsupported or partial semantics remain visible in the operation-level fidelity ledger.
 
 ## FLC-02 — IaC and CI
 
@@ -196,9 +199,9 @@ Do not start with:
 
 ## Immediate next slice
 
-After FLC-00 is accepted, authorize **FLC-01 — AWS golden path**.
+After FLC-01 is accepted, authorize **FLC-02 — IaC and CI**.
 
-The first implementation should be narrow enough to finish and verify as one coherent slice, but rich enough to exercise endpoint safety, clean fixtures, readiness, operation-level fidelity, state assertions, and a completion receipt.
+FLC-02 should reuse the FLC-01 endpoint guard, deterministic readiness/reset, provenance, fidelity ledger, and receipt machinery rather than create a second local-cloud path. Its new proof target is infrastructure provisioning and isolated parallel CI.
 
 ## Program completion criterion
 
