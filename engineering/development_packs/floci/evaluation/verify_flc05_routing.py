@@ -89,7 +89,8 @@ def main() -> int:
     assert "Never default to AWS" in local_router
     assert "No automatic real-cloud fallback" in local_router
     assert "UNSUPPORTED_ROUTE" in local_router
-    assert "IaC validation" in local_router and "AWS" in local_router
+    assert "agent_workflows/validate_iac_with_floci.md" in local_router
+    assert "AWS only" in local_router
 
     unsupported = sum(r["status"] == "UNSUPPORTED_ROUTE" for r in results)
     assert unsupported >= 4
