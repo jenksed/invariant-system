@@ -1,0 +1,190 @@
+{
+  "schema_version": "1.0.0",
+  "cases": [
+    {
+      "id": "feature-aws",
+      "task_kind": "feature",
+      "files": {
+        "main.tf": "provider \"aws\" {}\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "aws",
+        "primary": "workflows/floci_first_cloud_feature_delivery.md"
+      }
+    },
+    {
+      "id": "feature-azure",
+      "task_kind": "feature",
+      "files": {
+        ".env": "AZURE_STORAGE_CONNECTION_STRING=local\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "azure",
+        "primary": "workflows/floci_first_cloud_feature_delivery.md"
+      }
+    },
+    {
+      "id": "feature-gcp",
+      "task_kind": "feature",
+      "files": {
+        ".env": "STORAGE_EMULATOR_HOST=local\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "gcp",
+        "primary": "workflows/floci_first_cloud_feature_delivery.md"
+      }
+    },
+    {
+      "id": "feature-oci",
+      "task_kind": "feature",
+      "files": {
+        "main.tf": "provider \"oci\" {}\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "oci",
+        "primary": "workflows/floci_first_cloud_feature_delivery.md"
+      }
+    },
+    {
+      "id": "iac-aws",
+      "task_kind": "iac",
+      "files": {
+        "main.tf": "provider \"aws\" {}\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "aws",
+        "primary": "agent_workflows/validate_iac_with_floci.md"
+      }
+    },
+    {
+      "id": "migration-aws",
+      "task_kind": "migration",
+      "files": {
+        "compose.yml": "AWS_ENDPOINT_URL=http://localhost:4566\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "aws",
+        "primary": "agent_workflows/migrate_localstack_to_floci.md"
+      }
+    },
+    {
+      "id": "bug-gcp",
+      "task_kind": "bug",
+      "files": {
+        "app.py": "PUBSUB_EMULATOR_HOST = 'localhost:4588'\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "gcp",
+        "primary": "agent_workflows/reproduce_cloud_bug_locally.md"
+      }
+    },
+    {
+      "id": "environment-azure",
+      "task_kind": "environment",
+      "files": {
+        "app.py": "AZURE_STORAGE_CONNECTION_STRING = 'local'\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "azure",
+        "primary": "agent_workflows/diagnose_floci_environment.md"
+      }
+    },
+    {
+      "id": "fidelity-oci",
+      "task_kind": "fidelity",
+      "files": {
+        "main.tf": "provider \"oci\" {}\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "oci",
+        "primary": "agent_workflows/audit_floci_fidelity_gap.md"
+      }
+    },
+    {
+      "id": "review-aws",
+      "task_kind": "review",
+      "files": {
+        "app.py": "import boto3\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "aws",
+        "primary": "software_engineering/code_review_multi_axis.md"
+      }
+    },
+    {
+      "id": "provider-proof-aws",
+      "task_kind": "provider-proof",
+      "files": {
+        "main.tf": "provider \"aws\" {}\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ESCALATION_REVIEW",
+        "provider": "aws",
+        "primary": "foundations/cloud_execution_boundary.md",
+        "execution_boundary": "explicit-provider-review"
+      }
+    },
+    {
+      "id": "ambiguous",
+      "task_kind": "feature",
+      "files": {
+        "main.tf": "provider \"aws\" {}\nprovider \"google\" {}\n"
+      },
+      "expect": {
+        "rc": 3,
+        "status": "AMBIGUOUS",
+        "provider": null,
+        "primary": null
+      }
+    },
+    {
+      "id": "unknown",
+      "task_kind": "feature",
+      "files": {
+        "README.md": "no cloud provider selected\n"
+      },
+      "expect": {
+        "rc": 4,
+        "status": "UNKNOWN",
+        "provider": null,
+        "primary": null
+      }
+    },
+    {
+      "id": "explicit-provider",
+      "task_kind": "feature",
+      "provider": "azure",
+      "files": {
+        "README.md": "cloud intent supplied externally\n"
+      },
+      "expect": {
+        "rc": 0,
+        "status": "ROUTED",
+        "provider": "azure",
+        "primary": "workflows/floci_first_cloud_feature_delivery.md",
+        "provider_confidence": "explicit"
+      }
+    }
+  ]
+}

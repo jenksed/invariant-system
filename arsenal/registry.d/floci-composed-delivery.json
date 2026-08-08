@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "agent.local-cloud-router",
+      "path": "agent_workflows/local_cloud_router.md",
+      "category": "agent_workflows",
+      "kind": "router",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Route cloud-dependent engineering work to the smallest existing Arsenal capability sequence after resolving provider, work kind, execution boundary, and fidelity constraints.",
+      "upstream": [
+        "agent.arsenal-router",
+        "agent.route-local-cloud-provider",
+        "foundation.cloud-execution-boundary",
+        "engineering.floci-fidelity-policy"
+      ],
+      "downstream": [
+        "workflow.floci-first-cloud-feature-delivery",
+        "agent.validate-iac-with-floci",
+        "agent.migrate-localstack-to-floci",
+        "agent.reproduce-cloud-bug-locally",
+        "agent.diagnose-floci-environment",
+        "agent.audit-floci-fidelity-gap",
+        "software.code-review"
+      ]
+    },
+    {
+      "id": "workflow.floci-first-cloud-feature-delivery",
+      "path": "workflows/floci_first_cloud_feature_delivery.md",
+      "category": "workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "composed",
+      "purpose": "Compose repository truth, provider routing, tracer-ticket decomposition, TDD or diagnosis, Floci execution, review, independent verification, provider-only escalation, and handoff into one cloud-feature delivery path.",
+      "upstream": [
+        "workflow.software-feature-delivery",
+        "agent.local-cloud-router",
+        "foundation.cloud-execution-boundary",
+        "engineering.floci-provider-overlay-contract"
+      ],
+      "downstream": [
+        "agent.independent-verification",
+        "agent.session-handoff"
+      ]
+    },
+    {
+      "id": "engineering.floci-capability-router",
+      "path": "engineering/development_packs/floci/providers/scripts/route-local-cloud-capability.py",
+      "category": "engineering",
+      "kind": "router",
+      "status": "draft",
+      "invocation": "composed",
+      "purpose": "Deterministically combine explicit cloud work kind with the FLC-04 provider resolver and return the canonical existing Arsenal capability without enabling real-cloud fallback.",
+      "upstream": [
+        "agent.local-cloud-router",
+        "agent.route-local-cloud-provider"
+      ],
+      "downstream": [
+        "workflow.floci-first-cloud-feature-delivery",
+        "engineering.floci-capability-routing-evaluation"
+      ]
+    },
+    {
+      "id": "engineering.floci-capability-routing-evaluation",
+      "path": "engineering/development_packs/floci/evaluation/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define FLC-05 deterministic routing cases and invariants for four-provider feature delivery, specialized cloud work, ambiguity/unknown stops, and provider-only escalation review.",
+      "upstream": [
+        "engineering.floci-capability-router",
+        "workflow.floci-first-cloud-feature-delivery"
+      ],
+      "downstream": [
+        "engineering.floci-roadmap"
+      ]
+    }
+  ]
+}

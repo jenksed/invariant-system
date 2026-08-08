@@ -2,6 +2,12 @@
 
 Use this playbook when substantial repository work must move from uncertain current state to independently verified completion.
 
+## Cloud specialization
+
+If the requested feature or fix depends materially on AWS, Azure, GCP, or OCI behavior, route through `workflows/floci_first_cloud_feature_delivery.md` instead of manually inserting cloud steps into this generic sequence.
+
+That specialization preserves this workflow's repository-truth, execution, independent-verification, and handoff structure while adding provider resolution, Local Cloud execution boundaries, operation-level fidelity, and explicit provider-only residue.
+
 ## Sequence
 
 1. `agent.repository-truth-audit` — establish actual repository state when current state is uncertain.
