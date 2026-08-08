@@ -1,6 +1,6 @@
 # Repository Truth Quickstart
 
-Status: ARS-00B distribution pilot
+Status: ARS-00B distribution pilot, compiler-backed by ARS-03
 
 Repository Truth is the first Project Arsenal capability packaged for low-friction use outside this repository.
 
@@ -16,7 +16,7 @@ The package is an adapter, not a new source of truth. Its bundled `references/re
 
 ## What this pilot proves
 
-ARS-00B is intentionally narrow. It proves one useful distribution path before ARS-03 builds a general compiler.
+ARS-00B intentionally proved one useful distribution path before compiler automation. ARS-03 now regenerates that same path deterministically from canonical capability and asset data.
 
 Current supported tracer:
 
@@ -53,6 +53,7 @@ The installer writes only:
 ```text
 <target-repository>/.agents/skills/repository-truth/
 ├── SKILL.md
+├── arsenal-manifest.json
 └── references/
     └── repository_truth_audit.md
 ```
@@ -126,7 +127,7 @@ The package itself follows the open Agent Skills layout: `SKILL.md` plus optiona
 
 Other harnesses may install the same package through different directories, upload flows, plugin systems, or workspace management surfaces. ARS-00B does not pretend those distribution mechanisms are identical.
 
-Harness-specific packaging should remain an adapter concern. ARS-03 will use this pilot as a regression fixture when it introduces compiler/export infrastructure.
+Harness-specific packaging remains an adapter concern. ARS-03 now uses this pilot as its first compiler regression fixture: `python3 scripts/arsenal_compile.py verify` reconstructs the expected package and fails on manual drift.
 
 ## Why the package contains a canonical snapshot
 
@@ -142,7 +143,7 @@ The repository verifier requires that file to be byte-identical to:
 
 This gives the installed package autonomy while keeping Arsenal's canonical asset authoritative.
 
-The later compiler should generate or refresh that snapshot deterministically rather than maintain it by hand.
+The ARS-03 compiler now generates or refreshes that snapshot deterministically rather than maintaining it by hand.
 
 ## What ARS-00B does not prove
 
@@ -150,7 +151,7 @@ This pilot does not prove that Repository Truth improves engineering outcomes ve
 
 It does not define Capability Contract v2. That belongs to ARS-01.
 
-It does not define the permanent Arsenal distribution CLI or plugin system. That belongs to ARS-03 after this pilot establishes what a useful exported package actually needs.
+It does not define a universal multi-format distribution CLI or plugin system. ARS-03 v0 proves the compiler contract with Agent Skills only; additional format adapters require their own evidence-backed packaging contracts.
 
 ## Pilot acceptance
 
