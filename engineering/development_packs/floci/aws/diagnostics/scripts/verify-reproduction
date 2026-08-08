@@ -5,7 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIAG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 AWS_PACK_DIR="$(cd "$DIAG_DIR/.." && pwd)"
 CASE_DIR="$DIAG_DIR/examples/sqs-redrive-mismatch"
-ARTIFACT_DIR="${FLOCI_ARTIFACT_DIR:-$AWS_PACK_DIR/.floci-artifacts}/diagnostics"
+ARTIFACT_ROOT="${FLOCI_ARTIFACT_DIR:-$AWS_PACK_DIR/.floci-artifacts}"
+ARTIFACT_DIR="$ARTIFACT_ROOT/diagnostics"
 mkdir -p "$ARTIFACT_DIR"
 
 export AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-http://localhost:4566}"
@@ -49,20 +50,26 @@ print(h.hexdigest())
 PY
 )"
 
-cat >"$ARTIFACT_DIR/reproduction-receipt.md" <<EOF
+receipt="$ARTIFACT_DIR/reproduction-receipt.md"
+cat >"$receipt" <<EOF
 # FLC-03 Reproduction Receipt
 
-- Case ID: `flc03.sqs-redrive-mismatch`
-- Floci endpoint: `$AWS_ENDPOINT_URL`
-- Fixture digest: `$fixture_digest`
+- Case ID: \`flc03.sqs-redrive-mismatch\`
+- Floci endpoint: \`$AWS_ENDPOINT_URL\`
+- Fixture digest: \`$fixture_digest\`
 - Red result: PASS (reproduction observed)
-- Red signal: `REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3`
+- Red signal: \`REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3\`
 - Control result: PASS
-- Green signal: `CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5`
+- Green signal: \`CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5\`
 - Minimized state: one work queue, one DLQ, one RedrivePolicy attribute
 - Sensitive data: none; synthetic fixture only
 - Provider-only residue: AWS delivery timing, redrive timing, authorization, quota, regional, and managed-service semantics are not established by this local case.
 EOF
+
+test -s "$receipt"
+grep -F 'Case ID: `flc03.sqs-redrive-mismatch`' "$receipt" >/dev/null
+grep -F 'Red signal: `REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3`' "$receipt" >/dev/null
+grep -F 'Green signal: `CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5`' "$receipt" >/dev/null
 
 # Cleanup is explicit but not completion authority; CI also tears down the emulator.
 suffix="${REPRO_SUFFIX:-flc03}"
@@ -75,4 +82,4 @@ for q in "arsenal-${suffix}-work" "arsenal-${suffix}-dlq"; do
 done
 
 printf 'FLC-03 cloud reproduction gate: PASS\n'
-printf 'receipt: %s\n' "$ARTIFACT_DIR/reproduction-receipt.md"
+printf 'receipt: %s\n' "$receipt"
