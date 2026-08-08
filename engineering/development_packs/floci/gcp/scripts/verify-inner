@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+guard_endpoint
+wait_ready
+python3 -c 'import google.cloud.storage, google.cloud.pubsub_v1'
+printf 'FLC-04 GCP inner gate: PASS\n'

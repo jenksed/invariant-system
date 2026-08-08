@@ -1,0 +1,92 @@
+#!/usr/bin/env python3
+"""Resolve the local-cloud provider from explicit choice or repository evidence."""
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+PROVIDERS = {
+    "aws": {
+        "pack": "engineering/development_packs/floci/aws",
+        "patterns": [r"\bAWS_ENDPOINT_URL\b", r"\bboto3\b", r'provider\s+"aws"', r"\baws_s3_", r"\bCloudFormation\b"],
+    },
+    "azure": {
+        "pack": "engineering/development_packs/floci/azure",
+        "patterns": [r"\bAZURE_STORAGE_CONNECTION_STRING\b", r"\bazure-storage-(?:blob|queue)\b", r'provider\s+"azurerm"', r"\bazurerm_", r"\bAzurite\b"],
+    },
+    "gcp": {
+        "pack": "engineering/development_packs/floci/gcp",
+        "patterns": [r"\bSTORAGE_EMULATOR_HOST\b", r"\bPUBSUB_EMULATOR_HOST\b", r"\bgoogle-cloud-(?:storage|pubsub)\b", r'provider\s+"google"', r"\bgoogle_storage_"],
+    },
+    "oci": {
+        "pack": "engineering/development_packs/floci/oci",
+        "patterns": [r"\bOCI_CLI_ENDPOINT\b", r"\bFLOCI_OCI_ENDPOINT\b", r'provider\s+"oci"', r"\boci_objectstorage_", r"\boci\.object_storage\b"],
+    },
+}
+SKIP = {".git", ".terraform", ".venv", "node_modules", "vendor", "dist", "build", "target", "_build", "deps", ".floci-artifacts"}
+SUFFIXES = {".tf", ".tfvars", ".yml", ".yaml", ".json", ".toml", ".env", ".sh", ".py", ".js", ".ts", ".go", ".java", ".ex", ".exs"}
+
+
+def files(root: Path):
+    for path in root.rglob("*"):
+        if not path.is_file() or any(part in SKIP for part in path.parts):
+            continue
+        if path.suffix.lower() in SUFFIXES or path.name.startswith(".env") or path.name in {"Dockerfile", "Makefile"}:
+            yield path
+
+
+def scan(root: Path):
+    evidence = {name: [] for name in PROVIDERS}
+    for path in files(root):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        rel = str(path.relative_to(root))
+        for name, cfg in PROVIDERS.items():
+            for pattern in cfg["patterns"]:
+                if re.search(pattern, text, flags=re.IGNORECASE):
+                    evidence[name].append({"path": rel, "pattern": pattern})
+    return evidence
+
+
+def resolve(root: Path, explicit: str | None):
+    if explicit:
+        return {"provider": explicit, "confidence": "explicit", "pack": PROVIDERS[explicit]["pack"], "evidence": []}
+    evidence = scan(root)
+    hits = {name: items for name, items in evidence.items() if items}
+    if not hits:
+        return {"provider": None, "confidence": "unknown", "pack": None, "evidence": []}
+    if len(hits) > 1:
+        return {"provider": None, "confidence": "ambiguous", "pack": None, "evidence": hits}
+    name = next(iter(hits))
+    return {"provider": name, "confidence": "repository", "pack": PROVIDERS[name]["pack"], "evidence": hits[name]}
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("root", nargs="?", default=".")
+    p.add_argument("--provider", choices=sorted(PROVIDERS))
+    p.add_argument("--format", choices=("json", "text"), default="text")
+    args = p.parse_args()
+    root = Path(args.root).resolve()
+    if not root.exists():
+        p.error(f"root does not exist: {root}")
+    result = resolve(root, args.provider)
+    if args.format == "json":
+        print(json.dumps(result, indent=2, sort_keys=True))
+    elif result["provider"]:
+        print(f"{result['provider']}\t{result['pack']}\t{result['confidence']}")
+    else:
+        print(result["confidence"])
+    if result["confidence"] == "ambiguous":
+        return 3
+    if result["confidence"] == "unknown":
+        return 4
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
