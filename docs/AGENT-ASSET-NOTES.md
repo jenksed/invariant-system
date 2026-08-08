@@ -6,6 +6,39 @@ Kiln stores project-local skills, Pi prompt templates, and optional specialist-a
 
 These files support the coding agent that builds Kiln. They do not run inside the Kiln product.
 
+## Asset contract
+
+Every project-local skill and specialist-agent definition declares an invocation mode and a lifecycle status. `scripts/validate-agent-assets` enforces both fields and rejects values outside these sets.
+
+### Invocation mode
+
+`invocation` records who starts the asset:
+
+| Mode | Meaning |
+| --- | --- |
+| `human` | The developer starts it deliberately, including through a prompt template. Use for work that changes the shape of the work or makes a completion claim. |
+| `agent` | The coding agent may select it when the task matches. Use for reusable disciplines whose output is analysis rather than a consequential claim. |
+| `reference` | Not an executable flow. Other assets read it for shared vocabulary or rules. |
+| `composed` | Another asset or workflow dispatches it, rather than the developer starting it directly. The specialist reviewers are dispatched this way. |
+
+A heavyweight asset should not use `agent` merely because a task is large. Its preconditions must actually be present.
+
+A prompt template that loads a skill does not make that skill `composed`. The template is how the developer starts it, so the skill stays `human`.
+
+### Lifecycle status
+
+`status` is an evidence claim, not a confidence claim:
+
+| Status | Meaning |
+| --- | --- |
+| `draft` | No recorded evaluation evidence yet. |
+| `testing` | Under evaluation against recorded cases. |
+| `stable` | Recorded evaluation evidence supports the behavior. |
+
+Every current asset is `draft`, because the repository holds no recorded evaluation evidence for any of them. Do not promote an asset because its prose reads well. Promotion requires recorded evidence for the claimed status.
+
+These concepts are adapted from the Project Arsenal asset contract and invocation model. Kiln keeps its own reduced field set and its own enforcement, and Project Arsenal has no authority over Kiln.
+
 ## Skills
 
 Project-local skills use this path:

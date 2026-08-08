@@ -2,6 +2,8 @@
 name: kiln-elixir-otp
 description: Guides Elixir and OTP implementation in Kiln. Use when adding or changing modules, processes, supervisors, tasks, ports, messages, cancellation, configuration, or ExUnit tests.
 compatibility: Kiln targets Elixir 1.20 and Erlang/OTP 28.
+invocation: agent
+status: draft
 ---
 
 # Kiln Elixir and OTP

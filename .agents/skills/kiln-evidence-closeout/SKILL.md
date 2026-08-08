@@ -2,6 +2,8 @@
 name: kiln-evidence-closeout
 description: Closes a Kiln work package with current verification evidence. Use after implementation to inspect the diff, run required checks, map evidence to acceptance criteria, and report unknowns without overstating completion.
 compatibility: Kiln repository with Git, Bash, Vale, Elixir, and project scripts.
+invocation: human
+status: draft
 ---
 
 # Kiln Evidence Closeout
