@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_tools
+guard_endpoint
+prepare_docker_socket_group
+compose up -d
+"$PACK_DIR/scripts/wait-ready"
+printf 'Floci AWS golden-path environment started\n'

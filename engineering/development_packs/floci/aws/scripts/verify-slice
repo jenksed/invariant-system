@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_tools
+guard_endpoint
+"$PACK_DIR/scripts/wait-ready"
+"$PACK_DIR/scripts/reset"
+"$PACK_DIR/scripts/verify-inner"
+"$PACK_DIR/scripts/run-tracer"
+printf 'floci aws slice gate: PASS\n'

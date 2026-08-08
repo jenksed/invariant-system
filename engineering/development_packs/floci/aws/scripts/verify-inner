@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+ensure_tools
+guard_endpoint
+"$PACK_DIR/scripts/wait-ready"
+aws_local s3api head-bucket --bucket arsenal-floci-input
+aws_local s3api head-bucket --bucket arsenal-floci-results
+aws_local sqs get-queue-url --queue-name arsenal-floci-work >/dev/null
+aws_local lambda get-function --function-name arsenal-floci-consumer >/dev/null
+printf 'floci aws inner gate: PASS\n'
