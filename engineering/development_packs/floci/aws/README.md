@@ -145,6 +145,12 @@ Use the standard image for repositories with no in-container seed tooling.
 
 Use `-compat` when init hooks need AWS CLI, boto3, or Python. Do not use compat by habit when the extra tooling is unnecessary.
 
+## Multi-cloud routing
+
+This remains the AWS-owned overlay after FLC-04. Do not copy its account/region/access-key vocabulary into Azure, GCP, or OCI merely to make the packs look uniform.
+
+When provider intent is not already explicit, use `agent_workflows/route_local_cloud_provider.md` or `../providers/scripts/resolve-provider` first. The shared provider contract standardizes lifecycle and evidence; this directory continues to own AWS-specific endpoints, fixtures, service semantics, and fidelity claims.
+
 ## Completion criterion
 
 FLC-01's golden path is healthy when a zero-state rebuild reaches ready, the endpoint guard blocks unsafe configuration, the tracer deterministically produces the expected S3 result, the image tag/digest is captured, and the ledger/receipt prevent that local success from being reported as real-AWS verification.
