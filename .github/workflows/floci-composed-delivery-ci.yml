@@ -31,15 +31,14 @@ jobs:
         run: python3 engineering/development_packs/floci/evaluation/verify_flc05_routing.py
 
       - name: Materialize generated catalog candidate
-        run: |
-          python3 scripts/arsenal_audit.py --write-catalog
-          python3 - <<'PY'
-          import base64
-          from pathlib import Path
-          print("CATALOG_B64_BEGIN")
-          print(base64.b64encode(Path("CATALOG.md").read_bytes()).decode())
-          print("CATALOG_B64_END")
-          PY
+        run: python3 scripts/arsenal_audit.py --write-catalog
+
+      - name: Upload generated catalog candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f05-generated-catalog
+          path: CATALOG.md
+          if-no-files-found: error
 
       - name: Validate receipt
         run: |
