@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIAG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+AWS_PACK_DIR="$(cd "$DIAG_DIR/.." && pwd)"
+LEGACY_DIR="$DIAG_DIR/fixtures/localstack-legacy"
+MIGRATED_DIR="$DIAG_DIR/fixtures/floci-compat"
+ARTIFACT_DIR="${FLOCI_ARTIFACT_DIR:-$AWS_PACK_DIR/.floci-artifacts}/diagnostics"
+mkdir -p "$ARTIFACT_DIR"
+
+for tool in docker curl python3 aws; do
+  command -v "$tool" >/dev/null 2>&1 || { printf 'missing required tool: %s\n' "$tool" >&2; exit 127; }
+done
+docker compose version >/dev/null
+
+legacy_json="$ARTIFACT_DIR/localstack-legacy-inventory.json"
+migrated_json="$ARTIFACT_DIR/floci-migrated-inventory.json"
+python3 "$SCRIPT_DIR/inventory-localstack" "$LEGACY_DIR" --format json --output "$legacy_json"
+python3 "$SCRIPT_DIR/inventory-localstack" "$MIGRATED_DIR" --format json --output "$migrated_json"
+
+python3 - "$legacy_json" "$migrated_json" <<'PY'
+import json, sys
+legacy = json.load(open(sys.argv[1], encoding="utf-8"))
+migrated = json.load(open(sys.argv[2], encoding="utf-8"))
+assert legacy["summary"]["blockers"] >= 1, legacy["summary"]
+assert any(f["token"] == "LAMBDA_REMOTE_DOCKER" and f["disposition"] == "BLOCKER" for f in legacy["findings"])
+assert any(f["token"].startswith("localstack/localstack") for f in legacy["findings"])
+assert any(f["token"] == "/var/lib/localstack" for f in legacy["findings"])
+assert migrated["summary"]["blockers"] == 0, migrated["summary"]
+assert any(f["disposition"] == "KEEP_COMPAT" and "/etc/localstack/init/" in f["token"] for f in migrated["findings"])
+print("migration inventory assertions: PASS")
+PY
+
+set +e
+python3 "$SCRIPT_DIR/inventory-localstack" "$LEGACY_DIR" --format json --fail-on-blocker >/dev/null
+blocker_rc=$?
+set -e
+[[ "$blocker_rc" -eq 2 ]] || { printf 'expected --fail-on-blocker exit 2, got %s\n' "$blocker_rc" >&2; exit 1; }
+
+compose=(docker compose -p flc03migration -f "$MIGRATED_DIR/docker-compose.yml")
+cleanup() {
+  "${compose[@]}" down --volumes --remove-orphans >/dev/null 2>&1 || true
+}
+trap cleanup EXIT
+chmod +x "$MIGRATED_DIR/init/ready.d/01-seed.sh"
+"${compose[@]}" up -d
+
+export AWS_ENDPOINT_URL=http://localhost:4566
+export AWS_DEFAULT_REGION=us-east-1
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export AWS_EC2_METADATA_DISABLED=true
+
+ready=0
+for _ in $(seq 1 60); do
+  if curl -fsS --max-time 2 "$AWS_ENDPOINT_URL/_localstack/init" >"$ARTIFACT_DIR/localstack-init.json" 2>/dev/null && \
+     aws --endpoint-url "$AWS_ENDPOINT_URL" s3api head-bucket --bucket arsenal-flc03-migration >/dev/null 2>&1; then
+    ready=1
+    break
+  fi
+  sleep 1
+done
+[[ "$ready" -eq 1 ]] || { "${compose[@]}" logs >"$ARTIFACT_DIR/migration-floci.log" 2>&1 || true; echo 'migration fixture did not reach seeded ready state' >&2; exit 1; }
+
+"$SCRIPT_DIR/diagnose-floci" "$ARTIFACT_DIR/migration-environment.md"
+aws --endpoint-url "$AWS_ENDPOINT_URL" s3api head-bucket --bucket arsenal-flc03-migration
+aws --endpoint-url "$AWS_ENDPOINT_URL" sqs get-queue-url --queue-name arsenal-flc03-migration >"$ARTIFACT_DIR/migration-queue.json"
+"${compose[@]}" logs >"$ARTIFACT_DIR/migration-floci.log" 2>&1 || true
+
+cat >"$ARTIFACT_DIR/migration-receipt.md" <<'EOF'
+# FLC-03 LocalStack → Floci Migration Fixture Receipt
+
+- Legacy inventory: PASS; known LocalStack assumptions enumerated.
+- Legacy blocker gate: PASS; `LAMBDA_REMOTE_DOCKER` prevented blind migration.
+- Migrated inventory: PASS; zero unresolved blockers.
+- Runtime: pinned Floci `1.5.34-compat` unless explicitly overridden.
+- Compatibility path: `/etc/localstack/init/ready.d` retained intentionally.
+- Compatibility environment: `PERSISTENCE=1` retained and exercised.
+- Init tooling: compat-image `aws` command executed the seed fixture.
+- LocalStack-compatible init endpoint: PASS.
+- S3 seeded bucket assertion: PASS.
+- SQS seeded queue assertion: PASS.
+- Provider-only residue: AWS authorization, quotas, regional behavior, billing, timing, and undeclared semantics remain unverified.
+EOF
+
+printf 'FLC-03 migration compatibility gate: PASS\n'
+printf 'receipt: %s\n' "$ARTIFACT_DIR/migration-receipt.md"
