@@ -16,16 +16,11 @@ on:
       - "README.md"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   capability-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -39,26 +34,3 @@ jobs:
 
       - name: Arsenal integrity
         run: python3 scripts/arsenal_audit.py
-
-      - name: Correct ARS-01 README capability list
-        if: github.event_name == 'pull_request' && github.head_ref == 'agent/ars-01-capability-contract-v2'
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          from pathlib import Path
-          path = Path("README.md")
-          text = path.read_text()
-          bad = "- nine canonical Capability Contract v2 fragments spanning Core Arsenal + Local Cloud delivery;\n"
-          if bad in text:
-              text = text.replace(bad, "", 1)
-              path.write_text(text)
-          PY
-          if git diff --quiet -- README.md; then
-            echo "README capability list already correct"
-            exit 0
-          fi
-          git config user.name "Project Arsenal CI"
-          git config user.email "jenksed@noreply.local"
-          git add README.md
-          git commit -m "Correct ARS-01 README capability list"
-          git push origin HEAD:${{ github.head_ref }}
