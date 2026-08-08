@@ -10,21 +10,15 @@ on:
       - "docs/source_audits/agent_skills_distribution.md"
       - "scripts/install-repository-truth-skill"
       - "scripts/verify-repository-truth-distribution.py"
-      - "scripts/materialize-ars-00b-docs.py"
       - "README.md"
       - "docs/roadmap/capability-system.md"
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   distribution-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Validate distribution package
         run: python3 scripts/verify-repository-truth-distribution.py
@@ -57,15 +51,3 @@ jobs:
 
       - name: Arsenal integrity
         run: python3 scripts/arsenal_audit.py
-
-      - name: Materialize accepted ARS-00B public docs
-        if: github.event_name == 'pull_request'
-        run: |
-          python3 scripts/materialize-ars-00b-docs.py
-          if ! git diff --quiet -- README.md docs/roadmap/capability-system.md; then
-            git config user.name "Project Arsenal CI"
-            git config user.email "jenksed@noreply.local"
-            git add README.md docs/roadmap/capability-system.md
-            git commit -m "Record ARS-00B delivery and advance to ARS-01"
-            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-          fi
