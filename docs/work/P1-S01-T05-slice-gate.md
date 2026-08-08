@@ -222,13 +222,13 @@ P1-S01-D01 complete: select fixture Repository metadata, start Session, inspect 
 
 ## Completion record
 
-**Result:** Implemented; deterministic verification passes; owner-machine Evidence blocked
+**Result:** Implemented; deterministic verification passes; owner-machine Evidence collected on the accepted OD-02 acceptance machine
 
 The aggregate gate, the P1-S01-D01 demo, the protected failure matrix, the
 excluded-capability audit, and P1-S01-V01 are implemented and pass at the exact
 branch head. One integration defect in previously merged work was discovered and
-corrected. P1-S01 acceptance remains open because AC04 requires Evidence from the
-accepted OD-02 acceptance host and AC07 requires owner review.
+corrected. The final owner-machine pass collected AC04 Evidence on the accepted
+OD-02 acceptance machine. AC07 remains open pending owner review.
 
 ### Integration defect discovered and corrected
 
@@ -255,7 +255,7 @@ accommodate it.
 | P1-S01-T05-AC01 | Pass | P1-S01-T05-E01 | `scripts/gates/slice-01` exits 0 across 18 components; structured result written to `artifacts/p1-s01/slice-01-<commit>.json` |
 | P1-S01-T05-AC02 | Pass | P1-S01-T05-E02 | `scripts/demos/p1-s01` exits 0; identifiers and digests identical across separate operating-system processes and after the projection cache is discarded |
 | P1-S01-T05-AC03 | Pass | P1-S01-T05-E03 | Seven protected cases assert their exact classification through the integrated boundary; the harness itself fails if a fixture fails differently |
-| P1-S01-T05-AC04 | **Blocked** | P1-S01-T05-E04 | The current host is an Apple M3 MacBook Air (Mac15,13), not the OD-02 primary acceptance machine. See "Owner-machine Evidence" below |
+| P1-S01-T05-AC04 | **Pass** | P1-S01-T05-E04 | Final owner-machine pass on the accepted OD-02 acceptance machine (`hw.model = MacBookPro18,1`). See "Owner-machine Evidence" below |
 | P1-S01-T05-AC05 | Pass | P1-S01-T05-E05 | `Kiln.VerificationManifest` builds and validates P1-S01-V01; 21 assertions cover state binding and non-authority |
 | P1-S01-T05-AC06 | Pass | P1-S01-T05-E06 | Deterministic module, behaviour, source, and command-surface reachability checks |
 | P1-S01-T05-AC07 | **Open** | P1-S01-T05-E07 | Owner review of the exact integrated diff and manifest has not been given |
@@ -263,27 +263,29 @@ accommodate it.
 ### Owner-machine Evidence (AC04)
 
 The accepted OD-02 profile names "the owner's M1 Pro MacBook Pro" as the primary
-acceptance machine. Detected host:
+acceptance machine. Detected host on the final owner-machine pass:
 
 ```text
-model:      MacBook Air (Mac15,13), Apple M3
-macOS:      26.5.1 (build 25F80)
+model:      MacBook Pro (MacBookPro18,1), Apple M1 Pro
+macOS:      26.5.2 (build 25F84)
 arch:       arm64
-filesystem: APFS, internal
+filesystem: APFS, internal (device /dev/disk3s1)
+memory:     16 GB
 ```
 
-This host satisfies the general supported-host profile (macOS 15 or later, Apple
-Silicon, local APFS) but is not the named acceptance machine, and it differs from
-the host T02 recorded for its own owner-machine Evidence (macOS 26.5.2, build
-25F84). Per the accepted requirement that owner-machine Evidence is not inferred,
-AC04 is reported `BLOCKED` rather than satisfied from this machine. The aggregate
-gate records the component as `not_run` and P1-S01-V01 reports `overall: blocked`.
+This host is the named acceptance machine: `hw.model = MacBookPro18,1`. The
+`scripts/gates/slice-01` owner-machine guard (`KILN_OWNER_MACHINE=1`) refuses
+the assertion on any other Apple Silicon Mac, so a wrong machine cannot
+produce a passing `KILN_OWNER_MACHINE=1` result. With the actual hardware
+identity recorded and validated, the aggregate gate records
+`owner_machine_diagnostic = pass` and P1-S01-V01 records `overall: pass`,
+`owner_machine.outcome = pass`, and `owner_machine.decision = OD-02`.
 
-A related gap is recorded rather than silently corrected: the diagnostic in
-`scripts/diagnostics/p1-s01-store-host` records macOS version, architecture, and
-filesystem, but records no hardware model identifier. It therefore cannot
-distinguish the named acceptance machine from any other Apple Silicon Mac, which
-is why T02's Evidence could be collected without the mismatch being visible.
+The earlier implementation pass on an Apple M3 MacBook Air (`Mac15,13`) is
+preserved as the machine that proved every deterministic component and the
+earlier `not_run` owner-machine Evidence. The hardened hardware-model check
+added at `c872c16` is what made this final pass provably distinct from that
+earlier run.
 
 ### Verification executed
 
@@ -302,10 +304,11 @@ Erlang/OTP 28.4, Exqlite 0.39.0, SQLite 3.53.3, Vale 3.14.2, jsonschema 4.26.0.
 | `mix compile --warnings-as-errors` | 0 | no warnings |
 | `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | no cycles |
 | `mix test` | 0 | 386 tests, 386 passed (351 inherited + 14 slice + 21 manifest) |
-| `scripts/gates/slice-01` | 0 | 18 components; 0 failed; 0 blocked; owner-machine `not_run` |
+| `scripts/gates/slice-01` | 0 | 18 components; 0 failed; 0 blocked; owner-machine `not_run` (deterministic pass) |
+| `scripts/gates/slice-01` (`KILN_OWNER_MACHINE=1`) | 0 | 18 components; 0 failed; 0 blocked; `owner_machine_diagnostic = pass` on the OD-02 acceptance machine; P1-S01-V01 `overall: pass` |
 | `scripts/demos/p1-s01` | 0 | P1-S01-D01 restart and journal-reconstruction parity |
 | `scripts/check` | 0 | aggregate development check |
-| `scripts/diagnostics/p1-s01-store-host` | 0 | ran, but not on the accepted OD-02 acceptance host |
+| `scripts/diagnostics/p1-s01-store-host` | 0 | ran on the accepted OD-02 acceptance machine |
 
 ### Adversarial verification of the gate itself
 
@@ -323,30 +326,43 @@ Erlang/OTP 28.4, Exqlite 0.39.0, SQLite 3.53.3, Vale 3.14.2, jsonschema 4.26.0.
   journal reconstruction after cache discard both proved.
 - Parent slice gate affected: P1-S01-G09 through G11.
 - Slice verification manifest updated: Yes; P1-S01-V01 generated and validated,
-  currently `overall: blocked` pending owner-machine Evidence.
-- Slice completion claimed: **No.**
+  `overall: pass` after the owner-machine Evidence was collected on the accepted
+  OD-02 acceptance machine.
+- Slice completion claimed: **No.** AC07 owner review remains open.
 
 ### Failures and warnings
 
-- AC04 is blocked: owner-machine Evidence must be collected on the accepted
-  OD-02 acceptance host. CI, another Mac, Docker, and a virtual machine are not
-  substitutes.
 - AC07 is open: owner review has not been given.
-- The owner-machine diagnostic records no hardware model identifier, so it
-  cannot by itself prove which Apple Silicon Mac produced the Evidence.
-- P1-S01-V01 reports `overall: blocked` at this state. That is the correct
-  reading, not a defect.
+- The earlier owner-machine run on an M3 MacBook Air produced a `BLOCKED`
+  owner-machine component and is recorded as the limitation that the
+  hardware-model check in the hardened gate and diagnostic now closes.
 
 ### Remaining unknowns and exclusions
 
-- OD-02 host filesystem, WAL, and sync behavior is unverified at this state.
 - P1-S02 remains planned and unauthorized after this ticket unless separately
   adjudicated.
+
+### Owner-machine Evidence (final pass, AC04)
+
+The final owner-machine pass was executed on the accepted OD-02 acceptance
+machine, the owner's M1 Pro MacBook Pro (`hw.model = MacBookPro18,1`):
+
+| Command or check | Result |
+| --- | --- |
+| `scripts/diagnostics/p1-s01-store-host` | pass — recorded macOS 26.5.2 (build 25F84), APFS internal, Exqlite 0.39.0, SQLite 3.53.3, journal_mode `wal`, synchronous `2`, foreign_keys `1`, busy_timeout `2000`, quick_check `ok` |
+| `KILN_OWNER_MACHINE=1 scripts/gates/slice-01` | pass — 18 components; 0 failed; 0 blocked; `owner_machine_diagnostic = pass`; manifest digest `sha256:cb6e907fd126e2b0f7388d7775f8bf1afb61b1c5d405397170eb009dcfc0ddca` |
+| `scripts/demos/p1-s01` | pass — P1-S01-D01 restart parity and journal-reconstruction across separate OS processes; cache discarded, state rebuilt identically |
+
+The earlier implementation pass on an M3 MacBook Air is preserved as the
+machine that proved every deterministic component and the earlier
+`not_run` owner-machine Evidence. The hardened hardware-model check is what
+makes this final pass provably distinct from that earlier run.
 
 ### Repository state
 
 - Branch: `work/p1-s01-t05-slice-gate`
 - Base: `118bcaad7353e8f891e4d0101460379e78138e56`
 - Diff reviewed: Yes
-- Parent slice status after merge: P1-S01 candidate proved for every machine
-  gate; acceptance withheld pending owner-machine Evidence and owner review.
+- Parent slice status after merge: P1-S01 candidate proved on every machine
+  gate including the accepted OD-02 acceptance machine; acceptance withheld
+  pending owner review (AC07).

@@ -3,7 +3,7 @@
 **Document type:** Slice closeout record
 **Slice:** P1-S01 — Durable single-Run foundation
 **Closing ticket:** P1-S01-T05
-**Status:** Technically verified; acceptance withheld
+**Status:** Technically verified on the accepted OD-02 acceptance machine; owner acceptance withheld
 
 ## Purpose
 
@@ -61,15 +61,17 @@ silent skip and never a pass.
 
 ## Open items before acceptance
 
-1. **Owner-machine Evidence (AC04).** Must be collected on the accepted OD-02
-   acceptance machine. The host used during implementation is an Apple M3
-   MacBook Air, which satisfies the general supported-host profile but is not the
-   named acceptance machine.
+1. **Owner-machine Evidence (AC04).** Collected on the accepted OD-02
+   acceptance machine during the final owner-machine pass. Detected host:
+   `hw.model = MacBookPro18,1` (the owner's M1 Pro MacBook Pro), macOS
+   26.5.2 (build 25F84), APFS internal, Elixir 1.20.2 / OTP 28 / Git 2.50.1 /
+   Exqlite 0.39.0 / SQLite 3.53.3. P1-S01-V01 records `overall: pass` with
+   `owner_machine.outcome = pass` and `owner_machine.decision = OD-02`.
 2. **Owner review (AC07).** The owner must review the exact integrated diff and
    P1-S01-V01 and record the decision.
 
-Until both close, P1-S01-V01 reports `overall: blocked` and the slice is not
-accepted.
+Until AC07 closes, P1-S01-V01 is implementation Evidence only and the slice is
+not accepted.
 
 ## Authorization boundary after this ticket
 
@@ -85,3 +87,26 @@ P1-S02 remains unauthorized. No Evidence substrate, Development Pack runtime,
 Quality Compiler runtime, Repository investigation, Patch or mutation path,
 MiniMax provider, Context, Tool, or completion and Receipt runtime is started by
 this ticket.
+
+## Owner-machine Evidence (final pass)
+
+The owner-machine pass on the accepted OD-02 acceptance machine
+(`hw.model = MacBookPro18,1`, the owner's M1 Pro MacBook Pro) produced:
+
+- `scripts/diagnostics/p1-s01-store-host` — pass. Recorded macOS 26.5.2
+  (build 25F84), APFS internal, Exqlite 0.39.0, SQLite 3.53.3, journal_mode
+  `wal`, synchronous `2`, foreign_keys `1`, busy_timeout `2000`, quick_check
+  `ok`.
+- `KILN_OWNER_MACHINE=1 scripts/gates/slice-01` — pass. 18 components, 0
+  failed, 0 blocked. `owner_machine_diagnostic = pass`. Manifest digest:
+  `sha256:cb6e907fd126e2b0f7388d7775f8bf1afb61b1c5d405397170eb009dcfc0ddca`.
+- `scripts/demos/p1-s01` — pass. P1-S01-D01 restart and journal-reconstruction
+  parity proved across separate OS processes with cache discarded and
+  reconstructed identically.
+
+The earlier owner-machine pass reported `BLOCKED` because it ran on an M3
+MacBook Air (`Mac15,13`), which satisfies the general supported-host profile
+but is not the named acceptance machine. T05's harden commit
+(`c872c16`) added the hardware-model identity check to the gate and
+`scripts/diagnostics/p1-s01-store-host`, which is what allowed this final pass
+to record its Evidence against the exact named acceptance machine.
