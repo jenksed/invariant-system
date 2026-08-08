@@ -56,15 +56,16 @@ printf '%s\n' "- create_stack: PASS" "- direct_state_assertions: PASS" >>"$recei
 aws_local cloudformation delete-stack --stack-name "$stack"
 deleted=0
 for _ in $(seq 1 60); do
-  set +e
-  status="$(aws_local cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)"
-  rc=$?
-  set -e
-  if [[ "$rc" -ne 0 || "$status" == "DELETE_COMPLETE" ]]; then
+  if status="$(aws_local cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)"; then
+    if [[ "$status" == "DELETE_COMPLETE" ]]; then
+      deleted=1
+      break
+    fi
+    [[ "$status" != "DELETE_FAILED" ]] || { echo "CloudFormation delete failed" >&2; exit 1; }
+  else
     deleted=1
     break
   fi
-  [[ "$status" != "DELETE_FAILED" ]] || { echo "CloudFormation delete failed" >&2; exit 1; }
   sleep 1
 done
 [[ "$deleted" -eq 1 ]] || { echo "timed out waiting for CloudFormation delete" >&2; exit 1; }
