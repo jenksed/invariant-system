@@ -53,6 +53,21 @@ ensure_tools() {
   return "$missing"
 }
 
+prepare_docker_socket_group() {
+  local socket="/var/run/docker.sock"
+  if [[ ! -S "$socket" ]]; then
+    printf 'Docker socket not found at %s; this FLC-01 Lambda tracer requires a local Docker daemon socket\n' "$socket" >&2
+    return 1
+  fi
+
+  FLOCI_DOCKER_GID="$(python3 - "$socket" <<'PY'
+import os, sys
+print(os.stat(sys.argv[1]).st_gid)
+PY
+)"
+  export FLOCI_DOCKER_GID
+}
+
 guard_endpoint() {
   if [[ -z "${AWS_ENDPOINT_URL:-}" ]]; then
     printf 'refusing AWS call: AWS_ENDPOINT_URL is not set\n' >&2
