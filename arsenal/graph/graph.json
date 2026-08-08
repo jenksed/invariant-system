@@ -1,0 +1,142 @@
+{
+  "schema_version": "1.0.0",
+  "authority_profiles": [
+    {
+      "id": "read-only",
+      "grants": ["filesystem.read", "git.read", "shell.execute", "network.read"]
+    },
+    {
+      "id": "workspace-safe",
+      "grants": ["filesystem.read", "filesystem.write", "git.read", "shell.execute", "network.read"]
+    },
+    {
+      "id": "local-cloud-safe",
+      "grants": ["filesystem.read", "filesystem.write", "git.read", "git.write", "shell.execute", "network.read", "cloud.local"]
+    }
+  ],
+  "routes": [
+    {
+      "id": "route.repository-audit",
+      "display_name": "Repository Audit",
+      "purpose": "Establish repository truth before planning or implementation.",
+      "default_authority_profile": "read-only",
+      "steps": [
+        {
+          "capability_id": "capability.repository-truth",
+          "after": [],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        }
+      ]
+    },
+    {
+      "id": "route.feature-delivery",
+      "display_name": "Feature Delivery",
+      "purpose": "Establish repository truth, implement one behavior slice, review it independently, and verify completion.",
+      "default_authority_profile": "workspace-safe",
+      "steps": [
+        {
+          "capability_id": "capability.repository-truth",
+          "after": [],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.tdd",
+          "after": ["capability.repository-truth"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.review",
+          "after": ["capability.tdd"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.verify",
+          "after": ["capability.review"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        }
+      ]
+    },
+    {
+      "id": "route.bug-repair",
+      "display_name": "Bug Repair",
+      "purpose": "Establish repository truth, reproduce and repair the failure, independently review the change, and verify completion.",
+      "default_authority_profile": "workspace-safe",
+      "steps": [
+        {
+          "capability_id": "capability.repository-truth",
+          "after": [],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.diagnose",
+          "after": ["capability.repository-truth"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.review",
+          "after": ["capability.diagnose"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.verify",
+          "after": ["capability.review"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        }
+      ]
+    },
+    {
+      "id": "route.local-cloud-feature-delivery",
+      "display_name": "Local Cloud Feature Delivery",
+      "purpose": "Establish repository truth, deliver cloud-dependent behavior through the supported local execution boundary, review it, and verify completion.",
+      "default_authority_profile": "local-cloud-safe",
+      "steps": [
+        {
+          "capability_id": "capability.repository-truth",
+          "after": [],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.local-cloud-feature-delivery",
+          "after": ["capability.repository-truth"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "testing",
+          "minimum_evaluation": "candidate"
+        },
+        {
+          "capability_id": "capability.review",
+          "after": ["capability.local-cloud-feature-delivery"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        },
+        {
+          "capability_id": "capability.verify",
+          "after": ["capability.review"],
+          "minimum_version": "0.1.0",
+          "minimum_lifecycle": "draft",
+          "minimum_evaluation": "unassessed"
+        }
+      ]
+    }
+  ]
+}
