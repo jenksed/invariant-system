@@ -1,0 +1,39 @@
+name: ARS-02 Closeout Materialize
+
+on:
+  push:
+    branches:
+      - agent/ars-02-arsenal-bench-v0
+    paths:
+      - ".github/workflows/ars-02-closeout-materialize.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-02-arsenal-bench-v0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic public closeout
+        run: python3 scripts/materialize-ars02-closeout.py
+
+      - name: Commit public closeout only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add README.md docs/roadmap/capability-system.md engineering/development_packs/floci/ROADMAP.md
+          git diff --cached --quiet && exit 0
+          changed="$(git diff --cached --name-only)"
+          test "$changed" = $'README.md\ndocs/roadmap/capability-system.md\nengineering/development_packs/floci/ROADMAP.md'
+          git commit -m "Record ARS-02 delivery and signature primitives"
+          git push origin HEAD:agent/ars-02-arsenal-bench-v0
