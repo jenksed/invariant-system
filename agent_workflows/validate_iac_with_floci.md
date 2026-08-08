@@ -77,7 +77,7 @@ init
 → plan
 → apply
 → post-apply state assertions
-→ optional snapshot cache exercise
+→ optional capability-gated snapshot cache exercise
 → destroy
 → post-destroy absence assertions
 ```
@@ -108,15 +108,22 @@ Examples:
 
 Do not accept `terraform apply` exit `0` as proof that the resources have the required semantics.
 
-## 6. Treat snapshots as caches
+## 6. Treat snapshots as optional caches
+
+Do not infer snapshot support from CLI syntax or documentation alone. Prove the capability against the running Floci server before depending on it.
 
 Snapshot acceleration is allowed only when:
 
+- the running server accepts the snapshot control-plane operation;
 - the snapshot is bound to a reproducible cache key;
 - the key includes emulator/runtime provenance and fixture/tool inputs;
 - a mismatch refuses restore;
 - post-restore assertions rerun;
 - the authoritative completion gate can still rebuild from zero.
+
+If the running server does not implement the documented snapshot endpoint, record the capability as `UNSUPPORTED`/`SKIP`, preserve the probe response, reassert the applied state, and continue through destroy. Do not fail an otherwise-valid IaC completion claim merely because an optional acceleration capability is absent.
+
+Unexpected snapshot failures are not skips. They remain failures until explained.
 
 Never promote a snapshot-restored run to stronger evidence than a clean reconstruction can establish.
 
@@ -142,7 +149,7 @@ On failure, preserve enough evidence to reproduce the issue:
 - plan/apply output;
 - direct assertion failures;
 - Floci logs;
-- snapshot/cache metadata if used;
+- snapshot capability response and cache metadata if used;
 - teardown result.
 
 Do not preserve secrets. The local pack should use only synthetic credentials.
@@ -155,11 +162,12 @@ Report separately:
 - local provisioning evidence;
 - post-provision behavior/state evidence;
 - Floci fidelity evidence;
+- optional snapshot capability evidence;
 - provider-only unknowns.
 
 A valid final statement looks like:
 
-> The module provisioned from zero against the pinned Floci runtime, the required S3/SQS/DynamoDB/IAM state was independently asserted, and teardown returned the emulator to the expected empty state. This does not establish AWS IAM enforcement parity, quotas, regional behavior, billing, service timing, or undeclared provider semantics.
+> The module provisioned from zero against the pinned Floci runtime, the required S3/SQS/DynamoDB/IAM state was independently asserted, and teardown returned the emulator to the expected empty state. Snapshot acceleration was exercised only if the running server supported it and is reported separately. This does not establish AWS IAM enforcement parity, quotas, regional behavior, billing, service timing, or undeclared provider semantics.
 
 ## 10. Escalate only the residue
 
