@@ -8,9 +8,11 @@ Use when a Floci-backed AWS, Azure, GCP, or OCI test/workflow fails and you need
 
 Produce a bounded diagnosis with evidence from the lowest useful layer before changing application code or blaming the emulator.
 
-## 0. Resolve the provider
+## 0. Resolve the composed route and provider
 
-Use `agent_workflows/route_local_cloud_provider.md` before provider-shaped diagnosis. If provider evidence is ambiguous or unknown, stop rather than applying the AWS diagnostic path by habit.
+When diagnosis begins from a broader unresolved cloud-engineering request, enter through `agent_workflows/local_cloud_router.md` with the `environment` work kind. That route establishes repository truth as needed, resolves the provider, and verifies that the environment-diagnosis capability is available for the selected provider.
+
+When this workflow is invoked directly after the work kind is already known, use `agent_workflows/route_local_cloud_provider.md` to resolve the provider before provider-shaped diagnosis. If provider evidence is ambiguous or unknown, stop rather than applying the AWS diagnostic path by habit.
 
 Use the selected provider overlay as the authority for endpoint guard, readiness, synthetic identity, and direct provider-shaped probes.
 
@@ -99,6 +101,8 @@ Do not use `UNKNOWN` as permission to guess.
 - Fidelity uncertainty → `agent_workflows/audit_floci_fidelity_gap.md`.
 - LocalStack migration issue → `agent_workflows/migrate_localstack_to_floci.md` (AWS only).
 
+If the next step changes work kind or requires a higher-level specialization, return through `agent_workflows/local_cloud_router.md` rather than assuming the same provider supports that capability.
+
 ## Reference execution
 
 Prefer the selected provider pack's `scripts/verify-inner` and provider-specific readiness/guard surfaces.
@@ -115,4 +119,4 @@ That command is an AWS reference implementation, not the universal diagnostic co
 
 ## Handoff
 
-Report provider, endpoint boundary, runtime provenance, readiness, provider-shaped probe, exact failing operation, captured evidence, classification, next discriminating action, and provider-only residue.
+Report provider, endpoint boundary, runtime provenance, readiness, provider-shaped probe, exact failing operation, captured evidence, classification, next discriminating action, any capability transition required, and provider-only residue.
