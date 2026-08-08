@@ -1,0 +1,51 @@
+name: ARS-05 Closeout Materialize
+
+on:
+  push:
+    branches:
+      - agent/ars-05-reality-budget
+    paths:
+      - ".github/workflows/ars-05-materialize.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-05-reality-budget
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Regenerate catalog and public status
+        run: |
+          python3 scripts/arsenal_audit.py --write-catalog
+          python3 scripts/materialize-ars05-closeout.py
+
+      - name: Validate integrated state
+        run: |
+          python3 scripts/arsenal_substrate.py validate
+          python3 scripts/test-arsenal-substrate.py
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/arsenal_compile.py verify
+          python3 scripts/capability_audit.py
+          python3 scripts/arsenal_audit.py
+
+      - name: Commit generated and status files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add CATALOG.md README.md docs/roadmap/capability-system.md docs/use/reality-budget.md
+          git diff --cached --quiet && exit 0
+          changed="$(git diff --cached --name-only)"
+          allowed=$'CATALOG.md\nREADME.md\ndocs/roadmap/capability-system.md\ndocs/use/reality-budget.md'
+          test "$changed" = "$allowed"
+          git commit -m "Record ARS-05 delivery and advance frontier"
+          git push origin HEAD:agent/ars-05-reality-budget
