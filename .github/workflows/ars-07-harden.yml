@@ -25,13 +25,16 @@ jobs:
       - name: Apply deterministic hardening
         run: python3 scripts/materialize-ars07-hardening.py
 
+      - name: Restore workflow change for connector-owned update
+        run: git checkout -- .github/workflows/ars-07-evidence-observatory.yml
+
       - name: Validate hardened static contract
         run: |
           python3 -m py_compile scripts/arsenal_observe.py scripts/test-arsenal-observe.py
           python3 scripts/test-arsenal-observe.py
           python3 scripts/arsenal_audit.py
 
-      - name: Commit durable hardening only
+      - name: Commit durable code and docs hardening only
         shell: bash
         run: |
           set -euo pipefail
@@ -40,13 +43,12 @@ jobs:
           git add \
             scripts/arsenal_observe.py \
             scripts/test-arsenal-observe.py \
-            .github/workflows/ars-07-evidence-observatory.yml \
             arsenal/observability/CONTRACT.md \
             docs/use/evidence-observatory.md
 
           git diff --cached --quiet && exit 0
           changed="$(git diff --cached --name-only)"
-          allowed=$'.github/workflows/ars-07-evidence-observatory.yml\narsenal/observability/CONTRACT.md\ndocs/use/evidence-observatory.md\nscripts/arsenal_observe.py\nscripts/test-arsenal-observe.py'
+          allowed=$'arsenal/observability/CONTRACT.md\ndocs/use/evidence-observatory.md\nscripts/arsenal_observe.py\nscripts/test-arsenal-observe.py'
           test "$changed" = "$allowed"
-          git commit -m "Harden ARS-07 evidence provenance and bundle contract"
+          git commit -m "Harden ARS-07 evidence provenance semantics"
           git push origin HEAD:agent/ars-07-evidence-observatory
