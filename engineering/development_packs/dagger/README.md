@@ -60,7 +60,7 @@ A later agent host such as Kiln can execute model-mediated capability judgment w
 
 Prerequisites:
 
-- Dagger CLI `0.21.6`;
+- Dagger CLI `0.21.7`;
 - an OCI-compatible local container runtime supported by Dagger;
 - Python 3.12 for the Arsenal runner.
 
@@ -126,13 +126,13 @@ It does **not** claim perfect bit-for-bit environmental immutability because the
 
 - validates the world contract before Dagger is installed;
 - proves Reality Budget selects the exact local-container world;
-- installs Dagger `0.21.6` through the official GitHub Action;
+- installs Dagger `0.21.7` through the official GitHub Action;
 - runs the same `scripts/arsenal_dagger.py run` command documented for local use;
 - runs the world twice and byte-compares the final receipts;
 - uploads the receipt as CI evidence;
 - preserves ARS-05 through ARS-00B and Arsenal Integrity regressions.
 
-The workflow has read-only repository permissions.
+The workflow has read-only repository permissions. `DAGGER_NO_NAG=1` suppresses Dagger's optional Cloud/setup prompt during CI; no Dagger Cloud token or Cloud execution is required by the tracer.
 
 ## What Dagger does not own
 
