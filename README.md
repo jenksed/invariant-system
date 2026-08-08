@@ -68,27 +68,40 @@ Arsenal is not trying to make every task heavyweight. It is trying to make the *
 
 ## Try Arsenal today
 
-**Status: AVAILABLE, repository-native.**
+**Status: AVAILABLE — Repository Truth distribution pilot.**
 
-Arsenal does not yet ship a universal installer or `arsenal` CLI. Do not invent one.
+Arsenal still does not ship a universal `arsenal` CLI. The first low-friction portable package is **Repository Truth** as an Agent Skill.
 
-The simplest real path today is to use a canonical asset directly with your coding agent.
+### Codex project-local quickstart
 
-For example, start with Repository Truth:
+```bash
+git clone https://github.com/jenksed/project-arsenal.git
+cd project-arsenal
+scripts/install-repository-truth-skill --project /path/to/target-repository
+```
 
-1. Open [`agent_workflows/repository_truth_audit.md`](agent_workflows/repository_truth_audit.md).
-2. Give that workflow to the agent working in your target repository.
-3. Ask it to establish the actual read-only state of the repository **before planning or changing code**.
-4. Use the resulting evidence as the starting point for the next capability or implementation step.
+Then start or restart Codex in the target repository and ask:
 
-If you are adopting Arsenal into a repository, also inspect:
+> Establish repository truth for this repository before planning or changing code.
+
+The installer targets:
+
+`<target-repository>/.agents/skills/repository-truth`
+
+It is idempotent when the installed package is identical and refuses to overwrite a divergent installation.
+
+The portable package lives at [`distribution/agent-skills/repository-truth/`](distribution/agent-skills/repository-truth/). Its bundled canonical workflow is deterministically checked against [`agent_workflows/repository_truth_audit.md`](agent_workflows/repository_truth_audit.md).
+
+See the full [`Repository Truth quickstart`](docs/use/repository-truth-quickstart.md) for manual installation, user-global installation, limitations, and the compiler-regression contract.
+
+If you are adopting Arsenal more broadly into a repository, also inspect:
 
 - [`engineering/doctrine/CORE.md`](engineering/doctrine/CORE.md)
 - [`engineering/templates/AGENTS.md`](engineering/templates/AGENTS.md)
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Building next:** ARS-00B will turn one flagship capability into a much lower-friction distribution/quickstart path. That pilot will teach the later compiler what a useful package actually needs.
+**Next:** ARS-01 introduces Capability Contract v2. ARS-03 will later be required to reproduce this manually proven distribution shape rather than inventing packaging from theory.
 
 ---
 
@@ -394,6 +407,7 @@ The architecture is the reason the public promise can become durable. It is not 
 - Asset Contract and invocation model;
 - Engineering Doctrine and repository templates;
 - Repository Truth;
+- Repository Truth Agent Skills distribution pilot + Codex project-local installer;
 - Pressure Test / grilling method;
 - Recon / Wayfinding method;
 - software-engineering diagnosis, TDD, review, prototyping, specification, and decomposition disciplines;
@@ -405,7 +419,6 @@ The architecture is the reason the public promise can become durable. It is not 
 
 ### BUILDING TOWARD
 
-- ARS-00B flagship quickstart / portable distribution pilot;
 - Capability Contract v2;
 - Arsenal Bench and executable evaluation infrastructure;
 - compiler / harness exports;
