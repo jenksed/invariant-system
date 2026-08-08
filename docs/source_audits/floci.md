@@ -27,6 +27,7 @@ This audit records the Floci capabilities and constraints that Project Arsenal m
 - GCP overview: https://floci.io/gcp/
 - Source repository: https://github.com/floci-io/floci
 - Releases: https://github.com/floci-io/floci/releases
+- Floci CLI source/documentation: https://github.com/floci-io/floci-cli
 
 ## Adopt as the first Local Cloud Development Pack
 
@@ -34,13 +35,15 @@ Floci is a strong first implementation for Arsenal's emulator-neutral Local Clou
 
 - provider-shaped local endpoints intended for existing SDK/CLI/IaC clients;
 - credential-free/dummy-credential development for the AWS emulator;
-- a unified CLI surface for starting, stopping, inspecting, diagnosing, and snapshotting local cloud environments;
+- a unified CLI surface for starting, stopping, inspecting, and diagnosing local cloud environments;
 - explicit storage modes for ephemeral CI and durable local development;
 - ordered initialization hooks with a machine-readable readiness surface;
 - LocalStack-compatible port/path/environment behavior for migration use cases;
 - current AWS, Azure, GCP, and OCI emulator families;
 - operation-specific service documentation that can feed a fidelity ledger;
 - real container-backed engines for selected complex services while retaining provider-shaped control planes.
+
+The Floci CLI also documents snapshot commands. Those commands must be capability-checked against the running server before Arsenal depends on them; the latest released AWS server observed during FLC-02 does not implement the documented snapshot endpoint.
 
 Arsenal should use these capabilities to make local execution deterministic and evidence-producing, not to turn Floci into a universal truth oracle for cloud behavior.
 
@@ -135,7 +138,21 @@ A successful local apply proves the supported local path, not universal provider
 
 ## Snapshot treatment
 
-The Floci CLI documents snapshot save/restore for local state. Arsenal may use snapshots to accelerate expensive fixture construction, but snapshots are caches unless they have provenance, version compatibility, regeneration inputs, and post-restore checks.
+The Floci CLI currently documents AWS commands to save and load named snapshots. During FLC-02 validation, however, the latest published AWS server release (`1.5.34`) did not expose the documented `/_floci/snapshots/<name>` control-plane route.
+
+A real POST against the pinned runtime fell through to S3 routing and returned:
+
+`InvalidArgument: POST requires either ?uploads, ?uploadId, ?restore or ?select parameter.`
+
+Source inspection of the released/current AWS server likewise found no snapshot controller for that path at the audit point.
+
+Project Arsenal therefore must not treat CLI/documentation presence as proof of server capability. Snapshot acceleration is optional and capability-gated:
+
+- if the running server supports save/load, apply provenance-keyed cache invalidation and post-restore assertions;
+- if the exact known released-server endpoint-unavailable signature is observed, record `UNSUPPORTED`/`SKIP` and continue through the authoritative zero-state provision/assert/destroy gate;
+- any other snapshot failure remains a gate failure until explained.
+
+Snapshots are caches, never completion authority.
 
 ## Multi-cloud direction
 
@@ -150,6 +167,7 @@ Do not canonize these claims without operation-specific evidence:
 - exact aggregate service counts;
 - "100% protocol fidelity" as a general guarantee;
 - "drop-in replacement" as proof that every LocalStack workload is behaviorally equivalent;
+- CLI command presence as proof that the corresponding server endpoint exists in the pinned runtime;
 - a successful emulator response as proof of provider authorization, quota, timing, billing, regional, or production semantics;
 - floating `latest` image tags as completion-quality provenance.
 

@@ -1,0 +1,20 @@
+# Optional local backend example only.
+#
+# This is intentionally not used by the FLC-02 completion tracer. The tracer
+# keeps IaC state in its isolated work directory so provisioning evidence is
+# not coupled to a second state-management test. Use this when specifically
+# validating Floci-backed S3/DynamoDB remote state.
+
+bucket = "arsenal-floci-tfstate"
+key    = "flc-02/reference.tfstate"
+region = "us-east-1"
+
+endpoint                    = "http://floci:4566"
+access_key                  = "test"
+secret_key                  = "test"
+skip_credentials_validation = true
+skip_region_validation      = true
+force_path_style            = true
+
+dynamodb_endpoint = "http://floci:4566"
+dynamodb_table    = "arsenal-floci-tflock"
