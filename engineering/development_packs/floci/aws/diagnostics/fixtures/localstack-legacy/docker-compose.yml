@@ -1,0 +1,14 @@
+services:
+  localstack:
+    image: localstack/localstack:3.8
+    ports:
+      - "4566:4566"
+    environment:
+      PERSISTENCE: "1"
+      DEBUG: "1"
+      LAMBDA_REMOTE_DOCKER: "1"
+      LOCALSTACK_AUTH_TOKEN: "${LOCALSTACK_AUTH_TOKEN:-}"
+    volumes:
+      - ./init/ready.d:/etc/localstack/init/ready.d:ro
+      - ./data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
