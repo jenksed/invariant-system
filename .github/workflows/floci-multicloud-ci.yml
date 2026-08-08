@@ -35,7 +35,6 @@ jobs:
       - name: Prove four-provider routing and ambiguity stop
         run: |
           r=engineering/development_packs/floci/providers/scripts/resolve-provider
-          chmod +x "$r"
           root="$(mktemp -d)"
           mkdir -p "$root"/{aws,azure,gcp,oci,mixed,unknown}
           printf 'provider "aws" {}\n' > "$root/aws/main.tf"
@@ -77,7 +76,7 @@ jobs:
           AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=prod;BlobEndpoint=https://example.blob.core.windows.net;QueueEndpoint=https://example.queue.core.windows.net;' guard_endpoint >/tmp/azure-unsafe.log 2>&1
           rc=$?
           set -e
-          test "$rc" -ne 0
+          test "$rc" -eq 64
       - name: Run Azure completion gate
         run: engineering/development_packs/floci/azure/scripts/verify-completion
       - name: Upload Azure evidence
@@ -86,7 +85,7 @@ jobs:
         with:
           name: floci-f04-azure-evidence
           path: engineering/development_packs/floci/azure/.floci-artifacts/
-          if-no-files-found: warn
+          if-no-files-found: error
           include-hidden-files: true
       - name: Tear down Azure
         if: always()
@@ -117,7 +116,7 @@ jobs:
         with:
           name: floci-f04-gcp-evidence
           path: engineering/development_packs/floci/gcp/.floci-artifacts/
-          if-no-files-found: warn
+          if-no-files-found: error
           include-hidden-files: true
       - name: Tear down GCP
         if: always()
@@ -146,7 +145,7 @@ jobs:
         with:
           name: floci-f04-oci-evidence
           path: engineering/development_packs/floci/oci/.floci-artifacts/
-          if-no-files-found: warn
+          if-no-files-found: error
           include-hidden-files: true
       - name: Tear down OCI
         if: always()

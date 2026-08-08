@@ -9,9 +9,12 @@ compose pull
 compose up -d
 wait_ready
 "$PACK_DIR/scripts/verify-inner"
-result="$("$PACK_DIR/scripts/run-tracer" | head -n1)"
+tracer_output="$("$PACK_DIR/scripts/run-tracer")"
+grep -F 'FLC-04 GCP golden path: PASS' <<<"$tracer_output" >/dev/null
+result="${tracer_output%%$'\n'*}"
 image_id="$(compose images -q floci-gcp | head -n1)"
-cat > "$ARTIFACT_DIR/completion-receipt.md" <<EOF2
+receipt="$ARTIFACT_DIR/completion-receipt.md"
+cat > "$receipt" <<EOF2
 # GCP Provider Completion Receipt
 
 - Provider: GCP
@@ -27,6 +30,10 @@ cat > "$ARTIFACT_DIR/completion-receipt.md" <<EOF2
 - Provider-only proof: IAM enforcement, quotas, regional behavior, durability, billing, managed-service timing, and production auth are not verified.
 - Real-provider mutation: no
 EOF2
+test -s "$receipt"
+grep -F -- '- Provider: GCP' "$receipt" >/dev/null
+grep -F -- '- Result: `' "$receipt" >/dev/null
+grep -F -- '- Real-provider mutation: no' "$receipt" >/dev/null
 compose down --volumes --remove-orphans
 trap - EXIT
 printf 'FLC-04 GCP completion gate: PASS\n'

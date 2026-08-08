@@ -29,7 +29,7 @@ guard_endpoint() {
   [[ "$FLOCI_AZ_ENDPOINT" == "http://localhost:4577" || "$FLOCI_AZ_ENDPOINT" == "http://127.0.0.1:4577" ]] || {
     printf 'UNSAFE Azure endpoint: %s\n' "$FLOCI_AZ_ENDPOINT" >&2; return 64; }
   [[ -n "${AZURE_STORAGE_CONNECTION_STRING:-}" ]] || { printf 'missing AZURE_STORAGE_CONNECTION_STRING\n' >&2; return 64; }
-  python3 - "$AZURE_STORAGE_CONNECTION_STRING" <<'PY'
+  if ! python3 - "$AZURE_STORAGE_CONNECTION_STRING" <<'PY'
 import sys
 parts={}
 for item in sys.argv[1].split(';'):
@@ -45,6 +45,9 @@ for key, allowed in expected.items():
 if parts.get('AccountName') != 'devstoreaccount1':
     raise SystemExit('unexpected Azure development account')
 PY
+  then
+    return 64
+  fi
 }
 
 wait_ready() {

@@ -9,9 +9,12 @@ compose pull
 compose up -d
 wait_ready
 "$PACK_DIR/scripts/verify-inner"
-result="$("$PACK_DIR/scripts/run-tracer" | head -n1)"
+tracer_output="$("$PACK_DIR/scripts/run-tracer")"
+grep -F 'FLC-04 OCI golden path: PASS' <<<"$tracer_output" >/dev/null
+result="${tracer_output%%$'\n'*}"
 image_id="$(compose images -q floci-oci | head -n1)"
-cat > "$ARTIFACT_DIR/completion-receipt.md" <<EOF2
+receipt="$ARTIFACT_DIR/completion-receipt.md"
+cat > "$receipt" <<EOF2
 # OCI Provider Completion Receipt
 
 - Provider: OCI
@@ -27,6 +30,10 @@ cat > "$ARTIFACT_DIR/completion-receipt.md" <<EOF2
 - Provider-only proof: signature enforcement, IAM policy, compartments, quotas, regional durability, billing, and managed-service timing are not verified.
 - Real-provider mutation: no
 EOF2
+test -s "$receipt"
+grep -F -- '- Provider: OCI' "$receipt" >/dev/null
+grep -F -- '- Result: `' "$receipt" >/dev/null
+grep -F -- '- Real-provider mutation: no' "$receipt" >/dev/null
 compose down --volumes --remove-orphans
 trap - EXIT
 printf 'FLC-04 OCI completion gate: PASS\n'
