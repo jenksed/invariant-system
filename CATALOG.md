@@ -57,6 +57,9 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 |---|---|---|---|---|
 | `engineering.agents-template` | `template` | `stable` | Vendor-neutral repository contract template for adopting the Engineering Doctrine. | `engineering/templates/AGENTS.md` |
 | `engineering.claude-template` | `template` | `stable` | Thin Claude Code adapter that delegates repository governance to AGENTS.md. | `engineering/templates/CLAUDE.md` |
+| `engineering.dagger-executable-world-pack` | `reference` | `draft` | Define the Dagger Development Pack boundary for proof-gated materialization of Reality-Budget-selected executable worlds. | `engineering/development_packs/dagger/README.md` |
+| `engineering.dagger-proof-gated-runner` | `method` | `draft` | Validate a Dagger world, require an exact ARS-05 Reality Budget selection before execution, run it, and compose deterministic Arsenal evidence. | `scripts/arsenal_dagger.py` |
+| `engineering.dagger-tdd-python-world` | `template` | `draft` | Declare the first proof-gated executable world: a deterministic Python TDD red-green fixture on the local-container substrate. | `engineering/development_packs/dagger/worlds/tdd-python-container.json` |
 | `engineering.development-pack-contract` | `reference` | `draft` | Define the common contract for language/framework Development Packs that provide deterministic feedback, structural invariants, guardrails, and verification tiers. | `engineering/development_packs/CONTRACT.md` |
 | `engineering.doctrine-core` | `doctrine` | `stable` | Compact constitutional core for frequent agent context. | `engineering/doctrine/CORE.md` |
 | `engineering.doctrine-full` | `doctrine` | `stable` | Full Engineering Doctrine, decision heuristics, limits, and tradeoff philosophy. | `engineering/doctrine/ENGINEERING_DOCTRINE.md` |
