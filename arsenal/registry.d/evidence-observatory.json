@@ -12,7 +12,7 @@
       "upstream": [
         "arsenal.execution-substrate-contract",
         "engineering.dagger-proof-gated-runner",
-        "arsenal.evaluation-contract"
+        "evaluation.arsenal-bench-contract"
       ],
       "downstream": [
         "arsenal.flight-record-schema",
@@ -63,7 +63,7 @@
         "arsenal.flight-record-schema",
         "arsenal.observability-redaction-policy",
         "engineering.dagger-proof-gated-runner",
-        "arsenal.evaluation-contract"
+        "evaluation.arsenal-bench-contract"
       ]
     }
   ]
