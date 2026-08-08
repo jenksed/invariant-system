@@ -85,9 +85,26 @@ As of the 2026-08-08 source audit:
 - Floci-native configuration wins when both native and translated values are set;
 - `LAMBDA_REMOTE_DOCKER` is explicitly unsupported;
 - LocalStack persistence path `/var/lib/localstack` differs from Floci `/app/data`;
-- Floci's standard image does not promise AWS CLI/boto3 in init scripts; use the pinned `-compat` image when those tools are required.
+- Floci's standard image does not promise AWS CLI/boto3 in init scripts; use the pinned `-compat` image when those tools are required;
+- the `-compat` image ships `awslocal`, which forces `--endpoint-url` because older botocore service resolvers can bypass `AWS_ENDPOINT_URL` for SQS;
+- persistent `/app/data` must be writable by Floci's container user; a Docker named volume is the reference migration fixture because a host bind can inherit incompatible ownership in CI.
 
 Do not copy aggregate service counts from migration documentation into Arsenal. Capability truth remains provider + service + exact operation/protocol + required semantic.
+
+## Compatibility lessons proven by the FLC-03 tracer
+
+The runtime gate intentionally preserves the LocalStack init script byte-for-byte:
+
+```sh
+awslocal s3 mb s3://arsenal-flc03-migration
+awslocal sqs create-queue --queue-name arsenal-flc03-migration
+```
+
+That detail is load-bearing. During FLC-03 validation, replacing `awslocal` with bare `aws` allowed the S3 call to work while the SQS call escaped the emulator through an older botocore service-specific resolver and reached public AWS, which rejected the synthetic credentials with `InvalidClientTokenId`. Floci's shipped `awslocal` wrapper exists specifically to force the local endpoint for this class of client behavior.
+
+The first persistent-state fixture also used a host bind to `/app/data`; on the GitHub runner that directory ownership was incompatible with Floci's non-root container user. The corrected fixture uses a Docker named volume. Do not "fix" this class of migration failure by making the emulator run as root unless the target repository has a separately justified requirement.
+
+These findings reinforce the migration method: preserve supported compatibility behavior first, run it, and let evidence identify which differences actually require adaptation.
 
 ## Migration acceptance contract
 
@@ -155,7 +172,7 @@ Avoid global TRACE by default. Diagnostic artifacts can contain payloads and ide
 `.github/workflows/floci-diagnostics-ci.yml` proves three FLC-03 properties:
 
 - the LocalStack inventory recognizes a known unsupported assumption;
-- a LocalStack-style init/config fixture runs through Floci compatibility mode and reaches the expected seeded state;
+- a LocalStack-style init/config fixture runs through Floci compatibility mode and reaches the expected seeded state while retaining the init script byte-for-byte;
 - the SQS redrive reproduction is red-capable, then green-capable after the control change.
 
 Existing FLC-01 and FLC-02 workflows remain regression authority for the underlying local cloud execution surface.
