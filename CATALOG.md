@@ -46,9 +46,13 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `arsenal.competence-lockfile` | `reference` | `draft` | Pin the exact capability versions, source digests, evaluation qualification, and compiled distribution evidence used by this repository. | `.arsenal.lock` |
 | `arsenal.compiler-contract` | `reference` | `draft` | Define deterministic capability compilation, derived distribution artifacts, and competence-lockfile boundaries. | `arsenal/compiler/CONTRACT.md` |
 | `arsenal.compiler-export-plan` | `reference` | `draft` | Declare target-specific packaging metadata for compiler-generated capability distributions without duplicating canonical behavior. | `arsenal/compiler/export-plan.json` |
+| `arsenal.evidence-observatory-contract` | `reference` | `draft` | Define the Agent Flight Recorder boundary for reconstructable, evidence-bound run provenance without private chain-of-thought capture. | `arsenal/observability/CONTRACT.md` |
 | `arsenal.execution-substrate-catalog` | `router` | `draft` | Declare the ordered execution-substrate ladder, proof traits, availability profiles, limitations, and explicit escalation boundaries used by Reality Budget selection. | `arsenal/substrates/catalog.json` |
 | `arsenal.execution-substrate-contract` | `reference` | `draft` | Define Reality Budget selection, execution-substrate boundaries, evidence scope, availability, authority, teardown, and escalation semantics. | `arsenal/substrates/CONTRACT.md` |
+| `arsenal.flight-record-schema` | `reference` | `draft` | Define the common source-addressed run envelope for capability verification and evaluation evidence. | `arsenal/observability/flight-record.schema.json` |
+| `arsenal.flight-recorder` | `method` | `draft` | Normalize, validate, compare, and content-address Arsenal execution and evaluation receipts as privacy-safe Agent Flight Records. | `scripts/arsenal_observe.py` |
 | `arsenal.invocation-model` | `reference` | `draft` | Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets. | `arsenal/INVOCATION_MODEL.md` |
+| `arsenal.observability-redaction-policy` | `reference` | `draft` | Enforce metadata-first observability with prompt, completion, secret, environment-dump, and chain-of-thought content disabled by default. | `arsenal/observability/redaction-policy.json` |
 | `arsenal.proof-requirements` | `reference` | `draft` | Bind canonical capability verification requirements to runtime-agnostic proof properties for substrate selection. | `arsenal/substrates/proof-requirements.json` |
 
 ## engineering
