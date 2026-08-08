@@ -80,6 +80,17 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `engineering.floci-roadmap` | `reference` | `draft` | Sequence Floci support from the local-cloud foundation through AWS golden path, IaC/CI, migration/diagnosis, multi-cloud routing, and evaluation. | `engineering/development_packs/floci/ROADMAP.md` |
 | `engineering.floci-verification-contract` | `reference` | `draft` | Define inner-loop, slice-gate, and completion-gate evidence for reproducible Floci-backed cloud engineering. | `engineering/development_packs/floci/VERIFICATION_CONTRACT.md` |
 
+## evaluation
+
+| ID | Kind | Status | Purpose | Path |
+|---|---|---|---|---|
+| `evaluation.arsenal-bench-case-health-schema` | `reference` | `draft` | Define Case Health Receipts so an evaluation case must establish its own fitness before contributing evidence. | `evaluation/case-health-receipt.schema.json` |
+| `evaluation.arsenal-bench-case-schema` | `reference` | `draft` | Define the structural schema for reusable Arsenal Bench evaluation cases. | `evaluation/evaluation-case.schema.json` |
+| `evaluation.arsenal-bench-contract` | `reference` | `draft` | Define the Arsenal Bench evidence, Case Health, counterfactual, provenance, loss-retention, and lifecycle-gating contract. | `evaluation/BENCH_CONTRACT.md` |
+| `evaluation.arsenal-bench-core-v0` | `reference` | `draft` | Define eight high-signal control/treatment and ablation cases for Core Arsenal engineering judgment without fabricating unexecuted model runs. | `evaluation/cases/core-engineering.json` |
+| `evaluation.arsenal-bench-local-cloud-v0` | `reference` | `draft` | Define the eleven-case Local Cloud evaluation track and its five-case executable candidate lifecycle gate. | `evaluation/cases/local-cloud.json` |
+| `evaluation.arsenal-bench-receipt-schema` | `reference` | `draft` | Define evaluation receipts with explicit claim scope, counterfactual state, limitations, and capability passport evidence. | `evaluation/evaluation-receipt.schema.json` |
+
 ## foundations
 
 | ID | Kind | Status | Purpose | Path |
