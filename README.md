@@ -432,7 +432,6 @@ The architecture is the reason the public promise can become durable. It is not 
 ### BUILDING TOWARD
 
 - generalized execution substrates + Reality Budget;
-- generalized execution substrates;
 - evidence observability;
 - trust and authority.
 
