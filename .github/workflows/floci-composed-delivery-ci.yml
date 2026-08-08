@@ -14,11 +14,16 @@ on:
       - "arsenal/registry.d/floci-composed-delivery.json"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   routing-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Validate routing scripts
         run: |
@@ -30,15 +35,16 @@ jobs:
       - name: Run FLC-05 routing evaluation
         run: python3 engineering/development_packs/floci/evaluation/verify_flc05_routing.py
 
-      - name: Materialize generated catalog candidate
-        run: python3 scripts/arsenal_audit.py --write-catalog
-
-      - name: Upload generated catalog candidate
-        uses: actions/upload-artifact@v4
-        with:
-          name: floci-f05-generated-catalog
-          path: CATALOG.md
-          if-no-files-found: error
+      - name: Generate and commit catalog
+        run: |
+          python3 scripts/arsenal_audit.py --write-catalog
+          if ! git diff --quiet -- CATALOG.md; then
+            git config user.name "Project Arsenal CI"
+            git config user.email "jenksed@noreply.local"
+            git add CATALOG.md
+            git commit -m "Regenerate catalog for FLC-05"
+            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          fi
 
       - name: Validate receipt
         run: |
