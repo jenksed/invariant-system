@@ -66,7 +66,9 @@ silent skip and never a pass.
    `hw.model = MacBookPro18,1` (the owner's M1 Pro MacBook Pro), macOS
    26.5.2 (build 25F84), APFS internal, Elixir 1.20.2 / OTP 28 / Git 2.50.1 /
    Exqlite 0.39.0 / SQLite 3.53.3. P1-S01-V01 records `overall: pass` with
-   `owner_machine.outcome = pass` and `owner_machine.decision = OD-02`.
+   `owner_machine.outcome = pass` and `owner_machine.decision = OD-02`. The
+   final manifest is at
+   `artifacts/p1-s01/slice-01-444c5a5ac47fec1982909f570a44838fdbc55d3b.json`.
 2. **Owner review (AC07).** The owner must review the exact integrated diff and
    P1-S01-V01 and record the decision.
 
@@ -98,8 +100,9 @@ The owner-machine pass on the accepted OD-02 acceptance machine
   `wal`, synchronous `2`, foreign_keys `1`, busy_timeout `2000`, quick_check
   `ok`.
 - `KILN_OWNER_MACHINE=1 scripts/gates/slice-01` — pass. 18 components, 0
-  failed, 0 blocked. `owner_machine_diagnostic = pass`. Manifest digest:
-  `sha256:cb6e907fd126e2b0f7388d7775f8bf1afb61b1c5d405397170eb009dcfc0ddca`.
+  failed, 0 blocked. `owner_machine_diagnostic = pass`. Final manifest at
+  `artifacts/p1-s01/slice-01-444c5a5ac47fec1982909f570a44838fdbc55d3b.json`
+  with digest `sha256:94a5f9ec37dcc0fbb64444e5ad48fe73e9527ec8dbae9cff2e01faf5da5d68aa`.
 - `scripts/demos/p1-s01` — pass. P1-S01-D01 restart and journal-reconstruction
   parity proved across separate OS processes with cache discarded and
   reconstructed identically.

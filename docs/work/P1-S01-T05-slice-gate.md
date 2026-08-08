@@ -350,7 +350,7 @@ machine, the owner's M1 Pro MacBook Pro (`hw.model = MacBookPro18,1`):
 | Command or check | Result |
 | --- | --- |
 | `scripts/diagnostics/p1-s01-store-host` | pass — recorded macOS 26.5.2 (build 25F84), APFS internal, Exqlite 0.39.0, SQLite 3.53.3, journal_mode `wal`, synchronous `2`, foreign_keys `1`, busy_timeout `2000`, quick_check `ok` |
-| `KILN_OWNER_MACHINE=1 scripts/gates/slice-01` | pass — 18 components; 0 failed; 0 blocked; `owner_machine_diagnostic = pass`; manifest digest `sha256:cb6e907fd126e2b0f7388d7775f8bf1afb61b1c5d405397170eb009dcfc0ddca` |
+| `KILN_OWNER_MACHINE=1 scripts/gates/slice-01` | pass — 18 components; 0 failed; 0 blocked; `owner_machine_diagnostic = pass`; manifest at `artifacts/p1-s01/slice-01-444c5a5ac47fec1982909f570a44838fdbc55d3b.json` with digest `sha256:94a5f9ec37dcc0fbb64444e5ad48fe73e9527ec8dbae9cff2e01faf5da5d68aa` |
 | `scripts/demos/p1-s01` | pass — P1-S01-D01 restart parity and journal-reconstruction across separate OS processes; cache discarded, state rebuilt identically |
 
 The earlier implementation pass on an M3 MacBook Air is preserved as the
