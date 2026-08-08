@@ -2,7 +2,7 @@
 
 Status: active program
 
-Current frontier: **ARS-03 — Compiler & Distribution**
+Current frontier: **ARS-04 — Capability Graph + Capability Gap Preflight**
 
 Project Arsenal is evolving from a reusable library of prompts, methods, workflows, references, and Development Packs into a capability engineering system for making good engineering judgment reusable, composable, executable, evaluable, and governable.
 
@@ -282,7 +282,25 @@ Proof:
 
 ## ARS-03 — Compiler & Distribution
 
+**Status:** delivered by PR #15.
+
 **Goal:** compile canonical capabilities into downstream harness/distribution formats instead of manually maintaining divergent copies.
+
+Delivered in v0:
+
+- deterministic `scripts/arsenal_compile.py` with validate/build/verify/explain surfaces;
+- a target-specific export plan that contains packaging metadata without duplicating canonical behavior;
+- Repository Truth → Agent Skills as the first compiler-backed export;
+- generated `SKILL.md` carrying capability identity, lifecycle/evaluation state, authority, execution boundaries, outputs, and canonical source pointer;
+- byte-identical canonical workflow snapshot generated from the registered primary implementation asset;
+- generated `arsenal-manifest.json` as a proof-carrying package manifest with source and file digests;
+- deterministic `.arsenal.lock` pinning capability version/digest, primary-asset digest, evaluation qualification, adapter version, export path, package digest, and export-plan digest;
+- negative tests for duplicate exports, unknown capabilities, unsupported targets, path traversal, invalid package names, missing discovery context, and package drift;
+- deterministic double-build proof;
+- ARS-00B distribution/install regression preserved;
+- final compiler CI read-only.
+
+ARS-03 deliberately ships one proven exporter rather than speculative adapters. Agent Skills is the v0 target because ARS-00B already established its real package/install contract. Additional Claude, Codex-specific, MiniMax/generic, Kiln-native, or other adapters must earn their own format contract instead of copying behavior into another source of truth.
 
 Candidate export targets:
 
@@ -646,12 +664,12 @@ DELIVERED SPINE
 ARS-00  Public Surface & Distribution
 ARS-01  Capability Contract v2
 ARS-02  Arsenal Bench v0 + first evidence-backed testing capability
-
-NOW / NEXT AFTER ARS-02 ACCEPTANCE
 ARS-03  Compiler & Distribution + `.arsenal.lock`
 
-THEN
+NOW / NEXT AFTER ARS-03 ACCEPTANCE
 ARS-04  Capability Graph + Capability Gap Preflight
+
+THEN
 ARS-05  Execution Substrate Contract + Reality Budget
 ARS-06  Dagger / Executable World Pack
 ARS-07  Evidence Observatory / Agent Flight Recorder

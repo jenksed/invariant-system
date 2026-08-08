@@ -1,32 +1,54 @@
 ---
 name: repository-truth
-description: Establishes the actual read-only state of a software repository before planning, continuation, recovery, or implementation. Use when inheriting a repo, resuming work, reconciling status claims, or when documentation, branches, tests, or completion claims may be stale.
-compatibility: Requires repository read access and a coding-agent harness capable of reading files and Git state. Read-only shell or test execution is optional. Repository mutation requires separate authorization after the audit is complete.
+description: "Establishes the actual read-only state of a software repository before planning, continuation, recovery, or implementation. Use when inheriting a repo, resuming work, reconciling status claims, or when documentation, branches, tests, or completion claims may be stale."
+compatibility: "Requires repository read access and a coding-agent harness capable of reading files and Git state. Read-only shell or test execution is optional. Repository mutation requires separate authorization after the audit is complete."
 metadata:
-  arsenal-id: agent.repository-truth-audit
-  arsenal-source: agent_workflows/repository_truth_audit.md
-  arsenal-distribution: agent-skills
-  arsenal-pilot: ARS-00B
+  arsenal-capability: "capability.repository-truth"
+  arsenal-version: "0.1.0"
+  arsenal-source-asset: "agent.repository-truth-audit"
+  arsenal-source: "agent_workflows/repository_truth_audit.md"
+  arsenal-distribution: "agent-skills"
+  arsenal-generated: "true"
+  arsenal-lifecycle: "draft"
+  arsenal-evaluation: "unassessed"
 ---
 
 # Repository Truth
 
-Establish reality before planning or changing code.
+Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.
 
 ## Canonical behavior
 
-Read [`references/repository_truth_audit.md`](references/repository_truth_audit.md) in full and execute it as the authoritative workflow for this skill.
+Read [`references/repository_truth_audit.md`](references/repository_truth_audit.md) in full and execute it as the authoritative workflow for this capability.
 
-This `SKILL.md` is a discovery and packaging adapter. It does not replace the canonical Arsenal workflow. If this file and the bundled canonical reference ever disagree, the bundled canonical reference controls.
+This `SKILL.md` is a generated discovery and packaging adapter. It does not replace the canonical Arsenal workflow. If generated adapter text and the bundled canonical reference ever disagree, the bundled canonical reference controls.
 
-## Invocation boundary
+Do not hand-edit this package. Regenerate it with `python3 scripts/arsenal_compile.py build`.
 
-- Start read-only.
-- Recover repository path, intended branch, objective, governing files, and status claims from available context when possible.
-- Do not mutate the repository merely because the user asked what state it is in.
-- Do not convert a passing build or convenient test into a broader completion claim.
-- If the user separately authorizes implementation, finish and report Repository Truth first, then hand off to the next capability.
+## Capability contract
 
-## Expected result
+- Capability: `capability.repository-truth`
+- Version: `0.1.0`
+- Lifecycle: `draft`
+- Evaluation: `unassessed`
+- Primary asset: `agent.repository-truth-audit`
+- Mutation class: `read-only`
 
-Return the canonical workflow's evidence-backed current-state summary, repository map, claim-versus-evidence comparison, validation results, documentation drift, risks/blockers, exact continuation point, and recommended next actions.
+## Authority boundary
+
+- Required authority: `filesystem.read`, `git.read`
+- Optional authority: `shell.execute`
+- Forbidden authority: `filesystem.write`, `network.write`, `git.write`, `tracker.write`, `secrets.read`, `cloud.remote`, `production.mutate`
+- Allowed execution surfaces: `repository-read`, `local-process`
+- Prohibited execution surfaces: `remote-sandbox`, `shared-nonproduction`, `staging`, `production`
+
+Compilation never grants authority beyond this contract. Runtime execution must continue to honor the canonical capability and workflow boundaries.
+
+## Expected outputs
+
+- `current_state_report` — Evidence-backed repository state, claim comparison, drift, risks, and validation results.
+- `continuation_point` — Exact defensible point from which planning or execution should continue.
+
+## Provenance
+
+See [`arsenal-manifest.json`](arsenal-manifest.json) for exact source digests, qualification state, authority, and compiler/export provenance.

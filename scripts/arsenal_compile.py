@@ -1,0 +1,442 @@
+#!/usr/bin/env python3
+"""Deterministic Project Arsenal capability compiler and competence lockfile generator."""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
+ROOT = Path(__file__).resolve().parents[1]
+PLAN_PATH = ROOT / "arsenal/compiler/export-plan.json"
+LOCK_PATH = ROOT / ".arsenal.lock"
+COMPILER_VERSION = "0.1.0"
+LOCK_SCHEMA_VERSION = "1.0.0"
+SUPPORTED_TARGETS = {"agent-skills"}
+PACKAGE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+
+def sha256_bytes(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
+
+
+def canonical_json(data: Any) -> bytes:
+    return (json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def safe_relative_path(raw: str, *, field: str) -> Path:
+    path = Path(raw)
+    if not raw or path.is_absolute() or ".." in path.parts:
+        raise AssertionError(f"{field} must be a safe repository-relative path: {raw!r}")
+    return path
+
+
+def load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_capabilities(root: Path) -> dict[str, dict[str, Any]]:
+    result: dict[str, dict[str, Any]] = {}
+    for path in sorted((root / "arsenal/capabilities").glob("*.json")):
+        doc = load_json(path)
+        cap = doc["capability"]
+        cap_id = cap["id"]
+        if cap_id in result:
+            raise AssertionError(f"duplicate capability id: {cap_id}")
+        result[cap_id] = {"path": path, "document": doc, "capability": cap}
+    return result
+
+
+def load_assets(root: Path) -> dict[str, dict[str, Any]]:
+    files = [root / "arsenal/registry.json"] + sorted((root / "arsenal/registry.d").glob("*.json"))
+    assets: dict[str, dict[str, Any]] = {}
+    for path in files:
+        doc = load_json(path)
+        if doc.get("schema_version") != "1.0.0":
+            raise AssertionError(f"unsupported registry schema in {path.relative_to(root)}")
+        for asset in doc.get("assets", []):
+            asset_id = asset["id"]
+            if asset_id in assets:
+                raise AssertionError(f"duplicate asset id across registry fragments: {asset_id}")
+            assets[asset_id] = asset
+    return assets
+
+
+def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]:
+    if plan.get("schema_version") != "1.0.0":
+        raise AssertionError("export plan schema_version must be 1.0.0")
+    if plan.get("compiler_version") != COMPILER_VERSION:
+        raise AssertionError(
+            f"export plan compiler_version must be {COMPILER_VERSION}; got {plan.get('compiler_version')!r}"
+        )
+    exports = plan.get("exports")
+    if not isinstance(exports, list) or not exports:
+        raise AssertionError("export plan must contain at least one export")
+
+    capabilities = load_capabilities(root)
+    assets = load_assets(root)
+    seen: set[tuple[str, str]] = set()
+    normalized: list[dict[str, Any]] = []
+
+    for export in exports:
+        required = {
+            "capability_id",
+            "target",
+            "adapter_version",
+            "package_name",
+            "output_path",
+            "description",
+            "compatibility",
+        }
+        missing = sorted(required - set(export))
+        if missing:
+            raise AssertionError(f"export missing required fields: {', '.join(missing)}")
+
+        cap_id = export["capability_id"]
+        target = export["target"]
+        key = (cap_id, target)
+        if key in seen:
+            raise AssertionError(f"duplicate capability/target export: {cap_id} -> {target}")
+        seen.add(key)
+
+        if cap_id not in capabilities:
+            raise AssertionError(f"unknown capability in export plan: {cap_id}")
+        if target not in SUPPORTED_TARGETS:
+            raise AssertionError(f"unsupported export target: {target}")
+
+        package_name = export["package_name"]
+        if not isinstance(package_name, str) or not PACKAGE_RE.fullmatch(package_name):
+            raise AssertionError(f"invalid package_name: {package_name!r}")
+
+        output_rel = safe_relative_path(export["output_path"], field="output_path")
+        if output_rel.parts[:2] != ("distribution", "agent-skills"):
+            raise AssertionError("agent-skills output_path must live under distribution/agent-skills")
+        if output_rel.name != package_name:
+            raise AssertionError("output_path basename must equal package_name")
+
+        if not isinstance(export["description"], str) or not export["description"]:
+            raise AssertionError("description must be non-empty")
+        if "Use when" not in export["description"]:
+            raise AssertionError("Agent Skills description must include 'Use when' discovery context")
+        if len(export["description"]) > 1024:
+            raise AssertionError("Agent Skills description exceeds 1024 characters")
+        if not isinstance(export["compatibility"], str) or len(export["compatibility"]) > 500:
+            raise AssertionError("Agent Skills compatibility must be a string <= 500 characters")
+
+        cap = capabilities[cap_id]["capability"]
+        primary_asset_id = cap["implementation"]["primary_asset"]
+        if primary_asset_id not in assets:
+            raise AssertionError(f"capability primary asset is not registered: {primary_asset_id}")
+        source_rel = safe_relative_path(assets[primary_asset_id]["path"], field="primary asset path")
+        source_path = root / source_rel
+        if not source_path.is_file():
+            raise AssertionError(f"registered primary asset does not exist: {source_rel}")
+
+        normalized.append(
+            {
+                **export,
+                "_cap_record": capabilities[cap_id],
+                "_asset": assets[primary_asset_id],
+                "_source_path": source_path,
+                "_output_rel": output_rel,
+            }
+        )
+
+    return normalized
+
+
+def yaml_string(value: str) -> str:
+    return json.dumps(value, ensure_ascii=False)
+
+
+def render_agent_skill(export: dict[str, Any], source_rel: Path) -> str:
+    cap = export["_cap_record"]["capability"]
+    package = export["package_name"]
+    source_asset_id = cap["implementation"]["primary_asset"]
+    ref_name = source_rel.name
+    required = ", ".join(f"`{x}`" for x in cap["authority"]["required"]) or "none"
+    optional = ", ".join(f"`{x}`" for x in cap["authority"]["optional"]) or "none"
+    forbidden = ", ".join(f"`{x}`" for x in cap["authority"]["forbidden"]) or "none"
+    allowed = ", ".join(f"`{x}`" for x in cap["execution"]["allowed"]) or "none"
+    prohibited = ", ".join(f"`{x}`" for x in cap["execution"]["prohibited"]) or "none"
+
+    output_lines = "\n".join(
+        f"- `{item['name']}` — {item['description']}" for item in cap["outputs"]
+    )
+
+    return f"""---
+name: {package}
+description: {yaml_string(export["description"])}
+compatibility: {yaml_string(export["compatibility"])}
+metadata:
+  arsenal-capability: {yaml_string(cap["id"])}
+  arsenal-version: {yaml_string(cap["version"])}
+  arsenal-source-asset: {yaml_string(source_asset_id)}
+  arsenal-source: {yaml_string(source_rel.as_posix())}
+  arsenal-distribution: "agent-skills"
+  arsenal-generated: "true"
+  arsenal-lifecycle: {yaml_string(cap["lifecycle"])}
+  arsenal-evaluation: {yaml_string(cap["evaluation"]["status"])}
+---
+
+# {cap["display_name"]}
+
+{cap["purpose"]}
+
+## Canonical behavior
+
+Read [`references/{ref_name}`](references/{ref_name}) in full and execute it as the authoritative workflow for this capability.
+
+This `SKILL.md` is a generated discovery and packaging adapter. It does not replace the canonical Arsenal workflow. If generated adapter text and the bundled canonical reference ever disagree, the bundled canonical reference controls.
+
+Do not hand-edit this package. Regenerate it with `python3 scripts/arsenal_compile.py build`.
+
+## Capability contract
+
+- Capability: `{cap["id"]}`
+- Version: `{cap["version"]}`
+- Lifecycle: `{cap["lifecycle"]}`
+- Evaluation: `{cap["evaluation"]["status"]}`
+- Primary asset: `{source_asset_id}`
+- Mutation class: `{cap["mutation"]["class"]}`
+
+## Authority boundary
+
+- Required authority: {required}
+- Optional authority: {optional}
+- Forbidden authority: {forbidden}
+- Allowed execution surfaces: {allowed}
+- Prohibited execution surfaces: {prohibited}
+
+Compilation never grants authority beyond this contract. Runtime execution must continue to honor the canonical capability and workflow boundaries.
+
+## Expected outputs
+
+{output_lines}
+
+## Provenance
+
+See [`arsenal-manifest.json`](arsenal-manifest.json) for exact source digests, qualification state, authority, and compiler/export provenance.
+"""
+
+
+def digest_file_map(files: dict[str, bytes]) -> str:
+    rows = [{"path": path, "sha256": sha256_bytes(files[path])} for path in sorted(files)]
+    return sha256_bytes(canonical_json(rows))
+
+
+def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, bytes], dict[str, Any]]:
+    cap_record = export["_cap_record"]
+    cap = cap_record["capability"]
+    source_path: Path = export["_source_path"]
+    source_rel = source_path.relative_to(root)
+    reference_rel = f"references/{source_rel.name}"
+
+    generated: dict[str, bytes] = {
+        "SKILL.md": render_agent_skill(export, source_rel).encode("utf-8"),
+        reference_rel: source_path.read_bytes(),
+    }
+    content_digest = digest_file_map(generated)
+
+    manifest = {
+        "schema_version": "1.0.0",
+        "compiler": {
+            "version": COMPILER_VERSION,
+            "target": export["target"],
+            "adapter_version": export["adapter_version"],
+        },
+        "capability": {
+            "id": cap["id"],
+            "version": cap["version"],
+            "display_name": cap["display_name"],
+            "lifecycle": cap["lifecycle"],
+            "evaluation": cap["evaluation"],
+        },
+        "authority": cap["authority"],
+        "mutation": cap["mutation"],
+        "execution": cap["execution"],
+        "source": {
+            "capability_path": cap_record["path"].relative_to(root).as_posix(),
+            "capability_sha256": sha256_bytes(cap_record["path"].read_bytes()),
+            "primary_asset_id": cap["implementation"]["primary_asset"],
+            "primary_asset_path": source_rel.as_posix(),
+            "primary_asset_sha256": sha256_bytes(source_path.read_bytes()),
+        },
+        "package": {
+            "name": export["package_name"],
+            "content_sha256": content_digest,
+            "files": [
+                {"path": path, "sha256": sha256_bytes(generated[path])}
+                for path in sorted(generated)
+            ],
+        },
+    }
+    generated["arsenal-manifest.json"] = canonical_json(manifest)
+    return generated, manifest
+
+
+def build_outputs(root: Path, output_root: Path, plan_path: Path) -> tuple[dict[str, Any], list[Path]]:
+    plan = load_json(plan_path)
+    exports = validate_plan_data(plan, root)
+    lock_caps: dict[str, dict[str, Any]] = {}
+    written: list[Path] = []
+
+    for export in exports:
+        if export["target"] != "agent-skills":
+            raise AssertionError(f"target not implemented: {export['target']}")
+        files, manifest = build_agent_skill(export, root)
+        out_dir = output_root / export["_output_rel"]
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
+        for rel, data in files.items():
+            path = out_dir / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+            written.append(path)
+
+        cap_record = export["_cap_record"]
+        cap = cap_record["capability"]
+        source_path: Path = export["_source_path"]
+        source_rel = source_path.relative_to(root)
+        package_digest = digest_file_map(files)
+
+        locked = lock_caps.setdefault(
+            cap["id"],
+            {
+                "id": cap["id"],
+                "version": cap["version"],
+                "lifecycle": cap["lifecycle"],
+                "evaluation": cap["evaluation"],
+                "capability_path": cap_record["path"].relative_to(root).as_posix(),
+                "capability_sha256": sha256_bytes(cap_record["path"].read_bytes()),
+                "primary_asset": {
+                    "id": cap["implementation"]["primary_asset"],
+                    "path": source_rel.as_posix(),
+                    "sha256": sha256_bytes(source_path.read_bytes()),
+                },
+                "exports": [],
+            },
+        )
+        locked["exports"].append(
+            {
+                "target": export["target"],
+                "adapter_version": export["adapter_version"],
+                "package_name": export["package_name"],
+                "path": export["_output_rel"].as_posix(),
+                "manifest_path": (export["_output_rel"] / "arsenal-manifest.json").as_posix(),
+                "package_sha256": package_digest,
+            }
+        )
+
+    for item in lock_caps.values():
+        item["exports"].sort(key=lambda x: (x["target"], x["package_name"]))
+
+    lock = {
+        "schema_version": LOCK_SCHEMA_VERSION,
+        "compiler_version": COMPILER_VERSION,
+        "plan_sha256": sha256_bytes(plan_path.read_bytes()),
+        "capabilities": [lock_caps[key] for key in sorted(lock_caps)],
+    }
+    return lock, written
+
+
+def write_build(root: Path, plan_path: Path) -> None:
+    lock, written = build_outputs(root, root, plan_path)
+    LOCK_PATH.write_bytes(canonical_json(lock))
+    print(f"Arsenal compiler build: PASS ({len(lock['capabilities'])} capabilities; {len(written)} generated files)")
+    print(f"lockfile: {LOCK_PATH.relative_to(root)}")
+
+
+def compare_trees(expected: Path, actual: Path) -> list[str]:
+    def collect(base: Path) -> dict[str, bytes]:
+        if not base.exists():
+            return {}
+        return {
+            p.relative_to(base).as_posix(): p.read_bytes()
+            for p in sorted(base.rglob("*"))
+            if p.is_file()
+        }
+
+    left = collect(expected)
+    right = collect(actual)
+    problems: list[str] = []
+    for path in sorted(set(left) | set(right)):
+        if path not in left:
+            problems.append(f"unexpected generated file: {path}")
+        elif path not in right:
+            problems.append(f"missing generated file: {path}")
+        elif left[path] != right[path]:
+            problems.append(f"generated file drift: {path}")
+    return problems
+
+
+def verify_build(root: Path, plan_path: Path) -> None:
+    plan = load_json(plan_path)
+    exports = validate_plan_data(plan, root)
+    with tempfile.TemporaryDirectory(prefix="arsenal-compile-") as tmp:
+        tmp_root = Path(tmp)
+        lock, _ = build_outputs(root, tmp_root, plan_path)
+        problems: list[str] = []
+
+        for export in exports:
+            expected = tmp_root / export["_output_rel"]
+            actual = root / export["_output_rel"]
+            for issue in compare_trees(expected, actual):
+                problems.append(f"{export['capability_id']} -> {export['target']}: {issue}")
+
+        if not LOCK_PATH.is_file():
+            problems.append("missing .arsenal.lock")
+        elif LOCK_PATH.read_bytes() != canonical_json(lock):
+            problems.append(".arsenal.lock drifted from canonical compiler inputs")
+
+        if problems:
+            raise AssertionError("\n".join(problems))
+
+    print(f"Arsenal compiler verification: PASS ({len(exports)} exports)")
+    for export in exports:
+        print(f"  {export['capability_id']} -> {export['target']} -> {export['_output_rel'].as_posix()}")
+
+
+def explain(root: Path, plan_path: Path) -> None:
+    plan = load_json(plan_path)
+    exports = validate_plan_data(plan, root)
+    for export in exports:
+        cap = export["_cap_record"]["capability"]
+        source = export["_source_path"].relative_to(root).as_posix()
+        print(f"{cap['id']} {cap['version']}")
+        print(f"  lifecycle/evaluation: {cap['lifecycle']} / {cap['evaluation']['status']}")
+        print(f"  primary asset: {cap['implementation']['primary_asset']} -> {source}")
+        print(f"  export: {export['target']} {export['adapter_version']} -> {export['_output_rel'].as_posix()}")
+
+
+def parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=("validate", "build", "verify", "explain"))
+    parser.add_argument("--plan", default=str(PLAN_PATH), help="export plan path")
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = parse_args(sys.argv[1:] if argv is None else argv)
+    plan_path = Path(args.plan)
+    if not plan_path.is_absolute():
+        plan_path = (ROOT / plan_path).resolve()
+    if args.command == "validate":
+        exports = validate_plan_data(load_json(plan_path), ROOT)
+        print(f"Arsenal compiler contract: PASS ({len(exports)} exports; targets={','.join(sorted(SUPPORTED_TARGETS))})")
+    elif args.command == "build":
+        write_build(ROOT, plan_path)
+    elif args.command == "verify":
+        verify_build(ROOT, plan_path)
+    else:
+        explain(ROOT, plan_path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

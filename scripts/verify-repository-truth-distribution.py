@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Validate the ARS-00B Repository Truth Agent Skills distribution pilot."""
+"""Validate the Repository Truth Agent Skills distribution and ARS-03 compiler regression."""
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -9,7 +10,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGE = ROOT / "distribution/agent-skills/repository-truth"
 SKILL = PACKAGE / "SKILL.md"
 SNAPSHOT = PACKAGE / "references/repository_truth_audit.md"
+MANIFEST = PACKAGE / "arsenal-manifest.json"
 CANONICAL = ROOT / "agent_workflows/repository_truth_audit.md"
+CAPABILITY = ROOT / "arsenal/capabilities/repository-truth.json"
+LOCK = ROOT / ".arsenal.lock"
 QUICKSTART = ROOT / "docs/use/repository-truth-quickstart.md"
 
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -29,19 +33,19 @@ def parse_frontmatter(text: str) -> tuple[dict[str, str], str]:
         if not line or line[0].isspace() or ":" not in line:
             continue
         key, value = line.split(":", 1)
-        fields[key.strip()] = value.strip()
+        fields[key.strip()] = value.strip().strip('"')
     return fields, body
 
 
 def main() -> int:
-    for path in (SKILL, SNAPSHOT, CANONICAL, QUICKSTART):
-        assert path.is_file(), f"missing ARS-00B file: {path.relative_to(ROOT)}"
+    for path in (SKILL, SNAPSHOT, MANIFEST, CANONICAL, CAPABILITY, LOCK, QUICKSTART):
+        assert path.is_file(), f"missing distribution/compiler file: {path.relative_to(ROOT)}"
 
     canonical_bytes = CANONICAL.read_bytes()
     snapshot_bytes = SNAPSHOT.read_bytes()
     assert snapshot_bytes == canonical_bytes, (
         "distribution snapshot drifted from canonical Repository Truth; "
-        "refresh references/repository_truth_audit.md from agent_workflows/repository_truth_audit.md"
+        "regenerate with scripts/arsenal_compile.py build"
     )
 
     text = SKILL.read_text(encoding="utf-8")
@@ -60,15 +64,37 @@ def main() -> int:
 
     required_markers = [
         "references/repository_truth_audit.md",
-        "discovery and packaging adapter",
-        "bundled canonical reference controls",
-        "Start read-only",
-        "Do not mutate the repository",
+        "generated discovery and packaging adapter",
+        "Do not hand-edit this package",
+        "Capability contract",
+        "Authority boundary",
+        "arsenal-manifest.json",
     ]
     for marker in required_markers:
-        assert marker in body, f"SKILL.md missing boundary marker: {marker}"
+        assert marker in body, f"SKILL.md missing generated boundary marker: {marker}"
 
-    assert "agent.repository-truth-audit" in text
+    capability_doc = json.loads(CAPABILITY.read_text(encoding="utf-8"))
+    cap = capability_doc["capability"]
+    manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    lock = json.loads(LOCK.read_text(encoding="utf-8"))
+
+    assert manifest["capability"]["id"] == cap["id"]
+    assert manifest["capability"]["version"] == cap["version"]
+    assert manifest["capability"]["lifecycle"] == cap["lifecycle"]
+    assert manifest["capability"]["evaluation"] == cap["evaluation"]
+    assert manifest["authority"] == cap["authority"]
+    assert manifest["source"]["primary_asset_id"] == cap["implementation"]["primary_asset"]
+    assert manifest["source"]["primary_asset_path"] == "agent_workflows/repository_truth_audit.md"
+
+    locked = next(item for item in lock["capabilities"] if item["id"] == cap["id"])
+    assert locked["version"] == cap["version"]
+    assert locked["lifecycle"] == cap["lifecycle"]
+    assert locked["evaluation"] == cap["evaluation"]
+    assert locked["primary_asset"]["id"] == cap["implementation"]["primary_asset"]
+    assert any(item["target"] == "agent-skills" for item in locked["exports"])
+
+    assert cap["id"] in text
+    assert cap["implementation"]["primary_asset"] in text
     assert "agent_workflows/repository_truth_audit.md" in text
 
     quickstart = QUICKSTART.read_text(encoding="utf-8")
@@ -81,9 +107,10 @@ def main() -> int:
     ):
         assert marker in quickstart, f"quickstart missing required marker: {marker}"
 
-    print("ARS-00B Repository Truth distribution: PASS")
+    print("ARS-00B/ARS-03 Repository Truth distribution: PASS")
     print(f"canonical bytes: {len(canonical_bytes)}")
     print(f"skill body lines: {len(body.splitlines())}")
+    print(f"capability: {cap['id']} {cap['version']} ({cap['lifecycle']}/{cap['evaluation']['status']})")
     return 0
 
 

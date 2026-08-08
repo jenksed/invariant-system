@@ -90,7 +90,7 @@ The installer targets:
 
 It is idempotent when the installed package is identical and refuses to overwrite a divergent installation.
 
-The portable package lives at [`distribution/agent-skills/repository-truth/`](distribution/agent-skills/repository-truth/). Its bundled canonical workflow is deterministically checked against [`agent_workflows/repository_truth_audit.md`](agent_workflows/repository_truth_audit.md).
+The portable package lives at [`distribution/agent-skills/repository-truth/`](distribution/agent-skills/repository-truth/). ARS-03 now generates it deterministically from `capability.repository-truth`, the Asset Registry, and the export plan; its bundled canonical workflow remains byte-identical to [`agent_workflows/repository_truth_audit.md`](agent_workflows/repository_truth_audit.md). The generated package manifest and [`.arsenal.lock`](.arsenal.lock) preserve exact provenance and qualification.
 
 See the full [`Repository Truth quickstart`](docs/use/repository-truth-quickstart.md) for manual installation, user-global installation, limitations, and the compiler-regression contract.
 
@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-03 will compile canonical capabilities into harness packages and is planned to introduce `.arsenal.lock`, a competence lockfile for reproducible capability versions, digests, provenance, qualification, and generated exports.
+**Next:** ARS-04 turns the capability set into an executable **Capability Graph + Capability Gap Preflight**, so Arsenal can prove required competence is present, compatible, authorized, and sufficiently qualified before execution begins.
 
 ---
 
@@ -416,7 +416,7 @@ The architecture is the reason the public promise can become durable. It is not 
 - Asset Contract, Capability Contract v2, and invocation model;
 - Engineering Doctrine and repository templates;
 - Repository Truth;
-- Repository Truth Agent Skills distribution pilot + Codex project-local installer;
+- compiler-generated Repository Truth Agent Skills distribution + Codex project-local installer;
 - Pressure Test / grilling method;
 - Recon / Wayfinding method;
 - software-engineering diagnosis, TDD, review, prototyping, specification, and decomposition disciplines;
@@ -425,12 +425,12 @@ The architecture is the reason the public promise can become durable. It is not 
 - Development Pack contract;
 - Floci Local Cloud suite through composed multi-cloud delivery;
 - deterministic Arsenal Integrity audit;
-- Arsenal Bench v0 with Case Health Receipts, counterfactual/ablation contracts, Capability Evidence Passports, and the first evidence-backed `testing` capability.
+- Arsenal Bench v0 with Case Health Receipts, counterfactual/ablation contracts, Capability Evidence Passports, and the first evidence-backed `testing` capability;
+- deterministic capability compiler + `.arsenal.lock` competence lockfile + proof-carrying Repository Truth Agent Skills package.
 
 ### BUILDING TOWARD
 
-- compiler / harness exports + `.arsenal.lock`;
-- capability graph;
+- capability graph + Capability Gap Preflight;
 - generalized execution substrates;
 - evidence observability;
 - trust and authority.
