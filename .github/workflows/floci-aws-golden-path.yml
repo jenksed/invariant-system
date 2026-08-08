@@ -1,0 +1,50 @@
+name: Floci AWS Golden Path
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/floci-aws-golden-path.yml"
+      - "engineering/development_packs/floci/aws/**"
+      - "agent_workflows/adopt_floci_in_repo.md"
+      - "arsenal/registry.d/floci.json"
+  workflow_dispatch:
+
+jobs:
+  golden-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: engineering/development_packs/floci/aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp env.floci.example .env.floci
+
+      - name: Prove endpoint guard fails closed
+        run: |
+          set +e
+          AWS_ENDPOINT_URL=https://s3.amazonaws.com ./scripts/aws-local s3 ls >/tmp/unsafe.out 2>&1
+          rc=$?
+          set -e
+          test "$rc" -ne 0
+          grep -q "refusing AWS call" /tmp/unsafe.out
+
+      - name: Run completion gate
+        run: ./scripts/verify-completion
+
+      - name: Upload local-cloud evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-aws-golden-path-evidence
+          path: engineering/development_packs/floci/aws/.floci-artifacts/
+          if-no-files-found: warn
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file .env.floci -f docker-compose.floci.yml down --volumes --remove-orphans
