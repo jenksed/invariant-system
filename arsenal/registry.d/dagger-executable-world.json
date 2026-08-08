@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "engineering.dagger-executable-world-pack",
+      "path": "engineering/development_packs/dagger/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the Dagger Development Pack boundary for proof-gated materialization of Reality-Budget-selected executable worlds.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.execution-substrate-contract",
+        "arsenal.execution-substrate-catalog",
+        "arsenal.proof-requirements"
+      ]
+    },
+    {
+      "id": "engineering.dagger-tdd-python-world",
+      "path": "engineering/development_packs/dagger/worlds/tdd-python-container.json",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "purpose": "Declare the first proof-gated executable world: a deterministic Python TDD red-green fixture on the local-container substrate.",
+      "invocation": "composed",
+      "upstream": [
+        "engineering.dagger-executable-world-pack",
+        "software.tdd"
+      ],
+      "downstream": [
+        "engineering.dagger-proof-gated-runner"
+      ]
+    },
+    {
+      "id": "engineering.dagger-proof-gated-runner",
+      "path": "scripts/arsenal_dagger.py",
+      "category": "engineering",
+      "kind": "method",
+      "status": "draft",
+      "purpose": "Validate a Dagger world, require an exact ARS-05 Reality Budget selection before execution, run it, and compose deterministic Arsenal evidence.",
+      "invocation": "composed",
+      "upstream": [
+        "engineering.dagger-tdd-python-world",
+        "arsenal.execution-substrate-catalog",
+        "arsenal.proof-requirements"
+      ]
+    }
+  ]
+}
