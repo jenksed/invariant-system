@@ -444,17 +444,35 @@ Proof:
 
 ## ARS-06 — Dagger / Executable World Pack
 
-**Goal:** give the generalized execution model a strong portable containerized implementation.
+**Status:** delivered by PR #18.
 
-Treat Dagger as an adapter/Development Pack, not as Arsenal's architecture.
+**Goal:** give the generalized execution model a strong portable containerized implementation without making Dagger part of Arsenal's architecture.
 
-Use it to begin constructing purpose-built executable repository worlds that may include application code, dependencies, database, browser, cloud emulator, fixtures, and verifiers.
+Delivered in v0:
 
-Proof:
+- a Dagger Development Pack whose responsibility begins only after Reality Budget selects a container world;
+- **proof-gated execution**: the runner refuses to execute unless ARS-05 independently selects the world's exact substrate and reality rank;
+- `world.tdd-python-container`, a real `capability.tdd` verification world exercising canonical `red_observed` and `green_observed` requirements;
+- an explicit caller proof trait, `container-runtime`, that raises this tracer to `substrate.local-container` rank 4 while ordinary TDD still selects rank 2;
+- Dagger CLI `0.21.7` pinned and verified at runtime;
+- explicit host-input scope: only the Dagger Development Pack is imported into `/pack`;
+- no secrets and no runtime network requirement after required images are available;
+- deterministic world-definition and fixture digests;
+- a raw world receipt plus a composed Arsenal receipt carrying the exact Reality Budget selection evidence;
+- byte-identical replay proof across two executions;
+- the same checked-in runner command used locally and in CI;
+- final Dagger CI read-only.
 
-- at least one real Arsenal capability runs inside a reproducible disposable world;
-- local and CI execution share the same declared behavior where practical;
-- the substrate emits normal Arsenal evidence and respects authority boundaries.
+ARS-06 sharpened an important boundary: current Core capabilities such as TDD contain model/human judgment that a container does not itself execute. The Dagger world executes the **verification environment that earns evidence for the capability contract**. Capability judgment, execution substrate, and verification evidence remain distinct.
+
+Proof achieved:
+
+- a real canonical capability verification contract is exercised inside a reproducible disposable world;
+- Reality Budget, not runtime availability, authorizes that world;
+- ordinary TDD remains on the cheaper in-process substrate when container proof is unnecessary;
+- local and CI use the same declared runner/world contract;
+- two executions produce byte-identical Arsenal receipts;
+- Dagger emits normal Arsenal evidence without acquiring authority, lifecycle, or completion semantics.
 
 ---
 
@@ -707,12 +725,12 @@ ARS-02  Arsenal Bench v0 + first evidence-backed testing capability
 ARS-03  Compiler & Distribution + `.arsenal.lock`
 ARS-04  Capability Graph + Capability Gap Preflight
 ARS-05  Execution Substrate Contract + Reality Budget
+ARS-06  Dagger / Executable World Pack + proof-gated execution
 
-NOW / NEXT AFTER ARS-05 ACCEPTANCE
-ARS-06  Dagger / Executable World Pack
+NOW / NEXT AFTER ARS-06 ACCEPTANCE
+ARS-07  Evidence Observatory / Agent Flight Recorder
 
 THEN
-ARS-07  Evidence Observatory / Agent Flight Recorder
 ARS-08  Trust & Authority + third-party competence audit
 
 LATER
