@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "world": {
+    "id": "world.tdd-python-container",
+    "version": "0.1.0",
+    "adapter": "dagger",
+    "dagger_version": "0.21.6",
+    "pack_root": "engineering/development_packs/dagger",
+    "script": "worlds/tdd-python-container.dagger",
+    "definition_inputs": [
+      "worlds/tdd-python-container.json",
+      "worlds/tdd-python-container.dagger",
+      "fixtures/tdd-red-green"
+    ],
+    "substrate_id": "substrate.local-container",
+    "reality_rank": 4,
+    "capability_id": "capability.tdd",
+    "capability_version": "0.1.0",
+    "verification_requirements": [
+      "red_observed",
+      "green_observed"
+    ],
+    "reality_budget": {
+      "authority_profile": "workspace-safe",
+      "availability_profile": "container-local",
+      "additional_required_traits": [
+        "container-runtime"
+      ]
+    },
+    "container": {
+      "image": "python:3.12.11-alpine3.21",
+      "workdir": "/pack/fixtures/tdd-red-green"
+    },
+    "raw_receipt_path": ".arsenal-evidence/ars-06-tdd-python-container.world.json",
+    "receipt_path": ".arsenal-evidence/ars-06-tdd-python-container.json",
+    "network": "none-required",
+    "secrets": "none",
+    "host_writes": [
+      ".arsenal-evidence/ars-06-tdd-python-container.world.json",
+      ".arsenal-evidence/ars-06-tdd-python-container.json"
+    ],
+    "limitations": [
+      "This world exercises TDD verification evidence; it does not execute or replace the canonical TDD judgment method.",
+      "Container evidence does not prove host-specific, external-service, cloud-provider, staging, or production behavior.",
+      "The container image is pinned to a versioned tag, not an immutable registry digest, in ARS-06 v0."
+    ]
+  }
+}
