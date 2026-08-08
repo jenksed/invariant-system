@@ -43,6 +43,12 @@ jobs:
             --suite local-cloud \
             --receipt .arsenal-bench/local-cloud-receipt.json
 
+      - name: Prove Local Cloud testing lifecycle claim
+        run: |
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
       - name: Validate Capability Contract
         run: python3 scripts/capability_audit.py
 
