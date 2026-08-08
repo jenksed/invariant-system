@@ -66,6 +66,15 @@ def main() -> int:
     covered = [step["capability_id"] for step in lock_gap["steps"] if step["status"] == "covered"]
     assert covered == ["capability.repository-truth"], covered
 
+    locked = graphmod.load_locked_capabilities(ROOT)
+    repo_record = graphmod.load_capabilities(ROOT)["capability.repository-truth"]
+    stale = copy.deepcopy(locked["capability.repository-truth"])
+    stale["version"] = "9.9.9"
+    lock_ok, lock_reasons = graphmod.locked_entry_state(repo_record, stale)
+    assert not lock_ok
+    assert any("locked version" in reason for reason in lock_reasons)
+    print("PASS stale competence lock detection")
+
     authority_gap = assert_verdict(
         "feature route under read-only authority",
         "AUTHORITY_GAP",
