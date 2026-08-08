@@ -27,6 +27,21 @@ jobs:
           bash -n engineering/development_packs/floci/aws/diagnostics/scripts/verify-reproduction
           for f in engineering/development_packs/floci/aws/diagnostics/examples/sqs-redrive-mismatch/*.sh; do bash -n "$f"; done
 
+      - name: Prove root scan is not contaminated by the installed pack
+        run: |
+          out="$(mktemp)"
+          python3 engineering/development_packs/floci/aws/diagnostics/scripts/inventory-localstack \
+            . --format json --output "$out" --fail-on-blocker
+          python3 - "$out" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert data["summary"]["blockers"] == 0, data["summary"]
+          owned = "engineering/development_packs/floci/aws/diagnostics/"
+          assert not any(x["path"].startswith(owned) for x in data["findings"])
+          assert not any(x["path"] == ".github/workflows/floci-diagnostics-ci.yml" for x in data["findings"])
+          print("FLC-03 inventory self-contamination probe: PASS")
+          PY
+
       - name: Prove blocker detection
         run: |
           out="$(mktemp)"
