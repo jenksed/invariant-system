@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-01 introduces Capability Contract v2. ARS-03 will later be required to reproduce this manually proven distribution shape rather than inventing packaging from theory.
+**Next:** ARS-03 will compile canonical capabilities into harness packages and is planned to introduce `.arsenal.lock`, a competence lockfile for reproducible capability versions, digests, provenance, qualification, and generated exports.
 
 ---
 
@@ -315,7 +315,7 @@ See [`engineering/development_packs/floci/`](engineering/development_packs/floci
 
 ## Does Arsenal actually help?
 
-**ARSENAL BENCH — Status: BUILDING TOWARD (ARS-02).**
+**ARSENAL BENCH — Status: AVAILABLE v0 (ARS-02).**
 
 The project should not answer that question with confidence, prose quality, or cherry-picked examples.
 
@@ -339,7 +339,11 @@ Measure more than pass/fail:
 
 Losses matter. Ablations matter. Model/harness differences matter.
 
-The former Floci **FLC-06 evaluation/stabilization** program is being absorbed into Arsenal Bench as the first substantial execution-backed evaluation track rather than receiving a separate one-off benchmark framework.
+Bench v0 now ships a **19-case evaluation corpus** with Case Health Receipts, explicit control/treatment or ablation contracts, a deterministic runner, lifecycle gates, and Capability Evidence Passports. The first executable Local Cloud campaign runs 5 routing/boundary cases and keeps 6 deeper Local Cloud cases plus all 8 Core agent-behavior cases explicitly `designed-not-run`.
+
+That distinction is deliberate: the 5/5 deterministic campaign is enough to earn `capability.local-cloud-feature-delivery` the `testing` / `candidate` lifecycle under its registered suite, but it is **not evidence that Arsenal improves a coding model**. Model/harness efficacy requires actual controlled agent runs with complete provenance.
+
+The former Floci **FLC-06 evaluation/stabilization** program is now the Local Cloud track inside Arsenal Bench rather than a separate one-off benchmark framework.
 
 See the canonical [`capability-system roadmap`](docs/roadmap/capability-system.md).
 
@@ -377,7 +381,7 @@ ARS-01 models nine initial capabilities:
 - Resume;
 - Local Cloud Feature Delivery as the execution-backed tracer.
 
-The Local Cloud contract requires local-cloud authority while forbidding remote-cloud and production mutation by default. All nine capability lifecycle states remain `draft` / `unassessed`; ARS-02 Arsenal Bench must earn stronger lifecycle claims through evaluation evidence.
+The Local Cloud contract requires local-cloud authority while forbidding remote-cloud and production mutation by default. Eight initial capabilities remain `draft` / `unassessed`; Local Cloud Feature Delivery has earned `testing` / `candidate` through the registered Arsenal Bench Local Cloud suite. No capability is `stable` yet.
 
 ---
 
@@ -420,12 +424,12 @@ The architecture is the reason the public promise can become durable. It is not 
 - session handoff / resume workflows;
 - Development Pack contract;
 - Floci Local Cloud suite through composed multi-cloud delivery;
-- deterministic Arsenal Integrity audit.
+- deterministic Arsenal Integrity audit;
+- Arsenal Bench v0 with Case Health Receipts, counterfactual/ablation contracts, Capability Evidence Passports, and the first evidence-backed `testing` capability.
 
 ### BUILDING TOWARD
 
-- Arsenal Bench and executable evaluation infrastructure;
-- compiler / harness exports;
+- compiler / harness exports + `.arsenal.lock`;
 - capability graph;
 - generalized execution substrates;
 - evidence observability;

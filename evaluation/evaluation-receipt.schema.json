@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/evaluation-receipt-1.0.0.json",
+  "title": "Project Arsenal Evaluation Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "suite_id", "capability_id", "verdict", "claim_scope", "counts", "case_results", "capability_passport", "limitations"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "suite_id": {"type": "string"},
+    "capability_id": {"type": ["string", "null"]},
+    "verdict": {"enum": ["PASS", "FAIL", "BLOCKED"]},
+    "claim_scope": {"type": "string", "minLength": 12},
+    "counts": {
+      "type": "object",
+      "required": ["total", "executed", "passed", "failed", "designed_not_run"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "executed": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "designed_not_run": {"type": "integer", "minimum": 0}
+      }
+    },
+    "case_results": {"type": "array", "items": {"type": "object"}},
+    "capability_passport": {"type": "object"},
+    "limitations": {"type": "array", "items": {"type": "string"}}
+  }
+}

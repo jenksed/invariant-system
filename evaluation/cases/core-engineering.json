@@ -1,0 +1,116 @@
+{
+  "schema_version": "1.0.0",
+  "suite": {
+    "id": "suite.arsenal-core-v0",
+    "title": "Arsenal Core engineering judgment",
+    "track": "core-engineering",
+    "capability_id": null,
+    "lifecycle_gate": null,
+    "cases": [
+      {
+        "id": "core-repository-truth-before-edit",
+        "title": "Repository truth before implementation",
+        "track": "core-engineering",
+        "capability_id": "capability.repository-truth",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "repository-task", "description": "A plausible feature request in a repository whose authority, branch, and current work state are not yet established."},
+        "comparison": {"kind": "control-treatment", "control": "Same model/harness/task without Arsenal Repository Truth.", "treatment": "Same model/harness/task with capability.repository-truth.", "ablation": null},
+        "expected": {"treatment_behaviors": ["establish repository authority before editing", "report unresolved repository-state uncertainty"], "prohibited": ["claim current repository truth without inspection"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent"]},
+        "metrics": ["time_to_first_edit", "false_assumption_count", "scope_drift", "tokens", "tool_calls"]
+      },
+      {
+        "id": "core-pressure-test-ambiguity",
+        "title": "Consequential ambiguity is surfaced before implementation",
+        "track": "core-engineering",
+        "capability_id": "capability.pressure-test",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "task-brief", "description": "A feature request with two materially different interpretations that lead to incompatible implementations."},
+        "comparison": {"kind": "control-treatment", "control": "Same model/harness/task without Pressure Test.", "treatment": "Same model/harness/task with capability.pressure-test.", "ablation": null},
+        "expected": {"treatment_behaviors": ["identify the consequential fork", "resolve or explicitly block on the fork before implementation"], "prohibited": ["silently choose a consequential interpretation"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent"]},
+        "metrics": ["consequential_ambiguities_caught", "rework_cycles", "tokens", "human_interventions"]
+      },
+      {
+        "id": "core-diagnose-red-first",
+        "title": "Bug is reproduced before repair",
+        "track": "core-engineering",
+        "capability_id": "capability.diagnose",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "repository-bug", "description": "A localized bug with an easy-looking patch and a reproducible failing behavior."},
+        "comparison": {"kind": "control-treatment", "control": "Same model/harness/bug without Diagnose.", "treatment": "Same model/harness/bug with capability.diagnose.", "ablation": null},
+        "expected": {"treatment_behaviors": ["produce a red-capable reproduction before claiming a fix", "distinguish root cause from symptom"], "prohibited": ["patch first and infer success from green tests only"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "failure_reachable", "success_reachable", "verifier_independent"]},
+        "metrics": ["reproduction_before_patch", "repair_cycles", "false_completion", "tokens"]
+      },
+      {
+        "id": "core-tdd-red-green",
+        "title": "Behavioral slice proves red then green",
+        "track": "core-engineering",
+        "capability_id": "capability.tdd",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "repository-feature", "description": "A narrow behavior change with a deterministic acceptance test that initially fails."},
+        "comparison": {"kind": "ablation", "control": "Arsenal Core with TDD capability removed.", "treatment": "Arsenal Core with capability.tdd.", "ablation": "capability.tdd"},
+        "expected": {"treatment_behaviors": ["demonstrate red before implementation", "make the narrow acceptance case green"], "prohibited": ["write only implementation and post-hoc tests"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "failure_reachable", "success_reachable", "solution_not_leaked", "verifier_independent"]},
+        "metrics": ["red_observed", "acceptance_pass", "scope_drift", "tokens", "wall_time"]
+      },
+      {
+        "id": "core-review-scope-drift",
+        "title": "Review catches unnecessary scope expansion",
+        "track": "core-engineering",
+        "capability_id": "capability.review",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "patch-review", "description": "A patch that solves the requested behavior but also changes unrelated files and abstractions."},
+        "comparison": {"kind": "control-treatment", "control": "Same patch reviewed without Arsenal Review.", "treatment": "Same patch reviewed with capability.review.", "ablation": null},
+        "expected": {"treatment_behaviors": ["identify unrelated scope", "separate correctness from unnecessary churn"], "prohibited": ["approve based only on passing tests"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "verifier_independent"]},
+        "metrics": ["scope_findings", "high_signal_findings", "false_positive_findings", "tokens"]
+      },
+      {
+        "id": "core-verify-false-completion",
+        "title": "Independent verification rejects partial completion",
+        "track": "core-engineering",
+        "capability_id": "capability.verify",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "completion-claim", "description": "An implementation passes convenient unit tests but misses one explicit acceptance condition."},
+        "comparison": {"kind": "ablation", "control": "Arsenal Core with independent verification removed.", "treatment": "Arsenal Core with capability.verify.", "ablation": "capability.verify"},
+        "expected": {"treatment_behaviors": ["check acceptance evidence independently", "reject completion when one required condition is unproven"], "prohibited": ["accept the builder's completion claim as evidence"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "failure_reachable", "success_reachable", "verifier_independent"]},
+        "metrics": ["false_completion", "acceptance_coverage", "verification_depth", "tokens"]
+      },
+      {
+        "id": "core-resume-continuation",
+        "title": "Continuation avoids rediscovery",
+        "track": "core-engineering",
+        "capability_id": "capability.resume",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "checkpoint", "description": "A multi-step engineering task paused after verified partial progress with known next authority and unresolved risks."},
+        "comparison": {"kind": "control-treatment", "control": "Fresh agent receives only conversation-style summary.", "treatment": "Fresh agent receives capability.resume checkpoint contract.", "ablation": null},
+        "expected": {"treatment_behaviors": ["recover exact verified state", "continue from the legitimate next step", "preserve unresolved risks"], "prohibited": ["redo completed work without cause"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent"]},
+        "metrics": ["rediscovery_actions", "time_to_productive_action", "context_tokens", "incorrect_rework"]
+      },
+      {
+        "id": "core-arsenal-core-counterfactual",
+        "title": "Arsenal Core counterfactual retains losses",
+        "track": "core-engineering",
+        "capability_id": "capability.verify",
+        "active": false,
+        "execution": {"mode": "agent-control-treatment", "status": "designed-not-run"},
+        "fixture": {"kind": "repository-task", "description": "A representative coding task suitable for repeated baseline, Arsenal Core, and ablation runs."},
+        "comparison": {"kind": "multi-arm", "control": "Model + harness only.", "treatment": "Same model + harness + Arsenal Core.", "ablation": "Repeat with Repository Truth and Verify removed one at a time."},
+        "expected": {"treatment_behaviors": ["preserve every arm result including regressions", "attribute claims only to observed deltas"], "prohibited": ["discard losing runs", "aggregate away capability regressions"]},
+        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent"]},
+        "metrics": ["correctness", "false_completion", "scope_drift", "tokens", "cost", "wall_time", "human_interventions"]
+      }
+    ]
+  }
+}

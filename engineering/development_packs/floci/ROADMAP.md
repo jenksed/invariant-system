@@ -231,6 +231,8 @@ The following cases are now the Local Cloud evaluation track inside Arsenal Benc
 
 Evaluation should compare representative control/treatment runs and retain model, harness, tool, budget, repository-state, verifier, cost, and failure evidence under the general ARS-02 contract.
 
+ARS-02 v0 has now executed the first five deterministic Local Cloud routing/boundary cases under Case Health and counterfactual receipts. Six deeper Local Cloud runtime/agent cases remain explicitly `designed-not-run`. That candidate evidence is sufficient for `capability.local-cloud-feature-delivery` to enter `testing`, but it does not establish model efficacy, real-provider semantics, or `stable` maturity.
+
 Floci assets may earn `testing` or later `stable` only through the same lifecycle evidence rules as the rest of Arsenal.
 
 ## Future Floci work

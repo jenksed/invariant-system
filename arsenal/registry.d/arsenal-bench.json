@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "evaluation.arsenal-bench-contract",
+      "path": "evaluation/BENCH_CONTRACT.md",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the Arsenal Bench evidence, Case Health, counterfactual, provenance, loss-retention, and lifecycle-gating contract.",
+      "invocation": "reference"
+    },
+    {
+      "id": "evaluation.arsenal-bench-case-schema",
+      "path": "evaluation/evaluation-case.schema.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the structural schema for reusable Arsenal Bench evaluation cases.",
+      "invocation": "reference"
+    },
+    {
+      "id": "evaluation.arsenal-bench-case-health-schema",
+      "path": "evaluation/case-health-receipt.schema.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define Case Health Receipts so an evaluation case must establish its own fitness before contributing evidence.",
+      "invocation": "reference"
+    },
+    {
+      "id": "evaluation.arsenal-bench-receipt-schema",
+      "path": "evaluation/evaluation-receipt.schema.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define evaluation receipts with explicit claim scope, counterfactual state, limitations, and capability passport evidence.",
+      "invocation": "reference"
+    },
+    {
+      "id": "evaluation.arsenal-bench-core-v0",
+      "path": "evaluation/cases/core-engineering.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define eight high-signal control/treatment and ablation cases for Core Arsenal engineering judgment without fabricating unexecuted model runs.",
+      "invocation": "reference"
+    },
+    {
+      "id": "evaluation.arsenal-bench-local-cloud-v0",
+      "path": "evaluation/cases/local-cloud.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the eleven-case Local Cloud evaluation track and its five-case executable candidate lifecycle gate.",
+      "invocation": "reference"
+    }
+  ]
+}

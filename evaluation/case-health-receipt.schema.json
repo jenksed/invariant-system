@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/case-health-receipt-1.0.0.json",
+  "title": "Project Arsenal Case Health Receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["case_id", "status", "checks"],
+  "properties": {
+    "case_id": {"type": "string"},
+    "status": {"enum": ["HEALTHY", "UNHEALTHY", "DESIGNED-NOT-RUN"]},
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "evidence"],
+        "properties": {
+          "id": {"type": "string"},
+          "status": {"enum": ["PASS", "FAIL", "NOT-APPLICABLE", "NOT-RUN"]},
+          "evidence": {"type": "string"}
+        }
+      }
+    }
+  }
+}

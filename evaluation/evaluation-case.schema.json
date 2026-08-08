@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/evaluation-case-1.0.0.json",
+  "title": "Project Arsenal Evaluation Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "track", "capability_id", "active", "execution", "fixture", "comparison", "expected", "case_health", "metrics"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^[a-z][a-z0-9.-]+$"},
+    "title": {"type": "string", "minLength": 8},
+    "track": {"type": "string", "minLength": 3},
+    "capability_id": {"type": "string", "pattern": "^capability\\.[a-z][a-z0-9.-]*$"},
+    "active": {"type": "boolean"},
+    "execution": {
+      "type": "object",
+      "required": ["mode", "status"],
+      "properties": {
+        "mode": {"enum": ["agent-control-treatment", "local-cloud-router", "local-cloud-runtime"]},
+        "status": {"enum": ["designed-not-run", "executable"]},
+        "task_kind": {"type": "string"}
+      }
+    },
+    "fixture": {"type": "object"},
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "control", "treatment", "ablation"],
+      "properties": {
+        "kind": {"enum": ["control-treatment", "ablation", "multi-arm", "contract-counterfactual"]},
+        "control": {"type": "string", "minLength": 8},
+        "treatment": {"type": "string", "minLength": 8},
+        "ablation": {"type": ["string", "null"]}
+      }
+    },
+    "expected": {"type": "object"},
+    "case_health": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required_checks"],
+      "properties": {
+        "required_checks": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+      }
+    },
+    "metrics": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}}
+  }
+}

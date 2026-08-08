@@ -2,7 +2,7 @@
 
 Status: active program
 
-Current frontier: **ARS-02 — Arsenal Bench & Evaluation Lab v0**
+Current frontier: **ARS-03 — Compiler & Distribution**
 
 Project Arsenal is evolving from a reusable library of prompts, methods, workflows, references, and Development Packs into a capability engineering system for making good engineering judgment reusable, composable, executable, evaluable, and governable.
 
@@ -40,6 +40,24 @@ Prompts, methods, workflows, scripts, Development Packs, receipts, policies, eva
 8. **Publish losses.** Arsenal Bench exists to challenge Arsenal, not to manufacture favorable marketing results.
 9. **No self-granted authority.** Future capability evolution may propose changes but cannot silently increase its authority, rewrite doctrine, or promote itself.
 10. **Build the spine; grow packs in parallel.** Ecosystem-specific Development Packs should prove the shared contracts rather than fork the architecture.
+
+## Signature primitives
+
+The roadmap deliberately owns a small set of concepts that should make Arsenal feel obvious in hindsight rather than merely comprehensive. They are not all shipped yet; each has an explicit program owner.
+
+| Primitive | Product idea | Program owner |
+|---|---|---|
+| **Proof-Carrying Capability** | A capability travels with identity, authority, evaluation state, known limitations, and inspectable evidence instead of being trusted because its instructions look good. | ARS-02 seeds the Capability Evidence Passport; ARS-07/08 harden provenance and trust. |
+| **Case Health Receipt** | A benchmark case must prove it is fit to judge the agent before its result can count. | ARS-02 — AVAILABLE v0. |
+| **Counterfactual / Ablation Receipt** | Record what changed, what stayed fixed, which arms actually ran, and what Arsenal prevented rather than reporting a score without causal context. | ARS-02 — AVAILABLE v0; ARS-11 expands adversarial experiments. |
+| **Competence Lockfile — `.arsenal.lock`** | Version the engineering judgment a repository expects its agents to use, including capability versions, digests, provenance, evaluation qualification, and compiled exports. | ARS-03. |
+| **Capability Gap Preflight** | Compute required competence versus available/qualified competence before execution, so missing capabilities surface before the agent improvises around them. | ARS-04. |
+| **Reality Budget / Proof Ladder** | Spend only as much reality and authority as the evidence requires. | ARS-05. |
+| **Agent Flight Recorder** | Preserve capability/model/context/tool/evidence traces so a run can be replayed and successful/failed behavior can be diffed — eventually, git-bisect-like debugging for agent behavior. | ARS-07. |
+| **Third-Party Competence Audit** | Treat imported skills as untrusted packages: inspect provenance/authority/conflicts, quarantine, sandbox, evaluate, then approve. | ARS-08. |
+| **Evidence-Based Model Routing** | Route a capability to models/harnesses because Bench evidence shows competence for that capability, not because of brand reputation. | ARS-10 after ARS-02/04/07 evidence exists. |
+
+These primitives are architectural commitments only at the slices named above. Public surfaces must continue to distinguish `AVAILABLE`, `BUILDING`, and `FRONTIER` rather than presenting roadmap concepts as shipped features.
 
 ---
 
@@ -182,9 +200,25 @@ Proof:
 
 ## ARS-02 — Arsenal Bench & Evaluation Lab v0
 
-**Status:** next slice.
+**Status:** delivered by PR #14; model-efficacy campaigns remain ongoing evaluation work.
 
 **Goal:** measure whether Arsenal actually improves engineering work and make lifecycle promotion executable.
+
+Delivered in v0:
+
+- `evaluation/BENCH_CONTRACT.md` plus case, Case Health Receipt, and evaluation receipt schemas;
+- a 19-case corpus: 8 Core engineering-judgment cases and 11 Local Cloud / former-FLC-06 cases;
+- explicit control/treatment, ablation, and contract-counterfactual definitions;
+- **Case Health Receipts** so broken or under-specified cases cannot contribute lifecycle evidence;
+- **Counterfactual / Ablation Receipts** that preserve unexecuted arms instead of inferring causal wins;
+- a **Capability Evidence Passport** inside executable receipts as the first proof-carrying-capability surface;
+- deterministic runner + negative contract suite;
+- five active Local Cloud routing/boundary cases executed in CI while fourteen deeper/model cases remain explicitly `designed-not-run`;
+- retained claim scope and limitations stating that deterministic contract evidence is not model/harness efficacy evidence;
+- the first evidence-backed capability lifecycle promotion: `capability.local-cloud-feature-delivery` to `testing` / `candidate`, guarded by the registered Local Cloud suite and exact generated receipt;
+- read-only final CI and generated catalog integration.
+
+First candidate campaign evidence: 5/5 active Local Cloud cases executed, healthy, and passing; 6 deeper Local Cloud cases remain designed-not-run, as do all 8 Core model-behavior cases. No capability is promoted to `stable` by this campaign.
 
 This slice **absorbs the former FLC-06 evaluation/stabilization program**. Floci becomes the first substantial evaluation corpus for the general Arsenal evaluation system rather than receiving a parallel one-off evaluation framework.
 
@@ -258,6 +292,10 @@ Candidate export targets:
 - MiniMax/generic agent package;
 - Kiln-native capability package.
 
+ARS-03 also owns the **Competence Lockfile** concept: `.arsenal.lock` should pin the capability IDs/versions, content digests, provenance, evaluation qualification, and compiled export expectations a repository depends on. The goal is to make agent competence reproducible infrastructure in the same spirit that dependency lockfiles make software dependencies reproducible.
+
+The lockfile must not freeze model choice or pretend evaluation evidence never expires. It records the accepted competence contract and provenance; later evidence can invalidate or upgrade qualification deliberately.
+
 Potential CLI surface may include concepts such as lint/build/explain/install, but command names are not public contract until implementation reconnaissance proves the right interface.
 
 Proof:
@@ -287,6 +325,8 @@ route: decomposition → TDD
 
 FLC-05 is the tracer precedent: it proved that **provider resolved** and **requested capability available for that provider** are separate facts. ARS-04 generalizes that lesson beyond cloud work.
 
+ARS-04 should expose this as **Capability Gap Preflight**: before execution, derive the competence required by the intended route and compare it with capabilities that are actually present, compatible, authorized, and sufficiently qualified. The result should be explainable as covered / missing / unknown rather than allowing an agent to improvise around a consequential gap.
+
 Start deterministic. Models may interpret fuzzy intent; graph machinery validates legal composition.
 
 Proof:
@@ -301,6 +341,12 @@ Proof:
 ## ARS-05 — Execution Substrate Contract
 
 **Goal:** generalize the Local Cloud execution/fidelity lesson into a portable execution-selection model.
+
+Public concept: **Reality Budget / Proof Ladder**.
+
+> **Spend only as much reality and authority as the evidence requires.**
+
+The selector should be able to explain why a lower-blast-radius substrate is sufficient, what claim it cannot establish, and what additional evidence would justify escalation.
 
 Execution ladder:
 
@@ -354,9 +400,11 @@ Proof:
 
 ---
 
-## ARS-07 — Evidence Observatory
+## ARS-07 — Evidence Observatory / Agent Flight Recorder
 
 **Goal:** unify receipts, run provenance, evaluation evidence, model/harness usage, and execution traces into a common run model.
+
+The recognizable product surface is the **Agent Flight Recorder**: preserve enough of intent, capability versions, context, tools, authority escalation, verification, cost, and accepted evidence to explain *why* one run succeeded and another failed. Long term, this should enable time-travel inspection and git-bisect-like debugging for agent behavior without requiring private chain-of-thought capture.
 
 Start with data contracts, not a dashboard.
 
@@ -399,17 +447,19 @@ Capabilities/packages should eventually declare and enforce permissions such as:
 - production access;
 - reversibility/mutation class.
 
-External capability ingestion should evolve toward:
+External capability ingestion should evolve toward an **`arsenal audit` for third-party competence**:
 
 ```text
 discover
-→ inspect
-→ classify
+→ quarantine
+→ inspect provenance + requested authority + conflicts
 → sandbox
-→ extract/adapt
 → evaluate
-→ register
+→ adapt
+→ approve/register
 ```
+
+Unverified imported instructions should default to quarantine rather than becoming trusted behavior because they use a familiar package format.
 
 Proof:
 
@@ -462,7 +512,8 @@ Proof:
 - the compiler can explain the capability route from objective to completion proof;
 - missing decisions or unavailable capabilities surface as explicit frontiers;
 - no route gains authority merely because a model proposed it;
-- evaluation history may inform choices only after ARS-02/07 provide sufficient evidence.
+- evaluation history may inform choices only after ARS-02/07 provide sufficient evidence;
+- **evidence-based model routing** may select different models/harnesses for different capabilities only when comparable Bench/Flight-Recorder evidence supports that decision — never from brand reputation alone.
 
 ---
 
@@ -591,31 +642,26 @@ ARS-01 Capability Contract v2 must define display names, aliases, compatibility/
 # Current frontier
 
 ```text
-PROVEN FOUNDATION
-Asset registry · invocation model · doctrine · methods · workflows
-Development Pack contract · evidence/receipts · Floci FLC-00→05
+DELIVERED SPINE
+ARS-00  Public Surface & Distribution
+ARS-01  Capability Contract v2
+ARS-02  Arsenal Bench v0 + first evidence-backed testing capability
 
-NOW
-ARS-00A  Public Surface & Unified Roadmap
-
-NEXT
-ARS-00B  Flagship quickstart / distribution pilot
-ARS-01   Capability Contract v2
-ARS-02   Arsenal Bench & Evaluation Lab v0
-ARS-03   Compiler & Distribution
+NOW / NEXT AFTER ARS-02 ACCEPTANCE
+ARS-03  Compiler & Distribution + `.arsenal.lock`
 
 THEN
-ARS-04   Capability Graph
-ARS-05   Execution Substrate Contract
-ARS-06   Dagger / Executable World Pack
-ARS-07   Evidence Observatory
-ARS-08   Trust & Authority Plane
+ARS-04  Capability Graph + Capability Gap Preflight
+ARS-05  Execution Substrate Contract + Reality Budget
+ARS-06  Dagger / Executable World Pack
+ARS-07  Evidence Observatory / Agent Flight Recorder
+ARS-08  Trust & Authority + third-party competence audit
 
 LATER
-ARS-09   Knowledge Plane
-ARS-10   Intent Compiler
-ARS-11   Adversarial Verification
-ARS-12   Controlled Capability Evolution
+ARS-09  Knowledge Plane
+ARS-10  Intent Compiler + evidence-based model routing
+ARS-11  Adversarial Verification / deeper counterfactual laboratories
+ARS-12  Controlled Capability Evolution
 ```
 
 ## Program success criterion
