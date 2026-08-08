@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=iac-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/iac-common.sh"
+
+tool="${1:-}"
+namespace="${2:-}"
+[[ "$tool" == "terraform" || "$tool" == "opentofu" ]] || { echo "usage: run-hcl-cycle terraform|opentofu <namespace>" >&2; exit 64; }
+[[ -n "$namespace" ]] || { echo "namespace is required" >&2; exit 64; }
+
+ensure_tools
+ensure_iac_env
+work="$(prepare_iac_workdir "$tool" "$namespace")"
+receipt="$IAC_ARTIFACT_DIR/${tool}-receipt.md"
+plan_log="$IAC_ARTIFACT_DIR/${tool}-plan.txt"
+apply_log="$IAC_ARTIFACT_DIR/${tool}-apply.txt"
+snapshot="flc02-${tool}-${namespace}"
+
+on_error() {
+  local rc=$?
+  capture_floci_evidence "${tool}-failure"
+  {
+    echo
+    echo "- result: FAIL"
+    echo "- exit_code: $rc"
+  } >>"$receipt" 2>/dev/null || true
+  exit "$rc"
+}
+trap on_error ERR
+
+"$AWS_PACK_DIR/scripts/verify-inner"
+
+floci_version="$(curl -fsS "$AWS_ENDPOINT_URL/_floci/info" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("version","unknown"))')"
+floci_container="$(compose ps -q floci)"
+floci_image_id="$(docker inspect -f '{{.Image}}' "$floci_container")"
+floci_repo_digests="$(docker image inspect "$FLOCI_IMAGE" -f '{{join .RepoDigests ","}}' 2>/dev/null || true)"
+fixture_digest="$(sha256_paths "$IAC_DIR/terraform")"
+
+{
+  echo "# FLC-02 ${tool} completion receipt"
+  echo
+  echo "- result: RUNNING"
+  echo "- project_arsenal_revision: ${ARSENAL_REVISION:-unknown}"
+  echo "- iac_engine: $tool"
+  echo "- iac_image: $(iac_image "$tool")"
+  echo "- aws_provider_version: $AWS_PROVIDER_VERSION"
+  echo "- namespace: $namespace"
+  echo "- endpoint_host: $AWS_ENDPOINT_URL"
+  echo "- endpoint_container: $FLOCI_CONTAINER_ENDPOINT"
+  echo "- floci_image: $FLOCI_IMAGE"
+  echo "- floci_version: $floci_version"
+  echo "- floci_image_id: $floci_image_id"
+  echo "- floci_repo_digests: ${floci_repo_digests:-unavailable}"
+  echo "- fixture_digest: $fixture_digest"
+  echo
+  echo "## Gate evidence"
+} >"$receipt"
+
+iac_exec "$tool" "$work" init -backend=false -input=false | tee "$IAC_ARTIFACT_DIR/${tool}-init.txt"
+iac_exec "$tool" "$work" validate | tee "$IAC_ARTIFACT_DIR/${tool}-validate.txt"
+iac_exec "$tool" "$work" plan -input=false -out=plan.bin \
+  -var="endpoint=$FLOCI_CONTAINER_ENDPOINT" -var="namespace=$namespace" | tee "$plan_log"
+iac_exec "$tool" "$work" apply -input=false -auto-approve plan.bin | tee "$apply_log"
+assert_iac_present "$namespace"
+printf '%s\n' "- zero_state_apply: PASS" "- post_apply_assertions: PASS" >>"$receipt"
+
+"$IAC_SCRIPT_DIR/snapshot-cache" save "$snapshot" "$tool" "$namespace"
+raw_reset_floci
+assert_iac_absent "$namespace"
+printf '%s\n' "- snapshot_save: PASS" "- reset_absence_assertions: PASS" >>"$receipt"
+
+"$IAC_SCRIPT_DIR/snapshot-cache" load "$snapshot" "$tool" "$namespace"
+printf '%s\n' "- snapshot_provenance_match: PASS" "- snapshot_restore_assertions: PASS" >>"$receipt"
+
+iac_exec "$tool" "$work" destroy -input=false -auto-approve \
+  -var="endpoint=$FLOCI_CONTAINER_ENDPOINT" -var="namespace=$namespace" | tee "$IAC_ARTIFACT_DIR/${tool}-destroy.txt"
+assert_iac_absent "$namespace"
+printf '%s\n' "- destroy: PASS" "- post_destroy_absence_assertions: PASS" >>"$receipt"
+
+capture_floci_evidence "${tool}-pass"
+python3 - "$receipt" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1])
+text = p.read_text()
+p.write_text(text.replace("- result: RUNNING", "- result: PASS", 1))
+PY
+trap - ERR
+printf 'FLC-02 %s IaC gate: PASS\nreceipt: %s\n' "$tool" "$receipt"

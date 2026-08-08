@@ -1,0 +1,20 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Project Arsenal FLC-02 CloudFormation tracer
+
+Resources:
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: arsenal-floci-cfn-artifacts
+
+  JobsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: arsenal-floci-cfn-jobs
+      VisibilityTimeout: 45
+
+Outputs:
+  BucketName:
+    Value: !Ref ArtifactsBucket
+  QueueUrl:
+    Value: !Ref JobsQueue
