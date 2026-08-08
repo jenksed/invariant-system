@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+guard_endpoint
+mkdir -p "$ARTIFACT_DIR"
+trap 'compose logs >"$ARTIFACT_DIR/floci-az.log" 2>&1 || true' EXIT
+compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+compose pull
+compose up -d
+wait_ready
+"$PACK_DIR/scripts/verify-inner"
+result="$("$PACK_DIR/scripts/run-tracer" | head -n1)"
+image_id="$(compose images -q floci-az | head -n1)"
+cat > "$ARTIFACT_DIR/completion-receipt.md" <<EOF2
+# Azure Provider Completion Receipt
+
+- Provider: Azure
+- Floci image: \`${FLOCI_AZ_IMAGE:-floci/floci-az:0.10.0}\`
+- Container image ID: \`$image_id\`
+- Endpoint: \`$FLOCI_AZ_ENDPOINT\`
+- Credential mode: runtime-generated non-secret SharedKey in an Azurite-compatible local connection string
+- Fixture: Blob input -> explicit Queue work item -> host worker -> Blob result
+- Result: \`$result\`
+- Fidelity ledger: \`engineering/development_packs/floci/azure/FIDELITY_LEDGER.md\`
+- Provider-only proof: Azure identity/RBAC, SharedKey verification, account limits, regional behavior, durability, billing, and managed-service timing are not verified.
+- Real-provider mutation: no
+EOF2
+compose down --volumes --remove-orphans
+trap - EXIT
+printf 'FLC-04 Azure completion gate: PASS\n'

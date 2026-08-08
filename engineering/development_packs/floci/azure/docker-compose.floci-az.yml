@@ -1,0 +1,8 @@
+services:
+  floci-az:
+    image: ${FLOCI_AZ_IMAGE:-floci/floci-az:0.10.0}
+    ports:
+      - "127.0.0.1:4577:4577"
+    environment:
+      FLOCI_AZ_STORAGE_MODE: ${FLOCI_AZ_STORAGE_MODE:-memory}
+      FLOCI_AZ_SERVICES_FUNCTIONS_ENABLED: "false"
