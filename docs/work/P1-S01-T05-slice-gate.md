@@ -258,7 +258,7 @@ accommodate it.
 | P1-S01-T05-AC04 | **Pass** | P1-S01-T05-E04 | Final owner-machine pass on the accepted OD-02 acceptance machine (`hw.model = MacBookPro18,1`). See "Owner-machine Evidence" below |
 | P1-S01-T05-AC05 | Pass | P1-S01-T05-E05 | `Kiln.VerificationManifest` builds and validates P1-S01-V01; 21 assertions cover state binding and non-authority |
 | P1-S01-T05-AC06 | Pass | P1-S01-T05-E06 | Deterministic module, behaviour, source, and command-surface reachability checks |
-| P1-S01-T05-AC07 | **Open** | P1-S01-T05-E07 | Owner review of the exact integrated diff and manifest has not been given |
+| P1-S01-T05-AC07 | **Pass** | P1-S01-T05-E07 | Owner review of the exact integrated diff and P1-S01-V01 closed by Joshua Jenks at PR #46 merge at `db02198` |
 
 ### Owner-machine Evidence (AC04)
 
@@ -360,9 +360,8 @@ makes this final pass provably distinct from that earlier run.
 
 ### Repository state
 
-- Branch: `work/p1-s01-t05-slice-gate`
+- Branch: `work/p1-s01-t05-slice-gate` (merged via PR #46 at `db02198`)
 - Base: `118bcaad7353e8f891e4d0101460379e78138e56`
+- Closeout HEAD: `5792ffdd3af6c45f07e07b8334ce150ad642495b`
 - Diff reviewed: Yes
-- Parent slice status after merge: P1-S01 candidate proved on every machine
-  gate including the accepted OD-02 acceptance machine; acceptance withheld
-  pending owner review (AC07).
+- Parent slice status after merge: P1-S01 integrated and owner-accepted at PR #46 (`db02198`). Final manifest `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` (`overall: pass`, 18 components, owner-machine OD-02 pass).

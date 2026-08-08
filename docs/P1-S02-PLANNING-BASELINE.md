@@ -1,10 +1,10 @@
 # P1-S02 Planning Baseline
 
 **Document type:** Slice-planning baseline  
-**Status:** Proposed; planning only  
+**Status:** Proposed; planning only. P1-S01 entry-gate prerequisites are satisfied (integrated at `db02198` via PR #46 with owner-accepted P1-S01-V01). P1-S02 still requires a separate planning foundation, authoritative handoff, and explicit subsequent authorization before any runtime implementation begins.  
 **Target slice:** P1-S02 — Evidence-backed Single-Run Change Alpha plus QC0/QC1  
 **Implementation authorization:** Not granted  
-**Entry gate:** accepted P1-S01-T05 aggregate gate, demo, P1-S01-V01, owner-machine Evidence, and explicit subsequent authorization
+**Entry gate:** P1-S01 integrated at `db02198` via PR #46 with owner-accepted P1-S01-V01 (`artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json`, `overall: pass`, owner-machine OD-02 pass) and explicit subsequent authorization
 
 ## Purpose
 
@@ -16,9 +16,9 @@ The planning problem is therefore not "which subsystems should we build next?" T
 
 ## Starting point
 
-P1-S01 is establishing durable identity, journal truth, replay, projections, restart reconstruction, Workflow authority, and a foundation CLI. T05 remains responsible for proving that foundation as an integrated slice.
+P1-S01 integrated at `db02198` via PR #46 with P1-S01-V01 `overall: pass` (18 components, owner-machine OD-02 pass). The P1-S01 aggregate slice gate, the P1-S01-D01 demo, and P1-S01-V01 are recorded in `docs/work/P1-S01-T05-slice-gate.md` and `docs/work/P1-S01-slice-closeout.md`.
 
-P1-S02 may rely on the durable boundaries P1-S01 proves. It must not assume more than T05 actually demonstrates.
+P1-S02 may rely on the durable boundaries P1-S01 proves. It must not assume more than the integrated P1-S01 state actually demonstrates.
 
 Before P1-S02 authorization, the planning pass must consume at least:
 

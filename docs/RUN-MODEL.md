@@ -3,7 +3,7 @@
 **Document type:** Run subject summary  
 **Decision status:** Accepted  
 **Integration status:** Reconciled by Prompt 8-A  
-**Implementation status:** P1-S01 authorized after Prompt 8-A merges  
+**Implementation status:** P1-S01 integrated at `db02198` via PR #46  
 **Focused lifecycle authority:** `docs/ROOT-RUN-LIFECYCLE-AND-JOURNAL.md`
 
 ## Definition
@@ -233,8 +233,8 @@ A product Receipt is sealed after that transaction and has no authority.
 
 ## Current authorization
 
-Prompt 8-A authorizes only P1-S01-T01 through P1-S01-T05 in exact order.
+P1-S01 was executed as T01 → T02 → T03 → T06 → T04 → T05 and integrated at `db02198` via PR #46. See `docs/work/P1-S01-T01-domain-foundation.md`, `docs/work/P1-S01-T02-durable-store.md`, `docs/work/P1-S01-T03-replay-projections.md`, `docs/work/P1-S01-T06-workflow-surface.md`, `docs/work/P1-S01-T04-foundation-cli.md`, `docs/work/P1-S01-T05-slice-gate.md`, and `docs/work/P1-S01-slice-closeout.md`.
 
-Those tickets may implement domain identifiers and states, the durable store, deterministic replay and projections, the minimum foundation CLI, and the P1-S01 aggregate gate and slice verification manifest.
+Those tickets implemented domain identifiers and states, the durable store, deterministic replay and projections, the shared Workflow application boundary, the minimum foundation CLI, and the P1-S01 aggregate gate and slice verification manifest. P1-S02 remains planned and unauthorized.
 
 They may not implement MiniMax, Repository source reads, Patch mutation, external Commands, criterion completion Evidence, product Receipt sealing, release packaging, Child Runs, TUI, or Wave B work.

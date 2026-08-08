@@ -20,7 +20,7 @@ It does not define runtime Run identity, product branch behavior, or managed wor
 8. Dependent pull requests integrate in dependency order and are retested after ancestry changes.
 9. A vertical slice can use several small pull requests.
 10. Every merged ticket leaves `main` coherent, tested, and within its accepted slice boundary.
-11. A plan or ticket name does not authorize work. Prompt 8-A currently authorizes only P1-S01-T01 through T05 in exact order.
+11. A plan or ticket name does not authorize work. Prompt 8-A currently authorizes only P1-S01-T01 through T06 in their recorded merge order (T01 → T02 → T03 → T06 → T04 → T05).
 
 ## Work identifiers
 
@@ -131,6 +131,7 @@ Current accepted P1-S01 branches are:
 work/p1-s01-t01-domain-foundation
 work/p1-s01-t02-durable-store
 work/p1-s01-t03-replay-projections
+work/p1-s01-t06-workflow-surface
 work/p1-s01-t04-foundation-cli
 work/p1-s01-t05-slice-gate
 ```
@@ -268,6 +269,7 @@ Merge and accept in this order:
 T01 domain foundation
 → T02 durable store
 → T03 replay and projections
+→ T06 shared Kiln.Workflow application boundary (consumed by T04)
 → T04 foundation CLI
 → T05 aggregate gate and slice verification manifest
 ```
