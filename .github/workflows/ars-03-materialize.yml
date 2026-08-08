@@ -1,0 +1,60 @@
+name: ARS-03 Distribution Materialize
+
+on:
+  push:
+    branches:
+      - agent/ars-03-compiler-lockfile
+    paths:
+      - ".github/workflows/ars-03-materialize.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-03-compiler-lockfile
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate compiler before generation
+        run: |
+          python3 -m py_compile scripts/arsenal_compile.py scripts/test-arsenal-compiler.py
+          python3 scripts/arsenal_compile.py validate
+          python3 scripts/test-arsenal-compiler.py
+
+      - name: Materialize canonical distribution and competence lockfile
+        run: |
+          python3 scripts/arsenal_compile.py build
+          python3 scripts/arsenal_compile.py verify
+          python3 scripts/verify-repository-truth-distribution.py
+
+      - name: Regenerate authoritative catalog
+        run: python3 scripts/arsenal_audit.py --write-catalog
+
+      - name: Commit generated files only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add \
+            .arsenal.lock \
+            CATALOG.md \
+            distribution/agent-skills/repository-truth/SKILL.md \
+            distribution/agent-skills/repository-truth/references/repository_truth_audit.md \
+            distribution/agent-skills/repository-truth/arsenal-manifest.json
+
+          git diff --cached --quiet && exit 0
+
+          changed="$(git diff --cached --name-only)"
+          allowed=$'.arsenal.lock\nCATALOG.md\ndistribution/agent-skills/repository-truth/SKILL.md\ndistribution/agent-skills/repository-truth/arsenal-manifest.json'
+          test "$changed" = "$allowed"
+
+          git commit -m "Materialize ARS-03 compiled distribution"
+          git push origin HEAD:agent/ars-03-compiler-lockfile
