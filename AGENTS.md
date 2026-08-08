@@ -44,7 +44,7 @@ A named ticket, planning document, passing planning CI, JSON Schema, detailed sp
 
 Before planned work:
 
-1. run `scripts/test-agent-preflight` when applicable to the current branch class;
+1. run `scripts/agent-preflight` to validate the current branch's governing work package, then `scripts/test-agent-preflight` to verify the preflight implementation;
 2. stop and report a known conformance mismatch rather than bypass the check;
 3. read the accepted plan;
 4. read `docs/ENGINEERING-DOCTRINE.md` when the work contains material engineering choices not already decided by accepted authority;
@@ -431,6 +431,7 @@ If required verification cannot run, report `implemented but unverified`.
 ## Standard current checks
 
 ```bash
+scripts/agent-preflight
 scripts/test-agent-preflight
 scripts/validate-agent-assets
 vale --glob='!{deps,_build}/**' .

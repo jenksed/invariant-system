@@ -53,6 +53,12 @@ jobs:
       - name: Install conformance validator
         run: python3 -m pip install --disable-pip-version-check --requirement requirements/conformance.txt
 
+      - name: Validate governing work package
+        if: github.event_name == 'pull_request'
+        env:
+          KILN_BRANCH: ${{ github.head_ref }}
+        run: scripts/agent-preflight
+
       - name: Test agent preflight behavior
         run: scripts/test-agent-preflight
 
