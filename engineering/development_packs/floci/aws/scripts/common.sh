@@ -6,6 +6,18 @@ COMPOSE_FILE="$PACK_DIR/docker-compose.floci.yml"
 ENV_FILE="${FLOCI_ENV_FILE:-$PACK_DIR/.env.floci}"
 ARTIFACT_DIR="${FLOCI_ARTIFACT_DIR:-$PACK_DIR/.floci-artifacts}"
 
+# Preserve explicitly supplied process environment so it wins over the env file,
+# matching normal CLI/Compose precedence. The env file supplies repository-local
+# defaults but may never mask an unsafe caller override during endpoint validation.
+_had_floci_image="${FLOCI_IMAGE+x}"
+_had_expected_endpoint="${FLOCI_EXPECTED_ENDPOINT+x}"
+_had_aws_endpoint="${AWS_ENDPOINT_URL+x}"
+_had_region="${AWS_DEFAULT_REGION+x}"
+_external_floci_image="${FLOCI_IMAGE-}"
+_external_expected_endpoint="${FLOCI_EXPECTED_ENDPOINT-}"
+_external_aws_endpoint="${AWS_ENDPOINT_URL-}"
+_external_region="${AWS_DEFAULT_REGION-}"
+
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -13,9 +25,13 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+[[ -n "$_had_floci_image" ]] && FLOCI_IMAGE="$_external_floci_image"
+[[ -n "$_had_expected_endpoint" ]] && FLOCI_EXPECTED_ENDPOINT="$_external_expected_endpoint"
+[[ -n "$_had_aws_endpoint" ]] && AWS_ENDPOINT_URL="$_external_aws_endpoint"
+[[ -n "$_had_region" ]] && AWS_DEFAULT_REGION="$_external_region"
+
 : "${FLOCI_IMAGE:=floci/floci:1.5.34-compat}"
 : "${FLOCI_EXPECTED_ENDPOINT:=http://localhost:4566}"
-: "${AWS_ENDPOINT_URL:=$FLOCI_EXPECTED_ENDPOINT}"
 : "${AWS_DEFAULT_REGION:=us-east-1}"
 
 compose() {
@@ -38,6 +54,11 @@ ensure_tools() {
 }
 
 guard_endpoint() {
+  if [[ -z "${AWS_ENDPOINT_URL:-}" ]]; then
+    printf 'refusing AWS call: AWS_ENDPOINT_URL is not set\n' >&2
+    return 64
+  fi
+
   if [[ "$AWS_ENDPOINT_URL" != "$FLOCI_EXPECTED_ENDPOINT" ]]; then
     printf 'refusing AWS call: AWS_ENDPOINT_URL=%q expected=%q\n' \
       "$AWS_ENDPOINT_URL" "$FLOCI_EXPECTED_ENDPOINT" >&2
