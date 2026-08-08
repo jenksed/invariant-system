@@ -103,6 +103,15 @@ jobs:
             --left .arsenal-observatory/dagger-flight-a.json \
             --right .arsenal-observatory/dagger-flight-b.json
 
+      - name: Verify evidence bundle source set
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .arsenal-observatory -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' ')" = "3"
+          test -f .arsenal-evidence/ars-06-tdd-python-container.json
+          test -f .arsenal-evidence/ars-06-tdd-python-container.world.json
+          test -f .arsenal-bench/local-cloud-receipt.json
+
       - name: Upload Flight Recorder evidence bundle
         uses: actions/upload-artifact@v4
         with:
@@ -113,6 +122,7 @@ jobs:
             .arsenal-evidence/ars-06-tdd-python-container.world.json
             .arsenal-bench/local-cloud-receipt.json
           if-no-files-found: error
+          include-hidden-files: true
 
       - name: Preserve ARS-06 executable-world regression
         run: |
