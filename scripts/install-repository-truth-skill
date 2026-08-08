@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE_DIR="$ROOT_DIR/distribution/agent-skills/repository-truth"
+
+usage() {
+  cat <<'EOF'
+Usage:
+  scripts/install-repository-truth-skill --project /path/to/repository
+  scripts/install-repository-truth-skill --user
+
+Installs the ARS-00B Repository Truth Agent Skill without overwriting a divergent existing installation.
+
+Targets:
+  --project PATH   <project-root>/.agents/skills/repository-truth
+  --user           ~/.agents/skills/repository-truth
+
+Exit codes:
+  0  installed or already identical
+  2  invalid arguments or missing prerequisites
+  3  destination exists but differs; nothing overwritten
+EOF
+}
+
+die() {
+  printf 'ERROR: %s\n' "$*" >&2
+  exit 2
+}
+
+mode=""
+project=""
+
+while (($#)); do
+  case "$1" in
+    --project)
+      [[ $# -ge 2 ]] || die "--project requires a path"
+      [[ -z "$mode" ]] || die "choose exactly one install target"
+      mode="project"
+      project="$2"
+      shift 2
+      ;;
+    --user)
+      [[ -z "$mode" ]] || die "choose exactly one install target"
+      mode="user"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ -n "$mode" ]] || die "choose --project PATH or --user"
+[[ -f "$SOURCE_DIR/SKILL.md" ]] || die "missing source skill: $SOURCE_DIR/SKILL.md"
+[[ -f "$SOURCE_DIR/references/repository_truth_audit.md" ]] || die "missing canonical reference snapshot"
+
+if [[ "$mode" == "project" ]]; then
+  [[ -d "$project" ]] || die "project path does not exist: $project"
+  git -C "$project" rev-parse --is-inside-work-tree >/dev/null 2>&1 || die "project path is not inside a Git work tree: $project"
+  repo_root="$(git -C "$project" rev-parse --show-toplevel)"
+  destination_parent="$repo_root/.agents/skills"
+else
+  [[ -n "${HOME:-}" ]] || die "HOME is not set"
+  destination_parent="$HOME/.agents/skills"
+fi
+
+destination="$destination_parent/repository-truth"
+mkdir -p "$destination_parent"
+
+if [[ -e "$destination" ]]; then
+  if [[ -d "$destination" ]] && diff -qr "$SOURCE_DIR" "$destination" >/dev/null; then
+    printf 'Repository Truth skill already installed and identical: %s\n' "$destination"
+    exit 0
+  fi
+
+  printf 'REFUSED: destination exists and differs; no files were overwritten: %s\n' "$destination" >&2
+  exit 3
+fi
+
+tmp_parent="$(mktemp -d "$destination_parent/.repository-truth-install.XXXXXX")"
+cleanup() {
+  rm -rf "$tmp_parent"
+}
+trap cleanup EXIT
+
+cp -R "$SOURCE_DIR" "$tmp_parent/repository-truth"
+mv "$tmp_parent/repository-truth" "$destination"
+
+printf 'Installed Repository Truth skill: %s\n' "$destination"
+if [[ "$mode" == "project" ]]; then
+  printf 'Restart/reopen the coding-agent session in the repository so skill discovery can refresh.\n'
+fi
