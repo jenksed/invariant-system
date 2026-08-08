@@ -34,11 +34,9 @@ Historical baselines, earlier roadmaps, work records, and merged pull-request de
 
 ## Current authorization boundary
 
-Prompt 8-A authorizes only P1-S01 and its accepted T01 through T05 sequence. Follow `docs/ROADMAP.md`, the current accepted ticket plan, and exact prerequisite Evidence to determine which P1-S01 ticket may proceed.
+P1-S01 and its T01, T02, T03, T06, T04, and T05 tickets are integrated at `db02198` via PR #46 and owner-accepted. P1-S02 is planned but not authorized; no P1-S02 runtime implementation begins until a later explicit authorization accepts the P1-S02 implementation package. A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, or proposed ticket sequence does not authorize implementation by itself.
 
-P1-S02 is planned but not authorized. Planning and evidence gathering for P1-S02 may refine future decisions, but no P1-S02 runtime implementation begins until P1-S01-T05 passes its aggregate gate, demo, P1-S01-V01, and owner-machine Evidence and a later explicit authorization accepts the P1-S02 implementation package.
-
-A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, or proposed ticket sequence does not authorize implementation by itself.
+Follow `docs/ROADMAP.md`, the current accepted ticket plan, and exact prerequisite Evidence to determine whether any further P1-S02 ticket may proceed.
 
 ## Required start sequence
 

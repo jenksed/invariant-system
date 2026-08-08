@@ -2,9 +2,9 @@
 
 **Document type:** Implementation-order authority  
 **Decision status:** Accepted by Prompt 8-A  
-**Integration status:** Authorization becomes effective when the Prompt 8-A pull request merges at an exact green head  
-**Implementation status:** No product slice implemented  
-**Authorization level:** Vertical Slice Authorized for P1-S01 only  
+**Integration status:** P1-S01 integrated at `db02198` via PR #46 (closeout SHA `5792ffd`, evidence SHA `444c5a5`)  
+**Implementation status:** P1-S01 durable single-Run foundation integrated and owner-accepted on the OD-02 acceptance machine  
+**Authorization level:** P1-S02 remains planned and unauthorized  
 **Quality Compiler placement:** Planned across P1-S02, Wave B, and later evidence-gated expansion; not independently authorized
 
 ## Roadmap rule
@@ -85,13 +85,13 @@ Integrated shaping:
 - independent Prompt 7-A review;
 - Prompt 8-A adjudication and authorization.
 
-Phase 0 exits only when the Prompt 8-A branch merges after exact-head CI succeeds.
+Phase 0 complete on Prompt 8-A merge at `118bcaa`.
 
 ## Phase 1 — Change-loop-first slices
 
 # P1-S01 — Durable single-Run foundation
 
-**Status:** Authorized after Prompt 8-A merges  
+**Status:** Integrated at `db02198` via PR #46; owner-accepted; P1-S01-V01 manifest `overall: pass`  
 **Purpose:** establish the smallest durable Kiln work boundary before provider, Repository-source, mutation, Command, completion, or Quality Compiler complexity.
 
 ## User-visible outcome

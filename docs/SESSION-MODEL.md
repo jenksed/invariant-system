@@ -3,7 +3,7 @@
 **Document type:** Session and Task subject summary  
 **Decision status:** Accepted  
 **Integration status:** Reconciled by Prompt 8-A  
-**Implementation status:** P1-S01 authorized after Prompt 8-A merges  
+**Implementation status:** P1-S01 integrated at `db02198` via PR #46  
 **Focused lifecycle authority:** `docs/ROOT-RUN-LIFECYCLE-AND-JOURNAL.md`
 
 ## Definition

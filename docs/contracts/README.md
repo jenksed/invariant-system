@@ -3,7 +3,7 @@
 **Document type:** Contract authority index  
 **Status:** First-month conformance active; historical broad contracts deferred  
 **Implementation status:** Conformance support only  
-**Build authorization:** P1-S01 only after Prompt 8-A merges
+**Build authorization:** P1-S01 issued and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized
 
 ## Current required contract
 

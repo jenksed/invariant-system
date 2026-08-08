@@ -3,7 +3,7 @@
 **Document type:** Slice closeout record
 **Slice:** P1-S01 — Durable single-Run foundation
 **Closing ticket:** P1-S01-T05
-**Status:** Technically verified on the accepted OD-02 acceptance machine; owner acceptance withheld
+**Status:** Owner-accepted; integrated at `db02198` via PR #46 (closeout SHA `5792ffdd3af6c45f07e07b8334ce150ad642495b`, evidence SHA `444c5a5`, hardening SHA `c872c16`, slice closeout SHA `a4ea5f9`). Final manifest: `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` (`overall: pass`, 18 components, owner-machine OD-02 pass).
 
 ## Purpose
 
@@ -61,34 +61,23 @@ silent skip and never a pass.
 
 ## Open items before acceptance
 
-1. **Owner-machine Evidence (AC04).** Collected on the accepted OD-02
-   acceptance machine during the final owner-machine pass. Detected host:
-   `hw.model = MacBookPro18,1` (the owner's M1 Pro MacBook Pro), macOS
-   26.5.2 (build 25F84), APFS internal, Elixir 1.20.2 / OTP 28 / Git 2.50.1 /
-   Exqlite 0.39.0 / SQLite 3.53.3. P1-S01-V01 records `overall: pass` with
-   `owner_machine.outcome = pass` and `owner_machine.decision = OD-02`. The
-   final manifest is at
-   `artifacts/p1-s01/slice-01-444c5a5ac47fec1982909f570a44838fdbc55d3b.json`.
-2. **Owner review (AC07).** The owner must review the exact integrated diff and
-   P1-S01-V01 and record the decision.
-
-Until AC07 closes, P1-S01-V01 is implementation Evidence only and the slice is
-not accepted.
+1. **Owner-machine Evidence (AC04).** Closed at `444c5a5` on the accepted OD-02 acceptance machine. Detected host: `hw.model = MacBookPro18,1` (the owner's M1 Pro MacBook Pro), macOS 26.5.2 (build 25F84), APFS internal, Elixir 1.20.2 / OTP 28 / Git 2.50.1 / Exqlite 0.39.0 / SQLite 3.53.3. P1-S01-V01 records `overall: pass` with `owner_machine.outcome = pass` and `owner_machine.decision = OD-02`. The final manifest is at `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` (digest recorded in the manifest's `digest` field).
+2. **Owner review (AC07).** Closed by Joshua Jenks at the PR #46 merge at `db02198`. P1-S01 is accepted and the slice verification manifest is recorded as implementation Evidence only.
 
 ## Authorization boundary after this ticket
 
-A successful P1-S01 closeout changes the state to:
+P1-S01 integration is complete. The state is:
 
 ```text
-P1-S01 accepted durable foundation
-P1-S02 entry prerequisite satisfied
+P1-S01 accepted durable foundation (owner-accepted; integrated at db02198)
+P1-S02 entry prerequisites satisfied (aggregate gate, demo, V01, owner-machine Evidence)
 P1-S02 still requires its separate planning and adjudication authorization
 ```
 
 P1-S02 remains unauthorized. No Evidence substrate, Development Pack runtime,
 Quality Compiler runtime, Repository investigation, Patch or mutation path,
 MiniMax provider, Context, Tool, or completion and Receipt runtime is started by
-this ticket.
+P1-S01.
 
 ## Owner-machine Evidence (final pass)
 

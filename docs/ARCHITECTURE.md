@@ -3,7 +3,7 @@
 **Document type:** Architecture summary  
 **Decision status:** Accepted  
 **Integration status:** Reconciled by Prompt 8-A; Quality Compiler placement added as later planned work  
-**Implementation status:** P1-S01 authorized after Prompt 8-A merges  
+**Implementation status:** P1-S01 integrated at `db02198` via PR #46; P1-S02 still planned and unauthorized  
 **Detailed subject authorities:** P0-W21 through P0-W25  
 **Quality Compiler design package:** `quality-compiler/`, subordinate to Roadmap and later slice authorization
 

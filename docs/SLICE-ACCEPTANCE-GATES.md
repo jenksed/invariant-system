@@ -2,8 +2,8 @@
 
 **Document type:** Verification and integration authority  
 **Decision status:** Accepted by Prompt 8-A for P1-S01  
-**Integration status:** Effective after Prompt 8-A merges at an exact green head  
-**Implementation status:** Gate scripts do not yet exist  
+**Integration status:** P1-S01 gates integrated at `db02198` via PR #46; recorded in P1-S01-V01  
+**Implementation status:** `scripts/gates/slice-01` exists and passes 18 components on the OD-02 acceptance machine  
 **Slice authority:** `docs/IMPLEMENTATION-SLICES.md`  
 **Quality Compiler placement:** QC0/QC1 gates planned in P1-S02; QC2 and later gates remain authorization-blocked
 
@@ -13,7 +13,7 @@ This document defines the aggregate proof required for authorized implementation
 
 A gate name is a planned executable contract. It is not an implemented command until Repository source and current CI prove the path exists and passes.
 
-Only P1-S01 gates are authorized by Prompt 8-A. P1-S02 and QC0/QC1 gates remain planned. P1-S03 through P1-S05, QC2, QC3, and QC4 remain blocked behind their accepted runtime Evidence and later planning and authorization.
+P1-S01 gates are executed at `db02198` via PR #46 and recorded in P1-S01-V01 (`overall: pass`, 18 components). P1-S02 and QC0/QC1 gates remain planned. P1-S03 through P1-S05, QC2, QC3, and QC4 remain blocked behind their accepted runtime Evidence and later planning and authorization.
 
 The `quality-compiler/` Schemas and conformance fixtures are planning scaffolding. They do not create an executable gate or passing result.
 
@@ -41,7 +41,7 @@ The `quality-compiler/` Schemas and conformance fixtures are planning scaffoldin
 
 # P1-S01 gates — Durable single-Run foundation
 
-**Authorization:** Active only after Prompt 8-A merges.
+**Authorization:** Active; P1-S01 gates executed at `db02198` and recorded in P1-S01-V01.
 
 | Gate | Proof |
 | --- | --- |

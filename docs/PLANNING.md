@@ -2,7 +2,7 @@
 
 **Document type:** Planning and authority index  
 **Status:** Wave A adjudicated  
-**Build authorization:** Vertical Slice Authorized for P1-S01 after Prompt 8-A merges
+**Build authorization:** P1-S01 issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized
 
 ## Integrated Wave A baseline
 
@@ -19,7 +19,7 @@
 | Prompt 6-A | PR 34, final head `7b9afe5552ca0d336d343d4bfbe17ce7d14cc955`, merge `57a5790d2266cf1ab59f107d0b429c31c618e0ae`, CI `30425270052` |
 | Provider and SQLite evidence correction | PR 35, merge `d76402a30e178d577d363384750baffd062cf9ef` |
 | Prompt 7-A | independent adversarial review completed |
-| Prompt 8-A | current branch; effective only after exact-head green merge |
+| Prompt 8-A | merged at `118bcaa`; P1-S01 integrated at `db02198` via PR #46 |
 
 ## Current authority order
 
@@ -87,23 +87,22 @@ No conformance scaffold performs a product effect or grants authority.
 
 Authorization level:
 
-> **Vertical Slice Authorized**
+> **P1-S01 Vertical Slice Authorized (consumed)**
 
-The authorization becomes active only when the Prompt 8-A pull request merges after exact-head CI succeeds and the owner inspects the boundary.
+The P1-S01 authorization was activated at the `118bcaa` merge and consumed by PR #46, which integrated P1-S01 at `db02198`.
 
-Only these tickets are authorized, in exact order:
+The executed ticket chain (in actual merge order) was:
 
 ```text
-P1-S01-T01  work/p1-s01-t01-domain-foundation
-→ P1-S01-T02  work/p1-s01-t02-durable-store
-→ P1-S01-T03  work/p1-s01-t03-replay-projections
-→ P1-S01-T04  work/p1-s01-t04-foundation-cli
-→ P1-S01-T05  work/p1-s01-t05-slice-gate
+P1-S01-T01  work/p1-s01-t01-domain-foundation   → merged
+P1-S01-T02  work/p1-s01-t02-durable-store        → merged
+P1-S01-T03  work/p1-s01-t03-replay-projections   → merged
+P1-S01-T06  work/p1-s01-t06-workflow-surface     → merged
+P1-S01-T04  work/p1-s01-t04-foundation-cli       → merged
+P1-S01-T05  work/p1-s01-t05-slice-gate           → merged (PR #46 at db02198)
 ```
 
-Use the accepted plans under `docs/work/`.
-
-A later ticket begins only after its predecessor merges, passes exact-head gates, completes its closeout, and receives owner acceptance.
+See `docs/work/P1-S01-T01-domain-foundation.md` through `docs/work/P1-S01-T05-slice-gate.md` and `docs/work/P1-S01-T06-workflow-surface.md` for per-ticket plans and completion records, and `docs/work/P1-S01-slice-closeout.md` for the slice closeout.
 
 ## Prohibited scope
 
@@ -147,11 +146,4 @@ Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegat
 
 ## Exact next action
 
-After the Prompt 8-A pull request is green, inspected, and merged:
-
-```text
-create work/p1-s01-t01-domain-foundation
-follow docs/work/P1-S01-T01-domain-foundation.md
-```
-
-Do not begin implementation before Prompt 8-A merges.
+P1-S01 integration is complete. P1-S02 remains unauthorized. The owner is preparing the P1-S02 authorization package on `work/p0-w33-reconcile-p1-s01-closeout`. No P1-S02 runtime ticket begins until the owner returns an explicit authorization for the first P1-S02 ticket.

@@ -1,10 +1,10 @@
 # Wave A Adjudication and Development Authorization
 
 **Document type:** Final Wave A adjudication and build-authorization authority  
-**Status:** Accepted on this branch; effective only after merge at an exact green head  
-**Branch:** `work/p0-w29-wave-a-adjudication`  
-**Authorization level:** Vertical Slice Authorized  
-**Authorized scope:** P1-S01-T01 through P1-S01-T05 only  
+**Status:** Historical adjudication. Merged at `118bcaa`; P1-S01 authorization consumed by PR #46 (P1-S01 integrated at `db02198`). This document is preserved for provenance; the live authorization state lives in `AGENTS.md`, `docs/ROADMAP.md`, `docs/IMPLEMENTATION-SLICES.md`, and `docs/PLANNING.md`.  
+**Branch:** `work/p0-w29-wave-a-adjudication` (historical, merged)  
+**Authorization level:** Vertical Slice Authorized (historical, consumed)  
+**Authorized scope:** P1-S01-T01 through P1-S01-T05 (historical, consumed)  
 **Wave B:** Blocked
 
 ## Purpose

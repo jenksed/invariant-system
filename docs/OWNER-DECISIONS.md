@@ -2,7 +2,7 @@
 
 **Document type:** Owner-decision authority  
 **Status:** Active  
-**Build authorization:** Not issued
+**Build authorization:** P1-S01 issued and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized
 
 ## Purpose
 
