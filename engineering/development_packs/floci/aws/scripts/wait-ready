@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+guard_endpoint
+timeout="${FLOCI_READY_TIMEOUT_SECONDS:-90}"
+deadline=$((SECONDS + timeout))
+
+while (( SECONDS < deadline )); do
+  body="$(curl -fsS "$AWS_ENDPOINT_URL/_floci/init" 2>/dev/null || true)"
+  if [[ -n "$body" ]] && python3 - "$body" <<'PY'
+import json, sys
+try:
+    doc=json.loads(sys.argv[1])
+except Exception:
+    raise SystemExit(1)
+raise SystemExit(0 if doc.get("completed", {}).get("ready") is True else 1)
+PY
+  then
+    printf 'Floci ready at %s\n' "$AWS_ENDPOINT_URL"
+    exit 0
+  fi
+  sleep 1
+done
+
+printf 'timed out waiting for Floci ready at %s\n' "$AWS_ENDPOINT_URL" >&2
+compose logs --no-color >&2 || true
+exit 1
