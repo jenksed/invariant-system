@@ -40,6 +40,10 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `arsenal.capability-contract` | `reference` | `draft` | Define Capability Contract v2 as the harness-neutral behavioral contract layer distinct from repository Asset metadata. | `arsenal/CAPABILITY_CONTRACT.md` |
 | `arsenal.capability-schema` | `reference` | `draft` | Define the machine-readable structural schema for one Capability Contract v2 fragment. | `arsenal/capability.schema.json` |
 | `arsenal.capability-set` | `reference` | `draft` | Define the deterministic fragmented capability-set layout and first ARS-01 migration surface. | `arsenal/capabilities/README.md` |
+| `arsenal.competence-lock-schema` | `reference` | `draft` | Define the deterministic .arsenal.lock structure for pinned capability identity, provenance, qualification, and generated exports. | `arsenal/lock.schema.json` |
+| `arsenal.competence-lockfile` | `reference` | `draft` | Pin the exact capability versions, source digests, evaluation qualification, and compiled distribution evidence used by this repository. | `.arsenal.lock` |
+| `arsenal.compiler-contract` | `reference` | `draft` | Define deterministic capability compilation, derived distribution artifacts, and competence-lockfile boundaries. | `arsenal/compiler/CONTRACT.md` |
+| `arsenal.compiler-export-plan` | `reference` | `draft` | Declare target-specific packaging metadata for compiler-generated capability distributions without duplicating canonical behavior. | `arsenal/compiler/export-plan.json` |
 | `arsenal.invocation-model` | `reference` | `draft` | Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets. | `arsenal/INVOCATION_MODEL.md` |
 
 ## engineering
