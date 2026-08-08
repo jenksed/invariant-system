@@ -132,6 +132,18 @@ Repository CI remains authoritative for the exact head. The local checks above d
 
 The YAML workflow is reviewed manually against the current workflow's structure, shell conventions, ordering, naming, permissions, and event configuration. No new workflow-validation dependency is introduced.
 
+## Required completion Evidence
+
+| Evidence ID | Criterion | Result |
+| --- | --- | --- |
+| P0-W32-E01 | P0-W32-AC01 | exact CI run log for the merged P0-W32 PR showing the new step, the resolved `KILN_BRANCH` value, the preflight pass output, and exit status 0 |
+| P0-W32-E02 | P0-W32-AC02 | exact CI run log for a deliberately non-conformant follow-up commit on the same branch showing the preflight failure message and a failed job |
+| P0-W32-E03 | P0-W32-AC03 | exact CI run log showing `Test agent preflight behavior` and the new step in the same job |
+| P0-W32-E04 | P0-W32-AC04 | CI run log line showing the resolved `KILN_BRANCH` equals `github.head_ref`, and the absence of the detached-HEAD failure message |
+| P0-W32-E05 | P0-W32-AC05 | CI run log for the `push` event on `main` showing the absence of the new step |
+| P0-W32-E06 | P0-W32-AC06 | exact PR diff against `main` showing no historical plan migration and a narrow CI change |
+| P0-W32-E07 | P0-W32-AC07 | exact branch compare against `main` |
+
 ## Explicit exclusions
 
 - No validation of every historical `docs/work/` document.
