@@ -1,0 +1,34 @@
+name: ARS-02 Bench Bootstrap Push
+
+on:
+  push:
+    branches:
+      - agent/ars-02-arsenal-bench-v0
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-02-arsenal-bench-v0
+
+      - name: Materialize Bench v0 files
+        shell: bash
+        run: |
+          set -euo pipefail
+          src=.github/workflows/ars-02-materialize.yml
+          sed -n "/cat > \/tmp\/ars02.b64 <<'PAYLOAD'/,/^PAYLOAD$/p" "$src" | sed '1d;$d' > /tmp/ars02.b64
+          test -s /tmp/ars02.b64
+          base64 -d /tmp/ars02.b64 > /tmp/ars02.tar.gz
+          echo "27c3c02c0a403dbea306ace5cdef3f4d6318004b0dcd15fc8e3e2f68a618e7b8  /tmp/ars02.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/ars02.tar.gz
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add evaluation scripts/arsenal_bench.py scripts/test-arsenal-bench.py .github/workflows/ars-02-arsenal-bench.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "Materialize ARS-02 Arsenal Bench v0"
+          git push origin HEAD:agent/ars-02-arsenal-bench-v0
