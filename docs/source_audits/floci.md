@@ -19,7 +19,10 @@ This audit records the Floci capabilities and constraints that Project Arsenal m
 - AWS setup: https://floci.io/floci/getting-started/aws-setup/
 - Storage modes: https://floci.io/floci/configuration/storage/
 - Initialization hooks: https://floci.io/floci/configuration/initialization-hooks/
+- Environment variables: https://floci.io/floci/configuration/environment-variables/
+- Advanced application configuration/logging: https://floci.io/floci/configuration/advanced/application-yml/
 - LocalStack migration: https://floci.io/floci/getting-started/migrate-from-localstack/
+- Lambda behavior/migration notes: https://floci.io/floci/services/lambda/
 - STS behavior/limitations: https://floci.io/floci/services/sts/
 - AWS quick start: https://floci.io/floci/getting-started/quick-start/
 - AWS product page: https://floci.io/aws/
@@ -55,6 +58,7 @@ On 2026-08-08:
 
 - the main overview advertised 69 AWS services;
 - the AWS canonical service matrix stated 68 AWS services and explicitly described itself as the canonical operation-count reference;
+- the LocalStack migration page still contained an aggregate count of 58 in explanatory text;
 - overview counts for Azure/GCP also differed from some service-specific pages retrieved during research.
 
 Project Arsenal therefore must **not** encode aggregate service counts as durable capability truth.
@@ -110,11 +114,56 @@ Floci intentionally preserves significant LocalStack Community compatibility:
 - dummy credentials;
 - `/etc/localstack/init/` compatibility paths;
 - `/_localstack/init` and health compatibility endpoints;
-- translation of several LocalStack environment variables.
+- translation of several LocalStack environment variables;
+- a LocalStack-style `Ready.` startup log line while compatibility translation is enabled;
+- LocalStack wildcard S3 DNS compatibility for `*.s3.localhost.localstack.cloud`;
+- selected `_aws/*` inspection surfaces including SES mailbox inspection and non-destructive SQS message peeking.
 
-But migration is not semantically guaranteed by an image-name swap. Documented differences include Lambda execution behavior, unsupported `LAMBDA_REMOTE_DOCKER`, data-directory differences, logging variables, and service-selection behavior.
+The migration documentation states that compatibility translation is enabled by default. Explicit Floci variables win when both native and LocalStack variables are set. `LOCALSTACK_PARITY=false` disables the translation layer.
 
-Arsenal should therefore implement LocalStack migration as an audit + replacement + verification workflow, not as blind text substitution.
+Documented translation examples include:
+
+- `PERSISTENCE=1` / `PERSIST_STATE=1` → `FLOCI_STORAGE_MODE=persistent`;
+- `LOCALSTACK_HOST` / `LOCALSTACK_HOSTNAME` → `FLOCI_HOSTNAME`;
+- `EDGE_PORT` → `FLOCI_PORT`;
+- `GATEWAY_LISTEN` → `QUARKUS_HTTP_HOST`;
+- `LS_LOG` / `DEBUG=1` → `QUARKUS_LOG_LEVEL`;
+- `DOCKER_HOST` → `FLOCI_DOCKER_DOCKER_HOST`;
+- `LAMBDA_DOCKER_NETWORK` → `FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK`;
+- `DOCKER_NETWORK` → `FLOCI_SERVICES_DOCKER_NETWORK`;
+- `LAMBDA_REMOVE_CONTAINERS=1` → `FLOCI_SERVICES_LAMBDA_EPHEMERAL=true`;
+- `USE_SSL=1` → `FLOCI_TLS_ENABLED=true`.
+
+But migration is not semantically guaranteed by an image-name swap. Documented differences include:
+
+- `LAMBDA_REMOTE_DOCKER` is not supported;
+- Floci always uses Docker containers for Lambda rather than LocalStack's executor selection model;
+- LocalStack data path `/var/lib/localstack` differs from Floci `/app/data`;
+- service-selection variables do not map to the same runtime model;
+- certificate/configuration details can require explicit verification even when a translation exists.
+
+Arsenal should therefore implement LocalStack migration as an inventory + blocker resolution + replacement + behavioral verification workflow, not as blind text substitution.
+
+Compatibility paths are valid migration tools. FLC-03 intentionally keeps `/etc/localstack/init/ready.d`, `PERSISTENCE=1`, and `/_localstack/init` in its migrated reference fixture so the acceptance gate proves that supported compatibility can reduce simultaneous change. Native Floci renaming is optional cleanup, not migration authority.
+
+## Diagnostic and logging behavior adopted
+
+Floci uses Quarkus logging. Current configuration documentation states:
+
+- effective default logging is `INFO`;
+- service operation events are available at `DEBUG`;
+- full request/response payload detail is available at `TRACE` for service categories;
+- the shipped minimum logging level permits raising an individual service category to TRACE without globally changing the minimum.
+
+Project Arsenal therefore adopts scoped logging escalation:
+
+`INFO → affected service DEBUG → affected service TRACE`
+
+Global TRACE is not the default diagnostic action because it increases noise and can capture unnecessary payload detail.
+
+The CLI documents `floci status`, `floci logs --follow`, and `floci doctor`. FLC-03 treats these as useful supplemental diagnostics, not mandatory pack dependencies. Direct init endpoints, Docker evidence, and provider-shaped read-only operations remain the portable diagnostic substrate.
+
+For container-backed services, diagnosis must distinguish the Floci control plane from managed/spawned service containers and their network/DNS/runtime state.
 
 ## Fidelity gaps are first-class evidence
 
@@ -180,7 +229,10 @@ Project Arsenal owns:
 - fidelity ledger;
 - reproducible fixture discipline;
 - Development Pack verification contract;
-- evidence and escalation semantics.
+- evidence and escalation semantics;
+- migration inventory classification;
+- reproduction minimization and red/green evidence;
+- diagnostic classification.
 
 Floci owns its implementation, supported operations, configuration, release behavior, and compatibility surface.
 
@@ -192,4 +244,4 @@ Floci is most valuable to Project Arsenal not because it can claim to be "the cl
 
 The durable Arsenal differentiator is the evidence model around it:
 
-**local-first by default, fidelity-scoped by operation, deterministic from fixtures, explicit about remaining provider-only proof, and incapable of silently escalating into a real account.**
+**local-first by default, fidelity-scoped by operation, deterministic from fixtures, migration-safe through explicit assumption inventory, diagnostic through red/green reproductions, explicit about remaining provider-only proof, and incapable of silently escalating into a real account.**
