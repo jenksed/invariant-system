@@ -31,6 +31,7 @@ This audit records the Floci capabilities and constraints that Project Arsenal m
 - Source repository: https://github.com/floci-io/floci
 - Releases: https://github.com/floci-io/floci/releases
 - Floci CLI source/documentation: https://github.com/floci-io/floci-cli
+- Floci `awslocal` wrapper source at the audited source commit: `bin/awslocal`
 
 ## Adopt as the first Local Cloud Development Pack
 
@@ -93,6 +94,10 @@ The published Docker image documents `memory` as its shipped default even though
 
 Container-backed services can have separate Docker volume lifecycles. Reset/cleanup evidence must include those managed volumes when relevant.
 
+FLC-03 runtime validation exposed an additional deployment-level constraint: persistent `/app/data` must be writable by Floci's non-root container user. A host bind created from a GitHub Actions checkout inherited ownership that prevented the released `1.5.34-compat` container from opening its persistent state. Replacing that bind with a Docker named volume allowed the same `persistent` storage mode to initialize normally. The reference migration fixture therefore uses a named volume rather than weakening container isolation by running Floci as root.
+
+This is environment evidence rather than a universal ban on host binds. A repository may use a host path when its ownership/permissions are deliberately compatible and verified.
+
 ## Initialization lifecycle adopted
 
 Floci exposes ordered init phases:
@@ -145,6 +150,37 @@ But migration is not semantically guaranteed by an image-name swap. Documented d
 Arsenal should therefore implement LocalStack migration as an inventory + blocker resolution + replacement + behavioral verification workflow, not as blind text substitution.
 
 Compatibility paths are valid migration tools. FLC-03 intentionally keeps `/etc/localstack/init/ready.d`, `PERSISTENCE=1`, and `/_localstack/init` in its migrated reference fixture so the acceptance gate proves that supported compatibility can reduce simultaneous change. Native Floci renaming is optional cleanup, not migration authority.
+
+## FLC-03 runtime migration findings
+
+The FLC-03 compatibility tracer produced two evidence-backed findings that are easy to miss from configuration documentation alone.
+
+### Preserve `awslocal` when a LocalStack init script already uses it
+
+The released Floci `-compat` image ships an `awslocal` wrapper. Its source explicitly passes `--endpoint-url` on every AWS CLI invocation because some service-specific endpoint resolvers in older botocore versions — notably SQS — can silently bypass `AWS_ENDPOINT_URL`.
+
+FLC-03 proved this failure mode directly:
+
+1. a migrated ready hook used bare `aws` while `AWS_ENDPOINT_URL=http://localhost:4566` and synthetic `test/test` credentials were present;
+2. `aws s3 mb` succeeded locally;
+3. `aws sqs create-queue` escaped to public AWS and returned `InvalidClientTokenId` for the synthetic credentials;
+4. no SQS acceptance assertion was weakened;
+5. restoring the legacy `awslocal` commands made both S3 and SQS seed operations pass through the pinned Floci runtime;
+6. the final migration gate asserts that the LocalStack and Floci-compatible init scripts are byte-for-byte identical.
+
+The durable migration rule is therefore:
+
+> If a legacy LocalStack init script already uses `awslocal`, preserve it through the first Floci migration unless there is a reason to replace it. If using bare `aws`, pass the local endpoint explicitly rather than assuming `AWS_ENDPOINT_URL` will govern every client/service version.
+
+This is a client-routing compatibility concern, not evidence that Floci SQS itself rejects `test/test`; FLC-01/FLC-02 and the FLC-03 external reproduction path successfully exercise SQS locally with synthetic credentials.
+
+### Prefer a writable named volume for the reference persistent migration fixture
+
+The first FLC-03 migrated Compose fixture mapped a checkout directory directly to `/app/data`. On the hosted runner, that directory was not writable by Floci's non-root runtime user and startup failed before ready hooks could complete.
+
+The final reference fixture uses a Docker named volume at `/app/data`, preserves `PERSISTENCE=1`, and proves persistent-mode startup plus LocalStack-compatible init behavior. This keeps the runtime non-root and makes the ownership boundary deterministic in CI.
+
+These findings reinforce the pack's core migration rule: retain supported compatibility surfaces first, then let executable behavioral gates reveal which assumptions genuinely need adaptation.
 
 ## Diagnostic and logging behavior adopted
 
