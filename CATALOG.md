@@ -10,6 +10,7 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 
 | ID | Kind | Status | Purpose | Path |
 |---|---|---|---|---|
+| `agent.adopt-floci-in-repo` | `workflow` | `draft` | Inspect an existing repository and install the smallest safe Floci-backed AWS development loop without overwriting equivalent tooling or enabling cloud fallback. | `agent_workflows/adopt_floci_in_repo.md` |
 | `agent.arsenal-router` | `router` | `draft` | Route an outcome to the smallest Project Arsenal capability or workflow that actually fits. | `agent_workflows/arsenal_router.md` |
 | `agent.domain-questionnaire` | `prompt` | `draft` | Create a targeted questionnaire for a domain expert who owns facts or decisions unavailable to the current user and agent. | `agent_workflows/domain_questionnaire.md` |
 | `agent.execution-plan` | `prompt-package` | `unverified` | Turn a broad objective and current project state into a dependency-aware execution plan with proof-based acceptance gates. | `agent_workflows/execution_plan_with_acceptance_gates.md` |
@@ -40,6 +41,9 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `engineering.development-pack-contract` | `reference` | `draft` | Define the common contract for language/framework Development Packs that provide deterministic feedback, structural invariants, guardrails, and verification tiers. | `engineering/development_packs/CONTRACT.md` |
 | `engineering.doctrine-core` | `doctrine` | `stable` | Compact constitutional core for frequent agent context. | `engineering/doctrine/CORE.md` |
 | `engineering.doctrine-full` | `doctrine` | `stable` | Full Engineering Doctrine, decision heuristics, limits, and tradeoff philosophy. | `engineering/doctrine/ENGINEERING_DOCTRINE.md` |
+| `engineering.floci-aws-completion-receipt` | `template` | `draft` | Define the provenance and evidence fields emitted by the FLC-01 zero-state completion gate. | `engineering/development_packs/floci/aws/COMPLETION_RECEIPT.md` |
+| `engineering.floci-aws-fidelity-ledger` | `reference` | `draft` | Scope FLC-01 evidence at the exact S3, SQS, Lambda, and IAM operations exercised by the AWS golden path. | `engineering/development_packs/floci/aws/FIDELITY_LEDGER.md` |
+| `engineering.floci-aws-golden-path` | `reference` | `draft` | Provide the runnable FLC-01 AWS tracer with fail-closed endpoints, deterministic fixtures, three verification tiers, clean replay, and CI evidence. | `engineering/development_packs/floci/aws/README.md` |
 | `engineering.floci-fidelity-policy` | `reference` | `draft` | Interpret Floci evidence conservatively by exact provider service operation and required semantic rather than aggregate parity claims. | `engineering/development_packs/floci/FIDELITY_POLICY.md` |
 | `engineering.floci-pack` | `reference` | `draft` | Adapt the Development Pack contract to Floci with local-first execution, deterministic fixtures, operation-level fidelity, and explicit provider escalation. | `engineering/development_packs/floci/README.md` |
 | `engineering.floci-reference` | `reference` | `draft` | Provide a compact agent-facing Floci pointer surface for endpoint safety, verification tiers, evidence labels, and escalation hard stops. | `engineering/development_packs/floci/REFERENCE.md` |
