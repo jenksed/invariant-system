@@ -2,7 +2,7 @@
 
 Status: active program
 
-Current frontier: **ARS-01 — Capability Contract v2**
+Current frontier: **ARS-02 — Arsenal Bench & Evaluation Lab v0**
 
 Project Arsenal is evolving from a reusable library of prompts, methods, workflows, references, and Development Packs into a capability engineering system for making good engineering judgment reusable, composable, executable, evaluable, and governable.
 
@@ -105,7 +105,28 @@ ARS-03 must be able to reproduce the ARS-00B package shape from canonical capabi
 
 ## ARS-01 — Capability Contract v2
 
-**Status:** next slice.
+**Status:** delivered by PR #13.
+
+Delivered:
+
+- a separate Capability Contract v2 while preserving the Asset Contract as repository-artifact metadata;
+- deterministic `arsenal/capabilities/*.json` fragments instead of a monolithic capability manifest;
+- nine initial `draft` / `unassessed` capabilities spanning Repository Truth, Pressure Test, Recon, Diagnose, TDD, Review, Verify, Resume, and execution-backed Local Cloud Feature Delivery;
+- stable capability IDs separated from display names and compatibility aliases;
+- Pressure Test aliases `Grill` / `Grilling` without renaming `agent.grill`;
+- Recon aliases `Wayfind` / `Wayfinding` without renaming `agent.wayfind`;
+- declarative required/optional/forbidden authority, mutation class, execution surfaces, verification requirements, evidence outputs, evaluation state, provenance, and compatibility;
+- executable cross-contract validation against the merged Asset Registry;
+- seven negative contract cases covering alias collisions, unresolved implementation assets, authority conflicts, read-only mutation authority, execution-substrate errors, harness leakage, and unsupported stable lifecycle claims;
+- Local Cloud proof that a behavioral capability can require `cloud.local` while forbidding `cloud.remote` and `production.mutate` by default;
+- three registered capability-system reference assets and a generated catalog update.
+
+Boundary preserved:
+
+- ARS-01 records authority but ARS-08 will enforce it;
+- ARS-01 records execution intent but ARS-05 will select/enforce substrates and fidelity;
+- capability lifecycle remains `draft` until ARS-02 produces evaluation evidence;
+- ARS-00B distribution remains a derived compiler regression target rather than canonical capability behavior.
 
 **Goal:** introduce a machine-readable behavioral capability representation while preserving the existing Asset Contract as artifact metadata.
 
@@ -160,6 +181,8 @@ Proof:
 ---
 
 ## ARS-02 — Arsenal Bench & Evaluation Lab v0
+
+**Status:** next slice.
 
 **Goal:** measure whether Arsenal actually improves engineering work and make lifecycle promotion executable.
 
