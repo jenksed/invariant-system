@@ -1,0 +1,141 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "agent.route-local-cloud-provider",
+      "path": "agent_workflows/route_local_cloud_provider.md",
+      "category": "agent_workflows",
+      "kind": "router",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Resolve AWS, Azure, GCP, or OCI from task and repository evidence, route to the provider-owned Floci overlay, and stop on ambiguous or unknown cloud intent.",
+      "upstream": ["engineering.floci-provider-overlay-contract", "foundation.cloud-execution-boundary"],
+      "downstream": ["engineering.floci-aws-golden-path", "engineering.floci-azure-overlay", "engineering.floci-gcp-overlay", "engineering.floci-oci-overlay"]
+    },
+    {
+      "id": "engineering.floci-provider-overlay-contract",
+      "path": "engineering/development_packs/floci/providers/OVERLAY_CONTRACT.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define provider-neutral Local Cloud lifecycle and evidence machinery while requiring each cloud overlay to preserve its own endpoint, identity, resource, and fidelity semantics.",
+      "upstream": ["engineering.floci-pack", "engineering.floci-verification-contract", "foundation.cloud-fidelity-ledger"],
+      "downstream": ["agent.route-local-cloud-provider", "engineering.floci-provider-receipt", "engineering.floci-azure-overlay", "engineering.floci-gcp-overlay", "engineering.floci-oci-overlay"]
+    },
+    {
+      "id": "engineering.floci-provider-receipt",
+      "path": "engineering/development_packs/floci/providers/PROVIDER_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide a provider-neutral completion receipt schema for local endpoint provenance, operations exercised, deterministic results, fidelity bounds, and cleanup evidence.",
+      "upstream": ["engineering.floci-provider-overlay-contract", "foundation.cloud-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-azure-overlay",
+      "path": "engineering/development_packs/floci/azure/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide the runnable FLC-04 Azure Blob and Queue tracer with path-routed local endpoints, runtime-generated synthetic SharedKey material, fail-closed guards, and evidence receipts.",
+      "upstream": ["engineering.floci-provider-overlay-contract", "source.floci-multicloud"],
+      "downstream": ["engineering.floci-azure-fidelity-ledger", "engineering.floci-azure-completion-receipt"]
+    },
+    {
+      "id": "engineering.floci-azure-fidelity-ledger",
+      "path": "engineering/development_packs/floci/azure/FIDELITY_LEDGER.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Scope FLC-04 Azure evidence to the exact Blob and Queue operations exercised and keep SharedKey verification, Entra, RBAC, durability, quota, and regional claims explicit.",
+      "upstream": ["engineering.floci-azure-overlay", "engineering.floci-fidelity-policy", "foundation.cloud-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-azure-completion-receipt",
+      "path": "engineering/development_packs/floci/azure/COMPLETION_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define Azure-specific completion receipt fields for local storage routing, SDK operations, deterministic results, and provider-only residue.",
+      "upstream": ["engineering.floci-provider-receipt", "engineering.floci-azure-overlay", "engineering.floci-azure-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-gcp-overlay",
+      "path": "engineering/development_packs/floci/gcp/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide the runnable FLC-04 GCS and Pub/Sub tracer using GCP project identity, emulator-host variables, anonymous local credentials, fail-closed guards, and evidence receipts.",
+      "upstream": ["engineering.floci-provider-overlay-contract", "source.floci-multicloud"],
+      "downstream": ["engineering.floci-gcp-fidelity-ledger", "engineering.floci-gcp-completion-receipt"]
+    },
+    {
+      "id": "engineering.floci-gcp-fidelity-ledger",
+      "path": "engineering/development_packs/floci/gcp/FIDELITY_LEDGER.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Scope FLC-04 GCP evidence to the exact GCS and Pub/Sub operations exercised while keeping IAM, project/org policy, quota, durability, and regional claims provider-only.",
+      "upstream": ["engineering.floci-gcp-overlay", "engineering.floci-fidelity-policy", "foundation.cloud-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-gcp-completion-receipt",
+      "path": "engineering/development_packs/floci/gcp/COMPLETION_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define GCP-specific completion receipt fields for project/emulator routing, SDK operations, deterministic results, and provider-only residue.",
+      "upstream": ["engineering.floci-provider-receipt", "engineering.floci-gcp-overlay", "engineering.floci-gcp-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-oci-overlay",
+      "path": "engineering/development_packs/floci/oci/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide the runnable FLC-04 OCI Object Storage tracer using explicit service endpoints and synthetic tenancy/namespace context without imposing AWS-style account or region abstractions.",
+      "upstream": ["engineering.floci-provider-overlay-contract", "source.floci-multicloud"],
+      "downstream": ["engineering.floci-oci-fidelity-ledger", "engineering.floci-oci-completion-receipt"]
+    },
+    {
+      "id": "engineering.floci-oci-fidelity-ledger",
+      "path": "engineering/development_packs/floci/oci/FIDELITY_LEDGER.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Scope FLC-04 OCI evidence to the exact Object Storage operations exercised and make unsigned-local authentication, IAM, compartment, quota, and durability limits explicit.",
+      "upstream": ["engineering.floci-oci-overlay", "engineering.floci-fidelity-policy", "foundation.cloud-fidelity-ledger"]
+    },
+    {
+      "id": "engineering.floci-oci-completion-receipt",
+      "path": "engineering/development_packs/floci/oci/COMPLETION_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define OCI-specific completion receipt fields for endpoint, namespace/tenancy context, authentication mode, Object Storage operations, and provider-only residue.",
+      "upstream": ["engineering.floci-provider-receipt", "engineering.floci-oci-overlay", "engineering.floci-oci-fidelity-ledger"]
+    },
+    {
+      "id": "source.floci-multicloud",
+      "path": "docs/source_audits/floci_multicloud.md",
+      "category": "source_audits",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Record the 2026-08-08 Azure, GCP, and OCI Floci release/runtime audit and the provider-specific boundaries that constrain FLC-04 claims.",
+      "upstream": ["source.floci"],
+      "downstream": ["engineering.floci-provider-overlay-contract", "engineering.floci-azure-overlay", "engineering.floci-gcp-overlay", "engineering.floci-oci-overlay"]
+    }
+  ]
+}

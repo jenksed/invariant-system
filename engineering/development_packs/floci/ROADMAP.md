@@ -95,7 +95,7 @@ Acceptance evidence includes:
 
 **Goal:** make Floci useful for existing systems and incident/bug investigation, not only greenfield development.
 
-**Implementation status:** delivered on the FLC-03 reference branch by `engineering/development_packs/floci/aws/diagnostics/` plus four agent workflows. Lifecycle status remains `draft` until evaluation/stabilization earns stronger claims.
+**Implementation status:** delivered by `engineering/development_packs/floci/aws/diagnostics/` plus four agent workflows. Lifecycle status remains `draft` until evaluation/stabilization earns stronger claims.
 
 Delivered:
 
@@ -113,7 +113,7 @@ Delivered:
 - a red/green SQS reproduction tracer with minimized synthetic state and evidence receipt;
 - CI gates for inventory, migration compatibility, endpoint fail-closed behavior, and red/green reproduction.
 
-Acceptance target:
+Acceptance evidence includes:
 
 - migration never reduces to blind image-name replacement;
 - LocalStack-specific environment/config assumptions are enumerated;
@@ -126,30 +126,36 @@ Acceptance target:
 
 **Goal:** prove that the foundation is genuinely provider-neutral.
 
-Order:
+**Implementation status:** delivered by the provider overlay contract/router and runnable Azure, GCP, and OCI reference packs. Lifecycle status remains `draft` until FLC-06 evaluation/stabilization earns stronger claims.
 
-1. Azure
-2. GCP
-3. OCI
+Delivered provider order and pins:
 
-The order may change with real project demand.
+1. Azure — `floci/floci-az:0.10.0`, port `4577`;
+2. GCP — `floci/floci-gcp:0.6.0`, port `4588`;
+3. OCI — `floci/floci-oci:0.2.0`, port `4599`.
 
-For each provider, add:
+Delivered:
 
-- endpoint/credential environment contract;
-- environment discovery;
-- provider-specific fixture conventions;
-- health/readiness integration;
-- service/operation fidelity source strategy;
-- one golden-path integration scenario;
-- IaC/client compatibility guidance where supported;
-- completion receipt examples.
+- provider-neutral overlay contract and common completion receipt schema;
+- deterministic AWS/Azure/GCP/OCI router with explicit ambiguous/unknown stops;
+- provider-specific fail-closed endpoint/credential environment contracts;
+- provider-specific readiness, fixture, and fidelity conventions;
+- Azure Blob + Queue golden path through official Azure Python SDKs;
+- GCS + Pub/Sub golden path through official Google Cloud Python SDKs;
+- OCI Object Storage golden path through OCI-shaped wire routes;
+- independent operation-level fidelity ledgers and completion receipts;
+- FLC-04 CI with one router gate plus isolated Azure/GCP/OCI runtime jobs;
+- source audit capturing release pins, authentication limits, and cross-provider differences.
 
-Acceptance criteria:
+Acceptance evidence includes:
 
-- no AWS-only concept is required by the universal Local Cloud foundations;
-- provider overlays can share verification/evidence machinery without pretending service semantics are identical;
-- the local-cloud router can choose the correct provider pack from repository/task evidence.
+- the universal Local Cloud foundations require no AWS region/account/access-key concept;
+- Azure uses storage-account connection routing, GCP uses project/emulator hosts, and OCI uses tenancy/namespace/service endpoint semantics without forced translation;
+- all overlays share the same start → endpoint guard → readiness → inner → golden path → receipt → teardown lifecycle;
+- the router selects all four provider packs from repository evidence and returns hard-stop codes for ambiguous or unknown intent;
+- each local provider refuses a public endpoint before client execution;
+- provider semantics and provider-only residue remain independent in their fidelity ledgers;
+- OCI deliberately uses a different golden-path service graph, proving shared lifecycle does not require fake service symmetry.
 
 ## FLC-05 — Capability routing and composed delivery
 
@@ -210,9 +216,9 @@ Do not start with:
 
 ## Immediate next slice
 
-After FLC-03 is accepted, authorize **FLC-04 — Multi-cloud overlays**.
+After FLC-04 is accepted, authorize **FLC-05 — Capability routing and composed delivery**.
 
-FLC-04 should use Azure as the first tracer unless real project demand changes the order. Its purpose is not merely to add another emulator: it must prove that the universal Local Cloud foundations, fidelity ledger, fixture discipline, and verification tiers do not secretly require AWS concepts.
+FLC-05 should compose the provider router and Floci execution packs with Arsenal's repository-truth, TDD, diagnosis, verification, and handoff capabilities so cloud-dependent feature work naturally follows the lowest-blast-radius evidence path.
 
 ## Program completion criterion
 
