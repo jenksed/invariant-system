@@ -368,7 +368,6 @@ Canonical capability definitions are fragmented under [`arsenal/capabilities/`](
 ARS-01 models nine initial capabilities:
 
 - Repository Truth;
-- nine canonical Capability Contract v2 fragments spanning Core Arsenal + Local Cloud delivery;
 - Pressure Test, preserving Grill/Grilling aliases;
 - Recon, preserving Wayfind/Wayfinding aliases;
 - Diagnose;
