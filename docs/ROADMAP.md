@@ -122,8 +122,9 @@ A developer can select one Repository, record one objective and criteria, create
 | 1 | P1-S01-T01 | `work/p1-s01-t01-domain-foundation` | identifiers, state types, constructors, invariants, pure lifecycle transitions |
 | 2 | P1-S01-T02 | `work/p1-s01-t02-durable-store` | Exqlite, store startup, migrations, integrity, journal transaction, revision and idempotency boundary |
 | 3 | P1-S01-T03 | `work/p1-s01-t03-replay-projections` | deterministic replay, projections, restart, duplicate and out-of-order handling |
-| 4 | P1-S01-T04 | `work/p1-s01-t04-foundation-cli` | minimal foreground CLI and structured output over implemented P1-S01 actions |
-| 5 | P1-S01-T05 | `work/p1-s01-t05-slice-gate` | aggregate gate, restart demo, corruption fixtures, and P1-S01-V01 verification manifest |
+| 4 | P1-S01-T06 | `work/p1-s01-t06-workflow-surface` | shared `Kiln.Workflow` application boundary; consumed by T04 |
+| 5 | P1-S01-T04 | `work/p1-s01-t04-foundation-cli` | minimal foreground CLI and structured output over implemented P1-S01 actions |
+| 6 | P1-S01-T05 | `work/p1-s01-t05-slice-gate` | aggregate gate, restart demo, corruption fixtures, and P1-S01-V01 verification manifest |
 
 Each ticket begins only after its dependency merges and its exact gate is accepted.
 

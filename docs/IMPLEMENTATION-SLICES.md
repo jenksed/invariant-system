@@ -136,10 +136,11 @@ No Session, Task, Run, decision, operation, event, projection, or verification-m
 | 1 | P1-S01-T01 | identifiers, first-month state records, constructors, invariants, pure actions and transitions |
 | 2 | P1-S01-T02 | direct Exqlite, store startup, migrations, integrity checks, journal append, revision and idempotency transactions |
 | 3 | P1-S01-T03 | deterministic replay, rebuildable projections, restart, duplicate and out-of-order behavior |
-| 4 | P1-S01-T04 | minimal foreground CLI start, status, inspect, cancel, resume, and structured output |
-| 5 | P1-S01-T05 | aggregate gate, restart demo, corruption and migration fixtures, and P1-S01-V01 |
+| 4 | P1-S01-T06 | shared `Kiln.Workflow` application boundary; consumed by T04 |
+| 5 | P1-S01-T04 | minimal foreground CLI start, status, inspect, cancel, resume, and structured output |
+| 6 | P1-S01-T05 | aggregate gate, restart demo, corruption and migration fixtures, and P1-S01-V01 |
 
-The accepted plans are under `docs/work/P1-S01-T01-*.md` through `T05`.
+The accepted plans are under `docs/work/P1-S01-T01-*.md` through `T06`.
 
 Each ticket begins only after its predecessor merges and its exact acceptance Evidence is accepted.
 
