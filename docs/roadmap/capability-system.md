@@ -2,7 +2,7 @@
 
 Status: active program
 
-Current frontier: **ARS-00A — Public Surface & Unified Roadmap**
+Current frontier: **ARS-01 — Capability Contract v2**
 
 Project Arsenal is evolving from a reusable library of prompts, methods, workflows, references, and Development Packs into a capability engineering system for making good engineering judgment reusable, composable, executable, evaluable, and governable.
 
@@ -51,7 +51,7 @@ Prompts, methods, workflows, scripts, Development Packs, receipts, policies, eva
 
 ### ARS-00A — README / Operator Console + unified roadmap
 
-**Status:** current slice.
+**Status:** delivered by PR #11.
 
 Deliver:
 
@@ -74,24 +74,38 @@ Proof:
 
 ### ARS-00B — Flagship quickstart and distribution pilot
 
-Deliver:
+**Status:** delivered by the Repository Truth Agent Skills pilot.
 
-- choose one flagship capability, initially Repository Truth unless repository evidence suggests a better tracer;
-- create the smallest real path from discovery → use → useful result in an existing coding harness;
-- document what is manual, what is portable, and what requires harness-specific packaging;
-- preserve the pilot as a future compiler regression fixture.
+Delivered:
+
+- Repository Truth selected as the flagship tracer;
+- portable Agent Skills package under `distribution/agent-skills/repository-truth/`;
+- thin `SKILL.md` discovery adapter with canonical Arsenal identity/provenance metadata;
+- bundled canonical reference snapshot that must remain byte-for-byte identical to `agent_workflows/repository_truth_audit.md`;
+- Codex project-local install path at `<repo>/.agents/skills/repository-truth`;
+- optional user-global install path at `~/.agents/skills/repository-truth`;
+- safe installer that is idempotent for identical state and refuses divergent overwrite;
+- deterministic package/spec/source-drift verifier;
+- repository-native quickstart and external-format source audit;
+- CI acceptance for package shape, install layout, idempotence, non-clobber behavior, and Arsenal Integrity.
 
 Proof:
 
-- a new user can invoke one flagship capability without inventing setup steps;
-- the quickstart uses only shipped files/commands;
-- distribution limitations are explicit.
+- the first independent GitHub Actions run passed package validation and the project-local Codex installation contract;
+- the installed reference is compared byte-for-byte with the canonical Arsenal workflow;
+- the installer proves identical reinstall succeeds without mutation;
+- a deliberately divergent installed `SKILL.md` causes exit `3` and remains untouched;
+- distribution limitations are explicit: Agent Skills is an export format, Codex project-local is the first verified harness path, and outcome efficacy remains an ARS-02 question.
 
-Do **not** wait for the full compiler before learning what a useful package actually requires.
+Compiler regression contract:
+
+ARS-03 must be able to reproduce the ARS-00B package shape from canonical capability data without hand-maintained behavioral divergence.
 
 ---
 
 ## ARS-01 — Capability Contract v2
+
+**Status:** next slice.
 
 **Goal:** introduce a machine-readable behavioral capability representation while preserving the existing Asset Contract as artifact metadata.
 
