@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-04 turns the capability set into an executable **Capability Graph + Capability Gap Preflight**, so Arsenal can prove required competence is present, compatible, authorized, and sufficiently qualified before execution begins.
+**Next:** ARS-05 generalizes execution selection into an **Execution Substrate Contract + Reality Budget**, so Arsenal can spend only as much reality and authority as the evidence requires.
 
 ---
 
@@ -426,12 +426,12 @@ The architecture is the reason the public promise can become durable. It is not 
 - Floci Local Cloud suite through composed multi-cloud delivery;
 - deterministic Arsenal Integrity audit;
 - Arsenal Bench v0 with Case Health Receipts, counterfactual/ablation contracts, Capability Evidence Passports, and the first evidence-backed `testing` capability;
-- deterministic capability compiler + `.arsenal.lock` competence lockfile + proof-carrying Repository Truth Agent Skills package.
+- deterministic capability compiler + `.arsenal.lock` competence lockfile + proof-carrying Repository Truth Agent Skills package;
+- Capability Graph + Capability Gap Preflight with canonical/lock inventories, implementation checks, qualification gates, and safe authority profiles.
 
 ### BUILDING TOWARD
 
-- capability graph + Capability Gap Preflight;
-- generalized execution substrates;
+- generalized execution substrates + Reality Budget;
 - evidence observability;
 - trust and authority.
 

@@ -38,6 +38,8 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | ID | Kind | Status | Purpose | Path |
 |---|---|---|---|---|
 | `arsenal.capability-contract` | `reference` | `draft` | Define Capability Contract v2 as the harness-neutral behavioral contract layer distinct from repository Asset metadata. | `arsenal/CAPABILITY_CONTRACT.md` |
+| `arsenal.capability-graph` | `router` | `draft` | Declare v0 capability routes, dependency edges, minimum qualification, and safe authority profiles for deterministic composition checks. | `arsenal/graph/graph.json` |
+| `arsenal.capability-graph-contract` | `reference` | `draft` | Define explicit capability composition routes and deterministic preflight for presence, implementation, compatibility, qualification, and authority. | `arsenal/graph/CONTRACT.md` |
 | `arsenal.capability-schema` | `reference` | `draft` | Define the machine-readable structural schema for one Capability Contract v2 fragment. | `arsenal/capability.schema.json` |
 | `arsenal.capability-set` | `reference` | `draft` | Define the deterministic fragmented capability-set layout and first ARS-01 migration surface. | `arsenal/capabilities/README.md` |
 | `arsenal.competence-lock-schema` | `reference` | `draft` | Define the deterministic .arsenal.lock structure for pinned capability identity, provenance, qualification, and generated exports. | `arsenal/lock.schema.json` |

@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.capability-graph-contract",
+      "path": "arsenal/graph/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define explicit capability composition routes and deterministic preflight for presence, implementation, compatibility, qualification, and authority.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.capability-graph",
+      "path": "arsenal/graph/graph.json",
+      "category": "arsenal",
+      "kind": "router",
+      "status": "draft",
+      "purpose": "Declare v0 capability routes, dependency edges, minimum qualification, and safe authority profiles for deterministic composition checks.",
+      "invocation": "agent"
+    }
+  ]
+}
