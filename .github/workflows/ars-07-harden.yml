@@ -1,0 +1,52 @@
+name: ARS-07 Hardening Materialize
+
+on:
+  push:
+    branches:
+      - agent/ars-07-evidence-observatory
+    paths:
+      - ".github/workflows/ars-07-harden.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-07-evidence-observatory
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply deterministic hardening
+        run: python3 scripts/materialize-ars07-hardening.py
+
+      - name: Validate hardened static contract
+        run: |
+          python3 -m py_compile scripts/arsenal_observe.py scripts/test-arsenal-observe.py
+          python3 scripts/test-arsenal-observe.py
+          python3 scripts/arsenal_audit.py
+
+      - name: Commit durable hardening only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add \
+            scripts/arsenal_observe.py \
+            scripts/test-arsenal-observe.py \
+            .github/workflows/ars-07-evidence-observatory.yml \
+            arsenal/observability/CONTRACT.md \
+            docs/use/evidence-observatory.md
+
+          git diff --cached --quiet && exit 0
+          changed="$(git diff --cached --name-only)"
+          allowed=$'.github/workflows/ars-07-evidence-observatory.yml\narsenal/observability/CONTRACT.md\ndocs/use/evidence-observatory.md\nscripts/arsenal_observe.py\nscripts/test-arsenal-observe.py'
+          test "$changed" = "$allowed"
+          git commit -m "Harden ARS-07 evidence provenance and bundle contract"
+          git push origin HEAD:agent/ars-07-evidence-observatory
