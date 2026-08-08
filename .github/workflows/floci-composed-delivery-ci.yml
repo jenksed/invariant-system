@@ -6,6 +6,8 @@ on:
       - ".github/workflows/floci-composed-delivery-ci.yml"
       - "agent_workflows/local_cloud_router.md"
       - "agent_workflows/arsenal_router.md"
+      - "agent_workflows/reproduce_cloud_bug_locally.md"
+      - "agent_workflows/diagnose_floci_environment.md"
       - "workflows/floci_first_cloud_feature_delivery.md"
       - "workflows/software_feature_delivery.md"
       - "engineering/development_packs/floci/providers/**"
@@ -14,16 +16,11 @@ on:
       - "arsenal/registry.d/floci-composed-delivery.json"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   routing-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
 
       - name: Validate routing scripts
         run: |
@@ -35,16 +32,8 @@ jobs:
       - name: Run FLC-05 routing evaluation
         run: python3 engineering/development_packs/floci/evaluation/verify_flc05_routing.py
 
-      - name: Generate and commit catalog
-        run: |
-          python3 scripts/arsenal_audit.py --write-catalog
-          if ! git diff --quiet -- CATALOG.md; then
-            git config user.name "Project Arsenal CI"
-            git config user.email "jenksed@noreply.local"
-            git add CATALOG.md
-            git commit -m "Regenerate catalog for FLC-05"
-            git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
-          fi
+      - name: Validate Arsenal registry and catalog
+        run: python3 scripts/arsenal_audit.py
 
       - name: Validate receipt
         run: |
@@ -54,7 +43,8 @@ jobs:
           p = Path(".floci-artifacts/flc05-routing-receipt.json")
           data = json.loads(p.read_text(encoding="utf-8"))
           assert data["verdict"] == "PASS"
-          assert data["case_count"] >= 14
+          assert data["case_count"] >= 18
+          assert data["unsupported_route_count"] >= 4
           assert data["automatic_real_cloud_fallback"] is False
           assert data["requires_explicit_real_cloud_authorization"] is True
           assert all(case["pass"] for case in data["cases"])

@@ -5,10 +5,11 @@ Slice: FLC-05
 
 This directory turns capability composition into an inspectable regression surface.
 
-FLC-05 does not try to evaluate natural-language intelligence with a brittle keyword classifier. The model/human resolves the **work kind** from the request; deterministic routing then proves two things independently:
+FLC-05 does not evaluate natural-language intelligence with a brittle keyword classifier. The model/human resolves the **work kind** from the request; deterministic routing then proves three things independently:
 
 1. repository evidence resolves to exactly one cloud provider or hard-stops;
-2. the explicit work kind maps to the intended existing Arsenal capability without granting real-cloud fallback.
+2. the explicit work kind maps to the intended existing Arsenal capability;
+3. that capability is actually implemented for the resolved provider.
 
 ## Assets under test
 
@@ -19,20 +20,22 @@ FLC-05 does not try to evaluate natural-language intelligence with a brittle key
 - `flc05_cases.json`
 - `verify_flc05_routing.py`
 
-## Work-kind routes
+## Work-kind routes and current provider coverage
 
-The evaluation covers:
+| Work kind | Current routed provider coverage |
+|---|---|
+| feature | AWS, Azure, GCP, OCI |
+| IaC validation | AWS only |
+| LocalStack migration | AWS only |
+| cloud bug reproduction | AWS, Azure, GCP, OCI |
+| Floci environment diagnosis | AWS, Azure, GCP, OCI |
+| fidelity-gap analysis | AWS, Azure, GCP, OCI |
+| cloud-aware code review | AWS, Azure, GCP, OCI |
+| provider-only proof | AWS, Azure, GCP, OCI, always as escalation review |
 
-- feature delivery;
-- IaC preflight;
-- LocalStack migration;
-- cloud bug reproduction;
-- Floci environment diagnosis;
-- fidelity-gap analysis;
-- cloud-aware code review;
-- provider-only escalation review.
+Provider resolution and capability availability are separate facts. Resolving Azure successfully does not imply the AWS-only FLC-02 IaC preflight can validate Azure IaC.
 
-Provider coverage includes AWS, Azure, GCP, and OCI plus ambiguous and unknown hard stops.
+Unsupported provider/work-kind pairs return `UNSUPPORTED_ROUTE` with exit code `5`, the candidate capability, the currently supported providers, and `execution_boundary=local-capability-gap`. They do not fall through to a public provider.
 
 ## Invariants
 
@@ -41,8 +44,10 @@ A green evaluation must prove:
 - every routed primary/support asset exists;
 - all four providers can reach the composed feature-delivery workflow;
 - specialized work kinds route to the already-existing narrow Arsenal capability;
+- AWS-only IaC and LocalStack migration routes reject non-AWS providers;
 - ambiguous provider evidence exits `3`;
 - unknown provider evidence exits `4`;
+- unsupported provider/capability combinations exit `5`;
 - explicit provider selection can resolve a repository with no provider evidence;
 - provider-only proof returns `ESCALATION_REVIEW`;
 - `automatic_real_cloud_fallback` is always false;
@@ -62,11 +67,11 @@ The verifier writes:
 
 `.floci-artifacts/flc05-routing-receipt.json`
 
-The receipt records case IDs, expected/actual route fields, pass/fail status, and the global no-fallback invariant.
+The receipt records case IDs, expected/actual route fields, pass/fail status, unsupported-route count, and the global no-fallback invariant.
 
 ## What this evidence proves
 
-A pass establishes that Arsenal can deterministically compose the already-defined Local Cloud and engineering capabilities **after** provider/work-kind intent is grounded.
+A pass establishes that Arsenal can deterministically compose the already-defined Local Cloud and engineering capabilities **after** provider/work-kind intent is grounded, while refusing combinations for which the provider-specific capability does not yet exist.
 
 It does not prove that a model will always classify an arbitrary natural-language request correctly. That higher-level routing quality belongs in FLC-06 evaluation across representative harness/model combinations.
 

@@ -2,107 +2,93 @@
 
 Status: draft
 
-Use when a Floci-backed test, migration, or local cloud workflow fails and you need to determine whether the problem is endpoint safety, emulator startup/readiness, init state, provider-shaped behavior, application behavior, or a fidelity gap.
+Use when a Floci-backed AWS, Azure, GCP, or OCI test/workflow fails and you need to determine whether the problem is endpoint safety, emulator startup/readiness, fixture state, provider-shaped behavior, application behavior, or fidelity.
 
 ## Outcome
 
 Produce a bounded diagnosis with evidence from the lowest useful layer before changing application code or blaming the emulator.
 
+## 0. Resolve the provider
+
+Use `agent_workflows/route_local_cloud_provider.md` before provider-shaped diagnosis. If provider evidence is ambiguous or unknown, stop rather than applying the AWS diagnostic path by habit.
+
+Use the selected provider overlay as the authority for endpoint guard, readiness, synthetic identity, and direct provider-shaped probes.
+
 ## 1. Prove the execution boundary
 
 Confirm:
 
-- the intended endpoint is explicit;
+- the provider-specific local endpoint is explicit;
 - it resolves to the approved local Floci runtime;
-- synthetic credentials are in use;
-- ambient AWS profiles/config cannot redirect the request;
-- no fallback to public AWS is possible.
+- only synthetic local identity material is in use;
+- ambient provider credentials/config cannot redirect the request;
+- no fallback to a public provider is possible.
 
-The reference diagnostic refuses endpoints other than `http://localhost:4566` or `http://127.0.0.1:4566`.
+Run the selected overlay's endpoint guard before continuing. The AWS reference diagnostic still refuses endpoints other than `http://localhost:4566` or `http://127.0.0.1:4566`; Azure/GCP/OCI use their own contracts and must not be translated into AWS variables.
 
-If endpoint safety is not proven, stop. Do not continue diagnosis against an ambiguous target.
+If endpoint safety is not proven, stop.
 
 ## 2. Check process/container reachability
 
-Inspect the runtime before the application:
+Inspect:
 
-- container/process running state;
-- port binding;
-- Docker daemon/socket when container-backed services are involved;
+- runtime process/container state;
+- provider-specific port binding;
+- Docker daemon/socket when managed child containers are relevant;
 - runtime image/version/digest;
 - recent startup logs.
 
-If the Floci CLI is installed, `floci status`, `floci doctor`, and `floci logs` are useful supplemental probes. They are not required for the Development Pack because direct endpoints and provider-shaped calls remain portable across harnesses.
+Floci CLI status/doctor/logs are supplemental when available; provider-shaped calls and direct readiness surfaces remain the portable evidence.
 
-## 3. Check initialization state
+## 3. Check initialization/readiness state
 
-Probe:
+Use the selected provider overlay's readiness contract.
 
-- `/_floci/init`;
-- `/_localstack/init` when compatibility mode or migrated wait strategies matter;
-- hook status and failing phase;
-- init script exit/timeout evidence.
+For AWS, inspect `/_floci/init` and LocalStack-compatible init surfaces when relevant. Do not impose those AWS-specific surfaces on Azure, GCP, or OCI.
 
-Container health alone is not proof that the fixture reached its required `ready` state.
+Container health alone is not proof that the required fixture is ready.
 
 ## 4. Run one read-only provider-shaped probe
 
-Choose the smallest operation that proves routing through the service layer without mutating state.
+Choose the smallest read-only operation that proves routing through the selected provider service layer without mutating state.
 
-The reference diagnostic uses S3 `ListBuckets` when AWS CLI is available.
+Examples depend on the overlay: AWS may use S3 `ListBuckets`; Azure/GCP/OCI should use the provider-shaped SDK/wire probe already represented by that overlay rather than an AWS CLI substitute.
 
-If init is healthy but the provider-shaped probe fails, capture the exact response before changing configuration.
+If readiness is healthy but the provider-shaped probe fails, capture the exact response before changing configuration.
 
 ## 5. Narrow to the affected service/operation
 
 Record:
 
+- provider;
 - service;
 - exact operation/protocol;
-- request shape relevant to the failure;
+- relevant request shape;
 - response/error;
 - current local resource state;
-- whether the same operation passed previously on the pinned runtime.
+- whether the operation passed previously on the pinned runtime.
 
 Avoid broad service-level claims.
 
 ## 6. Increase logging only where discriminating
 
-Floci uses Quarkus logging.
+Escalate from default logs to affected service/category DEBUG, then TRACE only if request/response payload detail is required. Avoid global TRACE and sanitize artifacts before publishing.
 
-Escalate in this order:
+## 7. Inspect managed child runtimes when relevant
 
-1. default `INFO`;
-2. affected service category `DEBUG`;
-3. affected service category `TRACE` if request/response payload detail is required.
-
-Do not enable global TRACE by default.
-
-Diagnostic logs can contain payloads and identifiers. Sanitize before publishing.
-
-## 7. Inspect spawned service containers when relevant
-
-For Lambda, RDS, ElastiCache, MSK, or other Docker-backed services, distinguish:
-
-- Floci control-plane process health;
-- spawned container health;
-- Docker network/DNS reachability;
-- image pull/runtime failure;
-- service API behavior.
-
-A healthy Floci parent does not imply every managed child is healthy.
+Distinguish parent-emulator health from child execution/runtime health for any provider feature that launches or manages auxiliary containers/processes. Do not generalize AWS Lambda-specific assumptions to another provider runtime.
 
 ## 8. Classify the failure
 
-End diagnosis in one of these states:
+End in one of:
 
-- `BOUNDARY_DEFECT` — unsafe/wrong endpoint, credentials, routing, or ambient config;
-- `RUNTIME_DEFECT` — Floci/container startup or readiness problem;
-- `FIXTURE_DEFECT` — init/seed/state construction is wrong or incomplete;
-- `APPLICATION_DEFECT` — application/configuration produces the observed failure on supported local semantics;
-- `FIDELITY_GAP` — Floci behavior is unsupported, documented as different, or inconsistent with required provider semantics;
-- `PROVIDER_ONLY` — the acceptance claim cannot be established locally;
-- `UNKNOWN` — evidence is still insufficient.
+- `BOUNDARY_DEFECT`;
+- `RUNTIME_DEFECT`;
+- `FIXTURE_DEFECT`;
+- `APPLICATION_DEFECT`;
+- `FIDELITY_GAP`;
+- `PROVIDER_ONLY`;
+- `UNKNOWN`.
 
 Do not use `UNKNOWN` as permission to guess.
 
@@ -111,9 +97,13 @@ Do not use `UNKNOWN` as permission to guess.
 - Application/configuration defect → `software_engineering/diagnose_bug_feedback_loop.md`.
 - Cloud symptom needing local reconstruction → `agent_workflows/reproduce_cloud_bug_locally.md`.
 - Fidelity uncertainty → `agent_workflows/audit_floci_fidelity_gap.md`.
-- LocalStack migration issue → `agent_workflows/migrate_localstack_to_floci.md`.
+- LocalStack migration issue → `agent_workflows/migrate_localstack_to_floci.md` (AWS only).
 
-## Reference command
+## Reference execution
+
+Prefer the selected provider pack's `scripts/verify-inner` and provider-specific readiness/guard surfaces.
+
+AWS additionally provides:
 
 ```bash
 AWS_ENDPOINT_URL=http://localhost:4566 \
@@ -121,16 +111,8 @@ AWS_ENDPOINT_URL=http://localhost:4566 \
   .floci-artifacts/diagnostics/environment.md
 ```
 
+That command is an AWS reference implementation, not the universal diagnostic contract.
+
 ## Handoff
 
-Report:
-
-- endpoint boundary result;
-- runtime provenance;
-- init/readiness result;
-- provider-shaped probe;
-- exact failing service/operation;
-- logs/instrumentation captured;
-- classification;
-- next discriminating action;
-- provider-only residue if any.
+Report provider, endpoint boundary, runtime provenance, readiness, provider-shaped probe, exact failing operation, captured evidence, classification, next discriminating action, and provider-only residue.

@@ -27,12 +27,7 @@ COMPOSED_REQUIRED = [
 
 
 def invoke(case: dict, repo: Path) -> tuple[int, dict]:
-    cmd = [
-        "python3", str(ROUTER),
-        "--repo", str(repo),
-        "--task-kind", case["task_kind"],
-        "--format", "json",
-    ]
+    cmd = ["python3", str(ROUTER), "--repo", str(repo), "--task-kind", case["task_kind"], "--format", "json"]
     if case.get("provider"):
         cmd.extend(["--provider", case["provider"]])
     proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
@@ -49,8 +44,7 @@ def assert_route_assets(result: dict) -> None:
     for rel in [result.get("primary"), *result.get("support", [])]:
         if rel is None:
             continue
-        path = ROOT / rel
-        assert path.exists(), f"route references missing asset: {rel}"
+        assert (ROOT / rel).exists(), f"route references missing asset: {rel}"
 
 
 def main() -> int:
@@ -82,6 +76,7 @@ def main() -> int:
                 "status": actual["status"],
                 "provider": actual["provider"],
                 "primary": actual["primary"],
+                "candidate_primary": actual.get("candidate_primary"),
                 "pass": True,
             })
 
@@ -93,11 +88,17 @@ def main() -> int:
     assert "route-local-cloud-capability.py" in local_router
     assert "Never default to AWS" in local_router
     assert "No automatic real-cloud fallback" in local_router
+    assert "UNSUPPORTED_ROUTE" in local_router
+    assert "IaC validation" in local_router and "AWS" in local_router
+
+    unsupported = sum(r["status"] == "UNSUPPORTED_ROUTE" for r in results)
+    assert unsupported >= 4
 
     RECEIPT.parent.mkdir(parents=True, exist_ok=True)
     receipt = {
         "slice": "FLC-05",
         "case_count": len(results),
+        "unsupported_route_count": unsupported,
         "cases": results,
         "automatic_real_cloud_fallback": False,
         "requires_explicit_real_cloud_authorization": True,
@@ -105,7 +106,7 @@ def main() -> int:
         "verdict": "PASS",
     }
     RECEIPT.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"FLC-05 capability routing: PASS ({len(results)} cases)")
+    print(f"FLC-05 capability routing: PASS ({len(results)} cases; {unsupported} unsupported routes stopped)")
     print(f"receipt: {RECEIPT.relative_to(ROOT)}")
     return 0
 

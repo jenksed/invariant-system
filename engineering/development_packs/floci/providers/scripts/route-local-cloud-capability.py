@@ -11,8 +11,11 @@ import json
 import subprocess
 from pathlib import Path
 
+ALL_PROVIDERS = ("aws", "azure", "gcp", "oci")
+
 ROUTES = {
     "feature": {
+        "providers": ALL_PROVIDERS,
         "primary": "workflows/floci_first_cloud_feature_delivery.md",
         "support": [
             "agent_workflows/repository_truth_audit.md",
@@ -25,6 +28,7 @@ ROUTES = {
         ],
     },
     "iac": {
+        "providers": ("aws",),
         "primary": "agent_workflows/validate_iac_with_floci.md",
         "support": [
             "agent_workflows/repository_truth_audit.md",
@@ -34,6 +38,7 @@ ROUTES = {
         ],
     },
     "migration": {
+        "providers": ("aws",),
         "primary": "agent_workflows/migrate_localstack_to_floci.md",
         "support": [
             "agent_workflows/repository_truth_audit.md",
@@ -43,6 +48,7 @@ ROUTES = {
         ],
     },
     "bug": {
+        "providers": ALL_PROVIDERS,
         "primary": "agent_workflows/reproduce_cloud_bug_locally.md",
         "support": [
             "software_engineering/diagnose_bug_feedback_loop.md",
@@ -53,6 +59,7 @@ ROUTES = {
         ],
     },
     "environment": {
+        "providers": ALL_PROVIDERS,
         "primary": "agent_workflows/diagnose_floci_environment.md",
         "support": [
             "agent_workflows/route_local_cloud_provider.md",
@@ -61,6 +68,7 @@ ROUTES = {
         ],
     },
     "fidelity": {
+        "providers": ALL_PROVIDERS,
         "primary": "agent_workflows/audit_floci_fidelity_gap.md",
         "support": [
             "foundations/cloud_fidelity_ledger.md",
@@ -69,6 +77,7 @@ ROUTES = {
         ],
     },
     "review": {
+        "providers": ALL_PROVIDERS,
         "primary": "software_engineering/code_review_multi_axis.md",
         "support": [
             "agent_workflows/route_local_cloud_provider.md",
@@ -77,6 +86,7 @@ ROUTES = {
         ],
     },
     "provider-proof": {
+        "providers": ALL_PROVIDERS,
         "primary": "foundations/cloud_execution_boundary.md",
         "support": [
             "agent_workflows/audit_floci_fidelity_gap.md",
@@ -96,44 +106,74 @@ def provider_result(repo: Path, provider: str | None) -> tuple[dict, int]:
     proc = subprocess.run(cmd, text=True, capture_output=True, check=False)
     try:
         data = json.loads(proc.stdout)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
         raise RuntimeError(
             f"provider resolver returned invalid JSON (rc={proc.returncode}): {proc.stdout!r} {proc.stderr!r}"
-        )
+        ) from exc
     return data, proc.returncode
+
+
+def unresolved_result(detected: dict, task_kind: str, rc: int) -> tuple[dict, int]:
+    route = ROUTES[task_kind]
+    return {
+        "status": detected["confidence"].upper(),
+        "task_kind": task_kind,
+        "provider": None,
+        "provider_confidence": detected["confidence"],
+        "provider_pack": None,
+        "provider_evidence": detected["evidence"],
+        "supported_providers": list(route["providers"]),
+        "primary": None,
+        "candidate_primary": route["primary"],
+        "support": [],
+        "execution_boundary": "unresolved",
+        "reason": "provider must resolve to exactly one supported cloud before capability routing",
+        "automatic_real_cloud_fallback": False,
+        "requires_explicit_real_cloud_authorization": True,
+    }, rc
 
 
 def build_route(repo: Path, task_kind: str, provider: str | None) -> tuple[dict, int]:
     detected, rc = provider_result(repo, provider)
     if rc in (3, 4):
-        return {
-            "status": detected["confidence"].upper(),
-            "task_kind": task_kind,
-            "provider": None,
-            "provider_confidence": detected["confidence"],
-            "provider_pack": None,
-            "provider_evidence": detected["evidence"],
-            "primary": None,
-            "support": [],
-            "execution_boundary": "unresolved",
-            "automatic_real_cloud_fallback": False,
-            "requires_explicit_real_cloud_authorization": True,
-        }, rc
+        return unresolved_result(detected, task_kind, rc)
     if rc != 0:
         raise RuntimeError(f"unexpected provider resolver exit code: {rc}")
 
     route = ROUTES[task_kind]
+    selected = detected["provider"]
+    if selected not in route["providers"]:
+        return {
+            "status": "UNSUPPORTED_ROUTE",
+            "task_kind": task_kind,
+            "provider": selected,
+            "provider_confidence": detected["confidence"],
+            "provider_pack": detected["pack"],
+            "provider_evidence": detected["evidence"],
+            "supported_providers": list(route["providers"]),
+            "primary": None,
+            "candidate_primary": route["primary"],
+            "support": [],
+            "execution_boundary": "local-capability-gap",
+            "reason": f"{task_kind} specialization is not currently implemented for provider {selected}",
+            "automatic_real_cloud_fallback": False,
+            "requires_explicit_real_cloud_authorization": True,
+        }, 5
+
     escalation = bool(route.get("escalation_required"))
     result = {
         "status": "ESCALATION_REVIEW" if escalation else "ROUTED",
         "task_kind": task_kind,
-        "provider": detected["provider"],
+        "provider": selected,
         "provider_confidence": detected["confidence"],
         "provider_pack": detected["pack"],
         "provider_evidence": detected["evidence"],
+        "supported_providers": list(route["providers"]),
         "primary": route["primary"],
+        "candidate_primary": route["primary"],
         "support": route["support"],
         "execution_boundary": "explicit-provider-review" if escalation else "local-first",
+        "reason": None,
         "automatic_real_cloud_fallback": False,
         "requires_explicit_real_cloud_authorization": True,
     }
@@ -144,7 +184,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", default=".")
     parser.add_argument("--task-kind", required=True, choices=sorted(ROUTES))
-    parser.add_argument("--provider", choices=("aws", "azure", "gcp", "oci"))
+    parser.add_argument("--provider", choices=ALL_PROVIDERS)
     parser.add_argument("--format", choices=("json", "text"), default="text")
     args = parser.parse_args()
 
@@ -156,7 +196,7 @@ def main() -> int:
     if args.format == "json":
         print(json.dumps(result, indent=2, sort_keys=True))
     else:
-        if result["status"] in {"AMBIGUOUS", "UNKNOWN"}:
+        if result["status"] in {"AMBIGUOUS", "UNKNOWN", "UNSUPPORTED_ROUTE"}:
             print(result["status"])
         else:
             print(
