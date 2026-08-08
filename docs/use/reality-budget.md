@@ -47,7 +47,7 @@ A proof requirement names properties such as:
 - `behavior-observation`
 - `repeatable-test`
 - `network-boundary-observation`
-- `emulated-provider-behavior`
+- `provider-behavior-observation`
 - `real-provider-semantics`
 
 It does not name Docker, Dagger, Floci, kind, or any substrate ID.

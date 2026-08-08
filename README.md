@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-05 generalizes execution selection into an **Execution Substrate Contract + Reality Budget**, so Arsenal can spend only as much reality and authority as the evidence requires.
+**Next:** ARS-06 gives the Reality Budget a strong portable execution adapter through the **Dagger / Executable World Pack**, proving that selected worlds can be materialized reproducibly in local and CI environments.
 
 ---
 
@@ -427,11 +427,12 @@ The architecture is the reason the public promise can become durable. It is not 
 - deterministic Arsenal Integrity audit;
 - Arsenal Bench v0 with Case Health Receipts, counterfactual/ablation contracts, Capability Evidence Passports, and the first evidence-backed `testing` capability;
 - deterministic capability compiler + `.arsenal.lock` competence lockfile + proof-carrying Repository Truth Agent Skills package;
-- Capability Graph + Capability Gap Preflight with canonical/lock inventories, implementation checks, qualification gates, and safe authority profiles.
+- Capability Graph + Capability Gap Preflight with canonical/lock inventories, implementation checks, qualification gates, and safe authority profiles;
+- Execution Substrate Contract + Reality Budget with proof-property selection, declared availability, fidelity limitations, and explicit escalation boundaries.
 
 ### BUILDING TOWARD
 
-- generalized execution substrates + Reality Budget;
+- Dagger / Executable World Pack;
 - evidence observability;
 - trust and authority.
 

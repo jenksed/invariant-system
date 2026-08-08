@@ -46,7 +46,10 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `arsenal.competence-lockfile` | `reference` | `draft` | Pin the exact capability versions, source digests, evaluation qualification, and compiled distribution evidence used by this repository. | `.arsenal.lock` |
 | `arsenal.compiler-contract` | `reference` | `draft` | Define deterministic capability compilation, derived distribution artifacts, and competence-lockfile boundaries. | `arsenal/compiler/CONTRACT.md` |
 | `arsenal.compiler-export-plan` | `reference` | `draft` | Declare target-specific packaging metadata for compiler-generated capability distributions without duplicating canonical behavior. | `arsenal/compiler/export-plan.json` |
+| `arsenal.execution-substrate-catalog` | `router` | `draft` | Declare the ordered execution-substrate ladder, proof traits, availability profiles, limitations, and explicit escalation boundaries used by Reality Budget selection. | `arsenal/substrates/catalog.json` |
+| `arsenal.execution-substrate-contract` | `reference` | `draft` | Define Reality Budget selection, execution-substrate boundaries, evidence scope, availability, authority, teardown, and escalation semantics. | `arsenal/substrates/CONTRACT.md` |
 | `arsenal.invocation-model` | `reference` | `draft` | Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets. | `arsenal/INVOCATION_MODEL.md` |
+| `arsenal.proof-requirements` | `reference` | `draft` | Bind canonical capability verification requirements to runtime-agnostic proof properties for substrate selection. | `arsenal/substrates/proof-requirements.json` |
 
 ## engineering
 
