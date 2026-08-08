@@ -1,0 +1,61 @@
+{
+  "schema_version": "2.0.0",
+  "capability": {
+    "id": "capability.repository-truth",
+    "version": "0.1.0",
+    "display_name": "Repository Truth",
+    "aliases": ["Repository Audit"],
+    "purpose": "Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.",
+    "lifecycle": "draft",
+    "invocation": "agent",
+    "inputs": [
+      {"name": "repository_scope", "required": true, "description": "Repository or workspace whose current state must be established."},
+      {"name": "objective", "required": true, "description": "Current project objective or decision that makes repository truth relevant."},
+      {"name": "status_claims", "required": false, "description": "Existing completion, branch, roadmap, or handoff claims to verify."}
+    ],
+    "outputs": [
+      {"name": "current_state_report", "description": "Evidence-backed repository state, claim comparison, drift, risks, and validation results."},
+      {"name": "continuation_point", "description": "Exact defensible point from which planning or execution should continue."}
+    ],
+    "preconditions": [
+      {"id": "repository_available", "description": "The repository or equivalent inspectable workspace is available within scope."}
+    ],
+    "context": {
+      "required": ["task.intent", "repository.current_state"],
+      "preferred": ["repository.instructions", "repository.history", "repository.tests", "project.status_claims"]
+    },
+    "implementation": {
+      "primary_asset": "agent.repository-truth-audit",
+      "asset_ids": ["agent.repository-truth-audit"]
+    },
+    "authority": {
+      "required": ["filesystem.read", "git.read"],
+      "optional": ["shell.execute"],
+      "forbidden": ["filesystem.write", "network.write", "git.write", "tracker.write", "secrets.read", "cloud.remote", "production.mutate"]
+    },
+    "mutation": {"class": "read-only", "reversible": true},
+    "execution": {
+      "preferred": ["repository-read"],
+      "allowed": ["repository-read", "local-process"],
+      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
+    },
+    "verification": {
+      "requirements": [
+        {"id": "claims_grounded", "description": "Important status claims are compared against repository evidence.", "evidence_kind": "report"},
+        {"id": "validation_bounded", "description": "Performed, skipped, unavailable, and unverified checks are distinguished.", "evidence_kind": "report"},
+        {"id": "read_only_preserved", "description": "The audit does not intentionally mutate repository state.", "evidence_kind": "verdict"}
+      ],
+      "receipt_required": false
+    },
+    "evidence_outputs": [
+      {"name": "repository_truth_report", "description": "Inspectable current-state report with evidence and uncertainty."},
+      {"name": "continuation_point", "description": "Grounded next work boundary rather than a guessed plan."}
+    ],
+    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+    "provenance": {"asset_ids": ["agent.repository-truth-audit"]},
+    "compatibility": {
+      "supersedes": [],
+      "notes": "Public display name is independent of the canonical asset ID agent.repository-truth-audit."
+    }
+  }
+}
