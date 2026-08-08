@@ -305,6 +305,11 @@ def bench_record(source_path: Path, instance_id: str, repository_sha: str) -> di
         raise ObserveError("Bench receipt capability version does not match canonical capability")
 
     provenance = source.get("execution_provenance", {})
+    source_repository_sha = provenance.get("repository_sha")
+    if source_repository_sha not in {None, "unknown"} and source_repository_sha != repository_sha:
+        raise ObserveError(
+            f"Bench receipt repository_sha {source_repository_sha!r} does not match normalized run {repository_sha!r}"
+        )
     model_value = provenance.get("model")
     harness_value = provenance.get("harness")
     model_identity = identity("not-applicable") if model_value == "not-applicable" else identity("observed", str(model_value), None)
@@ -340,7 +345,7 @@ def bench_record(source_path: Path, instance_id: str, repository_sha: str) -> di
         },
         "authority": {
             "profile": None,
-            "required": sorted(set(canonical_cap.get("authority", {}).get("required", []))),
+            "required": [],
             "granted": [],
             "missing": [],
             "remote_credentials_used": remote,
@@ -469,6 +474,13 @@ def validate_record(record: dict[str, Any], *, verify_sources: bool = True) -> N
             raise ObserveError(f"authority {key} invalid")
     if not isinstance(authority["remote_credentials_used"], bool):
         raise ObserveError("remote_credentials_used must be boolean")
+    if authority["profile"] is None:
+        if authority["required"] or authority["granted"] or authority["missing"]:
+            raise ObserveError("authority-free execution layer must not imply unobserved capability grants or gaps")
+    else:
+        expected_missing = sorted(set(authority["required"]) - set(authority["granted"]))
+        if sorted(authority["missing"]) != expected_missing:
+            raise ObserveError("authority missing set must equal required minus granted")
 
     context = record["context"]
     if not isinstance(context, dict) or set(context) != {"content_recording", "sources", "token_volume"} or context["content_recording"] != "metadata-only":

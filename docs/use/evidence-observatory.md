@@ -85,6 +85,14 @@ Context sources are represented through IDs, paths, digests, and observed volume
 
 Raw content capture is not a hidden switch in v0. It requires a future explicit policy contract.
 
+## Authority is scoped to the recorded execution layer
+
+A Dagger capability-verification record carries the observed authority profile and checks `missing = required - granted`.
+
+A deterministic Bench evaluation is evaluating a capability rather than executing it under that capability's runtime authority. Its authority profile/sets are therefore empty; the recorder does not turn subject capability requirements into invented evaluator grants or gaps.
+
+When Bench records an actual repository SHA, the normalizer also requires it to match the run SHA supplied to the Flight Recorder.
+
 ## Evidence remains independently verifiable
 
 Normalization does not replace the source receipt.

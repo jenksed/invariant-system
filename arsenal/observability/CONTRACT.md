@@ -132,7 +132,9 @@ Tool arguments should not be copied wholesale when they may contain sensitive co
 
 ## Authority
 
-The Flight Recorder reports authority; it does not grant authority.
+The Flight Recorder reports authority for the **execution layer being recorded**; it does not grant authority.
+
+A capability-verification run with an observed authority profile records its required, granted, and missing sets. A deterministic evaluation adapter such as Arsenal Bench is not executing the subject capability under that capability's runtime permissions, so its profile and authority sets remain empty rather than pretending those grants were observed.
 
 The record should preserve, when available:
 

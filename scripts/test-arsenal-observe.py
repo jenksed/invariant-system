@@ -66,7 +66,7 @@ def bench_source() -> dict:
         "claim_scope": "Deterministic Local Cloud routing and execution-boundary contract evidence. No model/harness efficacy comparison is claimed.",
         "execution_provenance": {
             "runner": "scripts/arsenal_bench.py",
-            "repository_sha": "test",
+            "repository_sha": "repo-sha-1",
             "model": "not-applicable",
             "harness": "deterministic-python-adapter",
             "remote_credentials_used": False,
@@ -114,7 +114,10 @@ def main() -> int:
         assert set(d1) == set(b1) == observe.TOP_LEVEL
         assert d1["run"]["kind"] == "capability-verification"
         assert b1["run"]["kind"] == "evaluation"
+        assert b1["authority"]["profile"] is None
+        assert b1["authority"]["required"] == b1["authority"]["granted"] == b1["authority"]["missing"] == []
         print("PASS normal execution and Bench share one top-level record contract")
+        print("PASS Bench records evaluator-layer authority without inventing capability execution grants")
 
         assert d1["run"]["fingerprint"] == d2["run"]["fingerprint"]
         assert d1["run"]["instance_id"] != d2["run"]["instance_id"]
@@ -123,6 +126,21 @@ def main() -> int:
         d3 = observe.dagger_record(dagger_path, "instance-c", "repo-sha-2")
         assert d3["run"]["fingerprint"] != d1["run"]["fingerprint"]
         print("PASS repository state participates in behavioral fingerprint")
+
+        stale_bench = bench_source()
+        stale_bench["execution_provenance"]["repository_sha"] = "repo-sha-stale"
+        stale_bench_path = TEST_DIR / "bench-stale.json"
+        write_json(stale_bench_path, stale_bench)
+        expect_fail(
+            "Bench source repository provenance mismatch",
+            lambda: observe.bench_record(stale_bench_path, "bench-stale", "repo-sha-1"),
+        )
+
+        bad = copy.deepcopy(d1)
+        bad["authority"]["granted"] = []
+        bad["authority"]["missing"] = []
+        bad = observe.apply_fingerprint(bad)
+        expect_fail("execution authority arithmetic drift", lambda: observe.validate_record(bad))
 
         bad = copy.deepcopy(d1)
         bad["privacy"]["prompt_content_recorded"] = True
