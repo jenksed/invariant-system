@@ -14,11 +14,16 @@ on:
       - "engineering/development_packs/floci/ROADMAP.md"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   provider-router:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref }}
       - name: Validate router and shell entrypoints
         run: |
           python3 -m py_compile engineering/development_packs/floci/providers/scripts/resolve-provider
@@ -32,16 +37,16 @@ jobs:
             engineering/development_packs/floci/azure/tracer.py \
             engineering/development_packs/floci/gcp/tracer.py \
             engineering/development_packs/floci/oci/tracer.py
-      - name: Render catalog candidate
+      - name: Materialize generated catalog
         run: |
           python3 scripts/arsenal_audit.py --write-catalog
-          python3 - <<'PY'
-          import base64, pathlib
-          data = pathlib.Path('CATALOG.md').read_bytes()
-          print('CATALOG_B64_BEGIN')
-          print(base64.b64encode(data).decode())
-          print('CATALOG_B64_END')
-          PY
+          if ! git diff --quiet -- CATALOG.md; then
+            git config user.name github-actions[bot]
+            git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+            git add CATALOG.md
+            git commit -m "Regenerate Arsenal catalog for FLC-04"
+            git push origin HEAD:${GITHUB_HEAD_REF}
+          fi
       - name: Prove four-provider routing and ambiguity stop
         run: |
           r=engineering/development_packs/floci/providers/scripts/resolve-provider
