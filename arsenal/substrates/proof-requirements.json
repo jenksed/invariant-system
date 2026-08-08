@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0.0",
+  "requirements": [
+    {
+      "id": "proof.repository-truth.claims-grounded",
+      "capability_id": "capability.repository-truth",
+      "verification_requirement_id": "claims_grounded",
+      "required_traits": ["repository-observation"],
+      "minimum_isolation": "none",
+      "minimum_reproducibility": "resettable"
+    },
+    {
+      "id": "proof.tdd.red-observed",
+      "capability_id": "capability.tdd",
+      "verification_requirement_id": "red_observed",
+      "required_traits": ["behavior-observation", "repeatable-test"],
+      "minimum_isolation": "process",
+      "minimum_reproducibility": "resettable"
+    },
+    {
+      "id": "proof.tdd.green-observed",
+      "capability_id": "capability.tdd",
+      "verification_requirement_id": "green_observed",
+      "required_traits": ["behavior-observation", "repeatable-test"],
+      "minimum_isolation": "process",
+      "minimum_reproducibility": "resettable"
+    },
+    {
+      "id": "proof.local-cloud.provider-route",
+      "capability_id": "capability.local-cloud-feature-delivery",
+      "verification_requirement_id": "provider_route",
+      "required_traits": ["deterministic-routing"],
+      "minimum_isolation": "none",
+      "minimum_reproducibility": "deterministic"
+    },
+    {
+      "id": "proof.local-cloud.local-boundary",
+      "capability_id": "capability.local-cloud-feature-delivery",
+      "verification_requirement_id": "local_boundary",
+      "required_traits": ["cloud-api-integration", "network-boundary-observation", "provider-behavior-observation"],
+      "minimum_isolation": "container",
+      "minimum_reproducibility": "resettable"
+    },
+    {
+      "id": "proof.local-cloud.slice-verification",
+      "capability_id": "capability.local-cloud-feature-delivery",
+      "verification_requirement_id": "slice_and_independent_verification",
+      "required_traits": ["behavior-observation", "repeatable-test"],
+      "minimum_isolation": "process",
+      "minimum_reproducibility": "resettable"
+    },
+    {
+      "id": "proof.local-cloud.fidelity-bounded",
+      "capability_id": "capability.local-cloud-feature-delivery",
+      "verification_requirement_id": "fidelity_bounded",
+      "required_traits": ["fidelity-boundary-evaluation"],
+      "minimum_isolation": "none",
+      "minimum_reproducibility": "deterministic"
+    }
+  ]
+}

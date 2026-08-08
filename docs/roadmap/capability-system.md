@@ -376,7 +376,28 @@ Proof:
 
 ## ARS-05 — Execution Substrate Contract
 
+**Status:** delivered by PR #17.
+
 **Goal:** generalize the Local Cloud execution/fidelity lesson into a portable execution-selection model.
+
+Delivered in v0:
+
+- substrate-neutral `arsenal/substrates/CONTRACT.md`;
+- ordered 12-rung Reality Budget catalog from deterministic function through production, with Repository Read as an explicit observation rung;
+- runtime-agnostic proof requirements bound to canonical capability verification requirement IDs;
+- deterministic selector with `SELECTED`, `AUTHORITY_GAP`, `SUBSTRATE_GAP`, `ESCALATION_REQUIRED`, `EVIDENCE_GAP`, and `UNKNOWN` outcomes;
+- declared availability profiles instead of pretending every known substrate exists in the current environment;
+- reuse of ARS-04 authority profiles without widening them;
+- capability execution-surface compatibility checks;
+- per-substrate isolation, reproducibility, proof traits, limitations, reset, teardown, and escalation metadata;
+- remote sandbox, shared non-production, staging, and production marked explicit-only;
+- TDD proof selecting in-process execution before a higher-cost world;
+- Local Cloud proof stopping at the emulator when that evidence is sufficient;
+- stronger real-provider semantics producing an explicit remote escalation candidate rather than automatic cloud fallback;
+- proof vocabulary corrected to separate provider-behavior observation from emulator-vs-real fidelity;
+- final Reality Budget CI read-only.
+
+ARS-05 selects but does not execute. ARS-06 owns the first strong execution adapter implementation.
 
 Public concept: **Reality Budget / Proof Ladder**.
 
@@ -388,11 +409,12 @@ Execution ladder:
 
 ```text
 pure deterministic function
+→ repository read
 → in-process test
 → local process
-→ container
+→ local container
 → real local dependency
-→ emulator
+→ local emulator
 → local cluster
 → disposable remote sandbox
 → shared non-production
@@ -684,12 +706,12 @@ ARS-01  Capability Contract v2
 ARS-02  Arsenal Bench v0 + first evidence-backed testing capability
 ARS-03  Compiler & Distribution + `.arsenal.lock`
 ARS-04  Capability Graph + Capability Gap Preflight
-
-NOW / NEXT AFTER ARS-04 ACCEPTANCE
 ARS-05  Execution Substrate Contract + Reality Budget
 
-THEN
+NOW / NEXT AFTER ARS-05 ACCEPTANCE
 ARS-06  Dagger / Executable World Pack
+
+THEN
 ARS-07  Evidence Observatory / Agent Flight Recorder
 ARS-08  Trust & Authority + third-party competence audit
 

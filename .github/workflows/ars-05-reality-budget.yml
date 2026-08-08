@@ -1,0 +1,101 @@
+name: ARS-05 Execution Substrate & Reality Budget
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ars-05-reality-budget.yml"
+      - "arsenal/substrates/**"
+      - "arsenal/capabilities/**"
+      - "arsenal/graph/**"
+      - "arsenal/registry.json"
+      - "arsenal/registry.d/**"
+      - "scripts/arsenal_substrate.py"
+      - "scripts/test-arsenal-substrate.py"
+      - "scripts/arsenal_graph.py"
+      - "scripts/arsenal_compile.py"
+      - "scripts/arsenal_bench.py"
+      - "docs/use/reality-budget.md"
+      - "docs/roadmap/capability-system.md"
+      - "foundations/cloud_execution_boundary.md"
+      - "foundations/cloud_fidelity_ledger.md"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reality-budget:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check selector
+        run: python3 -m py_compile scripts/arsenal_substrate.py scripts/test-arsenal-substrate.py
+
+      - name: Validate substrate and proof contracts
+        run: python3 scripts/arsenal_substrate.py validate
+
+      - name: Run Reality Budget suite
+        run: python3 scripts/test-arsenal-substrate.py
+
+      - name: Prove TDD selects the lowest sufficient world
+        run: |
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.tdd \
+            --requirement red_observed \
+            --authority-profile workspace-safe \
+            --availability-profile minimal-local
+
+      - name: Prove Local Cloud boundary stops at emulator
+        run: |
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.local-cloud-feature-delivery \
+            --requirement local_boundary \
+            --authority-profile local-cloud-safe \
+            --availability-profile floci-local
+
+      - name: Prove provider semantics require explicit escalation
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.local-cloud-feature-delivery \
+            --requirement local_boundary \
+            --authority-profile local-cloud-safe \
+            --availability-profile floci-local \
+            --require-trait real-provider-semantics
+          rc=$?
+          set -e
+          test "$rc" -eq 6
+
+      - name: Preserve Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+          python3 scripts/arsenal_graph.py preflight \
+            --route route.local-cloud-feature-delivery \
+            --inventory canonical \
+            --authority-profile local-cloud-safe
+
+      - name: Preserve compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve Bench lifecycle evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
