@@ -49,6 +49,7 @@ jobs:
           name: floci-aws-golden-path-evidence
           path: engineering/development_packs/floci/aws/.floci-artifacts/
           if-no-files-found: warn
+          include-hidden-files: true
 
       - name: Tear down
         if: always()
