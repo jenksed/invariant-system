@@ -28,11 +28,16 @@ jobs:
       - name: Prove endpoint guard fails closed
         run: |
           set +e
-          AWS_ENDPOINT_URL=https://s3.amazonaws.com ./scripts/aws-local s3 ls >/tmp/unsafe.out 2>&1
-          rc=$?
+          env -u AWS_ENDPOINT_URL FLOCI_ENV_FILE=/tmp/no-floci-env ./scripts/aws-local s3 ls >/tmp/missing-endpoint.out 2>&1
+          missing_rc=$?
+          AWS_ENDPOINT_URL=https://s3.amazonaws.com ./scripts/aws-local s3 ls >/tmp/public-endpoint.out 2>&1
+          public_rc=$?
           set -e
-          test "$rc" -ne 0
-          grep -q "refusing AWS call" /tmp/unsafe.out
+
+          test "$missing_rc" -ne 0
+          test "$public_rc" -ne 0
+          grep -q "AWS_ENDPOINT_URL is not set" /tmp/missing-endpoint.out
+          grep -q "refusing AWS call" /tmp/public-endpoint.out
 
       - name: Run completion gate
         run: ./scripts/verify-completion
