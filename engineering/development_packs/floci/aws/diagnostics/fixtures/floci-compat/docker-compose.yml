@@ -6,11 +6,15 @@ services:
     environment:
       PERSISTENCE: "1"
       LOCALSTACK_PARITY: "true"
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
     volumes:
       - ./init/ready.d:/etc/localstack/init/ready.d:ro
-      - ./data:/app/data
+      - floci-data:/app/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/init >/dev/null || exit 1"]
       interval: 1s
       timeout: 2s
       retries: 30
+
+volumes:
+  floci-data:
