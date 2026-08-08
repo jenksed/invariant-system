@@ -5,6 +5,7 @@ source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
 
 ensure_tools
 guard_endpoint
+prepare_docker_socket_group
 mkdir -p "$ARTIFACT_DIR"
 
 cleanup() {
@@ -45,6 +46,7 @@ cat >"$receipt" <<EOF
 - Container image ID: \`$image_id\`
 - Pulled repo digest: \`$resolved_digest\`
 - Endpoint: \`$AWS_ENDPOINT_URL\`
+- Docker socket supplemental GID: \`$FLOCI_DOCKER_GID\`
 - Storage/reset mode: memory; zero-state Compose rebuild
 - Fixture: \`init/ready.d/10-seed.py\` + \`lambda/handler.py\`
 - Readiness: \`GET /_floci/init\` with \`completed.ready == true\`
