@@ -8,18 +8,26 @@ import json
 import re
 from pathlib import Path
 
+TOOL_ROOT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {
     ".git", ".terraform", ".venv", "node_modules", "vendor", "dist", "build",
-    ".next", "target", "_build", "deps",
+    ".next", "target", "_build", "deps", ".floci-artifacts",
 }
-TEXT_SUFFIXES = {
+RUNTIME_SUFFIXES = {
     ".yml", ".yaml", ".json", ".toml", ".env", ".sh", ".bash", ".zsh", ".py",
     ".js", ".ts", ".tsx", ".jsx", ".go", ".java", ".kt", ".kts", ".ex", ".exs",
-    ".md", ".txt", ".properties", ".conf", ".cfg",
+    ".properties", ".conf", ".cfg",
 }
+DOC_SUFFIXES = {".md", ".txt"}
 SPECIAL_NAMES = {
     "Dockerfile", "Makefile", "Procfile", "compose.yml", "compose.yaml",
     "docker-compose.yml", "docker-compose.yaml",
+}
+# These are Project Arsenal/FLC-03 implementation files outside TOOL_ROOT. When
+# the pack is installed into a repository and the inventory scans '.', they must
+# not become evidence about the target repository itself.
+OWNED_REPO_PATHS = {
+    ".github/workflows/floci-diagnostics-ci.yml",
 }
 
 RULES = [
@@ -73,17 +81,25 @@ RULES = [
 COMPILED_RULES = [(re.compile(p), d, e, n) for p, d, e, n in RULES]
 
 
-def candidate_files(root: Path):
+def candidate_files(root: Path, include_docs: bool):
+    suffixes = RUNTIME_SUFFIXES | (DOC_SUFFIXES if include_docs else set())
+    skip_tool_root = root != TOOL_ROOT and TOOL_ROOT.is_relative_to(root)
+
     for path in root.rglob("*"):
         if not path.is_file() or any(part in SKIP_DIRS for part in path.parts):
             continue
-        if path.name in SPECIAL_NAMES or path.suffix.lower() in TEXT_SUFFIXES or path.name.startswith(".env"):
+        if skip_tool_root and path.is_relative_to(TOOL_ROOT):
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel in OWNED_REPO_PATHS:
+            continue
+        if path.name in SPECIAL_NAMES or path.suffix.lower() in suffixes or path.name.startswith(".env"):
             yield path
 
 
-def scan(root: Path):
+def scan(root: Path, include_docs: bool = False):
     findings = []
-    for path in candidate_files(root):
+    for path in candidate_files(root, include_docs):
         try:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
@@ -114,11 +130,12 @@ def summarize(findings):
     }
 
 
-def render_markdown(root: Path, findings):
+def render_markdown(root: Path, findings, include_docs: bool):
     s = summarize(findings)
     lines = [
         "# LocalStack Migration Inventory", "",
-        f"- Root: `{root}`", f"- Findings: {s['total']}", f"- Blockers: {s['blockers']}", "",
+        f"- Root: `{root}`", f"- Findings: {s['total']}", f"- Blockers: {s['blockers']}",
+        f"- Documentation scanned: `{'yes' if include_docs else 'no'}`", "",
         "| Disposition | Location | Token | Floci equivalent | Note |",
         "|---|---|---|---|---|",
     ]
@@ -147,6 +164,8 @@ def main():
     parser.add_argument("root", nargs="?", default=".")
     parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
     parser.add_argument("--output")
+    parser.add_argument("--include-docs", action="store_true",
+                        help="also scan Markdown/text documentation; disabled by default to avoid prose-only false positives")
     parser.add_argument("--fail-on-blocker", action="store_true")
     args = parser.parse_args()
 
@@ -154,14 +173,15 @@ def main():
     if not root.exists():
         parser.error(f"root does not exist: {root}")
 
-    findings = scan(root)
+    findings = scan(root, include_docs=args.include_docs)
     payload = {
         "schema_version": "1.0.0",
         "root": str(root),
+        "include_docs": args.include_docs,
         "summary": summarize(findings),
         "findings": findings,
     }
-    rendered = json.dumps(payload, indent=2, sort_keys=True) if args.format == "json" else render_markdown(root, findings)
+    rendered = json.dumps(payload, indent=2, sort_keys=True) if args.format == "json" else render_markdown(root, findings, args.include_docs)
 
     if args.output:
         out = Path(args.output)
