@@ -40,139 +40,25 @@ jobs:
       - name: Arsenal integrity
         run: python3 scripts/arsenal_audit.py
 
-      - name: Materialize ARS-01 public status
+      - name: Correct ARS-01 README capability list
         if: github.event_name == 'pull_request' && github.head_ref == 'agent/ars-01-capability-contract-v2'
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-
-          def replace_once(text, old, new, label):
-              if new in text:
-                  return text
-              if old not in text:
-                  raise SystemExit(f"missing expected {label} pattern")
-              return text.replace(old, new, 1)
-
-          readme = Path("README.md")
-          text = readme.read_text()
-          old = '''## Capability is the next technical primitive
-
-          **Status: BUILDING TOWARD (ARS-01).**
-
-          Today Arsenal has a machine-readable Asset Contract, typed assets, relationships, invocation modes, lifecycle states, routers, workflows, Development Packs, and deterministic audit infrastructure.
-
-          Next, Arsenal will add a richer behavioral **Capability Contract**.
-
-          Working definition:
-
-          > A Capability is a versioned representation of a useful outcome, including what it needs, what authority it requires, how it should be approached, where it may operate, and what evidence is necessary before success can be claimed.
-
-          Conceptually:
-
-          ```text
-          identity + version
-          purpose
-          inputs + outputs
-          preconditions
-          context + method
-          authority + forbidden authority
-          execution substrate
-          verification + evidence
-          evaluation suite
-          provenance + compatibility + lifecycle
-          ```
-
-          The existing [`arsenal/ASSET_CONTRACT.md`](arsenal/ASSET_CONTRACT.md) remains the current artifact metadata contract. Capability Contract v2 will extend the system behaviorally rather than pretending the distinction already ships.
-          '''
-          new = '''## Capability Contract v2
-
-          **Status: AVAILABLE (ARS-01).**
-
-          Arsenal now has two deliberately separate machine-readable layers:
-
-          ```text
-          Asset
-            = registered repository artifact/package metadata
-
-          Capability
-            = versioned behavioral contract for achieving a useful outcome
-          ```
-
-          [`arsenal/ASSET_CONTRACT.md`](arsenal/ASSET_CONTRACT.md) remains authoritative for repository artifact identity, paths, kinds, lifecycle, invocation metadata, and relationships.
-
-          [`arsenal/CAPABILITY_CONTRACT.md`](arsenal/CAPABILITY_CONTRACT.md) now defines behavior: identity/version, public names and aliases, inputs/outputs, preconditions, context, registered implementation assets, authority, mutation class, execution surfaces, verification, evidence, evaluation, provenance, compatibility, and capability lifecycle.
-
-          Canonical capability definitions are fragmented under [`arsenal/capabilities/`](arsenal/capabilities/) so capabilities and Development Packs can evolve independently without recreating one giant manifest.
-
-          ARS-01 models nine initial capabilities:
-
-          - Repository Truth;
-          - Pressure Test, preserving Grill/Grilling aliases;
-          - Recon, preserving Wayfind/Wayfinding aliases;
-          - Diagnose;
-          - TDD;
-          - Review;
-          - Verify;
-          - Resume;
-          - Local Cloud Feature Delivery as the execution-backed tracer.
-
-          The Local Cloud contract requires local-cloud authority while forbidding remote-cloud and production mutation by default. All nine capability lifecycle states remain `draft` / `unassessed`; ARS-02 Arsenal Bench must earn stronger lifecycle claims through evaluation evidence.
-          '''
-          text = replace_once(text, old, new, "README capability section")
-          text = replace_once(text, "- Asset Contract and invocation model;", "- Asset Contract, Capability Contract v2, and invocation model;", "README available contract list")
-          text = replace_once(text, "- Repository Truth;\n", "- Repository Truth;\n- nine canonical Capability Contract v2 fragments spanning Core Arsenal + Local Cloud delivery;\n", "README capability set list")
-          text = text.replace("- Capability Contract v2;\n", "", 1)
-          text = replace_once(text, "- [`arsenal/INVOCATION_MODEL.md`](arsenal/INVOCATION_MODEL.md) — harness-neutral invocation semantics", "- [`arsenal/CAPABILITY_CONTRACT.md`](arsenal/CAPABILITY_CONTRACT.md) — behavioral capability contract and lifecycle rules\n- [`arsenal/capabilities/`](arsenal/capabilities/) — canonical fragmented capability set\n- [`arsenal/INVOCATION_MODEL.md`](arsenal/INVOCATION_MODEL.md) — harness-neutral invocation semantics", "README deep links")
-          readme.write_text(text)
-
-          roadmap = Path("docs/roadmap/capability-system.md")
-          text = roadmap.read_text()
-          text = replace_once(text, "Current frontier: **ARS-01 — Capability Contract v2**", "Current frontier: **ARS-02 — Arsenal Bench & Evaluation Lab v0**", "roadmap frontier")
-          old = '''## ARS-01 — Capability Contract v2
-
-          **Status:** next slice.
-
-          **Goal:** introduce a machine-readable behavioral capability representation while preserving the existing Asset Contract as artifact metadata.
-          '''
-          new = '''## ARS-01 — Capability Contract v2
-
-          **Status:** delivered by PR #13.
-
-          Delivered:
-
-          - a separate Capability Contract v2 while preserving the Asset Contract as repository-artifact metadata;
-          - deterministic `arsenal/capabilities/*.json` fragments instead of a monolithic capability manifest;
-          - nine initial `draft` / `unassessed` capabilities spanning Repository Truth, Pressure Test, Recon, Diagnose, TDD, Review, Verify, Resume, and execution-backed Local Cloud Feature Delivery;
-          - stable capability IDs separated from display names and compatibility aliases;
-          - Pressure Test aliases `Grill` / `Grilling` without renaming `agent.grill`;
-          - Recon aliases `Wayfind` / `Wayfinding` without renaming `agent.wayfind`;
-          - declarative required/optional/forbidden authority, mutation class, execution surfaces, verification requirements, evidence outputs, evaluation state, provenance, and compatibility;
-          - executable cross-contract validation against the merged Asset Registry;
-          - seven negative contract cases covering alias collisions, unresolved implementation assets, authority conflicts, read-only mutation authority, execution-substrate errors, harness leakage, and unsupported stable lifecycle claims;
-          - Local Cloud proof that a behavioral capability can require `cloud.local` while forbidding `cloud.remote` and `production.mutate` by default;
-          - three registered capability-system reference assets and a generated catalog update.
-
-          Boundary preserved:
-
-          - ARS-01 records authority but ARS-08 will enforce it;
-          - ARS-01 records execution intent but ARS-05 will select/enforce substrates and fidelity;
-          - capability lifecycle remains `draft` until ARS-02 produces evaluation evidence;
-          - ARS-00B distribution remains a derived compiler regression target rather than canonical capability behavior.
-
-          **Goal:** introduce a machine-readable behavioral capability representation while preserving the existing Asset Contract as artifact metadata.
-          '''
-          text = replace_once(text, old, new, "roadmap ARS-01 status")
-          text = replace_once(text, "## ARS-02 — Arsenal Bench & Evaluation Lab v0\n\n**Goal:**", "## ARS-02 — Arsenal Bench & Evaluation Lab v0\n\n**Status:** next slice.\n\n**Goal:**", "roadmap ARS-02 status")
-          roadmap.write_text(text)
+          path = Path("README.md")
+          text = path.read_text()
+          bad = "- nine canonical Capability Contract v2 fragments spanning Core Arsenal + Local Cloud delivery;\n"
+          if bad in text:
+              text = text.replace(bad, "", 1)
+              path.write_text(text)
           PY
-
-          if git diff --quiet -- README.md docs/roadmap/capability-system.md; then
-            echo "ARS-01 public status already current"
+          if git diff --quiet -- README.md; then
+            echo "README capability list already correct"
             exit 0
           fi
           git config user.name "Project Arsenal CI"
           git config user.email "jenksed@noreply.local"
-          git add README.md docs/roadmap/capability-system.md
-          git commit -m "Record ARS-01 delivery and advance to ARS-02"
+          git add README.md
+          git commit -m "Correct ARS-01 README capability list"
           git push origin HEAD:${{ github.head_ref }}
