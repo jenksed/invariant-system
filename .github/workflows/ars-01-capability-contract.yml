@@ -16,16 +16,11 @@ on:
       - "README.md"
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
   capability-contract:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.head_ref || github.ref_name }}
 
       - uses: actions/setup-python@v5
         with:
@@ -36,22 +31,6 @@ jobs:
 
       - name: Run negative contract suite
         run: python3 scripts/test-capability-contract.py
-
-      - name: Materialize generated catalog
-        if: github.event_name == 'pull_request' && github.head_ref == 'agent/ars-01-capability-contract-v2'
-        run: |
-          set -euo pipefail
-          python3 scripts/arsenal_audit.py --write-catalog
-          python3 scripts/arsenal_audit.py
-          if git diff --quiet -- CATALOG.md; then
-            echo "CATALOG.md already current"
-            exit 0
-          fi
-          git config user.name "Project Arsenal CI"
-          git config user.email "jenksed@noreply.local"
-          git add CATALOG.md
-          git commit -m "Regenerate catalog for Capability Contract v2"
-          git push origin HEAD:${{ github.head_ref }}
 
       - name: Arsenal integrity
         run: python3 scripts/arsenal_audit.py
