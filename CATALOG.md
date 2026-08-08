@@ -40,15 +40,24 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `engineering.development-pack-contract` | `reference` | `draft` | Define the common contract for language/framework Development Packs that provide deterministic feedback, structural invariants, guardrails, and verification tiers. | `engineering/development_packs/CONTRACT.md` |
 | `engineering.doctrine-core` | `doctrine` | `stable` | Compact constitutional core for frequent agent context. | `engineering/doctrine/CORE.md` |
 | `engineering.doctrine-full` | `doctrine` | `stable` | Full Engineering Doctrine, decision heuristics, limits, and tradeoff philosophy. | `engineering/doctrine/ENGINEERING_DOCTRINE.md` |
+| `engineering.floci-fidelity-policy` | `reference` | `draft` | Interpret Floci evidence conservatively by exact provider service operation and required semantic rather than aggregate parity claims. | `engineering/development_packs/floci/FIDELITY_POLICY.md` |
+| `engineering.floci-pack` | `reference` | `draft` | Adapt the Development Pack contract to Floci with local-first execution, deterministic fixtures, operation-level fidelity, and explicit provider escalation. | `engineering/development_packs/floci/README.md` |
+| `engineering.floci-reference` | `reference` | `draft` | Provide a compact agent-facing Floci pointer surface for endpoint safety, verification tiers, evidence labels, and escalation hard stops. | `engineering/development_packs/floci/REFERENCE.md` |
+| `engineering.floci-roadmap` | `reference` | `draft` | Sequence Floci support from the local-cloud foundation through AWS golden path, IaC/CI, migration/diagnosis, multi-cloud routing, and evaluation. | `engineering/development_packs/floci/ROADMAP.md` |
+| `engineering.floci-verification-contract` | `reference` | `draft` | Define inner-loop, slice-gate, and completion-gate evidence for reproducible Floci-backed cloud engineering. | `engineering/development_packs/floci/VERIFICATION_CONTRACT.md` |
 
 ## foundations
 
 | ID | Kind | Status | Purpose | Path |
 |---|---|---|---|---|
+| `foundation.cloud-execution-boundary` | `method` | `draft` | Choose the lowest-blast-radius cloud execution surface and require explicit evidence-backed escalation before real-provider mutation. | `foundations/cloud_execution_boundary.md` |
+| `foundation.cloud-fidelity-ledger` | `method` | `draft` | Record operation-level emulator fidelity so local protocol and behavior evidence cannot be overstated as real-cloud verification. | `foundations/cloud_fidelity_ledger.md` |
 | `foundation.context-boundaries` | `reference` | `draft` | Choose context transitions deliberately at phase boundaries while preserving primary reasoning when it still matters. | `foundations/context_boundaries.md` |
 | `foundation.domain-language` | `method` | `draft` | Sharpen shared domain terminology and preserve only durable non-obvious decisions. | `foundations/domain_language.md` |
 | `foundation.grilling` | `method` | `draft` | Resolve consequential ambiguity through a dependency-aware decision-tree interview and current decision frontier. | `foundations/grilling.md` |
+| `foundation.local-cloud-emulation` | `method` | `draft` | Run cloud-dependent engineering through reproducible low-blast-radius local execution before deliberately escalating irreducible provider-only proof. | `foundations/local_cloud_emulation.md` |
 | `foundation.rejected-decision-memory` | `method` | `draft` | Preserve durable rejected concepts and their reasons so future requests are reconsidered rather than rediscovered. | `foundations/rejected_decision_memory.md` |
+| `foundation.reproducible-cloud-fixtures` | `method` | `draft` | Construct minimal versioned cloud fixtures that can be reset or restored and replayed without hidden manual state. | `foundations/reproducible_cloud_fixtures.md` |
 | `foundation.wayfinding` | `method` | `draft` | Orchestrate multi-session decision work through a destination, frontier, fog, dependency graph, and primary-source resolution records. | `foundations/wayfinding.md` |
 
 ## job_search
@@ -115,6 +124,7 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 
 | ID | Kind | Status | Purpose | Path |
 |---|---|---|---|---|
+| `source.floci` | `reference` | `draft` | Record the 2026-08-08 Floci capability and fidelity audit that bounds Project Arsenal's local-cloud adaptation. | `docs/source_audits/floci.md` |
 | `source.mattpocock-skills` | `reference` | `draft` | Record the 2026-08-07 conceptual adoption audit of mattpocock/skills and the boundaries of Arsenal's adaptation. | `docs/source_audits/mattpocock-skills.md` |
 
 ## workflows
