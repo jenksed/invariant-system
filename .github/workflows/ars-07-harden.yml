@@ -1,4 +1,4 @@
-name: ARS-07 Hardening Materialize
+name: ARS-07 Closeout Materialize
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  harden:
+  closeout:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -22,33 +22,36 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Apply deterministic hardening
-        run: python3 scripts/materialize-ars07-hardening.py
+      - name: Apply deterministic public closeout
+        run: python3 scripts/materialize-ars07-closeout.py
 
-      - name: Restore workflow change for connector-owned update
-        run: git checkout -- .github/workflows/ars-07-evidence-observatory.yml
+      - name: Regenerate authoritative catalog
+        run: python3 scripts/arsenal_audit.py --write-catalog
 
-      - name: Validate hardened static contract
+      - name: Validate durable ARS-07 static spine
         run: |
-          python3 -m py_compile scripts/arsenal_observe.py scripts/test-arsenal-observe.py
           python3 scripts/test-arsenal-observe.py
+          python3 scripts/arsenal_dagger.py validate
+          python3 scripts/test-arsenal-dagger.py
+          python3 scripts/arsenal_substrate.py validate
+          python3 scripts/test-arsenal-substrate.py
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+          python3 scripts/arsenal_compile.py verify
+          python3 scripts/test-arsenal-bench.py
+          python3 scripts/capability_audit.py
           python3 scripts/arsenal_audit.py
 
-      - name: Commit durable code and docs hardening only
+      - name: Commit generated catalog and public closeout only
         shell: bash
         run: |
           set -euo pipefail
           git config user.name "Project Arsenal CI"
           git config user.email "jenksed@noreply.local"
-          git add \
-            scripts/arsenal_observe.py \
-            scripts/test-arsenal-observe.py \
-            arsenal/observability/CONTRACT.md \
-            docs/use/evidence-observatory.md
-
+          git add CATALOG.md README.md docs/roadmap/capability-system.md
           git diff --cached --quiet && exit 0
           changed="$(git diff --cached --name-only)"
-          allowed=$'arsenal/observability/CONTRACT.md\ndocs/use/evidence-observatory.md\nscripts/arsenal_observe.py\nscripts/test-arsenal-observe.py'
+          allowed=$'CATALOG.md\nREADME.md\ndocs/roadmap/capability-system.md'
           test "$changed" = "$allowed"
-          git commit -m "Harden ARS-07 evidence provenance semantics"
+          git commit -m "Record ARS-07 delivery and advance frontier"
           git push origin HEAD:agent/ars-07-evidence-observatory
