@@ -1,0 +1,66 @@
+name: ARS-05 Roadmap Ladder Cleanup
+
+on:
+  push:
+    branches:
+      - agent/ars-05-reality-budget
+    paths:
+      - ".github/workflows/ars-05-roadmap-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-05-reality-budget
+
+      - name: Align roadmap ladder with delivered catalog
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("docs/roadmap/capability-system.md")
+          text = path.read_text()
+          old = """pure deterministic function
+          → in-process test
+          → local process
+          → container
+          → real local dependency
+          → emulator
+          → local cluster
+          → disposable remote sandbox
+          → shared non-production
+          → staging
+          → production""".replace("          ", "")
+          new = """pure deterministic function
+          → repository read
+          → in-process test
+          → local process
+          → local container
+          → real local dependency
+          → local emulator
+          → local cluster
+          → disposable remote sandbox
+          → shared non-production
+          → staging
+          → production""".replace("          ", "")
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one ladder match; found {text.count(old)}")
+          path.write_text(text.replace(old, new, 1))
+          PY
+
+      - name: Commit only roadmap cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add docs/roadmap/capability-system.md
+          git diff --cached --quiet && exit 0
+          test "$(git diff --cached --name-only)" = "docs/roadmap/capability-system.md"
+          git commit -m "Align ARS-05 roadmap with Reality Budget ladder"
+          git push origin HEAD:agent/ars-05-reality-budget
