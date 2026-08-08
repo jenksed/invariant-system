@@ -3,6 +3,8 @@ services:
     image: ${FLOCI_IMAGE:-floci/floci:1.5.34-compat}
     ports:
       - "127.0.0.1:4566:4566"
+    group_add:
+      - "${FLOCI_DOCKER_GID:-0}"
     environment:
       FLOCI_HOSTNAME: floci
       FLOCI_STORAGE_MODE: memory
