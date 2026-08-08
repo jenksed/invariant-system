@@ -4,7 +4,7 @@
 **Status:** Accepted  
 **Parent slice:** P1-S01  
 **Branch:** `work/p1-s01-t05-slice-gate`  
-**Depends on:** P1-S01-T04 merged and accepted
+**Depends on:** P1-S01-T04 merged and accepted (which depends on P1-S01-T06, the shared `Kiln.Workflow` application boundary)
 
 ## Slice contribution
 
@@ -27,7 +27,11 @@ Prove the complete P1-S01 durable foundation against its exact integrated state,
 | T01 supplies accepted domain records and transitions | merged ticket Evidence | preceding sequence | current P1-S01 state |
 | T02 supplies the durable store, migrations, revisions, and idempotency | merged ticket Evidence | preceding sequence | current P1-S01 state |
 | T03 supplies replay, projections, and restart reconstruction | merged ticket Evidence | preceding sequence | current P1-S01 state |
-| T04 supplies the minimal foundation CLI | merged ticket Evidence | preceding sequence | current P1-S01 state |
+| T06 supplies the shared `Kiln.Workflow` application boundary | merged ticket Evidence | preceding sequence | current P1-S01 state |
+| T04 supplies the minimal foundation CLI, rebound onto the T06 Workflow boundary | merged ticket Evidence | preceding sequence | current P1-S01 state |
+| The integrated deterministic suite is 351 tests, substantially larger than when this plan was authored | `mix test` at `118bcaa` | implementation agent | 2026-08-08 |
+| Real governing-plan preflight is part of the standard verification path | P0-W32 merged (PR #45) | implementation agent | `118bcaa` |
+| Development-agent assets carry invocation and lifecycle contracts | P0-W31 merged (PR #44) | implementation agent | `118bcaa` |
 | No aggregate P1-S01 gate, demo, or verification manifest exists | Repository inspection | implementation agent | ticket entry |
 
 ## Assumptions and unknowns
@@ -51,7 +55,7 @@ Prove the complete P1-S01 durable foundation against its exact integrated state,
 - **P1-S01-T05-R04:** The gate shall bind its result to exact commit, dirty fingerprint, toolchain, migration, SQLite, fixture, and Environment facts.
 - **P1-S01-T05-R05:** P1-S01-D01 shall execute the accepted user-visible foundation workflow against an isolated fixture state.
 - **P1-S01-T05-R06:** The demo shall stop and restart the application and shall prove that current truth comes from the journal and projection reconstruction rather than transcript inference.
-- **P1-S01-T05-R07:** Corrupt journal, corrupt projection, modified migration, future-version store, stale revision, conflicting idempotency key, and nonterminal-operation restart fixtures shall produce their exact protected results.
+- **P1-S01-T05-R07:** Corrupt journal, corrupt projection, modified migration, future-version store, stale revision, conflicting idempotency key, and nonterminal-operation restart fixtures shall produce their exact protected results. T03, T04, and T06 already own the lower-level protections; the aggregate layer proves each classification still holds when reached through the integrated `Kiln.CLI.Runtime` and `Kiln.Workflow` boundary rather than duplicating those unit fixtures.
 - **P1-S01-T05-R08:** Provider, Repository source read, Context, Tool, Patch, mutation, external Command, completion Evidence, product Receipt, release, Child, TUI, and Wave B paths shall be absent or explicitly unsupported.
 - **P1-S01-T05-R09:** The ticket shall create P1-S01-V01 as a canonical slice verification manifest from exact immutable references.
 - **P1-S01-T05-R10:** P1-S01-V01 shall not claim Task satisfaction, Run completion, product acceptance, product Receipt authority, or authorization of P1-S02.
@@ -108,7 +112,11 @@ The aggregate script is development verification, not a model-facing Tool or reg
 | `test/fixtures/p1_s01/` | complete slice fixtures | Proposed |
 | `artifacts/p1-s01/README.md` | generated-Artifact location contract, not committed runtime output | Proposed |
 | `docs/work/P1-S01-slice-closeout.md` | exact aggregate closeout record | Proposed |
-| `.github/workflows/ci.yml` | run the deterministic P1-S01 gate after ticket implementation | Proposed |
+| `scripts/gates/build_manifest.exs` | manifest generation invoked by the aggregate gate | Added during implementation |
+| `test/kiln/verification_manifest_test.exs` | manifest state-binding and non-authority assertions | Added during implementation |
+| `lib/mix/tasks/kiln.ex` | start the application before dispatch (integration defect correction, see Completion record) | Added during implementation |
+| `.gitignore` | exclude generated gate Artifacts while tracking the location contract | Added during implementation |
+| `.github/workflows/ci.yml` | run the deterministic P1-S01 gate after ticket implementation; install the pinned Vale the gate requires | Proposed |
 
 Do not add product Receipt, provider, Repository-reader, Patch, Command, helper, release, Child, or TUI files.
 
@@ -153,6 +161,7 @@ Do not add product Receipt, provider, Repository-reader, Patch, Command, helper,
 ## Deterministic verification
 
 ```bash
+scripts/agent-preflight
 scripts/test-agent-preflight
 python3 scripts/validate_first_month_contracts.py
 python3 scripts/validate_json_schema_contracts.py
@@ -213,45 +222,131 @@ P1-S01-D01 complete: select fixture Repository metadata, start Session, inspect 
 
 ## Completion record
 
-**Result:** Implemented but unverified
+**Result:** Implemented; deterministic verification passes; owner-machine Evidence blocked
+
+The aggregate gate, the P1-S01-D01 demo, the protected failure matrix, the
+excluded-capability audit, and P1-S01-V01 are implemented and pass at the exact
+branch head. One integration defect in previously merged work was discovered and
+corrected. P1-S01 acceptance remains open because AC04 requires Evidence from the
+accepted OD-02 acceptance host and AC07 requires owner review.
+
+### Integration defect discovered and corrected
+
+**Severity:** High. The entire user-visible P1-S01 CLI was non-functional outside
+the test harness.
+
+| Field | Finding |
+| --- | --- |
+| Owning contract | P1-S01-T04-R01: "The source-development CLI shall be invoked as `mix kiln`" |
+| Observed behavior | `mix kiln start` exited 1 with an unstructured BEAM crash (`DBConnection.Watcher ... no process`), created no state database, and emitted no `kiln.cli.result/v1` envelope |
+| Root cause | A Mix task does not start the current application. `Kiln.CLI.Runtime.open/2` opens an Exqlite pool that registers with `DBConnection.Watcher`, which exists only when `:db_connection` is running. `Mix.Tasks.Kiln.run/1` never started the application |
+| Why prior Evidence missed it | Every T04 acceptance test calls `Kiln.CLI.run/1` in process under `mix test`, where Mix has already started `:kiln` and its dependencies. No test executed the real `mix kiln` entry point as an operating-system process, so the tests measured a proxy rather than the integrated entry point |
+| Correction | `Mix.Tasks.Kiln.run/1` calls `Mix.Task.run("app.start")` before dispatch. `Kiln.Application` supervises no store at boot, so this opens no database and leaves the per-command store lifecycle with `Kiln.CLI.Runtime` |
+| Protected regression Evidence | `test/kiln/slices/p1_s01_test.exs`, describe "the real mix kiln entry point runs as an operating-system process". Verified adversarially: with the correction reverted the test fails with the exact original crash; with it applied the test passes |
+
+The correction is inside already-authorized P1-S01 behavior. It makes an accepted
+T04 requirement true rather than adding capability. The gate was not weakened to
+accommodate it.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S01-T05-AC01 | Pending | P1-S01-T05-E01 | pending |
-| P1-S01-T05-AC02 | Pending | P1-S01-T05-E02 | pending |
-| P1-S01-T05-AC03 | Pending | P1-S01-T05-E03 | pending |
-| P1-S01-T05-AC04 | Pending | P1-S01-T05-E04 | pending |
-| P1-S01-T05-AC05 | Pending | P1-S01-T05-E05 | pending |
-| P1-S01-T05-AC06 | Pending | P1-S01-T05-E06 | pending |
-| P1-S01-T05-AC07 | Pending | P1-S01-T05-E07 | pending |
+| P1-S01-T05-AC01 | Pass | P1-S01-T05-E01 | `scripts/gates/slice-01` exits 0 across 18 components; structured result written to `artifacts/p1-s01/slice-01-<commit>.json` |
+| P1-S01-T05-AC02 | Pass | P1-S01-T05-E02 | `scripts/demos/p1-s01` exits 0; identifiers and digests identical across separate operating-system processes and after the projection cache is discarded |
+| P1-S01-T05-AC03 | Pass | P1-S01-T05-E03 | Seven protected cases assert their exact classification through the integrated boundary; the harness itself fails if a fixture fails differently |
+| P1-S01-T05-AC04 | **Blocked** | P1-S01-T05-E04 | The current host is an Apple M3 MacBook Air (Mac15,13), not the OD-02 primary acceptance machine. See "Owner-machine Evidence" below |
+| P1-S01-T05-AC05 | Pass | P1-S01-T05-E05 | `Kiln.VerificationManifest` builds and validates P1-S01-V01; 21 assertions cover state binding and non-authority |
+| P1-S01-T05-AC06 | Pass | P1-S01-T05-E06 | Deterministic module, behaviour, source, and command-surface reachability checks |
+| P1-S01-T05-AC07 | **Open** | P1-S01-T05-E07 | Owner review of the exact integrated diff and manifest has not been given |
+
+### Owner-machine Evidence (AC04)
+
+The accepted OD-02 profile names "the owner's M1 Pro MacBook Pro" as the primary
+acceptance machine. Detected host:
+
+```text
+model:      MacBook Air (Mac15,13), Apple M3
+macOS:      26.5.1 (build 25F80)
+arch:       arm64
+filesystem: APFS, internal
+```
+
+This host satisfies the general supported-host profile (macOS 15 or later, Apple
+Silicon, local APFS) but is not the named acceptance machine, and it differs from
+the host T02 recorded for its own owner-machine Evidence (macOS 26.5.2, build
+25F84). Per the accepted requirement that owner-machine Evidence is not inferred,
+AC04 is reported `BLOCKED` rather than satisfied from this machine. The aggregate
+gate records the component as `not_run` and P1-S01-V01 reports `overall: blocked`.
+
+A related gap is recorded rather than silently corrected: the diagnostic in
+`scripts/diagnostics/p1-s01-store-host` records macOS version, architecture, and
+filesystem, but records no hardware model identifier. It therefore cannot
+distinguish the named acceptance machine from any other Apple Silicon Mac, which
+is why T02's Evidence could be collected without the mismatch being visible.
 
 ### Verification executed
 
+Executed at branch `work/p1-s01-t05-slice-gate`. Toolchain: Elixir 1.20.2,
+Erlang/OTP 28.4, Exqlite 0.39.0, SQLite 3.53.3, Vale 3.14.2, jsonschema 4.26.0.
+
 | Command or check | Exit status | Evidence location |
 | --- | --- | --- |
-| pending | pending | pending |
+| `scripts/agent-preflight` | 0 | selects P1-S01-T05 and `docs/work/P1-S01-T05-slice-gate.md` |
+| `scripts/test-agent-preflight` | 0 | validator regression passes |
+| `python3 scripts/validate_first_month_contracts.py` | 0 | 10 positive, 11 protected-negative fixtures |
+| `python3 scripts/validate_json_schema_contracts.py` | 0 | jsonschema 4.26.0 |
+| `scripts/validate-agent-assets` | 0 | 5 skills, 3 specialist agents, 3 prompt templates |
+| `vale --glob='!{deps,_build}/**' .` | 0 | 0 errors, 0 warnings, 0 suggestions |
+| `mix format --check-formatted` | 0 | clean |
+| `mix compile --warnings-as-errors` | 0 | no warnings |
+| `mix xref graph --format cycles --label compile-connected --fail-above 0` | 0 | no cycles |
+| `mix test` | 0 | 386 tests, 386 passed (351 inherited + 14 slice + 21 manifest) |
+| `scripts/gates/slice-01` | 0 | 18 components; 0 failed; 0 blocked; owner-machine `not_run` |
+| `scripts/demos/p1-s01` | 0 | P1-S01-D01 restart and journal-reconstruction parity |
+| `scripts/check` | 0 | aggregate development check |
+| `scripts/diagnostics/p1-s01-store-host` | 0 | ran, but not on the accepted OD-02 acceptance host |
+
+### Adversarial verification of the gate itself
+
+| Property | Method | Result |
+| --- | --- | --- |
+| A failed required component fails the gate | injected a formatting defect | gate exited 1 and reported `FAIL source_formatting` |
+| A passing demo cannot hide a failed gate | same injected run | manifest recorded `demo: pass` with `overall: fail` |
+| A regression test actually protects the defect it names | reverted the `mix kiln` correction | the entry-point test failed with the exact original crash |
+| A manifest cannot be replayed against another commit | edited the recorded commit | `validate/1` returned `digest_mismatch` |
+| A manifest cannot be edited into a claim | flipped `is_product_receipt` and `overall` | `not_authority_altered` and `overall_mismatch` |
 
 ### Demo and slice status
 
-- Ticket demo contribution: Not yet exercised
-- Parent slice gate affected: P1-S01-G09 through G11
-- Slice verification manifest updated: No
-- Slice completion claimed: No
+- Ticket demo contribution: P1-S01-D01 exercised; restart parity and
+  journal reconstruction after cache discard both proved.
+- Parent slice gate affected: P1-S01-G09 through G11.
+- Slice verification manifest updated: Yes; P1-S01-V01 generated and validated,
+  currently `overall: blocked` pending owner-machine Evidence.
+- Slice completion claimed: **No.**
 
 ### Failures and warnings
 
-- P1-S01 cannot close from CI alone; owner-machine Evidence is required.
+- AC04 is blocked: owner-machine Evidence must be collected on the accepted
+  OD-02 acceptance host. CI, another Mac, Docker, and a virtual machine are not
+  substitutes.
+- AC07 is open: owner review has not been given.
+- The owner-machine diagnostic records no hardware model identifier, so it
+  cannot by itself prove which Apple Silicon Mac produced the Evidence.
+- P1-S01-V01 reports `overall: blocked` at this state. That is the correct
+  reading, not a defect.
 
 ### Remaining unknowns and exclusions
 
-- P1-S02 remains planned and unauthorized after this ticket unless separately adjudicated.
+- OD-02 host filesystem, WAL, and sync behavior is unverified at this state.
+- P1-S02 remains planned and unauthorized after this ticket unless separately
+  adjudicated.
 
 ### Repository state
 
-- Commit: pending
 - Branch: `work/p1-s01-t05-slice-gate`
-- Diff reviewed: No
-- Exact CI run: pending
-- Parent slice status after merge: unchanged
+- Base: `118bcaad7353e8f891e4d0101460379e78138e56`
+- Diff reviewed: Yes
+- Parent slice status after merge: P1-S01 candidate proved for every machine
+  gate; acceptance withheld pending owner-machine Evidence and owner review.

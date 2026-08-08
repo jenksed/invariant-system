@@ -53,6 +53,20 @@ jobs:
       - name: Install conformance validator
         run: python3 -m pip install --disable-pip-version-check --requirement requirements/conformance.txt
 
+      # The aggregate slice gate runs the prose check as one of its required
+      # components, so the exact Vale version pinned in `mise.toml` must be
+      # available in this job. The separate `prose` job remains the reviewer-
+      # facing check; this install exists so the gate is genuinely aggregate
+      # rather than recording an unavailable control.
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          version=3.14.2
+          curl -sSfL \
+            "https://github.com/errata-ai/vale/releases/download/v${version}/vale_${version}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+          vale --version
+
       - name: Validate governing work package
         if: github.event_name == 'pull_request'
         env:
@@ -85,3 +99,28 @@ jobs:
 
       - name: Run tests
         run: mix test
+
+      # The three checks below prove three different properties and are kept
+      # as distinct steps so a failure names the property that broke:
+      #
+      #   Validate governing work package -> current plan conformance (PR only)
+      #   Test agent preflight behavior    -> validator regression
+      #   P1-S01 aggregate slice gate      -> integrated slice proof
+      #
+      # The aggregate gate re-runs the deterministic components it composes.
+      # That repetition is intentional: the gate must prove the integrated
+      # slice as one command, and its structured result binds the exact state
+      # it proved. Owner-machine (OD-02) Evidence is not collected here; CI is
+      # not an OD-02 host and the gate records that component as `not_run`.
+      - name: Run P1-S01 aggregate slice gate
+        env:
+          KILN_BRANCH: ${{ github.head_ref }}
+        run: scripts/gates/slice-01
+
+      - name: Upload P1-S01 slice gate result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-s01-slice-gate-result
+          path: artifacts/p1-s01/*.json
+          if-no-files-found: warn

@@ -19,6 +19,21 @@ defmodule Mix.Tasks.Kiln do
   use Mix.Task
 
   def run(argv) do
+    # The CLI opens an Exqlite pool through `Kiln.CLI.Runtime.open/2`. That
+    # pool registers with `DBConnection.Watcher`, which exists only when the
+    # `:db_connection` application (a dependency of `:exqlite`, itself a
+    # dependency of `:kiln`) is running. A Mix task does not start the
+    # current application automatically, so without this call every real
+    # `mix kiln` invocation that opens a store crashes with an unstructured
+    # BEAM exit instead of returning a `kiln.cli.result/v1` envelope. Under
+    # `mix test` the applications are already started, which is why the
+    # in-process T04 dispatcher tests never observed this.
+    #
+    # `Kiln.Application` supervises no store at boot (`:state_path` is unset),
+    # so starting the application opens no database; the CLI still owns the
+    # per-command store lifecycle through `Kiln.CLI.Runtime`.
+    Mix.Task.run("app.start")
+
     case Kiln.CLI.Request.parse(argv) do
       {:ok, request} ->
         {result, exit_code} = Kiln.CLI.run(request)

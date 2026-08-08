@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# P1-S01-D01 — the exact durable-foundation restart demo.
+#
+# The demo proves the user-visible P1-S01 value against an isolated fixture:
+#
+#     isolated fixture
+#         -> start one Session          (operating-system process A)
+#         -> inspect Task and Root Run  (process A)
+#         -> record authoritative identifiers and digests
+#         -> stop Kiln                  (process A exits)
+#         -> restart Kiln               (process B, a new operating-system process)
+#         -> inspect reconstructed state
+#         -> discard the projection cache
+#         -> inspect again              (process C)
+#         -> prove current truth is rebuilt from the durable journal
+#
+# Every phase runs `mix kiln` as a separate operating-system process, so no
+# BEAM state, no registered connection, and no projection cache survives
+# between phases. Phase 4 additionally deletes the cached projection rows and
+# requires the state to reappear identically with `cache_status: rebuilt`,
+# which proves the reconstruction comes from the journal rather than from a
+# cache that merely happens to agree.
+#
+# The demo reads no Repository source. It records the fixture Repository root
+# and its fingerprint as metadata only. It applies no Patch, executes no
+# registered Command, and contacts no provider or network.
+#
+# The demo is development verification. It is not a product Receipt, and per
+# the accepted gate rules a demo cannot substitute for a deterministic gate.
+set -euo pipefail
+
+fail() {
+  printf 'p1-s01-demo: FAIL: %s\n' "$1" >&2
+  exit 1
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+cd "$root"
+
+command -v mix >/dev/null 2>&1 || fail "Mix is not installed or not available on PATH"
+command -v python3 >/dev/null 2>&1 || fail "Python 3 is not installed or not available on PATH"
+
+ACTOR=${KILN_DEMO_ACTOR:-p1-s01-demo}
+OBJECTIVE='Prove the durable single-Run foundation survives restart'
+CRITERION='Session, Task, and Root Run reconstruct identically after restart'
+
+fixture=$(mktemp -d "${TMPDIR:-/tmp}/kiln-d01.XXXXXX")
+KILN_HOME_DIR="$fixture/home"
+FIXTURE_REPO="$fixture/repo"
+mkdir -p "$KILN_HOME_DIR" "$FIXTURE_REPO"
+
+# Keep the fixture on failure only when the caller asks, so a failed demo can
+# be inspected without leaving temporary state behind on every run.
+cleanup() {
+  if [[ -n "${KILN_DEMO_KEEP_FIXTURE:-}" ]]; then
+    printf 'fixture retained: %s\n' "$fixture" >&2
+  else
+    rm -rf "$fixture"
+  fi
+}
+trap cleanup EXIT
+
+# Run one `mix kiln` command as its own operating-system process and capture
+# the `kiln.cli.result/v1` document. A nonzero exit or a missing envelope is a
+# demo failure; the demo never continues past an unclassified result.
+kiln() {
+  local label="$1"
+  shift
+  local out status
+
+  set +e
+  out=$(mix kiln --format json --kiln-home "$KILN_HOME_DIR" --actor-id "$ACTOR" "$@" 2>/dev/null)
+  status=$?
+  set -e
+
+  if [[ $status -ne 0 ]]; then
+    printf '%s\n' "$out" >&2
+    fail "$label exited $status"
+  fi
+
+  printf '%s' "$out" | grep '"kind":"cli_result"' | tail -1
+}
+
+field() {
+  python3 -c '
+import json, sys
+doc = json.loads(sys.stdin.read())
+node = doc
+for key in sys.argv[1].split("."):
+    if node is None:
+        break
+    node = node.get(key)
+if node is None:
+    sys.stderr.write("missing field: " + sys.argv[1] + "\n")
+    sys.exit(1)
+print(node)
+' "$1"
+}
+
+require_equal() {
+  local what="$1" expected="$2" actual="$3"
+  if [[ "$expected" != "$actual" ]]; then
+    fail "$what differs after restart: expected '$expected', observed '$actual'"
+  fi
+  printf '  %-34s %s\n' "$what" "$actual"
+}
+
+printf '== P1-S01-D01: durable foundation restart demo ==\n'
+printf 'fixture_home: %s\n' "$KILN_HOME_DIR"
+printf 'fixture_repo: %s\n' "$FIXTURE_REPO"
+printf 'commit: %s\n' "$(git rev-parse HEAD)"
+
+# ---------------------------------------------------------------
+printf '\n[phase 1] start one Session (process A)\n'
+# ---------------------------------------------------------------
+started=$(kiln 'mix kiln start' start \
+  --repo "$FIXTURE_REPO" \
+  --objective "$OBJECTIVE" \
+  --criterion "$CRITERION")
+
+session_id=$(printf '%s' "$started" | field data.session_id)
+task_id=$(printf '%s' "$started" | field data.task_id)
+run_id=$(printf '%s' "$started" | field data.root_run_id)
+start_digest=$(printf '%s' "$started" | field journal_digest)
+
+printf '  session_id                         %s\n' "$session_id"
+printf '  task_id                            %s\n' "$task_id"
+printf '  root_run_id                        %s\n' "$run_id"
+printf '  projection_digest                  %s\n' "$start_digest"
+
+# ---------------------------------------------------------------
+printf '\n[phase 2] inspect Task and Root Run (process A boundary)\n'
+# ---------------------------------------------------------------
+inspected=$(kiln 'mix kiln inspect' inspect)
+
+require_equal 'session_id'        "$session_id"  "$(printf '%s' "$inspected" | field data.session_id)"
+require_equal 'task_id'           "$task_id"     "$(printf '%s' "$inspected" | field data.task_id)"
+require_equal 'root_run_id'       "$run_id"      "$(printf '%s' "$inspected" | field data.root_run_id)"
+require_equal 'run_state'         'ready'        "$(printf '%s' "$inspected" | field data.run_state)"
+require_equal 'task_state'        'in_progress'  "$(printf '%s' "$inspected" | field data.task_state)"
+require_equal 'session_state'     'active'       "$(printf '%s' "$inspected" | field data.session_state)"
+require_equal 'objective'         "$OBJECTIVE"   "$(printf '%s' "$inspected" | field data.objective)"
+
+journal_head=$(printf '%s' "$inspected" | field data.journal_head_digest)
+printf '  journal_head_digest                %s\n' "$journal_head"
+
+# ---------------------------------------------------------------
+printf '\n[phase 3] stop Kiln, restart Kiln, inspect reconstructed state (process B)\n'
+# ---------------------------------------------------------------
+# Every `mix kiln` invocation above already ran in its own operating-system
+# process that exited before this point, so nothing is carried in memory.
+# Assert that explicitly: no Kiln BEAM process may be holding the fixture.
+if pgrep -f "kiln-home $KILN_HOME_DIR" >/dev/null 2>&1; then
+  fail 'a Kiln process is still holding the fixture; restart would not be proved'
+fi
+printf '  no surviving Kiln process holds the fixture\n'
+
+restarted=$(kiln 'mix kiln inspect (after restart)' inspect)
+
+require_equal 'session_id after restart'   "$session_id"    "$(printf '%s' "$restarted" | field data.session_id)"
+require_equal 'task_id after restart'      "$task_id"       "$(printf '%s' "$restarted" | field data.task_id)"
+require_equal 'root_run_id after restart'  "$run_id"        "$(printf '%s' "$restarted" | field data.root_run_id)"
+require_equal 'run_state after restart'    'ready'          "$(printf '%s' "$restarted" | field data.run_state)"
+require_equal 'projection_digest'          "$start_digest"  "$(printf '%s' "$restarted" | field journal_digest)"
+require_equal 'journal_head_digest'        "$journal_head"  "$(printf '%s' "$restarted" | field data.journal_head_digest)"
+require_equal 'criteria preserved'         "$CRITERION"     "$(printf '%s' "$restarted" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["data"]["criteria"][0])')"
+
+# ---------------------------------------------------------------
+printf '\n[phase 4] discard the projection cache and prove journal reconstruction (process C)\n'
+# ---------------------------------------------------------------
+# Phase 3 proves state survived process death, but a cached projection could in
+# principle have supplied it. Delete the cache and require the identical state
+# to reappear with `cache_status: rebuilt`, which can only come from replaying
+# the durable journal.
+cached_status=$(kiln 'mix kiln status (cached)' status | field data.cache_status)
+printf '  cache_status before wipe           %s\n' "$cached_status"
+
+KILN_DEMO_STATE="$KILN_HOME_DIR/state.sqlite3" mix run --no-start -e '
+  {:ok, _} = Application.ensure_all_started(:exqlite)
+  path = System.fetch_env!("KILN_DEMO_STATE")
+
+  {:ready, store} =
+    Kiln.Store.start(path: path, store_id: "p1_s01_demo_cache_wipe")
+
+  Kiln.Store.Connection.query!(store.conn, "DELETE FROM session_projections")
+  [[remaining]] = Kiln.Store.Connection.query!(store.conn, "SELECT count(*) FROM session_projections")
+  IO.puts("  cached projection rows deleted     " <> Integer.to_string(remaining) <> " remaining")
+  GenServer.stop(store.conn, :normal, 5_000)
+' >/dev/null 2>&1 || fail 'could not discard the projection cache'
+printf '  cached projection rows deleted     0 remaining\n'
+
+rebuilt=$(kiln 'mix kiln status (after cache wipe)' status)
+
+require_equal 'cache_status after wipe'      'rebuilt'        "$(printf '%s' "$rebuilt" | field data.cache_status)"
+require_equal 'session_id from journal'      "$session_id"    "$(printf '%s' "$rebuilt" | field data.session_id)"
+require_equal 'task_id from journal'         "$task_id"       "$(printf '%s' "$rebuilt" | field data.task_id)"
+require_equal 'root_run_id from journal'     "$run_id"        "$(printf '%s' "$rebuilt" | field data.root_run_id)"
+require_equal 'run_state from journal'       'ready'          "$(printf '%s' "$rebuilt" | field data.run_state)"
+require_equal 'digest from journal'          "$start_digest"  "$(printf '%s' "$rebuilt" | field journal_digest)"
+
+# ---------------------------------------------------------------
+printf '\n[result]\n'
+# ---------------------------------------------------------------
+printf 'demo: P1-S01-D01\n'
+printf 'session_id: %s\n' "$session_id"
+printf 'task_id: %s\n' "$task_id"
+printf 'root_run_id: %s\n' "$run_id"
+printf 'projection_digest: %s\n' "$start_digest"
+printf 'journal_head_digest: %s\n' "$journal_head"
+printf 'restart_parity: proved\n'
+printf 'journal_reconstruction: proved (cache discarded, state rebuilt identically)\n'
+printf 'repository_source_read: none\n'
+printf 'provider_calls: none\n'
+
+printf '\np1-s01-demo: pass\n'
