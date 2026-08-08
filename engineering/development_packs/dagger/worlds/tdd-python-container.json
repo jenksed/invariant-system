@@ -4,7 +4,7 @@
     "id": "world.tdd-python-container",
     "version": "0.1.0",
     "adapter": "dagger",
-    "dagger_version": "0.21.6",
+    "dagger_version": "0.21.7",
     "pack_root": "engineering/development_packs/dagger",
     "script": "worlds/tdd-python-container.dagger",
     "definition_inputs": [
