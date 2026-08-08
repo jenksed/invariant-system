@@ -30,7 +30,8 @@ defmodule Kiln.Gates.BuildManifest do
       exqlite: to_string(Application.spec(:exqlite, :vsn) || "unknown"),
       host_os: env!("KILN_GATE_HOST_OS"),
       host_arch: env!("KILN_GATE_HOST_ARCH"),
-      host_kernel: env!("KILN_GATE_HOST_KERNEL")
+      host_kernel: env!("KILN_GATE_HOST_KERNEL"),
+      hw_model: hw_model()
     }
 
     store = %{
@@ -167,6 +168,13 @@ defmodule Kiln.Gates.BuildManifest do
 
   defp maybe(list, false, _item), do: list
   defp maybe(list, true, item), do: list ++ [item]
+
+  defp hw_model do
+    case System.fetch_env("KILN_GATE_HOST_MODEL") do
+      {:ok, value} -> value
+      :error -> "unknown"
+    end
+  end
 
   defp env!(name) do
     case System.fetch_env(name) do

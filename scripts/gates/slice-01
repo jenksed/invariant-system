@@ -151,6 +151,7 @@ FIXTURE_FINGERPRINT="sha256:$(find test/fixtures -type f | sort | xargs shasum -
 HOST_OS=$(uname -s)
 HOST_ARCH=$(uname -m)
 HOST_KERNEL=$(uname -sr)
+HOST_MODEL=$(sysctl -n hw.model 2>/dev/null || echo unknown)
 
 printf 'commit: %s\n' "$COMMIT"
 printf 'branch: %s\n' "$BRANCH"
@@ -291,9 +292,23 @@ if [[ "${KILN_OWNER_MACHINE:-}" == "1" ]]; then
       "KILN_OWNER_MACHINE=1 was asserted on $HOST_OS/$HOST_ARCH, which is not an OD-02 host" \
       'OD-02 host, filesystem, SQLite, WAL, and migration facts'
   else
-    run_required owner_machine_diagnostic \
-      'OD-02 host, filesystem, SQLite, WAL, and migration facts' \
-      scripts/diagnostics/p1-s01-store-host
+    # The accepted OD-02 acceptance machine is the owner's M1 Pro MacBook Pro.
+    # Refuse the assertion on any other Apple Silicon Mac, even when the
+    # general host profile is satisfied, so a wrong machine cannot produce a
+    # passing `KILN_OWNER_MACHINE=1` result. Operators can override only by
+    # acknowledging the named machine explicitly.
+    expected_model=${KILN_OWNER_MACHINE_MODEL:-MacBookPro18,1}
+    actual_model=$(sysctl -n hw.model 2>/dev/null || echo unknown)
+
+    if [[ "$actual_model" != "$expected_model" ]]; then
+      record owner_machine_diagnostic blocked \
+        "KILN_OWNER_MACHINE=1 was asserted on hw.model='$actual_model'; expected '$expected_model' (set KILN_OWNER_MACHINE_MODEL to override only when a successor acceptance machine is approved)" \
+        'OD-02 host, filesystem, SQLite, WAL, and migration facts'
+    else
+      run_required owner_machine_diagnostic \
+        'OD-02 host, filesystem, SQLite, WAL, and migration facts' \
+        scripts/diagnostics/p1-s01-store-host
+    fi
   fi
 else
   record owner_machine_diagnostic not_run \
@@ -315,12 +330,17 @@ else
   RESULT_PATH="$ARTIFACT_DIR/slice-01-${COMMIT}.json"
 fi
 
-# Serialize the components for the manifest builder.
+# Serialize the components for the manifest builder. Use `--` so a future
+# component name that happens to equal a flag word cannot be misread as one.
 COMPONENTS_JSON=$(
-  python3 - "$RESULT_PATH" <<'PY' "${COMPONENT_NAMES[@]}" --outcomes "${COMPONENT_OUTCOMES[@]}" --details "${COMPONENT_DETAILS[@]}" --proves "${COMPONENT_PROVES[@]}"
+  python3 - <<'PY' -- "${COMPONENT_NAMES[@]}" --outcomes "${COMPONENT_OUTCOMES[@]}" --details "${COMPONENT_DETAILS[@]}" --proves "${COMPONENT_PROVES[@]}"
 import json, sys
 
-args = sys.argv[2:]
+# `sys.argv` is [script, --, *names, --outcomes, *outcomes, --details, *details, --proves, *proves]
+args = sys.argv[1:]
+if args and args[0] == "--":
+    args = args[1:]
+
 names, outcomes, details, proves = [], [], [], []
 bucket = names
 for arg in args:
@@ -371,6 +391,7 @@ export KILN_GATE_FIXTURE_FINGERPRINT="$FIXTURE_FINGERPRINT"
 export KILN_GATE_HOST_OS="$HOST_OS"
 export KILN_GATE_HOST_ARCH="$HOST_ARCH"
 export KILN_GATE_HOST_KERNEL="$HOST_KERNEL"
+export KILN_GATE_HOST_MODEL="$HOST_MODEL"
 export KILN_GATE_OUTCOME="$GATE_OUTCOME"
 export KILN_GATE_OWNER_OUTCOME="$OWNER_OUTCOME"
 export KILN_GATE_COMPONENTS="$COMPONENTS_JSON"

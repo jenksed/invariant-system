@@ -81,6 +81,24 @@ defmodule Kiln.Slices.P1S01Test do
       assert get_in(projection, ["session", "id"]) == session_id
       assert get_in(projection, ["run", "state"]) == "ready"
       assert digest == authoritative_digest
+
+      # The cache row itself must be replaced, not merely shadowed in memory.
+      # A second read in a *separate* runtime must still see the authoritative
+      # projection, not the planted false one, so the fix is durable.
+      in_runtime(home, fn ->
+        [[cached]] =
+          Connection.query!(
+            Process.whereis(Kiln.Store.Connection),
+            "SELECT projection FROM session_projections"
+          )
+
+        refute cached =~ "ses_deadbeef",
+               "the false cached projection was not rewritten after the rebuild"
+
+        {:ok, reread} = Workflow.query_session(session_id)
+        assert reread.source in [:cache, :rebuilt]
+        assert get_in(reread.projection, ["session", "id"]) == session_id
+      end)
     end
 
     test "CASE modified applied migration — EXPECTED migration block", %{home: home} do
