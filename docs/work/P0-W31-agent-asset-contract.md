@@ -3,7 +3,7 @@
 **Document type:** Development-tooling work package  
 **Status:** In progress  
 **Branch:** `work/p0-w31-agent-asset-contract`  
-**Base:** `work/p0-w30-p1-s02-planning-foundation` pending merge  
+**Base:** `main`, which contains the merged P0-W30 work  
 **Implementation authorization:** None; this work package does not authorize P1-S01 or P1-S02 product implementation
 
 ## Objective
@@ -20,6 +20,7 @@ This package also carries the doctrine provenance check that P0-W30 deliberately
 - No asset declared a lifecycle status, so a widely used asset and an untested one were indistinguishable.
 - `scripts/validate-agent-assets` checked presence, skill naming, and the specialist no-write rule. It did not check any field values against an allowed set.
 - `docs/ENGINEERING-DOCTRINE.md` records upstream provenance and a `Doctrine-Version`, and P0-W30 left that record unenforced so its own branch stayed documentation-only.
+- P0-W30 merged to `main` through pull request 43 as merge commit `4f32815`, so the doctrine provenance record this package enforces is now part of the base rather than a stacked dependency.
 - The repository holds no recorded evaluation evidence for any development-agent asset.
 
 ## Assumptions and unknowns

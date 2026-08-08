@@ -16,12 +16,14 @@ Every project-local skill and specialist-agent definition declares an invocation
 
 | Mode | Meaning |
 | --- | --- |
-| `human` | The developer starts it deliberately. Use for orchestration that changes the shape of the work or makes completion claims. |
-| `agent` | The coding agent may select it when the task matches. Use for reusable disciplines. |
+| `human` | The developer starts it deliberately, including through a prompt template. Use for work that changes the shape of the work or makes a completion claim. |
+| `agent` | The coding agent may select it when the task matches. Use for reusable disciplines whose output is analysis rather than a consequential claim. |
 | `reference` | Not an executable flow. Other assets read it for shared vocabulary or rules. |
-| `composed` | Normally reached through a larger workflow, such as a review or closeout step. |
+| `composed` | Another asset or workflow dispatches it, rather than the developer starting it directly. The specialist reviewers are dispatched this way. |
 
 A heavyweight asset should not use `agent` merely because a task is large. Its preconditions must actually be present.
+
+A prompt template that loads a skill does not make that skill `composed`. The template is how the developer starts it, so the skill stays `human`.
 
 ### Lifecycle status
 
