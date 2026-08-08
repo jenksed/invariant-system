@@ -1,0 +1,28 @@
+services:
+  floci:
+    image: ${FLOCI_IMAGE:-floci/floci:1.5.34-compat}
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      FLOCI_HOSTNAME: floci
+      FLOCI_STORAGE_MODE: memory
+      FLOCI_SERVICES_LAMBDA_EPHEMERAL: "true"
+      FLOCI_DNS_CONTAINER_FALLBACK_ENABLED: "false"
+      FLOCI_INIT_HOOKS_TIMEOUT_SECONDS: "60"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./init/ready.d:/etc/floci/init/ready.d:ro
+      - ./lambda:/opt/arsenal/lambda:ro
+    healthcheck:
+      test:
+        - CMD
+        - sh
+        - -c
+        - >-
+          python3 -c 'import json,urllib.request;
+          d=json.load(urllib.request.urlopen("http://localhost:4566/_floci/init"));
+          raise SystemExit(0 if d.get("completed",{}).get("ready") is True else 1)'
+      interval: 2s
+      timeout: 2s
+      retries: 30
+      start_period: 2s
