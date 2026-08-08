@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
@@ -28,6 +29,10 @@ EXIT_CODES = {
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def sha256_bytes(data: bytes) -> str:
+    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def safe_relative_path(raw: str, *, field: str) -> Path:
@@ -75,11 +80,17 @@ def load_assets(root: Path = ROOT) -> dict[str, dict[str, Any]]:
     return assets
 
 
-def load_locked_capabilities(root: Path = ROOT) -> set[str]:
+def load_locked_capabilities(root: Path = ROOT) -> dict[str, dict[str, Any]]:
     if not (root / ".arsenal.lock").is_file():
-        return set()
+        return {}
     lock = load_json(root / ".arsenal.lock")
-    return {item["id"] for item in lock.get("capabilities", [])}
+    result: dict[str, dict[str, Any]] = {}
+    for item in lock.get("capabilities", []):
+        cap_id = item["id"]
+        if cap_id in result:
+            raise AssertionError(f"duplicate capability in .arsenal.lock: {cap_id}")
+        result[cap_id] = item
+    return result
 
 
 def validate_graph_data(
@@ -198,6 +209,23 @@ def implementation_state(
     return True, rel.as_posix(), None
 
 
+def locked_entry_state(record: dict[str, Any], locked: dict[str, Any]) -> tuple[bool, list[str]]:
+    cap = record["capability"]
+    reasons: list[str] = []
+    if locked.get("version") != cap["version"]:
+        reasons.append(f"locked version {locked.get('version')!r} does not match canonical {cap['version']}")
+    expected_digest = sha256_bytes(record["path"].read_bytes())
+    if locked.get("capability_sha256") != expected_digest:
+        reasons.append("locked capability digest does not match canonical capability file")
+    if locked.get("lifecycle") != cap["lifecycle"]:
+        reasons.append(
+            f"locked lifecycle {locked.get('lifecycle')!r} does not match canonical {cap['lifecycle']}"
+        )
+    if locked.get("evaluation") != cap["evaluation"]:
+        reasons.append("locked evaluation qualification does not match canonical capability")
+    return not reasons, reasons
+
+
 def preflight(
     route_id: str,
     *,
@@ -229,7 +257,8 @@ def preflight(
         raise AssertionError(f"unknown authority profile: {profile_id}")
     grants = set(validated["profiles"][profile_id]["grants"])
 
-    available = set(capabilities) if inventory == "canonical" else load_locked_capabilities(root)
+    locked_inventory = load_locked_capabilities(root) if inventory == "lock" else {}
+    available = set(capabilities) if inventory == "canonical" else set(locked_inventory)
     available -= omitted or set()
 
     results: list[dict[str, Any]] = []
@@ -255,6 +284,11 @@ def preflight(
         if cap_id not in available:
             status = "missing"
             reasons.append(f"capability is not present in {inventory} inventory")
+        elif inventory == "lock":
+            lock_ok, lock_reasons = locked_entry_state(record, locked_inventory[cap_id])
+            if not lock_ok:
+                status = "incompatible"
+                reasons.extend(lock_reasons)
 
         impl_ok, impl_path, impl_reason = implementation_state(cap, assets, root)
         if not impl_ok:
@@ -331,6 +365,11 @@ def preflight(
             "preconditions": cap["preconditions"],
             "outputs": cap["outputs"],
         }
+        if inventory == "lock" and cap_id in locked_inventory:
+            result["lock"] = {
+                "version": locked_inventory[cap_id].get("version"),
+                "capability_sha256": locked_inventory[cap_id].get("capability_sha256"),
+            }
         results.append(result)
         statuses.add(status)
 
