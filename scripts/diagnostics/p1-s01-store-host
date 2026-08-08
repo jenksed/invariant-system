@@ -29,6 +29,13 @@ printf 'macos_build_version: %s\n' "$(sw_vers -buildVersion 2>/dev/null || echo 
 printf 'architecture: %s\n' "$(uname -m)"
 printf 'kernel: %s\n' "$(uname -sr)"
 
+# Hardware identity is required so an operator can verify the diagnostic
+# actually ran on the accepted acceptance machine rather than on any other
+# Apple Silicon Mac. `hw.model` and `hw.machine` are part of the kernel
+# sysctl interface and are not influenced by user environment variables.
+printf 'hw_model: %s\n' "$(sysctl -n hw.model 2>/dev/null || echo unknown)"
+printf 'hw_machine: %s\n' "$(sysctl -n hw.machine 2>/dev/null || echo unknown)"
+
 printf '\n[filesystem: %s]\n' "$target"
 mount_dev=$(df "$target" | awk 'NR==2 {print $1}')
 printf 'device: %s\n' "$mount_dev"
