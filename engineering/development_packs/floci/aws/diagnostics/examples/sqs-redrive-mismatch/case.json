@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0.0",
+  "id": "flc03.sqs-redrive-mismatch",
+  "provider": "aws",
+  "services": ["sqs"],
+  "operations": ["CreateQueue", "GetQueueAttributes", "SetQueueAttributes"],
+  "sanitized_remote_symptom": "Worker queue redrive policy uses maxReceiveCount=3 while the acceptance contract requires 5.",
+  "expected_signal": "REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3",
+  "control_signal": "CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5",
+  "minimal_state": ["one work queue", "one dead-letter queue", "one RedrivePolicy attribute"],
+  "sensitive_data": "none; all names and values are synthetic",
+  "claim_boundary": "Proves the queue attribute mismatch is reconstructable through the SQS API on the pinned Floci runtime. It does not prove AWS caused an original remote incident or that all SQS redrive timing semantics are equivalent."
+}
