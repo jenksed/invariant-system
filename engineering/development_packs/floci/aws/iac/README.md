@@ -3,7 +3,7 @@
 Status: draft  
 Slice: FLC-02
 
-This directory turns the FLC-01 AWS golden path into an infrastructure preflight that can provision, inspect, snapshot, isolate, and tear down AWS-shaped infrastructure in CI.
+This directory turns the FLC-01 AWS golden path into an infrastructure preflight that can provision, inspect, isolate, and tear down AWS-shaped infrastructure in CI, with snapshot acceleration exercised only when the running Floci server actually supports it.
 
 The reference proof targets are:
 
@@ -11,7 +11,7 @@ The reference proof targets are:
 - OpenTofu;
 - CloudFormation;
 - independent post-provision assertions;
-- snapshot cache save/reset/load with invalidation metadata;
+- capability-gated snapshot cache save/reset/load with invalidation metadata;
 - isolated ephemeral CI state.
 
 It deliberately reuses the FLC-01 runtime, endpoint guard, readiness, and evidence boundaries instead of creating a second Floci execution path.
@@ -93,25 +93,28 @@ cp ../env.floci.example ../.env.floci
 ./scripts/verify-opentofu
 ```
 
-The scripts:
+The scripts always:
 
 1. reconstruct Floci from zero;
 2. initialize/validate the HCL fixture;
 3. plan and apply;
-4. assert resulting provider state;
-5. save a Floci snapshot with a deterministic metadata key;
-6. reset emulator state and prove the resources disappeared;
-7. restore the snapshot only if the key still matches;
-8. rerun post-restore assertions;
-9. destroy through the retained IaC state;
-10. prove the tracer resources are absent;
-11. emit a receipt and preserve logs.
+4. assert resulting provider state independently;
+5. probe snapshot save using the documented AWS control-plane request shape;
+6. if snapshots are supported, save → reset → prove absence → provenance-check restore → rerun assertions;
+7. if snapshots are unavailable on the running server, record `UNSUPPORTED`/`SKIP` and reassert that the applied state remains intact;
+8. destroy through the retained IaC state;
+9. prove the tracer resources are absent;
+10. emit a receipt and preserve logs.
 
-A snapshot-restored pass never replaces the zero-state reconstruction at the start of the gate.
+A snapshot-restored pass never replaces the zero-state reconstruction at the start of the gate. Snapshot support is not required to establish the FLC-02 IaC completion claim.
 
-## Snapshot cache key
+## Snapshot capability and cache key
 
-The reference cache key includes:
+The latest published Floci AWS server observed for this slice is `1.5.34`. That released server does not implement `/_floci/snapshots/...`; the request falls through to S3 routing. The Floci CLI nevertheless documents AWS snapshot save/load commands.
+
+Project Arsenal therefore treats snapshots as an optional runtime capability rather than assuming server support from CLI/docs alone.
+
+When supported, the reference cache key includes:
 
 - Floci image tag;
 - IaC engine identity and pinned image;
@@ -119,7 +122,7 @@ The reference cache key includes:
 - HCL fixture digest;
 - Compose/runtime configuration digest.
 
-A key mismatch refuses restore.
+A key mismatch refuses restore. Unexpected snapshot errors still fail the gate; only the exact known endpoint-unavailable signature is classified as a capability skip.
 
 See `SNAPSHOT_POLICY.md`.
 
@@ -139,6 +142,8 @@ All verification scripts capture Floci logs on error under:
 
 The workflow uploads the hidden artifact directory with `if: always()`.
 
+Snapshot capability responses are retained there as evidence when the server does not support the documented endpoint.
+
 Do not put real credentials or provider secrets into these artifacts.
 
 ## Fidelity boundary
@@ -155,7 +160,8 @@ It does not prove:
 - production policy/SCP behavior;
 - undeclared Terraform provider operations;
 - semantic equivalence of every CloudFormation resource/property;
-- real remote-state durability characteristics.
+- real remote-state durability characteristics;
+- Floci snapshot support unless the receipt explicitly records a successful save/restore exercise.
 
 See `FIDELITY_RECEIPT.md` and the parent Floci fidelity policy.
 
@@ -166,7 +172,7 @@ FLC-02 is healthy when:
 - Terraform provisions the tracer from zero and independent assertions pass;
 - OpenTofu provisions the same tracer from zero and independent assertions pass;
 - CloudFormation provisions and deletes its supported tracer stack;
-- snapshot restore is guarded by provenance and followed by state assertions;
+- snapshot capability is recorded honestly: supported paths require provenance-guarded restore + post-restore assertions, unavailable paths require explicit `SKIP` evidence and intact-state reassertion;
 - two independent Floci runtimes do not share tracer state;
 - failure evidence is uploaded even when a gate fails;
 - teardown removes containers/volumes/resources;
