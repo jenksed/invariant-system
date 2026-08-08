@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.evidence-observatory-contract",
+      "path": "arsenal/observability/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the Agent Flight Recorder boundary for reconstructable, evidence-bound run provenance without private chain-of-thought capture.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.execution-substrate-contract",
+        "engineering.dagger-proof-gated-runner",
+        "arsenal.evaluation-contract"
+      ],
+      "downstream": [
+        "arsenal.flight-record-schema",
+        "arsenal.flight-recorder",
+        "arsenal.observability-redaction-policy"
+      ]
+    },
+    {
+      "id": "arsenal.flight-record-schema",
+      "path": "arsenal/observability/flight-record.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the common source-addressed run envelope for capability verification and evaluation evidence.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.evidence-observatory-contract"
+      ],
+      "downstream": [
+        "arsenal.flight-recorder"
+      ]
+    },
+    {
+      "id": "arsenal.observability-redaction-policy",
+      "path": "arsenal/observability/redaction-policy.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Enforce metadata-first observability with prompt, completion, secret, environment-dump, and chain-of-thought content disabled by default.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.evidence-observatory-contract"
+      ],
+      "downstream": [
+        "arsenal.flight-recorder"
+      ]
+    },
+    {
+      "id": "arsenal.flight-recorder",
+      "path": "scripts/arsenal_observe.py",
+      "category": "arsenal",
+      "kind": "method",
+      "status": "draft",
+      "purpose": "Normalize, validate, compare, and content-address Arsenal execution and evaluation receipts as privacy-safe Agent Flight Records.",
+      "invocation": "composed",
+      "upstream": [
+        "arsenal.evidence-observatory-contract",
+        "arsenal.flight-record-schema",
+        "arsenal.observability-redaction-policy",
+        "engineering.dagger-proof-gated-runner",
+        "arsenal.evaluation-contract"
+      ]
+    }
+  ]
+}
