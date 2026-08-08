@@ -23,9 +23,30 @@ print(hashlib.sha256("\n".join(sys.argv[1:]).encode()).hexdigest())
 PY
 )"
 
+snapshot_endpoint_unavailable() {
+  local status="$1"
+  local body="$2"
+
+  [[ "$status" == "404" || "$status" == "405" ]] && return 0
+
+  # Floci AWS 1.5.34 has no /_floci/snapshots controller. The request falls
+  # through to S3, which returns this exact InvalidArgument family. Treat only
+  # that known routing signature as "capability unavailable"; other 4xx/5xx
+  # responses remain real failures so a broken snapshot implementation cannot
+  # be silently downgraded to a skip.
+  if [[ "$status" == "400" ]] \
+    && grep -Fq '<Code>InvalidArgument</Code>' "$body" \
+    && grep -Fq 'POST requires either ?uploads, ?uploadId, ?restore or ?select parameter.' "$body"; then
+    return 0
+  fi
+
+  return 1
+}
+
 snapshot_post() {
   local path="$1"
   local label="$2"
+  local allow_unavailable="${3:-false}"
   local body="$IAC_ARTIFACT_DIR/${label}.response"
   local status
   status="$(curl -sS \
@@ -36,17 +57,30 @@ snapshot_post() {
     --data '{}' \
     "$AWS_ENDPOINT_URL$path")"
 
-  if [[ ! "$status" =~ ^2[0-9][0-9]$ ]]; then
-    printf 'Floci snapshot request failed: %s HTTP %s\n' "$path" "$status" >&2
-    cat "$body" >&2 || true
-    return 1
+  if [[ "$status" =~ ^2[0-9][0-9]$ ]]; then
+    cat "$body"
+    return 0
   fi
 
-  cat "$body"
+  if [[ "$allow_unavailable" == "true" ]] && snapshot_endpoint_unavailable "$status" "$body"; then
+    printf 'Floci snapshot capability unavailable: %s HTTP %s\n' "$path" "$status" >&2
+    cat "$body" >&2 || true
+    return 78
+  fi
+
+  printf 'Floci snapshot request failed: %s HTTP %s\n' "$path" "$status" >&2
+  cat "$body" >&2 || true
+  return 1
 }
 
 if [[ "$command" == "save" ]]; then
-  snapshot_post "/_floci/snapshots/$name" "snapshot-save-${name}" >/dev/null
+  if snapshot_post "/_floci/snapshots/$name" "snapshot-save-${name}" true >/dev/null; then
+    :
+  else
+    rc=$?
+    exit "$rc"
+  fi
+
   python3 - "$meta" "$cache_key" "$FLOCI_IMAGE" "$tool" "$tool_image" "$AWS_PROVIDER_VERSION" "$fixture_digest" "$namespace" <<'PY'
 import json, sys
 path, key, floci, tool, image, provider, fixture, namespace = sys.argv[1:]
