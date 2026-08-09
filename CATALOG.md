@@ -52,6 +52,9 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `arsenal.flight-record-schema` | `reference` | `draft` | Define the common source-addressed run envelope for capability verification and evaluation evidence. | `arsenal/observability/flight-record.schema.json` |
 | `arsenal.flight-recorder` | `method` | `draft` | Normalize, validate, compare, and content-address Arsenal execution and evaluation receipts as privacy-safe Agent Flight Records. | `scripts/arsenal_observe.py` |
 | `arsenal.invocation-model` | `reference` | `draft` | Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets. | `arsenal/INVOCATION_MODEL.md` |
+| `arsenal.knowledge-plane` | `method` | `draft` | Validate and content-address Knowledge Snapshots, resolve typed repository authority claims, detect lifecycle contradictions, and compile bounded task context. | `scripts/arsenal_knowledge.py` |
+| `arsenal.knowledge-plane-contract` | `reference` | `draft` | Define typed, provenance-bearing exact-state knowledge, lifecycle separation, contradiction retention, authority applicability, and relevant-subgraph context compilation. | `arsenal/knowledge/CONTRACT.md` |
+| `arsenal.knowledge-snapshot-schema` | `reference` | `draft` | Define an exact-repository-state Knowledge Snapshot containing sources, typed entities, claims, relationships, authorization records, queries, and field observations. | `arsenal/knowledge/snapshot.schema.json` |
 | `arsenal.observability-redaction-policy` | `reference` | `draft` | Enforce metadata-first observability with prompt, completion, secret, environment-dump, and chain-of-thought content disabled by default. | `arsenal/observability/redaction-policy.json` |
 | `arsenal.proof-requirements` | `reference` | `draft` | Bind canonical capability verification requirements to runtime-agnostic proof properties for substrate selection. | `arsenal/substrates/proof-requirements.json` |
 | `arsenal.trust-auditor` | `method` | `draft` | Discover, assess, verify, and revoke exact imported packages using canonical capability authority and local trust policy. | `scripts/arsenal_trust.py` |
@@ -106,6 +109,8 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 
 | ID | Kind | Status | Purpose | Path |
 |---|---|---|---|---|
+| `arsenal.kft-0-kiln-fixture` | `reference` | `testing` | Preserve the first external authority-sensitive Knowledge Plane regression: implemented and verified Kiln work that remains unauthorized by stronger repository authority. | `arsenal/knowledge/fixtures/kft-0-kiln.json` |
+| `arsenal.kft-0-kiln-report` | `reference` | `testing` | Record KFT-0 facts, authority result, losses, friction, evidence, capability gaps, and the resulting ARS-09 design response. | `docs/field-trials/KFT-0-kiln.md` |
 | `evaluation.arsenal-bench-case-health-schema` | `reference` | `draft` | Define Case Health Receipts so an evaluation case must establish its own fitness before contributing evidence. | `evaluation/case-health-receipt.schema.json` |
 | `evaluation.arsenal-bench-case-schema` | `reference` | `draft` | Define the structural schema for reusable Arsenal Bench evaluation cases. | `evaluation/evaluation-case.schema.json` |
 | `evaluation.arsenal-bench-contract` | `reference` | `draft` | Define the Arsenal Bench evidence, Case Health, counterfactual, provenance, loss-retention, and lifecycle-gating contract. | `evaluation/BENCH_CONTRACT.md` |

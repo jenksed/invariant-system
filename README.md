@@ -439,7 +439,7 @@ The architecture is the reason the public promise can become durable. It is not 
 
 ### FRONTIER
 
-- typed project knowledge;
+- automatic project-knowledge extraction beyond the delivered typed ARS-09 snapshot/evaluator;
 - intent compilation;
 - counterfactual engineering;
 - failure laboratories;
@@ -491,6 +491,8 @@ python3 scripts/arsenal_audit.py --write-catalog
 - [`arsenal/CAPABILITY_CONTRACT.md`](arsenal/CAPABILITY_CONTRACT.md) — behavioral capability contract and lifecycle rules
 - [`arsenal/capabilities/`](arsenal/capabilities/) — canonical fragmented capability set
 - [`arsenal/INVOCATION_MODEL.md`](arsenal/INVOCATION_MODEL.md) — harness-neutral invocation semantics
+- [`arsenal/knowledge/CONTRACT.md`](arsenal/knowledge/CONTRACT.md) — typed exact-state Knowledge Plane and authority applicability contract
+- [`docs/field-trials/KFT-0-kiln.md`](docs/field-trials/KFT-0-kiln.md) — first external authority-sensitive Field Trial result
 - [`engineering/doctrine/CORE.md`](engineering/doctrine/CORE.md) — compact engineering doctrine
 - [`engineering/doctrine/ENGINEERING_DOCTRINE.md`](engineering/doctrine/ENGINEERING_DOCTRINE.md) — full doctrine and tradeoffs
 - [`engineering/development_packs/CONTRACT.md`](engineering/development_packs/CONTRACT.md) — Development Pack contract

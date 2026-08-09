@@ -609,6 +609,20 @@ Proof:
 - decisions and assumptions retain supporting/challenging evidence;
 - stale knowledge has explicit invalidation/reconsideration triggers.
 
+Delivered in v0 from KFT-0:
+
+- content-addressed Knowledge Snapshots bound to exact repository state;
+- typed sources, knowledge entities, state claims, relationships, authorization records, queries, and Field Trial observations;
+- independent planned, permitted, authorized, implemented, verified, and accepted state dimensions;
+- deterministic cross-source contradiction and duplicate-identifier detection;
+- repository-authority resolution that preserves lower-rank challenges and blocks equal-rank conflicts;
+- owner/scope/base-SHA/plan-path/plan-digest-bound authorization applicability;
+- explicit unavailable/stale Evidence representation;
+- relevant-subgraph context compilation;
+- the first external executable regression fixture from Kiln KFT-0.
+
+The v0 evaluator consumes typed observations. Automatic arbitrary-prose extraction, durable ignored/local Evidence synchronization, branch-age filtering, capability discovery, objective routing, and self-promotion remain explicitly outside ARS-09's first slice.
+
 ---
 
 ## ARS-10 — Intent Compiler
