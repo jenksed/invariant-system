@@ -1,0 +1,87 @@
+name: ARS-08 Closeout Materialize
+
+on:
+  push:
+    branches:
+      - agent/ars-08-trust-authority
+    paths:
+      - ".github/workflows/ars-08-closeout.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  closeout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/ars-08-trust-authority
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Generate catalog and public closeout
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_audit.py --write-catalog
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path('README.md')
+          text = readme.read_text()
+          old = '**Next:** ARS-08 builds the **Trust & Authority Plane**, making capability/package provenance, requested authority, escalation, quarantine, and third-party competence review explicit before imported behavior can become trusted execution.'
+          new = '**Next:** ARS-09 builds the **Knowledge Plane**, turning decisions, requirements, assumptions, unknowns, evidence, and reconsideration triggers into typed durable project knowledge instead of conversational history dumps.'
+          assert old in text
+          text = text.replace(old, new, 1)
+          old_build = '### BUILDING TOWARD\n\n- trust and authority + third-party competence audit.'
+          new_build = '### BUILDING TOWARD\n\n- typed durable project knowledge + context compilation.'
+          assert old_build in text
+          text = text.replace(old_build, new_build, 1)
+          marker = '- Evidence Observatory / Agent Flight Recorder with source-addressed receipts, stable run fingerprints, metadata-first privacy, evidence-bound outcomes, and OpenTelemetry-compatible mapping.'
+          addition = marker + '\n- Trust & Authority Plane with quarantine-first third-party admission, content-bound review, canonical authority ceilings, explicit escalation, revocation, and drift re-quarantine.'
+          assert marker in text and addition not in text
+          text = text.replace(marker, addition, 1)
+          readme.write_text(text)
+
+          road = Path('docs/roadmap/capability-system.md')
+          text = road.read_text()
+          assert 'Current frontier: **ARS-08 — Trust & Authority Plane**' in text
+          text = text.replace('Current frontier: **ARS-08 — Trust & Authority Plane**', 'Current frontier: **ARS-09 — Knowledge Plane**', 1)
+          header = '## ARS-08 — Trust & Authority Plane\n\n**Goal:**'
+          assert header in text
+          text = text.replace(header, '## ARS-08 — Trust & Authority Plane\n\n**Status:** delivered by PR #20.\n\n**Goal:**', 1)
+          proof = '- imported capability material cannot silently acquire authority;\n- provenance/version/digest are preserved;\n- authority escalation is explicit, reviewable, and revocable.'
+          delivered = proof + '\n\nDelivered in v0:\n\n- quarantine-first, content-addressed Trust Candidates for exact imported package bytes;\n- explicit Trust Reviews bound to candidate digests and canonical capability IDs;\n- conservative local Trust Policy separating baseline, escalation, and prohibited authority;\n- machine-readable Trust Decisions with APPROVED/REVIEW_REQUIRED/ESCALATION_REQUIRED/REJECTED/REVOKED verdicts and route gates;\n- canonical authority arithmetic preventing imported packages or local policy from widening Capability Contract boundaries;\n- advisory Agent Skills `allowed-tools` interpretation that preserves unknown expressions for review instead of pretending harness enforcement;\n- compiler-manifest provenance re-verification for the existing Repository Truth package;\n- append-only revocation and digest-drift re-quarantine;\n- data-only seams for ARS-09 reconsideration, ARS-10 route authorization, ARS-11 challenge requirements, and ARS-12 non-inherited trust on content change.\n\nARS-08 deliberately does not implement the later systems behind those seams.'
+          assert proof in text
+          text = text.replace(proof, delivered, 1)
+          text = text.replace('NOW / NEXT AFTER ARS-06 ACCEPTANCE\nARS-07  Evidence Observatory / Agent Flight Recorder\n\nTHEN\nARS-08  Trust & Authority + third-party competence audit\n\nLATER\nARS-09  Knowledge Plane', 'DELIVERED THROUGH\nARS-08  Trust & Authority + third-party competence audit\n\nNOW\nARS-09  Knowledge Plane', 1)
+          road.write_text(text)
+          PY
+
+      - name: Validate closeout
+        run: |
+          python3 scripts/arsenal_trust.py validate
+          python3 scripts/test-arsenal-trust.py
+          python3 scripts/arsenal_observe.py --help >/dev/null
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/arsenal_compile.py verify
+          python3 scripts/test-arsenal-bench.py
+          python3 scripts/capability_audit.py
+          python3 scripts/arsenal_audit.py
+
+      - name: Commit generated public closeout
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "Project Arsenal CI"
+          git config user.email "jenksed@noreply.local"
+          git add CATALOG.md README.md docs/roadmap/capability-system.md
+          git diff --cached --quiet && exit 0
+          changed="$(git diff --cached --name-only)"
+          allowed=$'CATALOG.md\nREADME.md\ndocs/roadmap/capability-system.md'
+          test "$changed" = "$allowed"
+          git commit -m "Record ARS-08 delivery and advance frontier"
+          git push origin HEAD:agent/ars-08-trust-authority
