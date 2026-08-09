@@ -325,10 +325,4 @@ Development pauses when:
 
 ## Exact next action
 
-After Prompt 8-A merges, begin only:
-
-```text
-work/p1-s01-t01-domain-foundation
-```
-
-Use `docs/work/P1-S01-T01-domain-foundation.md` as the accepted ticket plan.
+P1-S01 is complete and accepted. P1-S02 remains planned and unauthorized. Integrate the P0-W34 development-authority repair, then perform owner adjudication of the corrected P1-S02-T01 plan and the existing PR #48 candidate implementation. Do not begin, continue, or merge P1-S02 runtime work unless the accepted plan and exact authorization record satisfy `docs/IMPLEMENTATION-AUTHORIZATION.md`.

@@ -15,6 +15,27 @@ slice-01-<commit>-dirty.json     result and manifest for a dirty tree at <commit
 Generated files are runtime output. They are not committed: `.gitignore`
 excludes `/artifacts/`. This README is the only tracked file in the directory.
 
+## Durable retrieval requirement
+
+Ignored local output is not a durable locator. When a generated manifest is required completion Evidence, closeout must also record:
+
+- the exact generating commit and dirty-state result;
+- the manifest SHA-256;
+- a durable retrievable location, such as a retained GitHub Actions artifact or an owner-approved release attachment;
+- the remote object or artifact identifier;
+- the retention or expiry condition; and
+- the retrieval command or procedure available to a fresh authorized agent.
+
+A local path plus digest preserves provenance but does not make the bytes reproducible from a fresh checkout.
+
+### Legacy P1-S01 gap
+
+The final owner-machine manifest documented at `slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` was generated on the accepted OD-02 machine and ignored by Git. Its recorded digest is `sha256:94a5f9ec37dcc0fbb64444e5ad48fe73e9527ec8dbae9cff2e01faf5da5d68aa`, but current Repository authority does not contain a durable remote locator for those exact bytes.
+
+CI run `31235964412` retained a separate synthetic-merge artifact. That artifact is useful CI Evidence but is not the owner-machine manifest: its owner-machine result is `not_run` and its aggregate result is `blocked`. Do not substitute it for the missing OD-02 file.
+
+Until the exact owner-machine manifest is uploaded to an approved durable location and its digest is rechecked, a fresh agent must report the Evidence as historically recorded but not independently retrievable.
+
 ## Why the filename carries the commit
 
 A gate result is meaningful only against the exact state it proved. The commit

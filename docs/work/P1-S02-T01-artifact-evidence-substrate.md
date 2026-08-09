@@ -12,7 +12,7 @@ P1-S02 turns the P1-S01 durable foundation into the first complete, evidence-bac
 
 This ticket adds the durable Artifact storage module, its forward SQL migration, the typed Evidence module with method, producer, state binding, freshness, completeness, and contradiction classes, and the protected failure matrix the later P1-S02 capabilities record into. Every later P1-S02 ticket (registered Commands, fake provider, Repository read Tool, sealed Context, Patch engine, Gate execution, completion, Receipt) writes into this shared substrate without redefining Artifact identity or Evidence semantics.
 
-It contributes to P1-S02-G01 (substrate and Evidence contracts), P1-S02-G02 (protected failure matrix), and P1-S02-G03 (no unauthorized external effect).
+It contributes prerequisite substrate to P1-S02-G06 (state-bound observations), P1-S02-G10 (freshness, completeness, and contradiction outcomes), and P1-S02-G16 (raw Artifact retention). T01 cannot satisfy any aggregate P1-S02 gate by itself.
 
 After merge, no provider call, no Repository source read, no Patch, no Tool surface, no Gate execution, no completion, and no product Receipt exists.
 
@@ -30,6 +30,7 @@ Implement one content-addressed, immutable Artifact store and one typed Evidence
 | Conformance `first_month.ex` already declares `evidence_statuses = [:pass, :fail, :blocked, :unknown]` and `tools_for_step/1` references `artifact.read` — these are contract references, not implementations | `lib/kiln/conformance/first_month.ex` lines 43–45, 105, 128 | Repository inspection | current `main` |
 | Provider behaviour contract exists with no implementation; Command host behaviour contract exists with no implementation | `lib/kiln/conformance/provider.ex`, `lib/kiln/conformance/command_host.ex` | Repository inspection | current `main` |
 | Workflow capability matrix pattern established as single source of truth, with `valid_next_actions/1` | `lib/kiln/workflow.ex` `@capability_matrix` (lines 145–148) | Repository inspection | current `main` |
+| Candidate T01 implementation exists but was produced before valid Repository authorization | PR #48 at `60367874bfc3c0e6d8cbd736f58e1ae17938943b` | KFT-0 authority review | candidate only; not accepted or merge-authorized |
 
 ## Assumptions and unknowns
 
@@ -173,9 +174,9 @@ P1-S02-D01 durable-substrate prerequisite: create one Artifact row from a determ
 
 | Slice gate | Contribution |
 | --- | --- |
-| P1-S02-G01 | Artifact content addressing + Evidence construction contracts |
-| P1-S02-G02 | protected failure matrix |
-| P1-S02-G03 | no unauthorized external effect |
+| P1-S02-G06 | Prerequisite only: typed Evidence binds observations to an exact subject state; later Repository and model paths must prove the aggregate gate |
+| P1-S02-G10 | Prerequisite only: freshness, completeness, contradiction, and stale-state classifications; later completion evaluation must prove the aggregate gate |
+| P1-S02-G16 | Prerequisite only: durable raw Artifact substrate; later Gate registration, execution, cleanup, and terminal classification must prove the aggregate gate |
 
 ## Explicit exclusions
 
@@ -187,27 +188,29 @@ P1-S02-D01 durable-substrate prerequisite: create one Artifact row from a determ
 
 ## Completion record
 
-**Result:** Implemented; deterministic verification passes; owner-machine Evidence collected on the accepted OD-02 acceptance machine.
+**Result:** Not started under valid Repository authorization.
+
+PR #48 contains candidate implementation and historical CI Claims. Those facts are inputs to later owner review, not completion Evidence for this Proposed plan. If the owner accepts this plan and authorizes T01, the candidate diff must be reviewed against the accepted plan and exact authorization state before any implementation or merge Claim is made.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S02-T01-AC01 | _Populated at closeout_ | P1-S02-T01-E01 | _Populated at closeout_ |
-| P1-S02-T01-AC02 | _Populated at closeout_ | P1-S02-T01-E02 | _Populated at closeout_ |
-| P1-S02-T01-AC03 | _Populated at closeout_ | P1-S02-T01-E03 | _Populated at closeout_ |
-| P1-S02-T01-AC04 | _Populated at closeout_ | P1-S02-T01-E04 | _Populated at closeout_ |
-| P1-S02-T01-AC05 | _Populated at closeout_ | P1-S02-T01-E05 | _Populated at closeout_ |
-| P1-S02-T01-AC06 | _Populated at closeout_ | P1-S02-T01-E06 | _Populated at closeout_ |
-| P1-S02-T01-AC07 | _Populated at closeout_ | P1-S02-T01-E07 | _Populated at closeout_ |
+| P1-S02-T01-AC01 | Not run | P1-S02-T01-E01 | authorization required |
+| P1-S02-T01-AC02 | Not run | P1-S02-T01-E02 | authorization required |
+| P1-S02-T01-AC03 | Not run | P1-S02-T01-E03 | authorization required |
+| P1-S02-T01-AC04 | Not run | P1-S02-T01-E04 | authorization required |
+| P1-S02-T01-AC05 | Not run | P1-S02-T01-E05 | authorization required |
+| P1-S02-T01-AC06 | Not run | P1-S02-T01-E06 | authorization required |
+| P1-S02-T01-AC07 | Not run | P1-S02-T01-E07 | authorization required |
 
 ### Verification executed
 
-_Populated at closeout with exact CI run, deterministic test count, and owner-machine diagnostic output._
+None under valid Repository authorization. PR #48's pre-authorization results remain candidate-review inputs only.
 
 ### Repository state
 
 - Branch: `work/p1-s02-t01-artifact-evidence-substrate`
-- Base: `db021984a9278ed582804d0bf3acd74207ad32e9` (current `main`)
-- Diff reviewed: _Populated at closeout_
-- Parent slice status after merge: P1-S02 substrate ready; provider, Repository read, sealed Context, Patch engine, Gate execution, completion, and Receipt remain later tickets.
+- Proposed-plan base: `ad319d7c748a6b723b9cff4187fa06c60bc3cf06`
+- Candidate diff: PR #48 at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`; owner adjudication pending
+- Parent slice status: P1-S02 planned and unauthorized

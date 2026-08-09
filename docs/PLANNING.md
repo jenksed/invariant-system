@@ -2,7 +2,7 @@
 
 **Document type:** Planning and authority index  
 **Status:** Wave A adjudicated  
-**Build authorization:** P1-S01 issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized
+**Build authorization:** P1-S01 issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
 
 ## Integrated Wave A baseline
 
@@ -35,6 +35,8 @@ Use these files in order:
 8. [Roadmap](ROADMAP.md), [Implementation Slices](IMPLEMENTATION-SLICES.md), and [Slice Acceptance Gates](SLICE-ACCEPTANCE-GATES.md) — authorized order and gates.
 9. [First-month Contract Index](contracts/README.md) — conformance support only.
 10. Accepted ADRs and integrated work records.
+
+`docs/IMPLEMENTATION-AUTHORIZATION.md` and a matching record under `docs/authorizations/` are additionally required before a ticket or slice implementation branch may proceed. Plan acceptance and implementation authorization are separate decisions.
 
 ## Focused specification status
 
@@ -124,6 +126,8 @@ P1-S01 does not authorize:
 
 P1-S02 remains planned and unauthorized.
 
+PR #48 is candidate P1-S02-T01 implementation at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`. It was produced before valid Repository authorization. Preserve it for owner adjudication, but do not treat its pull-request body, code, or passing CI as authority or acceptance.
+
 ## Owner schedule adjudication
 
 The first-month Single-Run Alpha target remains aggressive.
@@ -146,4 +150,4 @@ Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegat
 
 ## Exact next action
 
-P1-S01 integration is complete. P1-S02 remains unauthorized. The owner is preparing the P1-S02 authorization package on `work/p0-w33-reconcile-p1-s01-closeout`. No P1-S02 runtime ticket begins until the owner returns an explicit authorization for the first P1-S02 ticket.
+P1-S01 integration and P0-W33 planning reconciliation are complete. P1-S02 remains unauthorized. Integrate P0-W34's authority repair, then adjudicate the corrected P1-S02-T01 plan and PR #48 candidate diff. Runtime work resumes only after a separate owner decision creates a valid authorization record bound to the accepted plan and exact base SHA.

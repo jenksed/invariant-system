@@ -162,14 +162,37 @@ This ticket does not contribute to a user-visible demo. It contributes one bound
 
 ## Completion record
 
-To be filled at closeout:
+**Result:** Complete, verified, accepted, and integrated through PR #47.
 
-```text
-- Branch: work/p0-w33-reconcile-p1-s01-closeout
-- Base:  db021984a9278ed582804d0bf3acd74207ad32e9
-- Reconciliation commit: <sha>
-- Files touched: 17 docs + 2 new work plans
-- P1-S01 closeout now accurately recorded
+### Acceptance status
+
+| Criterion | Status | Evidence | Result |
+| --- | --- | --- | --- |
+| P0-W33-AC01 | Pass | compare `db02198..01fae3d` | required stale findings reconciled |
+| P0-W33-AC02 | Pass | runtime-path compare | no `lib/`, `test/`, `priv/`, `scripts/`, `mix.exs`, or `config/` changes |
+| P0-W33-AC03 | Pass with recorded path correction | `docs/work/P1-S02-T01-artifact-evidence-substrate.md` | integrated filename expanded the planned `evidence-substrate` name; content supplies the intended T01 plan |
+| P0-W33-AC04 | Pass | exact-head CI run `31240371136` | governing-plan preflight passed |
+| P0-W33-AC05 | Pass | exact-head CI run `31240371136` | preflight regression suite passed |
+| P0-W33-AC06 | Pass | exact-head CI run `31240371136` | agent assets passed |
+| P0-W33-AC07 | Pass | exact-head CI run `31240371136` | Vale passed |
+| P0-W33-AC08 | Pass | exact-head CI run `31240371136` | Mix formatting check passed |
+| P0-W33-AC09 | Pass | integrated compare | deferred findings remained outside the required reconciliation set |
+| P0-W33-AC10 | Pass at P0-W33 head | branch observation at closeout | no P1-S02 implementation branch existed in the adjudicated P0-W33 state |
+
+### Repository state
+
+- Branch: `work/p0-w33-reconcile-p1-s01-closeout`
+- Base: `db021984a9278ed582804d0bf3acd74207ad32e9`
+- Final branch head: `01fae3d4873fb4a327ba4d6a8c1942e8493fc86a`
+- Merge commit: `ad319d7c748a6b723b9cff4187fa06c60bc3cf06`
+- Pull request: #47
+- Exact-head CI: run `31240371136`, success
+- Compare scope: 18 documentation and work-plan files, 454 insertions, 92 deletions
+- T01 plan SHA-256 at the final P0-W33 head: `780f9257cccbb38d279784f8dcec4851923f6238686d228a51d1d37c2d791cb3`
+- P1-S01 closeout recorded as owner-accepted and integrated
 - P1-S02 authorization package prepared for owner decision
-- No P1-S02 runtime implementation was started
-```
+- No P1-S02 runtime implementation was authorized or started by P0-W33
+
+### Successor-state note
+
+PR #48 and its P1-S02 branch were created after the P0-W33 authority state. Their later existence does not alter this closeout or prove that the prepared authorization package was accepted.

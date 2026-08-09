@@ -265,7 +265,7 @@ Kiln is not:
 
 ## Current implementation status
 
-P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 (closeout SHA `5792ffdd3af6c45f07e07b8334ce150ad642495b`, evidence SHA `444c5a5`, hardening SHA `c872c16`, slice closeout SHA `a4ea5f9`). The final P1-S01-V01 manifest at `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` records `overall: pass` with 18 components passing on the accepted OD-02 owner-machine. P1-S02 remains planned and unauthorized. See `docs/work/P1-S01-slice-closeout.md`.
+P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 (closeout SHA `5792ffdd3af6c45f07e07b8334ce150ad642495b`, evidence SHA `444c5a5`, hardening SHA `c872c16`, slice closeout SHA `a4ea5f9`). The final P1-S01-V01 manifest was recorded at the ignored local path `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` with `overall: pass` and 18 components passing on the accepted OD-02 owner-machine. Its documented digest preserves provenance, but the owner-machine file is not currently retrievable from a fresh checkout; see `artifacts/p1-s01/README.md`. P1-S02 remains planned and unauthorized. See `docs/work/P1-S01-slice-closeout.md`.
 
 ## Development
 
@@ -291,4 +291,4 @@ Current development-agent conformance still requires reconciliation before Phase
 7. subject specifications for detailed boundaries
 8. JSON contracts as provisional conformance scaffolding
 
-Build authorization for P1-S01 was issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46. P1-S02 remains unplanned for implementation.
+Build authorization for P1-S01 was issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46. P1-S02 is planned but remains unauthorized. PR #48 is candidate T01 implementation pending explicit owner adjudication; its existence and passing CI do not authorize or accept it. See `docs/IMPLEMENTATION-AUTHORIZATION.md`.
