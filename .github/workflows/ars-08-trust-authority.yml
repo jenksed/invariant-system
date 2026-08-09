@@ -1,0 +1,205 @@
+name: ARS-08 Trust & Authority
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ars-08-trust-authority.yml"
+      - "arsenal/trust/**"
+      - "arsenal/capabilities/**"
+      - "arsenal/compiler/**"
+      - "arsenal/graph/**"
+      - "arsenal/observability/**"
+      - "distribution/agent-skills/**"
+      - "scripts/arsenal_trust.py"
+      - "scripts/test-arsenal-trust.py"
+      - "scripts/arsenal_observe.py"
+      - "scripts/arsenal_graph.py"
+      - "scripts/arsenal_compile.py"
+      - "docs/source_audits/trust-and-provenance.md"
+      - "docs/use/trust-authority.md"
+      - "docs/roadmap/capability-system.md"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  trust-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check ARS-08
+        run: python3 -m py_compile scripts/arsenal_trust.py scripts/test-arsenal-trust.py
+
+      - name: Validate Trust & Authority contract
+        run: |
+          python3 scripts/arsenal_trust.py validate
+          python3 scripts/test-arsenal-trust.py
+
+      - name: Produce reviewed third-party approval tracer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .arsenal-trust
+          python3 scripts/arsenal_trust.py discover \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --source-kind local-directory \
+            --source fixture://third-party-safe \
+            --output .arsenal-trust/third-party-safe-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate = json.loads(Path('.arsenal-trust/third-party-safe-candidate.json').read_text())
+          review = {
+            'schema_version': '1.0.0',
+            'candidate_sha256': candidate['package']['sha256'],
+            'target_capability_id': 'capability.repository-truth',
+            'disposition': 'approve',
+            'review_reference': 'ci.ars-08.third-party-safe',
+            'requested_authority': ['filesystem.read','git.read','shell.execute'],
+            'approved_authority': ['filesystem.read','git.read','shell.execute'],
+            'acknowledged_unmapped_tools': [],
+            'reviewed_executable_paths': [],
+            'evidence_refs': ['scripts/test-arsenal-trust.py'],
+            'escalation': {'confirmed': False, 'confirmation_reference': None},
+            'notes': 'Synthetic third-party fixture used only to prove ARS-08 admission semantics.'
+          }
+          Path('.arsenal-trust/third-party-safe-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/third-party-safe-candidate.json \
+            --review .arsenal-trust/third-party-safe-review.json \
+            --output .arsenal-trust/third-party-safe-decision.json
+          python3 scripts/arsenal_trust.py verify \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --decision .arsenal-trust/third-party-safe-decision.json
+
+      - name: Prove overbroad third-party authority is rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py discover \
+            --package arsenal/trust/fixtures/third-party-overbroad \
+            --source-kind local-directory \
+            --source fixture://third-party-overbroad \
+            --output .arsenal-trust/third-party-overbroad-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate = json.loads(Path('.arsenal-trust/third-party-overbroad-candidate.json').read_text())
+          authority = candidate['declaration']['authority_signals']
+          review = {
+            'schema_version':'1.0.0','candidate_sha256':candidate['package']['sha256'],
+            'target_capability_id':'capability.repository-truth','disposition':'approve',
+            'review_reference':'ci.ars-08.third-party-overbroad',
+            'requested_authority':authority,'approved_authority':authority,
+            'acknowledged_unmapped_tools':candidate['declaration']['unmapped_tools'],
+            'reviewed_executable_paths':candidate['risk']['executable_paths'],
+            'evidence_refs':['scripts/test-arsenal-trust.py'],
+            'escalation':{'confirmed':True,'confirmation_reference':'ci.synthetic-confirmation'},
+            'notes':'Synthetic overbroad fixture; rejection is expected.'
+          }
+          Path('.arsenal-trust/third-party-overbroad-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          set +e
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/third-party-overbroad-candidate.json \
+            --review .arsenal-trust/third-party-overbroad-review.json \
+            --output .arsenal-trust/third-party-overbroad-decision.json
+          code=$?
+          set -e
+          test "$code" = "6"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('.arsenal-trust/third-party-overbroad-decision.json').read_text())
+          assert d['verdict']=='REJECTED'
+          assert any(r.startswith('canonical-authority-conflict:') for r in d['reasons'])
+          PY
+
+      - name: Re-verify compiler-generated Repository Truth provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py discover \
+            --package distribution/agent-skills/repository-truth \
+            --source-kind arsenal-compiled \
+            --source arsenal://compiler/repository-truth \
+            --revision "$GITHUB_SHA" \
+            --output .arsenal-trust/compiler-package-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate=json.loads(Path('.arsenal-trust/compiler-package-candidate.json').read_text())
+          assert candidate['provenance']['assurance']=='compiler-manifest-verified'
+          assert candidate['provenance']['manifest_verified'] is True
+          authority=candidate['declaration']['authority_signals']
+          review={
+            'schema_version':'1.0.0','candidate_sha256':candidate['package']['sha256'],
+            'target_capability_id':'capability.repository-truth','disposition':'approve',
+            'review_reference':'ci.ars-08.compiler-package','requested_authority':authority,
+            'approved_authority':authority,'acknowledged_unmapped_tools':[],
+            'reviewed_executable_paths':[],'evidence_refs':['distribution/agent-skills/repository-truth/arsenal-manifest.json'],
+            'escalation':{'confirmed':False,'confirmation_reference':None},
+            'notes':'First-party compiler package tracer.'
+          }
+          Path('.arsenal-trust/compiler-package-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/compiler-package-candidate.json \
+            --review .arsenal-trust/compiler-package-review.json \
+            --output .arsenal-trust/compiler-package-decision.json
+          python3 scripts/arsenal_trust.py verify \
+            --package distribution/agent-skills/repository-truth \
+            --decision .arsenal-trust/compiler-package-decision.json
+
+      - name: Prove explicit revocation closes route gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py revoke \
+            --decision .arsenal-trust/third-party-safe-decision.json \
+            --reason "synthetic CI revocation proof" \
+            --reference ci.ars-08.revocation \
+            --output .arsenal-trust/third-party-safe-revoked.json
+          set +e
+          python3 scripts/arsenal_trust.py verify \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --decision .arsenal-trust/third-party-safe-revoked.json
+          code=$?
+          set -e
+          test "$code" = "7"
+
+      - name: Upload Trust & Authority evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ars-08-trust-authority-evidence
+          path: .arsenal-trust/*.json
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: Preserve ARS-07 Flight Recorder regression
+        run: python3 scripts/test-arsenal-observe.py
+
+      - name: Preserve ARS-04 Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+
+      - name: Preserve ARS-03 compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve ARS-02 Bench regression
+        run: python3 scripts/test-arsenal-bench.py
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py

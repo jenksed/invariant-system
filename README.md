@@ -101,7 +101,7 @@ If you are adopting Arsenal more broadly into a repository, also inspect:
 - [`agent_workflows/install_engineering_doctrine.md`](agent_workflows/install_engineering_doctrine.md)
 - [`agent_workflows/setup_project_arsenal.md`](agent_workflows/setup_project_arsenal.md)
 
-**Next:** ARS-08 builds the **Trust & Authority Plane**, making capability/package provenance, requested authority, escalation, quarantine, and third-party competence review explicit before imported behavior can become trusted execution.
+**Next:** ARS-09 builds the **Knowledge Plane**, turning decisions, requirements, assumptions, unknowns, evidence, and reconsideration triggers into typed durable project knowledge instead of conversational history dumps.
 
 ---
 
@@ -431,10 +431,11 @@ The architecture is the reason the public promise can become durable. It is not 
 - Execution Substrate Contract + Reality Budget with proof-property selection, declared availability, fidelity limitations, and explicit escalation boundaries;
 - Dagger / Executable World Pack with proof-gated execution, deterministic replay, explicit host-input boundaries, and normal Arsenal evidence;
 - Evidence Observatory / Agent Flight Recorder with source-addressed receipts, stable run fingerprints, metadata-first privacy, evidence-bound outcomes, and OpenTelemetry-compatible mapping.
+- Trust & Authority Plane with quarantine-first third-party admission, content-bound review, canonical authority ceilings, explicit escalation, revocation, and drift re-quarantine.
 
 ### BUILDING TOWARD
 
-- trust and authority + third-party competence audit.
+- typed durable project knowledge + context compilation.
 
 ### FRONTIER
 

@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "policy_id": "policy.third-party-default-v0",
+  "auto_approval": false,
+  "baseline_authority": [
+    "filesystem.read",
+    "git.read",
+    "shell.execute",
+    "network.read"
+  ],
+  "escalation_authority": [
+    "filesystem.write",
+    "git.write",
+    "tracker.read",
+    "tracker.write",
+    "cloud.local",
+    "human.confirmation"
+  ],
+  "prohibited_authority": [
+    "network.write",
+    "secrets.read",
+    "cloud.remote",
+    "production.mutate"
+  ],
+  "challenge_authority": [
+    "tracker.write",
+    "cloud.local"
+  ],
+  "digest_change_action": "REQUARANTINE",
+  "policy_change_action": "REVIEW_REQUIRED",
+  "canonical_change_action": "REVIEW_REQUIRED"
+}

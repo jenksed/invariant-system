@@ -54,6 +54,12 @@ Lifecycle status is an evidence claim: `draft` and `unverified` do not imply poo
 | `arsenal.invocation-model` | `reference` | `draft` | Define harness-neutral human, agent, reference, and composed invocation semantics for Arsenal assets. | `arsenal/INVOCATION_MODEL.md` |
 | `arsenal.observability-redaction-policy` | `reference` | `draft` | Enforce metadata-first observability with prompt, completion, secret, environment-dump, and chain-of-thought content disabled by default. | `arsenal/observability/redaction-policy.json` |
 | `arsenal.proof-requirements` | `reference` | `draft` | Bind canonical capability verification requirements to runtime-agnostic proof properties for substrate selection. | `arsenal/substrates/proof-requirements.json` |
+| `arsenal.trust-auditor` | `method` | `draft` | Discover, assess, verify, and revoke exact imported packages using canonical capability authority and local trust policy. | `scripts/arsenal_trust.py` |
+| `arsenal.trust-authority-contract` | `reference` | `draft` | Define fail-closed admission, provenance, review, authority, escalation, drift, and revocation semantics for imported competence. | `arsenal/trust/CONTRACT.md` |
+| `arsenal.trust-candidate-schema` | `reference` | `draft` | Define content-addressed quarantined candidate records for imported capability packages and authority signals. | `arsenal/trust/candidate.schema.json` |
+| `arsenal.trust-decision-schema` | `reference` | `draft` | Define machine-readable admission verdicts, route gates, challenge seams, reconsideration triggers, and revocation state. | `arsenal/trust/decision.schema.json` |
+| `arsenal.trust-policy` | `reference` | `draft` | Declare the conservative v0 baseline, escalation, prohibited authority, challenge, and drift policy for third-party competence. | `arsenal/trust/policy.json` |
+| `arsenal.trust-review-schema` | `reference` | `draft` | Bind explicit human review, requested authority, approved authority, and escalation evidence to exact candidate bytes. | `arsenal/trust/review.schema.json` |
 
 ## engineering
 

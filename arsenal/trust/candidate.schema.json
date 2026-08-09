@@ -1,0 +1,39 @@
+{
+  "$id": "https://project-arsenal.dev/schema/trust-candidate-1.0.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "candidate_id": {"pattern": "^candidate-[0-9a-f]{20}$", "type": "string"},
+    "declaration": {
+      "additionalProperties": false,
+      "properties": {
+        "allowed_tools": {"items": {"type": "string"}, "type": "array"},
+        "authority_signals": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+        "description": {"type": ["string","null"]},
+        "name": {"type": ["string","null"]},
+        "unmapped_tools": {"items": {"type": "string"}, "type": "array", "uniqueItems": true}
+      },
+      "required": ["name","description","allowed_tools","authority_signals","unmapped_tools"],
+      "type": "object"
+    },
+    "format": {"enum": ["agent-skill","arsenal-package","unknown"]},
+    "package": {
+      "additionalProperties": false,
+      "properties": {
+        "files": {"items": {"additionalProperties": false, "properties": {"executable": {"type": "boolean"}, "path": {"minLength": 1,"type": "string"}, "sha256": {"pattern": "^sha256:[0-9a-f]{64}$","type": "string"}}, "required": ["path","sha256","executable"], "type": "object"}, "minItems": 1, "type": "array"},
+        "name": {"minLength": 1,"type": "string"},
+        "sha256": {"pattern": "^sha256:[0-9a-f]{64}$","type": "string"}
+      },
+      "required": ["name","sha256","files"],
+      "type": "object"
+    },
+    "provenance": {"additionalProperties": false, "properties": {"assurance": {"enum": ["incomplete","digest-only","source-revision-pinned","compiler-manifest-verified"]}, "manifest_reasons": {"items": {"type": "string"}, "type": "array"}, "manifest_verified": {"type": "boolean"}}, "required": ["assurance","manifest_verified","manifest_reasons"], "type": "object"},
+    "risk": {"additionalProperties": false, "properties": {"executable_paths": {"items": {"type": "string"}, "type": "array", "uniqueItems": true}, "unknown_authority": {"type": "boolean"}}, "required": ["executable_paths","unknown_authority"], "type": "object"},
+    "schema_version": {"const": "1.0.0"},
+    "source": {"additionalProperties": false, "properties": {"kind": {"enum": ["local-directory","git","arsenal-compiled","archive"]}, "locator": {"minLength": 1,"type": "string"}, "revision": {"type": ["string","null"]}, "revision_pinned": {"type": "boolean"}}, "required": ["kind","locator","revision","revision_pinned"], "type": "object"},
+    "state": {"const": "QUARANTINED"}
+  },
+  "required": ["schema_version","candidate_id","state","format","source","package","declaration","provenance","risk"],
+  "title": "Project Arsenal Trust Candidate",
+  "type": "object"
+}

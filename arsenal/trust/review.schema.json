@@ -1,0 +1,22 @@
+{
+  "$id": "https://project-arsenal.dev/schema/trust-review-1.0.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acknowledged_unmapped_tools": {"items": {"type": "string"}, "type": "array", "uniqueItems": true},
+    "approved_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "candidate_sha256": {"pattern": "^sha256:[0-9a-f]{64}$", "type": "string"},
+    "disposition": {"enum": ["approve","reject"]},
+    "escalation": {"additionalProperties": false, "properties": {"confirmation_reference": {"type": ["string","null"]}, "confirmed": {"type": "boolean"}}, "required": ["confirmed","confirmation_reference"], "type": "object"},
+    "evidence_refs": {"items": {"type": "string"}, "type": "array", "uniqueItems": true},
+    "notes": {"type": "string"},
+    "requested_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "review_reference": {"minLength": 3, "type": "string"},
+    "reviewed_executable_paths": {"items": {"type": "string"}, "type": "array", "uniqueItems": true},
+    "schema_version": {"const": "1.0.0"},
+    "target_capability_id": {"pattern": "^capability\\.[a-z][a-z0-9.-]*$", "type": "string"}
+  },
+  "required": ["schema_version","candidate_sha256","target_capability_id","disposition","review_reference","requested_authority","approved_authority","acknowledged_unmapped_tools","reviewed_executable_paths","evidence_refs","escalation","notes"],
+  "title": "Project Arsenal Trust Review",
+  "type": "object"
+}
