@@ -105,3 +105,49 @@ Do not grant a third-party subagent extension access to Kiln before reviewing:
 - update mechanism.
 
 The repository agent definitions do not establish trust in the extension that executes them.
+
+## Third-party development-agent dependencies
+
+A third-party development dependency that the Claude coding agent consumes at build time lives outside the Kiln runtime and outside the Kiln-owned asset contract. Kiln references such a dependency by deterministic pin, never by copy or vendor.
+
+### project-arsenal
+
+`jenksed/project-arsenal` is referenced as a Claude skill dependency for read-only repository truth work. Kiln does not vendor or copy any of its content.
+
+- Submodule path: `.claude/dependencies/project-arsenal`
+- Submodule URL: `https://github.com/jenksed/project-arsenal.git`
+- Pinned commit: `ecc8797d45447060b0c4aacd8efb6b1909e9e690`
+- Reviewed lockfile digests (from `.claude/dependencies/project-arsenal/.arsenal.lock`):
+  - plan: `sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`
+  - repository-truth package: `sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`
+- Claude skill path: `.claude/skills/repository-truth` (tracked symbolic link to `<submodule>/distribution/agent-skills/repository-truth`)
+- Verifier: `scripts/check-project-arsenal-dependency` is invoked from `scripts/validate-agent-assets` after the existing Kiln-owned asset and doctrine checks.
+
+### Initialization
+
+A fresh checkout initializes the dependency before using the Arsenal-backed skill:
+
+```bash
+git submodule update --init --recursive
+```
+
+Do not configure branch tracking. Future updates require an explicit reviewed commit change and a new work package that records the new pin and digests.
+
+### Authority boundary
+
+The dependency is reference content. It MUST NOT:
+
+- widen Kiln scope, ADRs, invariants, or the accepted work plan;
+- grant permissions, write authority, or production mutation;
+- override `AGENTS.md`, `CLAUDE.md`, `docs/ENGINEERING-DOCTRINE.md`, or any Kiln asset contract;
+- prove Kiln runtime implementation or fill in any current gap;
+- modify or copy itself into the Kiln repository.
+
+The Kiln asset contract (`invocation` and `status` fields, fixed name conventions, and the existing validator) applies only to Kiln-authored assets. The upstream package is governed by its own manifest and the dependency verifier.
+
+### Known upstream limitations at the reviewed commit
+
+- No `LICENSE` file; no GitHub releases or tags. Kiln does not redistribute any upstream content, so this does not create a redistribution liability, but every pin update requires a renewed source and trust review.
+- No `CODEOWNERS` or `SECURITY.md`; the upstream trust model collapses to the same author as Kiln.
+- The upstream `HEAD` at adoption is a GitHub merge commit; pinning combines a commit SHA and the lockfile digests, both checked deterministically.
+- The upstream installer targets `.agents/skills/` rather than Claude Code's `.claude/skills/`. Kiln does not invoke the upstream installer and exposes the package only through the tracked symlink.
