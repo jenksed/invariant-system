@@ -223,6 +223,13 @@ The baseline is useful for generating hypotheses and metric definitions, not cau
 
 Because P1-S02 is currently unauthorized, the first prospective Kiln shadow trial should be a planning/authorization/reconciliation task, not runtime implementation.
 
+Good first candidates include:
+
+- reconcile current P1-S02 planning authority and blockers;
+- inspect whether a proposed P1-S02 implementation package would satisfy the current prerequisite/authorization rules;
+- compile the exact current continuation state for the next owner decision;
+- compare current roadmap/plan/invariants against a proposed next work package without implementing it.
+
 Arsenal should independently produce:
 
 - repository truth summary;
