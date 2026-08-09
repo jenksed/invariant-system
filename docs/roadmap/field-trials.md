@@ -23,7 +23,7 @@ There are two adoption lines:
 
 Kiln may begin a read-only baseline/shadow observation during ARS-09 because that does not route or authorize implementation. **Assisted Kiln development begins only after ARS-09 acceptance and only for work Kiln itself has explicitly authorized.** This lets ARS-10 be designed against real usage without using Arsenal as a backdoor around Kiln's authority model.
 
-The Kiln plan adds explicit promotion gates rather than adopting Arsenal by enthusiasm: KFT-1 requires a minimum prospective evidence package across multiple real episodes before default routing is considered, and KFT-2 re-evaluates continued default use after a bounded cohort. A task class can be demoted back to assisted mode or disabled if the evidence is weak.
+The Kiln plan adds explicit operator checkpoints and promotion gates rather than adopting Arsenal by enthusiasm: Observe → Assist → Route → Gate Claims → Propose Hardening → Behavioral CI. Each higher level requires the preceding system/evidence and may be demoted later if Arsenal becomes noisy, slow, unsafe, or ineffective.
 
 ## Field Trial progression
 
