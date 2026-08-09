@@ -100,10 +100,40 @@ git diff --name-only d0f9cf424297d1b55f6d3d2bad9478555ebe03ed -- lib test priv m
 
 ## Completion record
 
-**Result:** Pending exact-head validation and integration.
+**Result:** Rejected T01 adjudication closed in Repository authority and verified. No active P1-S02 authorization remains; no runtime path changed.
+
+### Verified Repository state
 
 - Base: `d0f9cf424297d1b55f6d3d2bad9478555ebe03ed`.
+- Branch: `work/p0-w37-close-rejected-t01-adjudication`.
+- Pull request: PR #52.
+- Governance enforcement head: `1b34f15f43b01ce7684ae9216a0864efd0b03df8`.
+- Exact-head CI: [31294256864](https://github.com/jenksed/kiln/actions/runs/31294256864), success.
 - Rejected PR #48 head: `7ba158bddff76ade9aca79cb8501e675bd0cded9`.
-- Rejected CI: `31294035484`, green but criteria-insufficient.
-- Runtime-path diff: pending.
-- Governance CI: pending.
+- Rejected PR #48 CI: [31294035484](https://github.com/jenksed/kiln/actions/runs/31294035484), green but criteria-insufficient.
+- PR #48 state: closed, unmerged.
+- Active T01 record: removed.
+- Runtime-path diff: empty.
+- Final closeout commit: documentation-only and must receive fresh full CI before integration.
+
+### Acceptance status
+
+| Criterion | Status | Evidence | Result |
+| --- | --- | --- | --- |
+| P0-W37-AC01 | Pass | P0-W37-E02 | `docs/authorizations/P1-S02-T01.authorization` removed |
+| P0-W37-AC02 | Pass | P0-W37-E01, E03 | current authority names exact rejected head, closed/unmerged state, and non-retroactivity |
+| P0-W37-AC03 | Pass | T01 completion record | result, persistence, classification, TTL, and API blockers recorded |
+| P0-W37-AC04 | Pass | P0-W37-E03 | every P1-S02 ticket and aggregate slice explicitly unauthorized |
+| P0-W37-AC05 | Pass | P0-W37-E04, E05 | full CI green and runtime-path diff empty |
+
+### Completion Evidence
+
+- **P0-W37-E01:** PR #48 closed at `7ba158bddff76ade9aca79cb8501e675bd0cded9`; exact CI run `31294035484` passed; owner adjudication rejected the candidate without merge.
+- **P0-W37-E02:** the active T01 authorization record is deleted in the governance compare; consumed authority remains preserved in Git history.
+- **P0-W37-E03:** `AGENTS.md`, README, Planning, Roadmap, Architecture, Run Model, Implementation Slices, Slice Gates, T01 plan, and implementation-authorization authority agree that no P1-S02 work is authorized.
+- **P0-W37-E04:** CI run `31294256864` passed preflight/regressions, semantic and JSON Schema validation, agent assets, formatting, warnings-as-errors compilation, cycle checks, direct tests, P1-S01 aggregate gate/upload, and Vale.
+- **P0-W37-E05:** compare from `d0f9cf4…` contains only governance/status documents and deletion of the authorization record; no `lib/`, `test/`, `priv/`, `mix.exs`, `mix.lock`, or `config/` path.
+
+### Required next action
+
+Create a governance-only replacement T01 planning package that resolves the five recorded blockers. Do not reopen PR #48 or begin runtime implementation. A later owner decision must accept the corrected plan and issue a new exact authorization record.
