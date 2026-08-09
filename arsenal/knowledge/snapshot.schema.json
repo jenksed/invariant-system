@@ -1,0 +1,224 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/knowledge-snapshot-1.0.0.json",
+  "title": "Project Arsenal Knowledge Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_kind",
+    "snapshot_id",
+    "subject",
+    "sources",
+    "knowledge",
+    "claims",
+    "relationships",
+    "authorization_records",
+    "queries",
+    "field_observations"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "record_kind": {"const": "arsenal-knowledge-snapshot"},
+    "snapshot_id": {"$ref": "#/$defs/id"},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "repository_sha", "captured_at", "mode"],
+      "properties": {
+        "repository": {"type": "string", "pattern": "^[^/]+/[^/]+$"},
+        "repository_sha": {"$ref": "#/$defs/gitSha"},
+        "captured_at": {"type": "string", "format": "date-time"},
+        "mode": {"enum": ["read-only", "assisted", "routed"]}
+      }
+    },
+    "sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/source"}
+    },
+    "knowledge": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/knowledge"}
+    },
+    "claims": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/claim"}
+    },
+    "relationships": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/relationship"}
+    },
+    "authorization_records": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/authorization"}
+    },
+    "queries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/query"}
+    },
+    "field_observations": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fieldObservation"}
+    }
+  },
+  "$defs": {
+    "id": {"type": "string", "minLength": 1, "pattern": "^\\S+$"},
+    "gitSha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "locator", "authority_rank", "state_binding", "content_sha256", "retrieval"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {
+          "enum": [
+            "repository-instruction",
+            "governing-plan",
+            "accepted-plan",
+            "proposed-plan",
+            "pull-request",
+            "git",
+            "evidence",
+            "owner-authorization",
+            "field-observation"
+          ]
+        },
+        "locator": {"type": "string", "minLength": 1},
+        "authority_rank": {"type": "integer", "minimum": 0},
+        "state_binding": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_sha"],
+          "properties": {
+            "repository_sha": {"$ref": "#/$defs/gitSha"},
+            "artifact_sha": {"$ref": "#/$defs/gitSha"}
+          }
+        },
+        "content_sha256": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+        "retrieval": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "durability", "limitation"],
+          "properties": {
+            "status": {"enum": ["retrieved", "not-retrieved", "unavailable"]},
+            "durability": {"enum": ["repository", "pull-request", "ci-artifact", "owner-machine", "transient", "unknown"]},
+            "limitation": {"type": "string"}
+          }
+        }
+      }
+    },
+    "knowledge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "status", "statement", "source_refs", "supports", "challenges", "reconsideration_triggers"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {
+          "enum": [
+            "Decision", "Requirement", "Invariant", "Assumption", "Unknown",
+            "NegativeKnowledge", "Evidence", "Experiment", "Observation", "Incident",
+            "Capability", "Artifact", "ReconsiderationTrigger", "Exception",
+            "FrictionEvent", "CompetenceExpectation", "Authorization"
+          ]
+        },
+        "status": {"enum": ["candidate", "accepted", "rejected", "superseded", "unknown"]},
+        "statement": {"type": "string", "minLength": 1},
+        "source_refs": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "supports": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "challenges": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+        "reconsideration_triggers": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "subject_id", "predicate", "value", "source_ref", "source_location", "observed_at"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "subject_id": {"$ref": "#/$defs/id"},
+        "predicate": {
+          "enum": [
+            "planning_status", "permission_status", "implementation_authorization",
+            "implementation_status", "verification_status", "acceptance_status"
+          ]
+        },
+        "value": {
+          "enum": [
+            "unplanned", "proposed", "accepted", "unspecified", "permitted", "forbidden",
+            "not-authorized", "authorized", "revoked", "not-started", "in-progress",
+            "implemented", "unverified", "verified", "failed", "unaccepted", "rejected"
+          ]
+        },
+        "source_ref": {"$ref": "#/$defs/id"},
+        "source_location": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "from", "to", "kind"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "from": {"$ref": "#/$defs/id"},
+        "to": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["supported-by", "challenged-by", "governed-by", "blocks", "requires", "reconsiders", "observed-as"]}
+      }
+    },
+    "authorization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "subject_id", "owner", "scope", "base_repository_sha", "plan_path",
+        "plan_sha256", "issued_at", "status", "source_ref"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "subject_id": {"$ref": "#/$defs/id"},
+        "owner": {"$ref": "#/$defs/id"},
+        "scope": {"type": "string", "minLength": 1},
+        "base_repository_sha": {"$ref": "#/$defs/gitSha"},
+        "plan_path": {"type": "string", "minLength": 1},
+        "plan_sha256": {"$ref": "#/$defs/digest"},
+        "issued_at": {"type": "string", "format": "date-time"},
+        "status": {"enum": ["active", "revoked", "expired", "consumed"]},
+        "source_ref": {"$ref": "#/$defs/id"}
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "subject_id", "target", "context_entity_ids"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "kind": {"enum": ["implementation-authority", "task-context"]},
+        "subject_id": {"$ref": "#/$defs/id"},
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository_sha", "plan_path", "plan_sha256"],
+          "properties": {
+            "repository_sha": {"$ref": "#/$defs/gitSha"},
+            "plan_path": {"type": "string", "minLength": 1},
+            "plan_sha256": {"$ref": "#/$defs/digest"}
+          }
+        },
+        "context_entity_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "fieldObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "classification", "statement", "source_refs"],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "classification": {"enum": ["got-right", "got-wrong", "friction", "gap", "loss", "unknown"]},
+        "statement": {"type": "string", "minLength": 1},
+        "source_refs": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    }
+  }
+}

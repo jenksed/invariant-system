@@ -1,0 +1,262 @@
+{
+  "schema_version": "1.0.0",
+  "record_kind": "arsenal-knowledge-snapshot",
+  "snapshot_id": "snapshot.kft-0.kiln.ad319d7",
+  "subject": {
+    "repository": "jenksed/kiln",
+    "repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06",
+    "captured_at": "2026-08-09T01:20:00Z",
+    "mode": "read-only"
+  },
+  "sources": [
+    {
+      "id": "source.kiln.agents",
+      "kind": "repository-instruction",
+      "locator": "AGENTS.md",
+      "authority_rank": 0,
+      "state_binding": {"repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06"},
+      "content_sha256": "sha256:c5f06e3687cb053f27768ed7eb906d3671e756dca608060d9d484b5cb87cbcf4",
+      "retrieval": {"status": "retrieved", "durability": "repository", "limitation": "None observed."}
+    },
+    {
+      "id": "source.kiln.planning",
+      "kind": "governing-plan",
+      "locator": "docs/PLANNING.md",
+      "authority_rank": 10,
+      "state_binding": {"repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06"},
+      "content_sha256": "sha256:6274b877c61f5fe584f026e24389f6c903d25a634e413e02089e243c915e73d1",
+      "retrieval": {"status": "retrieved", "durability": "repository", "limitation": "None observed."}
+    },
+    {
+      "id": "source.kiln.roadmap",
+      "kind": "governing-plan",
+      "locator": "docs/ROADMAP.md",
+      "authority_rank": 10,
+      "state_binding": {"repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06"},
+      "content_sha256": "sha256:39a2419c193323ac388592b6f3cec9ad3a609993f5351583981f50e937712b00",
+      "retrieval": {"status": "retrieved", "durability": "repository", "limitation": "None observed."}
+    },
+    {
+      "id": "source.kiln.p1-s02-baseline",
+      "kind": "proposed-plan",
+      "locator": "docs/P1-S02-PLANNING-BASELINE.md",
+      "authority_rank": 20,
+      "state_binding": {"repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06"},
+      "content_sha256": "sha256:2194efa7e0d101413c52bc2421c03b0cb9296f204af719c394333a8debace523",
+      "retrieval": {"status": "retrieved", "durability": "repository", "limitation": "Planning input only; it explicitly denies implementation authority."}
+    },
+    {
+      "id": "source.kiln.t01-plan",
+      "kind": "proposed-plan",
+      "locator": "docs/work/P1-S02-T01-artifact-evidence-substrate.md",
+      "authority_rank": 30,
+      "state_binding": {
+        "repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06",
+        "artifact_sha": "60367874bfc3c0e6d8cbd736f58e1ae17938943b"
+      },
+      "content_sha256": "sha256:780f9257cccbb38d279784f8dcec4851923f6238686d228a51d1d37c2d791cb3",
+      "retrieval": {"status": "retrieved", "durability": "pull-request", "limitation": "The plan exists only on PR #48's branch and remains Proposed."}
+    },
+    {
+      "id": "source.kiln.pr48",
+      "kind": "pull-request",
+      "locator": "https://github.com/jenksed/kiln/pull/48",
+      "authority_rank": 40,
+      "state_binding": {
+        "repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06",
+        "artifact_sha": "60367874bfc3c0e6d8cbd736f58e1ae17938943b"
+      },
+      "content_sha256": null,
+      "retrieval": {"status": "retrieved", "durability": "pull-request", "limitation": "PR body was retrieved, but its exact content digest was not captured in KFT-0."}
+    },
+    {
+      "id": "source.kiln.owner-evidence-index",
+      "kind": "evidence",
+      "locator": "Kiln ignored/local owner-machine Evidence locations",
+      "authority_rank": 20,
+      "state_binding": {"repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06"},
+      "content_sha256": null,
+      "retrieval": {"status": "unavailable", "durability": "owner-machine", "limitation": "KFT-0 could discover references but lacked one durable retrieval index for ignored/local Evidence."}
+    }
+  ],
+  "knowledge": [
+    {
+      "id": "knowledge.kiln.p1-s02-boundary",
+      "kind": "Decision",
+      "status": "accepted",
+      "statement": "P1-S02 is planned but not authorized; a named ticket, plan, passing CI, schema, or implementation does not grant authority.",
+      "source_refs": ["source.kiln.agents", "source.kiln.planning", "source.kiln.roadmap"],
+      "supports": [],
+      "challenges": ["knowledge.kiln.pr48-authority-claim"],
+      "reconsideration_triggers": ["knowledge.kiln.owner-adjudication-trigger"]
+    },
+    {
+      "id": "knowledge.kiln.pr48-authority-claim",
+      "kind": "Observation",
+      "status": "accepted",
+      "statement": "PR #48 says it implements T01 per explicit owner authorization at ad319d7.",
+      "source_refs": ["source.kiln.pr48"],
+      "supports": [],
+      "challenges": ["knowledge.kiln.p1-s02-boundary"],
+      "reconsideration_triggers": ["knowledge.kiln.owner-adjudication-trigger"]
+    },
+    {
+      "id": "knowledge.kiln.t01-proposed",
+      "kind": "Observation",
+      "status": "accepted",
+      "statement": "The T01 implementation plan is explicitly Proposed and awaits owner authorization.",
+      "source_refs": ["source.kiln.t01-plan"],
+      "supports": ["knowledge.kiln.p1-s02-boundary"],
+      "challenges": ["knowledge.kiln.t01-implemented"],
+      "reconsideration_triggers": ["knowledge.kiln.owner-adjudication-trigger"]
+    },
+    {
+      "id": "knowledge.kiln.t01-implemented",
+      "kind": "Observation",
+      "status": "accepted",
+      "statement": "PR #48 contains an implementation and reports verification at head 60367874.",
+      "source_refs": ["source.kiln.pr48", "source.kiln.t01-plan"],
+      "supports": [],
+      "challenges": ["knowledge.kiln.t01-proposed", "knowledge.kiln.p1-s02-boundary"],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.no-bound-authorization",
+      "kind": "Unknown",
+      "status": "accepted",
+      "statement": "KFT-0 found no owner-issued authorization record bound to owner, scope, base SHA, plan path, and plan digest for T01.",
+      "source_refs": ["source.kiln.agents", "source.kiln.t01-plan", "source.kiln.pr48"],
+      "supports": ["knowledge.kiln.p1-s02-boundary"],
+      "challenges": ["knowledge.kiln.pr48-authority-claim"],
+      "reconsideration_triggers": ["knowledge.kiln.owner-adjudication-trigger"]
+    },
+    {
+      "id": "knowledge.kiln.authority-invariant",
+      "kind": "Invariant",
+      "status": "accepted",
+      "statement": "Filesystem or branch mutation ability is not implementation authority, and missing authority must fail closed.",
+      "source_refs": ["source.kiln.agents", "source.kiln.roadmap"],
+      "supports": ["knowledge.kiln.p1-s02-boundary"],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.lifecycle-friction",
+      "kind": "FrictionEvent",
+      "status": "candidate",
+      "statement": "A Proposed plan, implemented branch, green verification, and an unaccepted authority claim coexisted without a deterministic lifecycle contradiction gate.",
+      "source_refs": ["source.kiln.t01-plan", "source.kiln.pr48", "source.kiln.agents"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.evidence-retrieval-friction",
+      "kind": "FrictionEvent",
+      "status": "candidate",
+      "statement": "Ignored/local Evidence could be referenced but not reliably retrieved through one durable index.",
+      "source_refs": ["source.kiln.owner-evidence-index"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.arsenal.sha-bound-authorization",
+      "kind": "Requirement",
+      "status": "candidate",
+      "statement": "Authorization records must bind owner, scope, base repository SHA, plan path, plan digest, issue time, status, and authoritative source.",
+      "source_refs": ["source.kiln.agents", "source.kiln.t01-plan", "source.kiln.pr48"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.arsenal.stage-separation",
+      "kind": "Requirement",
+      "status": "candidate",
+      "statement": "Planned, permitted, authorized, implemented, verified, and accepted must remain separate queryable states.",
+      "source_refs": ["source.kiln.agents", "source.kiln.t01-plan", "source.kiln.pr48"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.owner-adjudication-trigger",
+      "kind": "ReconsiderationTrigger",
+      "status": "accepted",
+      "statement": "Reconsider the blocked result only after owner adjudication is recorded against an exact current main SHA and exact plan digest.",
+      "source_refs": ["source.kiln.agents", "source.kiln.planning", "source.kiln.t01-plan"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.competence-expectation",
+      "kind": "CompetenceExpectation",
+      "status": "candidate",
+      "statement": "An appropriately equipped agent should discover implementation authority before beginning implementation.",
+      "source_refs": ["source.kiln.agents"],
+      "supports": [],
+      "challenges": [],
+      "reconsideration_triggers": []
+    },
+    {
+      "id": "knowledge.kiln.negative-no-implementation",
+      "kind": "NegativeKnowledge",
+      "status": "accepted",
+      "statement": "Missing P1-S02 authorization must not be solved by proposing or beginning implementation.",
+      "source_refs": ["source.kiln.agents", "source.kiln.planning"],
+      "supports": ["knowledge.kiln.authority-invariant"],
+      "challenges": [],
+      "reconsideration_triggers": ["knowledge.kiln.owner-adjudication-trigger"]
+    }
+  ],
+  "claims": [
+    {"id": "claim.kiln.agents.not-authorized", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_authorization", "value": "not-authorized", "source_ref": "source.kiln.agents", "source_location": "Current authorization boundary", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.planning.not-authorized", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_authorization", "value": "not-authorized", "source_ref": "source.kiln.planning", "source_location": "Final authorization", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.roadmap.not-authorized", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_authorization", "value": "not-authorized", "source_ref": "source.kiln.roadmap", "source_location": "Authorization level and P1-S02", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.baseline.not-authorized", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_authorization", "value": "not-authorized", "source_ref": "source.kiln.p1-s02-baseline", "source_location": "Implementation authorization", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.pr48.authorized", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_authorization", "value": "authorized", "source_ref": "source.kiln.pr48", "source_location": "Summary", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.t01.proposed", "subject_id": "work.kiln.p1-s02-t01", "predicate": "planning_status", "value": "proposed", "source_ref": "source.kiln.t01-plan", "source_location": "Status", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.pr48.implemented", "subject_id": "work.kiln.p1-s02-t01", "predicate": "implementation_status", "value": "implemented", "source_ref": "source.kiln.pr48", "source_location": "Summary and Scope", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.pr48.verified", "subject_id": "work.kiln.p1-s02-t01", "predicate": "verification_status", "value": "verified", "source_ref": "source.kiln.pr48", "source_location": "Validation results", "observed_at": "2026-08-09T01:20:00Z"},
+    {"id": "claim.kiln.pr48.unaccepted", "subject_id": "work.kiln.p1-s02-t01", "predicate": "acceptance_status", "value": "unaccepted", "source_ref": "source.kiln.pr48", "source_location": "Merge policy", "observed_at": "2026-08-09T01:20:00Z"}
+  ],
+  "relationships": [
+    {"id": "relationship.kiln.boundary-invariant", "from": "knowledge.kiln.p1-s02-boundary", "to": "knowledge.kiln.authority-invariant", "kind": "governed-by"},
+    {"id": "relationship.kiln.claim-challenges-boundary", "from": "knowledge.kiln.pr48-authority-claim", "to": "knowledge.kiln.p1-s02-boundary", "kind": "challenged-by"},
+    {"id": "relationship.kiln.no-record-blocks", "from": "knowledge.kiln.no-bound-authorization", "to": "knowledge.kiln.pr48-authority-claim", "kind": "blocks"},
+    {"id": "relationship.kiln.lifecycle-observed", "from": "knowledge.kiln.lifecycle-friction", "to": "knowledge.kiln.t01-proposed", "kind": "observed-as"},
+    {"id": "relationship.kiln.lifecycle-implementation", "from": "knowledge.kiln.lifecycle-friction", "to": "knowledge.kiln.t01-implemented", "kind": "observed-as"},
+    {"id": "relationship.arsenal.authorization-derived", "from": "knowledge.arsenal.sha-bound-authorization", "to": "knowledge.kiln.no-bound-authorization", "kind": "supported-by"},
+    {"id": "relationship.arsenal.stages-derived", "from": "knowledge.arsenal.stage-separation", "to": "knowledge.kiln.lifecycle-friction", "kind": "supported-by"},
+    {"id": "relationship.kiln.negative-governed", "from": "knowledge.kiln.negative-no-implementation", "to": "knowledge.kiln.authority-invariant", "kind": "governed-by"}
+  ],
+  "authorization_records": [],
+  "queries": [
+    {
+      "id": "query.kft-0.p1-s02-t01-authority",
+      "kind": "implementation-authority",
+      "subject_id": "work.kiln.p1-s02-t01",
+      "target": {
+        "repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06",
+        "plan_path": "docs/work/P1-S02-T01-artifact-evidence-substrate.md",
+        "plan_sha256": "sha256:780f9257cccbb38d279784f8dcec4851923f6238686d228a51d1d37c2d791cb3"
+      },
+      "context_entity_ids": [
+        "knowledge.kiln.p1-s02-boundary",
+        "knowledge.kiln.lifecycle-friction",
+        "knowledge.kiln.evidence-retrieval-friction",
+        "knowledge.kiln.negative-no-implementation",
+        "knowledge.kiln.competence-expectation"
+      ]
+    }
+  ],
+  "field_observations": [
+    {"id": "field.kft-0.right-boundary", "classification": "got-right", "statement": "The trial preserved Kiln's planned-but-unauthorized boundary and made BLOCKED a successful outcome.", "source_refs": ["source.kiln.agents", "source.kiln.planning"]},
+    {"id": "field.kft-0.wrong-shape", "classification": "got-wrong", "statement": "Repository Truth and green CI established shape and implementation evidence but did not independently establish authority.", "source_refs": ["source.kiln.pr48", "source.kiln.t01-plan"]},
+    {"id": "field.kft-0.gap-resolver", "classification": "gap", "statement": "Arsenal lacked a first-class repository authority resolver and exact authorization record.", "source_refs": ["source.kiln.agents", "source.kiln.pr48"]},
+    {"id": "field.kft-0.gap-evidence", "classification": "gap", "statement": "Arsenal lacked durable retrieval and applicability rules for ignored/local Evidence.", "source_refs": ["source.kiln.owner-evidence-index"]},
+    {"id": "field.kft-0.friction-lifecycle", "classification": "friction", "statement": "Proposed, implemented, verified, and accepted states were expressed across different surfaces and repeatedly reconciled by a human or model.", "source_refs": ["source.kiln.t01-plan", "source.kiln.pr48", "source.kiln.agents"]}
+  ]
+}

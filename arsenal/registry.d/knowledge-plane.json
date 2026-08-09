@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.knowledge-plane-contract",
+      "path": "arsenal/knowledge/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define typed, provenance-bearing exact-state knowledge, lifecycle separation, contradiction retention, authority applicability, and relevant-subgraph context compilation.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.knowledge-snapshot-schema",
+      "path": "arsenal/knowledge/snapshot.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define an exact-repository-state Knowledge Snapshot containing sources, typed entities, claims, relationships, authorization records, queries, and field observations.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.knowledge-plane-contract",
+        "arsenal.flight-record-schema",
+        "arsenal.trust-decision-schema"
+      ]
+    },
+    {
+      "id": "arsenal.knowledge-plane",
+      "path": "scripts/arsenal_knowledge.py",
+      "category": "arsenal",
+      "kind": "method",
+      "status": "draft",
+      "purpose": "Validate and content-address Knowledge Snapshots, resolve typed repository authority claims, detect lifecycle contradictions, and compile bounded task context.",
+      "invocation": "composed",
+      "upstream": [
+        "arsenal.knowledge-plane-contract",
+        "arsenal.knowledge-snapshot-schema",
+        "arsenal.trust-auditor",
+        "arsenal.flight-recorder"
+      ]
+    },
+    {
+      "id": "arsenal.kft-0-kiln-fixture",
+      "path": "arsenal/knowledge/fixtures/kft-0-kiln.json",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "testing",
+      "purpose": "Preserve the first external authority-sensitive Knowledge Plane regression: implemented and verified Kiln work that remains unauthorized by stronger repository authority.",
+      "invocation": "composed",
+      "upstream": [
+        "arsenal.knowledge-plane"
+      ]
+    },
+    {
+      "id": "arsenal.kft-0-kiln-report",
+      "path": "docs/field-trials/KFT-0-kiln.md",
+      "category": "evaluation",
+      "kind": "reference",
+      "status": "testing",
+      "purpose": "Record KFT-0 facts, authority result, losses, friction, evidence, capability gaps, and the resulting ARS-09 design response.",
+      "invocation": "reference",
+      "upstream": [
+        "arsenal.kft-0-kiln-fixture"
+      ]
+    }
+  ]
+}

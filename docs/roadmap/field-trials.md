@@ -50,6 +50,8 @@ No shadow recommendation may create authority, block ordinary work, or claim eff
 
 **Exit evidence:** at least one real ARS-09 implementation slice has a reconstructable field-trial record and concrete observations that feed the Knowledge Plane design, plus at least one Kiln read-only shadow episode exercising the external authority/context boundary.
 
+**Kiln KFT-0 result:** passed with material findings against Kiln main `ad319d7` and PR #48. The episode found implemented and reportedly verified work without governing implementation authority, producing ARS-09's first executable Knowledge Plane fixture. See `docs/field-trials/KFT-0-kiln.md`. The internal ARS-09 FT-0 dogfood remains part of this stage's overall exit evidence.
+
 ### FT-1 — Assisted Kiln Pilot
 
 **Starts:** after ARS-09 acceptance.

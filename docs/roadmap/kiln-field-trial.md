@@ -132,6 +132,8 @@ Do not duplicate large Kiln source artifacts into Arsenal when a path + commit +
 
 ### KFT-0 — Baseline and read-only observation
 
+**Status:** Passed with material findings against Kiln main `ad319d7` and PR #48. See `docs/field-trials/KFT-0-kiln.md` and the executable regression fixture at `arsenal/knowledge/fixtures/kft-0-kiln.json`.
+
 **Timing:** begin during ARS-09.
 
 **Control:** normal Kiln development process remains the sole operational process.
@@ -265,6 +267,8 @@ KFT-0 passes when:
 5. observed overhead/losses are recorded, not hidden.
 
 Failure to recognize that P1-S02 is unauthorized is an immediate KFT-0 failure.
+
+KFT-0 found a harder case than the planning baseline anticipated: PR #48 already contained verified implementation work while the governing repository state and the plan itself still denied authorization. That result directly shaped ARS-09's typed lifecycle vector, source-authority resolution, exact authorization-record contract, contradiction retention, and unavailable-Evidence representation. The correct v0 verdict is `NOT_AUTHORIZED`; the conflicting PR claim remains visible.
 
 ---
 
