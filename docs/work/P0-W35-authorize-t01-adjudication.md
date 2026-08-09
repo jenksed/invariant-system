@@ -104,39 +104,31 @@ git diff --name-only dc375d923c99b9c754d9b53d601b214b0c8941a5 -- lib test priv m
 
 ## Completion record
 
-**Result:** Prospective P1-S02-T01 adjudication authority implemented and verified. No Kiln runtime path changed. Candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` remains premature and was not retroactively authorized, modified, accepted, or merged by this governance package.
+**Result:** Governance intent integrated, but the authorization record was invalid at the P0-W35 merge and is superseded by P0-W36.
 
-### Verified Repository state
+### Exact history
 
 - Authorization base: `dc375d923c99b9c754d9b53d601b214b0c8941a5`.
-- Branch: `work/p0-w35-authorize-t01-adjudication`.
-- Pull request: PR #50.
-- Initial authority head: `35045baa22be86ee182236eaca98d70edc5a9150`; CI run [31293458242](https://github.com/jenksed/kiln/actions/runs/31293458242) passed, but independent digest verification found that the authorization record contained an incorrect plan digest. That head is superseded and was not integrated.
-- Corrected authority head: `f25a2a912576d5f81b472407fae28b15244833bb`.
-- Correct accepted T01 plan SHA-256: `3ce600f0ffe07eb0617c9756090173d9bdaacb48835bf8ca273756f7f9084259`.
-- Corrected exact-head CI: [31293535726](https://github.com/jenksed/kiln/actions/runs/31293535726), success.
-- Closeout rule: this documentation-only completion commit must receive its own full exact-head CI run before integration; its SHA and run belong in the PR body.
+- Initial authority head: `35045baa22be86ee182236eaca98d70edc5a9150`; its record correctly used plan digest `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`, and CI run [31293458242](https://github.com/jenksed/kiln/actions/runs/31293458242) passed.
+- A flawed local verification materialized the plan with one extra newline and falsely reported digest `3ce600f0…`.
+- Incorrect-digest head: `f25a2a912576d5f81b472407fae28b15244833bb`; CI run [31293535726](https://github.com/jenksed/kiln/actions/runs/31293535726) passed because a P0 planning branch does not consume the T01 authorization record.
+- Final P0-W35 head: `ed116085a11b37d9c86220265fab0b35ec3ee635`; CI run [31293601378](https://github.com/jenksed/kiln/actions/runs/31293601378) passed with the same invalid record.
+- P0-W35 merge: `d26449e41eb97a316fa6bae4442418397ab29cd3`.
+- First rebased PR #48 head: `01d4258c6abc9f53f0ddb1fb5e3999734af1dbca`; CI run [31293701028](https://github.com/jenksed/kiln/actions/runs/31293701028) correctly failed preflight because `plan_sha256` did not match the exact committed plan.
+- Exact committed plan SHA-256 recomputed from the GitHub blob's base64-decoded bytes: `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`.
+- P0-W36 corrects the active record and this historical completion Evidence before adjudication continues.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence | Result |
 | --- | --- | --- | --- |
-| P0-W35-AC01 | Pass | P0-W35-E01 | exact post-PR #49 main recorded as authorization base; scope is prospective T01 adjudication and bounded repair only |
-| P0-W35-AC02 | Pass | P0-W35-E02, E04 | committed plan SHA-256 independently recomputed as `3ce600f0…` and matches the canonical authorization record |
-| P0-W35-AC03 | Pass | P0-W35-E01 | current authority preserves `60367874…` as premature and explicitly rejects retroactive authorization |
-| P0-W35-AC04 | Pass | P0-W35-E01 | all later P1-S02 tickets and aggregate slice acceptance remain unauthorized |
-| P0-W35-AC05 | Pass | P0-W35-E05 | compare contains only authority/status documentation and the authorization record |
-| P0-W35-AC06 | Pass | P0-W35-E04 | corrected authority head passed complete CI |
+| P0-W35-AC01 | Pass | P0-W35-E01 | prospective T01-only scope and exact base were recorded |
+| P0-W35-AC02 | Fail at merge | P0-W35-E02 | active record contained `3ce600f0…`, not the exact plan digest `7a064766…` |
+| P0-W35-AC03 | Pass | P0-W35-E01 | candidate `60367874…` remained premature and non-retroactive |
+| P0-W35-AC04 | Pass | P0-W35-E01 | later P1-S02 work remained unauthorized |
+| P0-W35-AC05 | Pass | P0-W35-E05 | governance diff contained no runtime path |
+| P0-W35-AC06 | Fail as an authorization package | PR #48 CI 31293701028 | planning CI was green, but the first authorized consumer rejected the record |
 
-### Completion Evidence
+### Boundary
 
-- **P0-W35-E01:** Compare `dc375d9…f25a2a9` contains 12 authority/status files; PR #48 remained at `60367874…` throughout governance work.
-- **P0-W35-E02:** `sha256sum docs/work/P1-S02-T01-artifact-evidence-substrate.md` produced `3ce600f0ffe07eb0617c9756090173d9bdaacb48835bf8ca273756f7f9084259`, identical to `plan_sha256` in `docs/authorizations/P1-S02-T01.authorization`.
-- **P0-W35-E03:** `scripts/agent-preflight` and `scripts/test-agent-preflight` passed in exact-head CI, including trusted-main, actual-PR-head, and protected-negative enforcement.
-- **P0-W35-E04:** CI run `31293535726` passed governing-package validation, preflight regression, semantic and JSON Schema validation, agent assets, formatting, warnings-as-errors compilation, cycle checks, direct tests, the P1-S01 aggregate gate and upload, and Vale.
-- **P0-W35-E05:** The compare contains no `lib/`, `test/`, `priv/`, `mix.exs`, `mix.lock`, or `config/` path.
-- **P0-W35-E06:** PR #48 was not modified during governance work. Its later rebase must occur only after this authority integrates on canonical main.
-
-### Remaining boundary
-
-P0-W35 authorizes only the next adjudication sequence: rebase PR #48 onto the trusted authority source, rerun the complete T01 gate against the actual implementation head, and accept, repair within the accepted scope, or reject it. PR #48 is not merge-authorized by this record. P1-S02-T02 and later work remain unauthorized.
+No runtime implementation passed under the invalid P0-W35 record. PR #48 remains unaccepted and unmerged. P0-W36 must integrate a byte-correct record before PR #48 is rebased again or repaired.
