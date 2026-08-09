@@ -127,7 +127,7 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 ## Completion record
 
-**Current result:** Reopened for the pull-request-head binding defect found at prior closeout head `99822a253667551aa4ae554c472ff548402738bd`. The repair is implemented and locally verified; exact-head CI and final Repository closeout are pending. P1-S02 remains planned and unauthorized. PR #48 remains candidate-only and was not modified, accepted, authorized, rebased, merged, or represented as completion Evidence.
+**Result:** Implemented and verified. Authority validation now binds plan identity, record identity, and authority-source ancestry to the actual implementation commit rather than GitHub's synthetic pull-request merge. P1-S02 remains planned and unauthorized. PR #48 remains candidate-only and was not modified, accepted, authorized, rebased, merged, or represented as completion Evidence.
 
 ### Verified Repository state
 
@@ -136,7 +136,8 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 - Pull request: PR #49, draft during repair and closeout.
 - Prior enforcement head: `ec5d59c44a55a0625f5a302b0303c9bc9ad6ed4c`; [CI run 31291135022](https://github.com/jenksed/kiln/actions/runs/31291135022) succeeded but did not bind ancestry to the actual PR head.
 - Prior closeout head: `99822a253667551aa4ae554c472ff548402738bd`; [CI run 31291218226](https://github.com/jenksed/kiln/actions/runs/31291218226) failed once in the P1-S01 corruption fixture and passed on attempt 2, but both attempts retained the same PR-head binding defect.
-- Replacement enforcement head and exact-head CI: pending commit and CI Evidence.
+- First PR-head repair head: `ac21a6a08796d7beeb470968bf39062bbad3855d`; [CI run 31292352355](https://github.com/jenksed/kiln/actions/runs/31292352355) proved the immutable PR-head fetch, distinct checkout/validated commits, and synthetic-merge regression, then failed because the aggregate gate's nested fixture runner inherited the caller's PR-head identity.
+- Final enforcement head: `2e9a9417ea1455bc7d6b86f2ee4c7ca27ef9f29b`; [CI run 31292430318](https://github.com/jenksed/kiln/actions/runs/31292430318), success.
 - Candidate PR #48 head: `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
 - Closeout rule: the commit that adds this completion record is documentation-only and must receive a fresh exact-head CI run before merge; that final head and run belong in the PR body because a commit cannot contain its own SHA.
 
@@ -144,20 +145,20 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 | Criterion | Status | Evidence | Result |
 | --- | --- | --- | --- |
-| P0-W34-AC01 | Local pass; CI pending | P0-W34-E03 | Proposed-plan fixture rejected for non-Accepted lifecycle state |
-| P0-W34-AC02 | Local pass; CI pending | P0-W34-E03 | synthetic merge makes authority source A ancestral to checkout M, but validation bound to independent actual head B fails because A is not B's ancestor |
-| P0-W34-AC03 | Local pass; CI pending | P0-W34-E03 | trusted ticket and slice fixtures pass with actual implementation heads created after and descending from authority |
+| P0-W34-AC01 | Pass | P0-W34-E03 | Proposed-plan fixture rejected for non-Accepted lifecycle state |
+| P0-W34-AC02 | Pass | P0-W34-E03 | synthetic merge makes authority source A ancestral to checkout M, but validation bound to independent actual head B fails because A is not B's ancestor |
+| P0-W34-AC03 | Pass | P0-W34-E03 | trusted ticket and slice fixtures pass with actual implementation heads created after and descending from authority |
 | P0-W34-AC04 | Pass | P0-W34-E01, E06 | authority diff preserves P1-S02 as unauthorized and PR #48 as candidate-only |
 | P0-W34-AC05 | Pass | P0-W34-E01 | T01 remains Proposed and references P1-S02-G06, G10, and G16 as prerequisite-only contributions |
 | P0-W34-AC06 | Pass | P0-W34-E07 | Artifact contract states the durable-locator requirement and legacy retrieval gap |
-| P0-W34-AC07 | Pending | P0-W34-E01, E04, E05 | local required checks and runtime-path compare pass; replacement exact-head CI has not run |
+| P0-W34-AC07 | Pass | P0-W34-E01, E04, E05 | final enforcement head is CI-green and the runtime-path compare is empty |
 
 ### Completion Evidence
 
-- **P0-W34-E01:** The current uncommitted compare from `ad319d7` contains governance documents, development scripts, and CI configuration only. No Kiln runtime file changed. Replacement commit identity remains pending.
-- **P0-W34-E02:** `scripts/agent-preflight` passes locally for the P0-W34 planning branch and reports checkout commit and validated commit separately.
-- **P0-W34-E03:** `scripts/test-agent-preflight` passes locally. Its isolated Git fixtures prove trusted ticket and slice positive paths; the synthetic-merge regression constructs authority A, independent implementation B with byte-identical authority blobs, and merge M with both parents, proves A is ancestral to M, demonstrates why M would pass if misidentified as implementation, and rejects B for the exact non-ancestry reason. Existing protected negatives remain covered.
-- **P0-W34-E04:** Replacement exact-head CI is pending. Historical runs remain visible above and are not represented as proof of this repair.
+- **P0-W34-E01:** The compare from `ad319d7` through `2e9a9417` contains governance documents, development scripts, and CI configuration only. No Kiln runtime file changed.
+- **P0-W34-E02:** `scripts/agent-preflight` passed locally and in CI. At enforcement CI checkout `fc71598868efd9721f691edd24d215eda299a05f`, it reported validated commit `2e9a9417ea1455bc7d6b86f2ee4c7ca27ef9f29b` rather than treating the synthetic merge as implementation identity.
+- **P0-W34-E03:** `scripts/test-agent-preflight` passed locally, under an ambient caller PR-head identity, as a standalone CI step, and inside the aggregate gate. Its isolated Git fixtures prove trusted ticket and slice positive paths; the synthetic-merge regression constructs authority A, independent implementation B with byte-identical authority blobs, and merge M with both parents, proves A is ancestral to M, demonstrates why M would pass if misidentified as implementation, and rejects B for the exact non-ancestry reason. Existing protected negatives remain covered.
+- **P0-W34-E04:** CI run `31292430318` passed immutable PR-head and canonical-main fetch, governing-package validation, the preflight regression suite, semantic and JSON Schema contracts, agent assets, formatting, warnings-as-errors compilation, compile-connected cycle checks, all 386 direct tests, the P1-S01 aggregate gate and Artifact upload, and Vale prose validation.
 - **P0-W34-E05:** `git diff --name-only ad319d7 -- lib test priv mix.exs mix.lock config` produced no paths locally; the PR compare contains no path in that runtime set.
 - **P0-W34-E06:** Repository authority names PR #48 at exact head `60367874bfc3c0e6d8cbd736f58e1ae17938943b` as candidate-only. P1-S02 has no active authorization record.
 - **P0-W34-E07:** `artifacts/p1-s01/README.md` distinguishes ignored local manifests from durable locators and states that the legacy final owner-machine manifest is not retrievable from a fresh checkout.
@@ -176,7 +177,7 @@ git diff --check
 git diff --name-only ad319d7 -- lib test priv mix.exs mix.lock config
 ```
 
-Local JSON Schema, Vale, and Elixir/Mix checks are unavailable in this environment. Replacement exact-head CI must execute those checks before closeout; no unavailable local check is represented as locally executed.
+The preflight regression also passed locally with `KILN_BRANCH` and `KILN_IMPLEMENTATION_COMMIT` set to the same ambient values used by the aggregate CI gate, proving fixture identity isolation. Local JSON Schema, Vale, and Elixir/Mix checks were unavailable in this environment. Exact-head CI run `31292430318` executed and passed those checks; no unavailable local check is represented as locally executed.
 
 ### Remaining unknowns
 
