@@ -107,7 +107,7 @@ git diff --name-only dc375d923c99b9c754d9b53d601b214b0c8941a5 -- lib test priv m
 **Result:** Pending exact-head governance validation and integration.
 
 - Authorization base: `dc375d923c99b9c754d9b53d601b214b0c8941a5`.
-- Accepted T01 plan SHA-256: `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`.
+- Accepted T01 plan SHA-256: `3ce600f0ffe07eb0617c9756090173d9bdaacb48835bf8ca273756f7f9084259`.
 - Candidate preserved as premature: `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
 - Runtime-path diff: pending.
 - Exact-head CI: pending.
