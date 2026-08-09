@@ -100,9 +100,9 @@ A changed gate, fixture, source state, warning, Evidence item, or decision creat
 
 P1-S01-V01 cannot satisfy a Task, complete a Run, authorize integration, authorize Quality Compiler work, or act as a product Receipt.
 
-# P1-S02 gates — Planned, not authorized
+# P1-S02 gates — Planned; T01 prerequisite adjudication authorized
 
-These gates describe the accepted Single-Run Alpha plus QC0/QC1 target but cannot be implemented until P1-S01 passes and later authorization confirms the P1-S02 handoff.
+These gates describe the accepted Single-Run Alpha plus QC0/QC1 target. P1-S02-T01 may implement only its accepted Artifact/Evidence prerequisite contributions to G06, G10, and G16 during authorized adjudication; no aggregate gate or later P1-S02 capability is authorized.
 
 ## Complete change-loop gates
 

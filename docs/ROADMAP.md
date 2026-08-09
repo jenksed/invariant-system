@@ -171,7 +171,7 @@ P1-S01 passes only when the exact integrated state proves:
 
 # P1-S02 — Evidence-backed Single-Run Change Alpha plus QC0/QC1
 
-**Status:** Planned but not authorized  
+**Status:** T01 adjudication and bounded repair authorized; remaining slice planned but not authorized  
 **Entry gate:** P1-S01 must merge and pass its aggregate gate and owner-machine Evidence.
 
 ## Intended outcome
@@ -325,4 +325,4 @@ Development pauses when:
 
 ## Exact next action
 
-P1-S01 is complete and accepted. P1-S02 remains planned and unauthorized. Integrate the P0-W34 development-authority repair, then perform owner adjudication of the corrected P1-S02-T01 plan and the existing PR #48 candidate implementation. Do not begin, continue, or merge P1-S02 runtime work unless the accepted plan and exact authorization record satisfy `docs/IMPLEMENTATION-AUTHORIZATION.md`.
+P1-S01 is complete and accepted. P1-S02-T01 alone is prospectively authorized for PR #48 adjudication, exact-state verification, and bounded repair. Rebase PR #48 onto the trusted authority source, rerun the complete T01 gate, then accept, repair within scope, or reject it. Do not begin any later P1-S02 ticket; the aggregate slice remains unauthorized.

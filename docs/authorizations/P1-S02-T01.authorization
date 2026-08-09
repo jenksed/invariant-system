@@ -1,0 +1,7 @@
+work_id=P1-S02-T01
+state=authorized
+owner=Joshua Jenks
+base_sha=dc375d923c99b9c754d9b53d601b214b0c8941a5
+plan_sha256=3ce600f0ffe07eb0617c9756090173d9bdaacb48835bf8ca273756f7f9084259
+authorized_at=2026-08-09T03:49:33Z
+scope=Adjudicate PR #48 against the accepted T01 plan, rerun exact-state verification, and make only repairs bounded by T01; no later P1-S02 work

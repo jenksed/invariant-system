@@ -2,7 +2,7 @@
 
 **Document type:** Implementation roadmap detail  
 **Decision status:** Accepted by Prompt 8-A  
-**Integration status:** P1-S01 integrated at `db02198` via PR #46; P1-S02 remains planned and unauthorized  
+**Integration status:** P1-S01 integrated at `db02198`; P1-S02-T01 adjudication and bounded repair authorized; remaining P1-S02 work unauthorized  
 **Implementation status:** P1-S01 — Durable single-Run foundation integrated and owner-accepted  
 **Order authority:** `docs/ROADMAP.md`  
 **Quality Compiler placement:** QC0/QC1 planned in P1-S02; QC2 planned with bounded delegation; QC3/QC4 evidence-gated later
@@ -13,7 +13,7 @@ This document defines the bounded vertical workflows that implement Kiln.
 
 A slice must produce usable behavior. It must not complete a horizontal framework merely because later architecture describes it.
 
-P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 and owner-accepted (P1-S01-V01 manifest `overall: pass`, owner-machine OD-02 pass). P1-S02 remains planned but unauthorized and requires a separate planning foundation, authoritative handoff, and explicit subsequent authorization before any runtime implementation begins.
+P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 and owner-accepted (P1-S01-V01 manifest `overall: pass`, owner-machine OD-02 pass). P1-S02-T01 alone is prospectively authorized for PR #48 adjudication and bounded repair under its accepted plan. Every later P1-S02 ticket and aggregate slice acceptance remain unauthorized.
 
 The Quality Compiler is a cross-slice product spine rather than a separate pre-product subsystem. QC0 and QC1 must be delivered through the P1-S02 Single-Run change workflow. Child Runs and QC2 enter only after accepted Single-Run Alpha Evidence and Wave B planning and authorization. QC3 and QC4 remain later evidence-gated expansion.
 
