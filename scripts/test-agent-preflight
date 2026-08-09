@@ -159,6 +159,7 @@ prepare_trusted_ticket() {
     git commit --quiet -m "Add trusted authority fixture"
     git update-ref refs/remotes/origin/main HEAD
     git switch --quiet -c "$branch"
+    git commit --quiet --allow-empty -m "Begin implementation after authority"
   )
 }
 
@@ -180,6 +181,36 @@ expect_failure() {
   local output
 
   if output=$(cd "$repo" && KILN_BRANCH="$branch" scripts/agent-preflight 2>&1); then
+    fail "$description passed preflight"
+  fi
+
+  if [[ -n "$expected" && "$output" != *"$expected"* ]]; then
+    fail "$description failed for the wrong reason: $output"
+  fi
+}
+
+expect_success_at_commit() {
+  local repo=$1
+  local branch=$2
+  local commit=$3
+  local description=$4
+
+  if ! (cd "$repo" && KILN_BRANCH="$branch" KILN_IMPLEMENTATION_COMMIT="$commit" \
+    scripts/agent-preflight >/dev/null 2>&1); then
+    fail "$description failed preflight"
+  fi
+}
+
+expect_failure_at_commit() {
+  local repo=$1
+  local branch=$2
+  local commit=$3
+  local description=$4
+  local expected=${5:-}
+  local output
+
+  if output=$(cd "$repo" && KILN_BRANCH="$branch" KILN_IMPLEMENTATION_COMMIT="$commit" \
+    scripts/agent-preflight 2>&1); then
     fail "$description passed preflight"
   fi
 
@@ -224,8 +255,56 @@ new_case valid-slice
   git commit --quiet -m "Add trusted slice authority fixture"
   git update-ref refs/remotes/origin/main HEAD
   git switch --quiet -c "$slice_branch"
+  git commit --quiet --allow-empty -m "Begin slice implementation after authority"
 )
 expect_success "$prepared_repo" work/p9-s98-preflight-fixture "trusted slice authorization"
+
+new_case synthetic-merge
+(
+  cd "$prepared_repo"
+  base_sha=$(git rev-parse HEAD)
+  branch=work/p9-s99-t83-preflight-fixture
+  work_id=P9-S99-T83
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  authorization="docs/authorizations/${work_id}.authorization"
+  write_ticket_plan "$work_id" "$branch" Accepted
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "Synthetic merge ancestry fixture"
+  git add "$plan" "$authorization"
+  git commit --quiet -m "Add trusted authority fixture A"
+  authority_commit=$(git rev-parse HEAD)
+  git update-ref refs/remotes/origin/main "$authority_commit"
+
+  git switch --quiet --detach "$base_sha"
+  git switch --quiet -c "$branch"
+  mkdir -p docs/work docs/authorizations
+  git show "$authority_commit:$plan" >"$plan"
+  git show "$authority_commit:$authorization" >"$authorization"
+  git add "$plan" "$authorization"
+  git commit --quiet -m "Copy authority blobs independently"
+  implementation_commit=$(git rev-parse HEAD)
+
+  merge_tree=$(git rev-parse "${implementation_commit}^{tree}")
+  merge_commit=$(printf 'Synthetic pull-request merge\n' | \
+    git commit-tree "$merge_tree" -p "$authority_commit" -p "$implementation_commit")
+  git update-ref refs/heads/fixture-authority "$authority_commit"
+  git update-ref refs/heads/fixture-implementation "$implementation_commit"
+  git update-ref refs/heads/fixture-merge "$merge_commit"
+  git switch --quiet --detach "$merge_commit"
+)
+authority_commit=$(git -C "$prepared_repo" rev-parse fixture-authority)
+implementation_commit=$(git -C "$prepared_repo" rev-parse fixture-implementation)
+merge_commit=$(git -C "$prepared_repo" rev-parse fixture-merge)
+git -C "$prepared_repo" merge-base --is-ancestor "$authority_commit" "$merge_commit" ||
+  fail "synthetic merge fixture does not make authority appear ancestral"
+expect_success_at_commit "$prepared_repo" work/p9-s99-t83-preflight-fixture "$merge_commit" \
+  "synthetic merge state demonstrates the former false-positive path"
+expect_failure_at_commit "$prepared_repo" work/p9-s99-t83-preflight-fixture "$implementation_commit" \
+  "actual independent implementation head behind a synthetic merge" \
+  "is not an ancestor of implementation commit $implementation_commit"
+
+expect_failure_at_commit "$prepared_repo" work/p9-s99-t83-preflight-fixture HEAD \
+  "symbolic implementation commit input" "must be an exact 40-character lowercase commit SHA"
 
 new_case untracked
 (
@@ -239,7 +318,7 @@ new_case untracked
     2026-08-08T12:00:00-04:00 "Untracked fixture"
 )
 expect_failure "$prepared_repo" work/p9-s99-t98-preflight-fixture "untracked plan and authorization" \
-  "is not tracked Repository authority"
+  "is not committed in implementation commit"
 
 new_case local-record
 (
@@ -257,7 +336,7 @@ new_case local-record
     2026-08-08T12:00:00-04:00 "Locally issued record"
 )
 expect_failure "$prepared_repo" work/p9-s99-t97-preflight-fixture "locally created untracked authorization" \
-  "is not tracked Repository authority"
+  "implementation authorization is missing from implementation commit"
 
 new_case branch-issued
 (
@@ -287,7 +366,7 @@ prepare_trusted_ticket locally-restored P9-S99-T84 work/p9-s99-t84-preflight-fix
   git add "$authorization"
 )
 expect_failure "$prepared_repo" work/p9-s99-t84-preflight-fixture "locally restored staged authorization" \
-  "is not committed unchanged in implementation HEAD"
+  "implementation authorization is missing from implementation commit"
 
 prepare_trusted_ticket arbitrary-owner P9-S99-T95 work/p9-s99-t95-preflight-fixture Accepted authorized \
   "Arbitrary Agent" valid valid 2026-08-08T12:00:00-04:00 "Arbitrary owner fixture"

@@ -16,7 +16,9 @@ scope=<one non-empty line describing the bounded authorized package>
 
 The key order shown above is canonical and enforced. Values are parsed as data and are never sourced or executed. Blank or whitespace-only owner and scope values, duplicate or reordered keys, unknown keys, malformed digests, invalid RFC 3339 calendar, clock, or offset values, a non-ancestor base, a work-ID mismatch, an owner absent from `TRUSTED-OWNERS`, or any state other than `authorized` fails preflight.
 
-The accepted plan and authorization record must both be tracked, committed unchanged in implementation `HEAD`, and byte-identical to their active versions at freshly fetched `refs/remotes/origin/main`. Preflight identifies the trusted commit that contains the exact pair and requires that commit to be ancestral to the implementation state. Creating, staging, restoring, or committing either file only on an implementation branch cannot issue authority.
+The accepted plan and authorization record must both be committed unchanged in the explicit implementation commit and byte-identical to their active versions at freshly fetched `refs/remotes/origin/main`. Preflight identifies the trusted commit that contains the exact pair and requires that commit to be ancestral to the actual implementation head. Creating, staging, restoring, or committing either file only on an implementation branch cannot issue authority.
+
+On a normal named local checkout, the implementation commit is `HEAD`. In pull-request CI, `KILN_IMPLEMENTATION_COMMIT` must be the immutable `github.event.pull_request.head.sha`; CI fetches and resolves that exact commit before preflight. GitHub's synthetic `refs/pull/<number>/merge` checkout remains useful test-merge state, but it is not implementation identity and is never used for plan/record blob identity or authority-source ancestry.
 
 `TRUSTED-OWNERS` contains one exact owner identity per line. The registry is read from trusted Repository authority, not from an implementation working-tree edit.
 

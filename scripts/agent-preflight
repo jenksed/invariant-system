@@ -6,11 +6,13 @@ fail() {
   exit 1
 }
 
-sha256_file() {
+sha256_blob() {
+  local blob=$1
+
   if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | awk '{print $1}'
+    git cat-file blob "$blob" | sha256sum | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | awk '{print $1}'
+    git cat-file blob "$blob" | shasum -a 256 | awk '{print $1}'
   else
     fail "sha256sum or shasum is required to validate plan authorization"
   fi
@@ -52,13 +54,6 @@ validate_rfc3339() {
   fi
 }
 
-require_tracked_file() {
-  local path=$1
-
-  git ls-files --error-unmatch -- "$path" >/dev/null 2>&1 ||
-    fail "$path is not tracked Repository authority"
-}
-
 find_authority_source() {
   local trusted_ref=$1
   local plan_path=$2
@@ -87,32 +82,27 @@ validate_authorization() {
   local trusted_owners="docs/authorizations/TRUSTED-OWNERS"
   local line key value line_count=0
   local record_work_id="" state="" owner="" base_sha="" plan_sha256="" authorized_at="" scope=""
-  local plan_blob authorization_blob head_plan_blob head_authorization_blob
+  local plan_blob authorization_blob
   local trusted_plan_blob trusted_authorization_blob authority_source
   local expected_keys=(work_id state owner base_sha plan_sha256 authorized_at scope)
 
-  grep -Eq '^\*\*Status:\*\* Accepted([[:space:](]|$)' "$plan_path" ||
+  grep -Eq '^\*\*Status:\*\* Accepted([[:space:](]|$)' < <(git show "$implementation_commit:$plan_path") ||
     fail "$plan_path is not Accepted; proposed or ambiguous lifecycle state cannot authorize implementation"
 
-  [[ -f "$authorization" ]] ||
-    fail "implementation authorization is missing: $authorization"
-
-  require_tracked_file "$plan_path"
-  require_tracked_file "$authorization"
+  git cat-file -e "$implementation_commit:$authorization" 2>/dev/null ||
+    fail "implementation authorization is missing from implementation commit $implementation_commit: $authorization"
   git rev-parse --verify --quiet "${trusted_ref}^{commit}" >/dev/null ||
     fail "trusted authority ref is unavailable: $trusted_ref"
 
-  plan_blob=$(git hash-object "$plan_path")
-  authorization_blob=$(git hash-object "$authorization")
-  head_plan_blob=$(git rev-parse "HEAD:$plan_path" 2>/dev/null || true)
-  head_authorization_blob=$(git rev-parse "HEAD:$authorization" 2>/dev/null || true)
+  plan_blob=$(git rev-parse "$implementation_commit:$plan_path" 2>/dev/null || true)
+  authorization_blob=$(git rev-parse "$implementation_commit:$authorization" 2>/dev/null || true)
   trusted_plan_blob=$(git rev-parse "$trusted_ref:$plan_path" 2>/dev/null || true)
   trusted_authorization_blob=$(git rev-parse "$trusted_ref:$authorization" 2>/dev/null || true)
 
-  [[ "$plan_blob" == "$head_plan_blob" ]] ||
-    fail "$plan_path is not committed unchanged in implementation HEAD"
-  [[ "$authorization_blob" == "$head_authorization_blob" ]] ||
-    fail "$authorization is not committed unchanged in implementation HEAD"
+  [[ -n "$plan_blob" ]] ||
+    fail "$plan_path is not committed in implementation commit $implementation_commit"
+  [[ -n "$authorization_blob" ]] ||
+    fail "$authorization is not committed in implementation commit $implementation_commit"
   [[ "$plan_blob" == "$trusted_plan_blob" ]] ||
     fail "$plan_path is not identical to trusted Repository authority at $trusted_ref"
   [[ "$authorization_blob" == "$trusted_authorization_blob" ]] ||
@@ -120,8 +110,8 @@ validate_authorization() {
 
   authority_source=$(find_authority_source "$trusted_ref" "$plan_path" "$authorization" "$plan_blob" "$authorization_blob") ||
     fail "no trusted authority-source commit contains the exact plan and authorization record"
-  git merge-base --is-ancestor "$authority_source" HEAD ||
-    fail "authorization source $authority_source is not an ancestor of HEAD"
+  git merge-base --is-ancestor "$authority_source" "$implementation_commit" ||
+    fail "authorization source $authority_source is not an ancestor of implementation commit $implementation_commit"
 
   while IFS= read -r line || [[ -n "$line" ]]; do
     line_count=$((line_count + 1))
@@ -167,7 +157,7 @@ validate_authorization() {
         fail "$authorization contains unknown key: $key"
         ;;
     esac
-  done <"$authorization"
+  done < <(git show "$implementation_commit:$authorization")
 
   [[ $line_count -eq ${#expected_keys[@]} ]] ||
     fail "$authorization must contain exactly ${#expected_keys[@]} records; found $line_count"
@@ -178,7 +168,7 @@ validate_authorization() {
   [[ "$plan_sha256" =~ ^[0-9a-f]{64}$ ]] || fail "$authorization plan_sha256 is not 64 lowercase hexadecimal characters"
   validate_rfc3339 "$authorized_at" || fail "$authorization authorized_at is not a valid RFC 3339 timestamp"
   [[ "$scope" =~ [^[:space:]] ]] || fail "$authorization scope is empty or whitespace-only"
-  [[ "$(sha256_file "$plan_path")" == "$plan_sha256" ]] || fail "$authorization plan_sha256 does not match $plan_path"
+  [[ "$(sha256_blob "$plan_blob")" == "$plan_sha256" ]] || fail "$authorization plan_sha256 does not match $plan_path"
   git cat-file -e "$trusted_ref:$trusted_owners" 2>/dev/null ||
     fail "trusted owner registry is unavailable at $trusted_ref:$trusted_owners"
   git show "$trusted_ref:$trusted_owners" | grep -Fqx -- "$owner" ||
@@ -191,12 +181,26 @@ validate_authorization() {
 root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
 cd "$root"
 
+checkout_commit=$(git rev-parse --verify HEAD)
 checked_out_branch=$(git branch --show-current)
 if [[ -n "${KILN_BRANCH:-}" && -n "$checked_out_branch" && "$KILN_BRANCH" != "$checked_out_branch" ]]; then
   fail "KILN_BRANCH '$KILN_BRANCH' does not match checked-out branch '$checked_out_branch'"
 fi
 branch=${KILN_BRANCH:-$checked_out_branch}
 [[ -n "$branch" ]] || fail "detached HEAD is not a valid implementation state"
+
+implementation_commit_input=${KILN_IMPLEMENTATION_COMMIT:-HEAD}
+if [[ -n "${KILN_IMPLEMENTATION_COMMIT:-}" && ! "$KILN_IMPLEMENTATION_COMMIT" =~ ^[0-9a-f]{40}$ ]]; then
+  fail "KILN_IMPLEMENTATION_COMMIT must be an exact 40-character lowercase commit SHA"
+fi
+implementation_commit=$(git rev-parse --verify "${implementation_commit_input}^{commit}" 2>/dev/null) ||
+  fail "implementation commit does not resolve: $implementation_commit_input"
+if [[ -n "${KILN_IMPLEMENTATION_COMMIT:-}" && "$implementation_commit" != "$KILN_IMPLEMENTATION_COMMIT" ]]; then
+  fail "KILN_IMPLEMENTATION_COMMIT resolved to unexpected commit $implementation_commit"
+fi
+if [[ -n "$checked_out_branch" && "$implementation_commit" != "$checkout_commit" ]]; then
+  fail "named checkout $checked_out_branch must validate its own HEAD $checkout_commit"
+fi
 
 case "$branch" in
   main|master|develop)
@@ -241,9 +245,19 @@ elif [[ "$branch" == work/* ]]; then
 fi
 
 if [[ -n "$work_id" ]]; then
-  shopt -s nullglob
-  candidates=(docs/work/"${work_id}"-*.md)
-  shopt -u nullglob
+  candidates=()
+  while IFS= read -r candidate; do
+    candidates+=("$candidate")
+  done < <(git ls-tree -r --name-only "$implementation_commit" -- docs/work | grep -E "^docs/work/${work_id}-.*\\.md$" || true)
+
+  if [[ ${#candidates[@]} -eq 0 ]]; then
+    shopt -s nullglob
+    working_tree_candidates=(docs/work/"${work_id}"-*.md)
+    shopt -u nullglob
+    if [[ ${#working_tree_candidates[@]} -gt 0 ]]; then
+      fail "${working_tree_candidates[0]} is not committed in implementation commit $implementation_commit"
+    fi
+  fi
   plans=()
 
   for candidate in "${candidates[@]}"; do
@@ -259,7 +273,8 @@ if [[ -n "$work_id" ]]; then
   [[ ${#plans[@]} -eq 1 ]] || fail "expected one plan for $work_id; found ${#plans[@]}"
   plan=${plans[0]}
 
-  grep -Fq "**Branch:** \`$branch\`" "$plan" || fail "$plan does not identify branch $branch"
+  grep -Fq "**Branch:** \`$branch\`" < <(git show "$implementation_commit:$plan") ||
+    fail "$plan does not identify branch $branch in implementation commit $implementation_commit"
 
   required_headings=(
     "Objective"
@@ -284,7 +299,7 @@ if [[ -n "$work_id" ]]; then
   fi
 
   for heading in "${required_headings[@]}"; do
-    grep -Fqx "## $heading" "$plan" || fail "$plan is missing heading: $heading"
+    grep -Fqx "## $heading" < <(git show "$implementation_commit:$plan") || fail "$plan is missing heading: $heading"
   done
 
   if [[ "$work_kind" == "ticket" || "$work_kind" == "slice" ]]; then
@@ -294,14 +309,15 @@ if [[ -n "$work_id" ]]; then
       [[ -z "$gate_id" ]] && continue
       grep -Fq "| $gate_id |" docs/SLICE-ACCEPTANCE-GATES.md ||
         fail "$plan references unregistered slice gate: $gate_id"
-    done < <(grep -oE 'P[0-9]+-S[0-9]{2}-G[0-9]{2}' "$plan" | sort -u)
+    done < <(git show "$implementation_commit:$plan" | grep -oE 'P[0-9]+-S[0-9]{2}-G[0-9]{2}' | sort -u)
   fi
 fi
 
 printf 'agent-preflight: pass\n'
 printf 'repository: %s\n' "$root"
 printf 'branch: %s\n' "$branch"
-printf 'commit: %s\n' "$(git rev-parse HEAD)"
+printf 'checkout commit: %s\n' "$checkout_commit"
+printf 'validated commit: %s\n' "$implementation_commit"
 
 if [[ -n "$plan" ]]; then
   printf 'work kind: %s\n' "$work_kind"
