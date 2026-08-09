@@ -443,9 +443,23 @@ Prefer one of:
 
 Disclose task differences.
 
-#### KFT-1 exit gate
+#### KFT-1 adoption gate
 
-KFT-1 passes when at least several real Kiln work episodes show enough evidence to answer:
+Do not promote Arsenal from “assisted experiment” to default Kiln entry merely because several tasks completed.
+
+Require a minimum prospective evidence package such as:
+
+- at least 3 real assisted Kiln episodes across at least 2 task types;
+- at least 1 episode involving continuation/resume or handoff;
+- at least 1 episode where Arsenal surfaces a real blocker, scope issue, knowledge gap, or verification obligation — or explicit evidence that it did not;
+- zero cases where Arsenal caused unauthorized implementation to proceed;
+- every episode has exact start/end repository identity and outcome evidence;
+- overhead is measured, including cases where Arsenal added no value;
+- at least one comparison/ablation design is strong enough to influence ARS-10 design decisions.
+
+This is a minimum evidence package, not a success quota. Negative episodes can justify shrinking or redesigning Arsenal rather than promoting it.
+
+KFT-1 should answer:
 
 - Did Arsenal reduce rediscovery?
 - Did it catch authority/scope mistakes before implementation?
@@ -545,11 +559,21 @@ record the bypass.
 
 Bypass rate is a product metric, not operator disobedience.
 
-#### KFT-2 exit gate
+#### KFT-2 promotion/retention gate
 
-Arsenal earns continued default use only if the routed workflow is at least operationally competitive with normal work and provides material safety, context, verification, or continuity benefit.
+Arsenal earns continued default use only if the routed workflow is operationally competitive with normal work and provides material safety, context, verification, or continuity benefit.
 
-If routing adds ceremony without benefit, shrink the routed scope.
+Evaluate after a bounded cohort, initially 5–10 selected routed Kiln tasks or a smaller cohort if the signal is decisive.
+
+Possible outcomes:
+
+- **retain default route** for the task class;
+- **retain with narrower capability/context set**;
+- **return to assisted mode**;
+- **disable Arsenal for that task class**;
+- **open a capability/knowledge/evaluation defect**.
+
+Do not make “default” permanent. Later regressions may demote a route.
 
 ---
 
@@ -870,7 +894,7 @@ Do this in sequence:
 9. wait for / verify exact Kiln work authorization before implementation assistance;
 10. use Repository Truth + Knowledge context + Verify/Resume first;
 11. expand to Pressure Test/Recon/Diagnose/TDD/Review only on real authorized demand;
-12. collect several real assisted episodes;
+12. collect the KFT-1 minimum prospective evidence package;
 13. feed route/context/authority friction directly into ARS-10 acceptance design.
 
 ### During ARS-10
