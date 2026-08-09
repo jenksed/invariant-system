@@ -943,7 +943,35 @@ Do this in sequence:
 36. establish receipt-backed AX profiles;
 37. use Behavioral CI to detect when future Kiln changes make the repository materially harder for agents to understand or modify correctly.
 
-## 13. North-star relationship
+## 13. Operator checkpoints
+
+The operator should have explicit checkpoints where Arsenal earns more responsibility rather than responsibility drifting upward.
+
+### Checkpoint A — observe
+
+Arsenal can read, normalize, and record Kiln state. It cannot influence execution.
+
+### Checkpoint B — assist
+
+After ARS-09 and Kiln authorization, Arsenal can provide context/capability/proof assistance while the normal workflow retains control.
+
+### Checkpoint C — route
+
+After ARS-10 plus KFT-1 evidence, selected Kiln task classes begin through Arsenal by default.
+
+### Checkpoint D — gate claims
+
+After ARS-11 evidence, selected task classes may require Arsenal acceptance/proof traces before the operator accepts a completion claim, while Kiln's native gate remains final authority.
+
+### Checkpoint E — propose hardening
+
+After ARS-12, Arsenal may propose evidence-backed improvements derived from recurring Kiln friction. Promotion remains human-controlled and any Kiln change uses Kiln's normal process.
+
+### Checkpoint F — behavioral CI
+
+ARS-13 may continuously test representative agent experience properties, but failing AX does not silently rewrite Kiln or Arsenal.
+
+## 14. North-star relationship
 
 Kiln is not merely a convenient test repository.
 
