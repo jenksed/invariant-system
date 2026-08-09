@@ -126,4 +126,4 @@ git diff --name-only d26449e41eb97a316fa6bae4442418397ab29cd3 -- lib test priv m
 
 ### Remaining boundary
 
-PR #48 remains unaccepted and unmerged. Its first rebased head `01d4258c…` remains failed Evidence tied to the invalid P0-W35 authority state. No runtime validation result from that head may be promoted. P1-S02-T02 and later work remain unauthorized.
+PR #48's first rebased head `01d4258c…` remains failed Evidence tied to the invalid P0-W35 authority state. After P0-W36 integrated, actual implementation head `7ba158bddff76ade9aca79cb8501e675bd0cded9` passed authorization preflight and full CI run `31294035484`, satisfying the post-integration consumer proof. Technical adjudication then rejected the candidate and closed PR #48 without merge. P1-S02-T02 and later work remain unauthorized.

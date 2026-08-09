@@ -2,7 +2,7 @@
 
 **Document type:** Planning and authority index  
 **Status:** Wave A adjudicated  
-**Build authorization:** P1-S01 consumed by PR #46; P1-S02-T01 adjudication and bounded repair authorized prospectively; all later P1-S02 work unauthorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
+**Build authorization:** P1-S01 consumed by PR #46; P1-S02-T01 adjudication consumed by rejected PR #48; no P1-S02 work authorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
 
 ## Integrated Wave A baseline
 
@@ -124,9 +124,9 @@ P1-S01 does not authorize:
 - P0-W26, P0-W27, or Wave B;
 - broad build implementation.
 
-P1-S02-T01 adjudication and bounded repair are authorized prospectively; every later P1-S02 ticket remains planned and unauthorized.
+PR #48 was adjudicated and rejected; every P1-S02 ticket remains planned and unauthorized.
 
-PR #48 candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was produced before valid Repository authorization and remains premature candidate work. The prospective authorization permits a rebased implementation state to be adjudicated; it does not retroactively authorize that commit or imply acceptance.
+PR #48 candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was premature. Correctly authorized head `7ba158bddff76ade9aca79cb8501e675bd0cded9` passed CI but failed technical adjudication; the PR closed without merge.
 
 ## Owner schedule adjudication
 
@@ -150,4 +150,4 @@ Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegat
 
 ## Exact next action
 
-P1-S01 integration and P0-W34 authority enforcement are complete. The corrected P1-S02-T01 plan and matching authorization record now permit prospective adjudication of PR #48 and bounded T01 repair. Rebase the candidate onto the trusted authority source, rerun exact-state verification, then accept, repair within scope, or reject it. Do not begin any later P1-S02 ticket.
+P1-S01 integration and authority enforcement are complete. PR #48 was rejected. Correct the T01 Evidence/result, persistence, protected-classification, TTL, and API contracts in governance planning; then seek owner acceptance and a new authorization. Do not implement any P1-S02 ticket.

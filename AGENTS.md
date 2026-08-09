@@ -35,9 +35,9 @@ Historical baselines, earlier roadmaps, work records, and merged pull-request de
 
 ## Current authorization boundary
 
-P1-S01 and its T01, T02, T03, T06, T04, and T05 tickets are integrated at `db02198` via PR #46 and owner-accepted. P1-S02-T01 alone is prospectively authorized for PR #48 adjudication, exact-state verification, and repairs bounded by its accepted plan. Every later P1-S02 ticket and the aggregate slice remain unauthorized. A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, proposed ticket sequence, pull-request body, available branch, or candidate implementation does not authorize implementation by itself.
+P1-S01 and its T01, T02, T03, T06, T04, and T05 tickets are integrated at `db02198` via PR #46 and owner-accepted. No P1-S02 ticket or aggregate slice is currently authorized. A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, proposed ticket sequence, pull-request body, available branch, or candidate implementation does not authorize implementation by itself.
 
-PR #48 candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was produced before valid Repository authorization and remains permanently classified as premature candidate work. Rebase may create a new authorized implementation state for adjudication; it does not retroactively authorize the earlier commit. PR #48 is not accepted or merge-authorized until exact-state verification and owner adjudication complete.
+PR #48 candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was premature. Its correctly authorized adjudication state `7ba158bddff76ade9aca79cb8501e675bd0cded9` passed CI but failed technical acceptance and the PR was closed without merge. The consumed authorization is removed; do not continue or recreate T01 runtime work until a corrected plan is accepted and newly authorized.
 
 Follow `docs/ROADMAP.md`, the current accepted ticket plan, and exact prerequisite Evidence to determine whether any further P1-S02 ticket may proceed.
 
