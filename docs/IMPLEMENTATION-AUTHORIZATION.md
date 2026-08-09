@@ -2,7 +2,7 @@
 
 **Document type:** Current implementation-authorization authority
 **Status:** Accepted
-**Current result:** No P1-S02 ticket or slice is authorized
+**Current result:** P1-S02-T01 adjudication and bounded repair are authorized prospectively; all later P1-S02 work remains unauthorized
 
 An accepted plan describes work. An authorization record permits one bounded implementation package to begin. Passing CI, a pull-request body, an available branch, generated code, or an implementation Claim does not substitute for either.
 
@@ -35,9 +35,10 @@ Planning work under `work/p<phase>-w<work>-*` can create or amend proposed imple
 ## Current authority result
 
 - P1-S01 authorization is historical and consumed by its accepted integration at `db02198`.
-- P1-S02 is planned and unauthorized.
-- P1-S02-T01 has no authorization record.
-- PR #48 is available candidate implementation produced before valid Repository authorization. It is not accepted, merge-authorized, or evidence that authorization occurred.
-- The next legitimate action is owner adjudication of the corrected T01 plan and candidate diff after this governance repair integrates.
+- P1-S02-T01 has an active prospective authorization for PR #48 adjudication, exact-state verification, and repairs strictly bounded by the accepted T01 plan.
+- Candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was produced before valid Repository authorization and remains permanently classified as premature candidate work; the later authorization does not rewrite its history.
+- PR #48 is not accepted or merge-authorized merely because adjudication is authorized.
+- Every later P1-S02 ticket and the aggregate slice remain unauthorized.
+- The next legitimate action is to rebase PR #48 onto the trusted authority source, rerun exact-state verification, and accept, repair within scope, or reject the candidate.
 
 Authorization is effective only while the exact record and accepted plan remain active at trusted canonical `main` and unchanged in the explicit implementation commit. Revocation or supersession requires a governance change that updates or removes the trusted record before further implementation proceeds.

@@ -2,7 +2,7 @@
 
 **Document type:** Planning and authority index  
 **Status:** Wave A adjudicated  
-**Build authorization:** P1-S01 issued by `docs/WAVE-A-ADJUDICATION-AND-AUTHORIZATION.md` and consumed by PR #46 (integrated at `db02198`); P1-S02 not authorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
+**Build authorization:** P1-S01 consumed by PR #46; P1-S02-T01 adjudication and bounded repair authorized prospectively; all later P1-S02 work unauthorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
 
 ## Integrated Wave A baseline
 
@@ -124,9 +124,9 @@ P1-S01 does not authorize:
 - P0-W26, P0-W27, or Wave B;
 - broad build implementation.
 
-P1-S02 remains planned and unauthorized.
+P1-S02-T01 adjudication and bounded repair are authorized prospectively; every later P1-S02 ticket remains planned and unauthorized.
 
-PR #48 is candidate P1-S02-T01 implementation at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`. It was produced before valid Repository authorization. Preserve it for owner adjudication, but do not treat its pull-request body, code, or passing CI as authority or acceptance.
+PR #48 candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` was produced before valid Repository authorization and remains premature candidate work. The prospective authorization permits a rebased implementation state to be adjudicated; it does not retroactively authorize that commit or imply acceptance.
 
 ## Owner schedule adjudication
 
@@ -150,4 +150,4 @@ Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegat
 
 ## Exact next action
 
-P1-S01 integration and P0-W33 planning reconciliation are complete. P1-S02 remains unauthorized. Integrate P0-W34's authority repair, then adjudicate the corrected P1-S02-T01 plan and PR #48 candidate diff. Runtime work resumes only after a separate owner decision creates a valid authorization record bound to the accepted plan and exact base SHA.
+P1-S01 integration and P0-W34 authority enforcement are complete. The corrected P1-S02-T01 plan and matching authorization record now permit prospective adjudication of PR #48 and bounded T01 repair. Rebase the candidate onto the trusted authority source, rerun exact-state verification, then accept, repair within scope, or reject it. Do not begin any later P1-S02 ticket.

@@ -1,7 +1,7 @@
 # P1-S02-T01: Artifact content-addressed substrate and typed Evidence module
 
 **Document type:** Implementation plan  
-**Status:** Proposed (awaits owner authorization; P1-S02 implementation package is not yet authorized)  
+**Status:** Accepted (prospective authorization for PR #48 adjudication and bounded T01 repair; no retroactive authorization)  
 **Parent slice:** P1-S02  
 **Branch:** `work/p1-s02-t01-artifact-evidence-substrate`  
 **Depends on:** P1-S01-V01 accepted (P1-S01-T05 slice closeout merged at `db02198` via PR #46)
@@ -188,29 +188,29 @@ P1-S02-D01 durable-substrate prerequisite: create one Artifact row from a determ
 
 ## Completion record
 
-**Result:** Not started under valid Repository authorization.
+**Result:** Adjudication authorized prospectively; implementation not yet accepted.
 
-PR #48 contains candidate implementation and historical CI Claims. Those facts are inputs to later owner review, not completion Evidence for this Proposed plan. If the owner accepts this plan and authorizes T01, the candidate diff must be reviewed against the accepted plan and exact authorization state before any implementation or merge Claim is made.
+The owner accepted this corrected plan after P0-W34 integrated. Authorization permits rebase of PR #48 onto the trusted authority state, exact-state verification, technical adjudication, and only repairs bounded by this plan. It does not authorize any later P1-S02 ticket and does not retroactively authorize candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S02-T01-AC01 | Not run | P1-S02-T01-E01 | authorization required |
-| P1-S02-T01-AC02 | Not run | P1-S02-T01-E02 | authorization required |
-| P1-S02-T01-AC03 | Not run | P1-S02-T01-E03 | authorization required |
-| P1-S02-T01-AC04 | Not run | P1-S02-T01-E04 | authorization required |
-| P1-S02-T01-AC05 | Not run | P1-S02-T01-E05 | authorization required |
-| P1-S02-T01-AC06 | Not run | P1-S02-T01-E06 | authorization required |
-| P1-S02-T01-AC07 | Not run | P1-S02-T01-E07 | authorization required |
+| P1-S02-T01-AC01 | Pending | P1-S02-T01-E01 | rerun after authorized rebase |
+| P1-S02-T01-AC02 | Pending | P1-S02-T01-E02 | rerun after authorized rebase |
+| P1-S02-T01-AC03 | Pending | P1-S02-T01-E03 | rerun after authorized rebase |
+| P1-S02-T01-AC04 | Pending | P1-S02-T01-E04 | rerun after authorized rebase |
+| P1-S02-T01-AC05 | Pending | P1-S02-T01-E05 | rerun after authorized rebase |
+| P1-S02-T01-AC06 | Pending | P1-S02-T01-E06 | source review after authorized rebase |
+| P1-S02-T01-AC07 | Pending | P1-S02-T01-E07 | exact-head CI after authorized rebase |
 
 ### Verification executed
 
-None under valid Repository authorization. PR #48's pre-authorization results remain candidate-review inputs only.
+None under the prospective authorization yet. PR #48's results at pre-authorization commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` remain historical candidate-review inputs only.
 
 ### Repository state
 
-- Branch: `work/p1-s02-t01-artifact-evidence-substrate`
-- Proposed-plan base: `ad319d7c748a6b723b9cff4187fa06c60bc3cf06`
-- Candidate diff: PR #48 at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`; owner adjudication pending
-- Parent slice status: P1-S02 planned and unauthorized
+- Authorization base: `dc375d923c99b9c754d9b53d601b214b0c8941a5`.
+- Candidate before authorization: PR #48 at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
+- Required next state: a rebased PR #48 head descending from the trusted authority-source commit.
+- Parent slice status: only P1-S02-T01 adjudication and bounded repair are authorized; every later P1-S02 ticket remains unauthorized.
