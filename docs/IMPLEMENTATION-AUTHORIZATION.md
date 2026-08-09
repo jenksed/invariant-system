@@ -20,7 +20,7 @@ For a `work/p<phase>-s<slice>-t<ticket>-*` ticket branch or `work/p<phase>-s<sli
 10. the record keys in the documented canonical order;
 11. valid calendar, clock, and offset values in the RFC 3339 authorization time;
 12. non-whitespace owner and scope values;
-13. the exact plan and record blobs to exist unchanged at `refs/remotes/origin/main`;
+13. the exact plan and record blobs to be committed unchanged in implementation `HEAD` and to exist unchanged at `refs/remotes/origin/main`;
 14. the trusted commit containing that exact pair to be an ancestor of the implementation state; and
 15. the recorded base commit to be an ancestor of that trusted authority-source commit.
 

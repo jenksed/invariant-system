@@ -43,9 +43,9 @@ Repair the authority conflict exposed by KFT-0 without implementing or accepting
 
 - **P0-W34-R01:** The branch shall remain governance/development-tooling only and shall not modify Kiln runtime source, tests, migrations, dependencies, or PR #48.
 - **P0-W34-R02:** Repository authority shall state that PR #48 is candidate implementation produced before valid repository authorization and is neither accepted nor merge-authorized.
-- **P0-W34-R03:** A ticket or slice implementation branch shall fail preflight unless its governing plan and matching authorization record are tracked, identical to active trusted Repository authority at canonical `origin/main`, and sourced from a trusted commit ancestral to the implementation state.
+- **P0-W34-R03:** A ticket or slice implementation branch shall fail preflight unless its governing plan and matching authorization record are tracked, committed unchanged in implementation `HEAD`, identical to active trusted Repository authority at canonical `origin/main`, and sourced from a trusted commit ancestral to the implementation state.
 - **P0-W34-R04:** An authorization record shall bind work ID, state, an owner registered by trusted Repository authority, exact base SHA, governing-plan SHA-256, valid RFC 3339 authorization time, and non-whitespace bounded scope in one enforced canonical key order.
-- **P0-W34-R05:** Preflight tests shall prove rejection of Proposed plans, missing records, digest mismatch, malformed base SHA, unauthorized state, locally created or untracked authority, implementation-branch-created authority, arbitrary owners, reordered keys, invalid timestamp values, whitespace-only owner or scope, and branch-class spoofing, plus acceptance of complete trusted ticket and slice records.
+- **P0-W34-R05:** Preflight tests shall prove rejection of Proposed plans, missing records, digest mismatch, malformed base SHA, unauthorized state, locally created, untracked, staged-only, or implementation-branch-created authority, arbitrary owners, reordered keys, invalid timestamp values, whitespace-only owner or scope, and branch-class spoofing, plus acceptance of complete trusted ticket and slice records.
 - **P0-W34-R06:** The T01 plan shall remain Proposed, identify PR #48 as candidate-only, remove premature completion Claims, and use accepted aggregate gate identifiers without claiming that T01 satisfies an aggregate gate alone.
 - **P0-W34-R07:** `AGENTS.md`, `docs/PLANNING.md`, `docs/ROADMAP.md`, and `README.md` shall agree on the exact next action and authorization boundary.
 - **P0-W34-R08:** The P0-W33 completion record shall name its actual branch head, merge, PR, scope, and CI Evidence.
@@ -109,7 +109,7 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 - **P0-W34-E01:** final branch head and compare against `ad319d7`.
 - **P0-W34-E02:** `scripts/agent-preflight` pass for P0-W34.
-- **P0-W34-E03:** `scripts/test-agent-preflight` pass including untracked, locally self-issued, implementation-branch-issued, arbitrary-owner, branch-spoofing, syntax, semantic-value, and provenance negatives.
+- **P0-W34-E03:** `scripts/test-agent-preflight` pass including untracked, locally self-issued, staged-only, implementation-branch-issued, arbitrary-owner, branch-spoofing, syntax, semantic-value, and provenance negatives.
 - **P0-W34-E04:** standard Repository validation results.
 - **P0-W34-E05:** empty runtime-path diff for `lib`, `test`, `priv`, `mix.exs`, and `config`.
 - **P0-W34-E06:** exact PR #48 head and candidate-only authority statement.
@@ -143,7 +143,7 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 | Criterion | Status | Evidence | Result |
 | --- | --- | --- | --- |
 | P0-W34-AC01 | Pass | P0-W34-E03 | Proposed-plan fixture rejected for non-Accepted lifecycle state |
-| P0-W34-AC02 | Pass | P0-W34-E03 | missing, untracked, locally issued, branch-issued, arbitrary-owner, malformed, and stale authority fixtures rejected for their expected reasons |
+| P0-W34-AC02 | Pass | P0-W34-E03 | missing, untracked, locally issued, staged-only, branch-issued, arbitrary-owner, malformed, and stale authority fixtures rejected for their expected reasons |
 | P0-W34-AC03 | Pass | P0-W34-E03 | trusted ticket and slice fixtures accepted only after the exact plan and record integrate on trusted `origin/main` and become ancestral |
 | P0-W34-AC04 | Pass | P0-W34-E01, E06 | authority diff preserves P1-S02 as unauthorized and PR #48 as candidate-only |
 | P0-W34-AC05 | Pass | P0-W34-E01 | T01 remains Proposed and references P1-S02-G06, G10, and G16 as prerequisite-only contributions |
@@ -154,7 +154,7 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 - **P0-W34-E01:** The compare from `ad319d7` through `84564c3` contains governance documents, development scripts, and CI configuration only. No Kiln runtime file changed.
 - **P0-W34-E02:** `scripts/agent-preflight` passed for the P0-W34 planning branch locally and in CI step `Validate governing work package`.
-- **P0-W34-E03:** `scripts/test-agent-preflight` passed locally and in CI. Its isolated Git fixtures prove the trusted ticket and slice positive paths and protected negatives for untracked files, locally created records, implementation-branch-created authority, arbitrary owners, Proposed plans, missing records, stale digests, revoked state, malformed base SHA, reordered keys, invalid RFC 3339 values, whitespace-only owner or scope, missing headings, and branch-class spoofing. Each material negative asserts its expected failure reason.
+- **P0-W34-E03:** `scripts/test-agent-preflight` passed locally and in CI. Its isolated Git fixtures prove the trusted ticket and slice positive paths and protected negatives for untracked files, locally created records, staged-only restoration, implementation-branch-created authority, arbitrary owners, Proposed plans, missing records, stale digests, revoked state, malformed base SHA, reordered keys, invalid RFC 3339 values, whitespace-only owner or scope, missing headings, and branch-class spoofing. Each material negative asserts its expected failure reason.
 - **P0-W34-E04:** CI run `31290919050` passed governing-package validation, the preflight regression suite, semantic and JSON Schema contracts, agent assets, formatting, warnings-as-errors compilation, compile-connected cycle checks, full tests, the P1-S01 aggregate gate and Artifact upload, and Vale prose validation.
 - **P0-W34-E05:** `git diff --name-only ad319d7 -- lib test priv mix.exs mix.lock config` produced no paths locally; the PR compare contains no path in that runtime set.
 - **P0-W34-E06:** Repository authority names PR #48 at exact head `60367874bfc3c0e6d8cbd736f58e1ae17938943b` as candidate-only. P1-S02 has no active authorization record.

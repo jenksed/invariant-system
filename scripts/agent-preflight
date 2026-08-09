@@ -87,7 +87,8 @@ validate_authorization() {
   local trusted_owners="docs/authorizations/TRUSTED-OWNERS"
   local line key value line_count=0
   local record_work_id="" state="" owner="" base_sha="" plan_sha256="" authorized_at="" scope=""
-  local plan_blob authorization_blob trusted_plan_blob trusted_authorization_blob authority_source
+  local plan_blob authorization_blob head_plan_blob head_authorization_blob
+  local trusted_plan_blob trusted_authorization_blob authority_source
   local expected_keys=(work_id state owner base_sha plan_sha256 authorized_at scope)
 
   grep -Eq '^\*\*Status:\*\* Accepted([[:space:](]|$)' "$plan_path" ||
@@ -103,9 +104,15 @@ validate_authorization() {
 
   plan_blob=$(git hash-object "$plan_path")
   authorization_blob=$(git hash-object "$authorization")
+  head_plan_blob=$(git rev-parse "HEAD:$plan_path" 2>/dev/null || true)
+  head_authorization_blob=$(git rev-parse "HEAD:$authorization" 2>/dev/null || true)
   trusted_plan_blob=$(git rev-parse "$trusted_ref:$plan_path" 2>/dev/null || true)
   trusted_authorization_blob=$(git rev-parse "$trusted_ref:$authorization" 2>/dev/null || true)
 
+  [[ "$plan_blob" == "$head_plan_blob" ]] ||
+    fail "$plan_path is not committed unchanged in implementation HEAD"
+  [[ "$authorization_blob" == "$head_authorization_blob" ]] ||
+    fail "$authorization is not committed unchanged in implementation HEAD"
   [[ "$plan_blob" == "$trusted_plan_blob" ]] ||
     fail "$plan_path is not identical to trusted Repository authority at $trusted_ref"
   [[ "$authorization_blob" == "$trusted_authorization_blob" ]] ||
