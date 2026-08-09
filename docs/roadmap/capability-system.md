@@ -2,7 +2,7 @@
 
 Status: active program
 
-Current frontier: **ARS-08 — Trust & Authority Plane**
+Current frontier: **ARS-09 — Knowledge Plane**
 
 Project Arsenal is evolving from a reusable library of prompts, methods, workflows, references, and Development Packs into a capability engineering system for making good engineering judgment reusable, composable, executable, evaluable, and governable.
 
@@ -528,6 +528,8 @@ Proof:
 
 ## ARS-08 — Trust & Authority Plane
 
+**Status:** delivered by PR #20.
+
 **Goal:** make useful action distinct from authority to perform it and make capability/package provenance inspectable.
 
 Capabilities/packages should eventually declare and enforce permissions such as:
@@ -560,6 +562,20 @@ Proof:
 - imported capability material cannot silently acquire authority;
 - provenance/version/digest are preserved;
 - authority escalation is explicit, reviewable, and revocable.
+
+Delivered in v0:
+
+- quarantine-first, content-addressed Trust Candidates for exact imported package bytes;
+- explicit Trust Reviews bound to candidate digests and canonical capability IDs;
+- conservative local Trust Policy separating baseline, escalation, and prohibited authority;
+- machine-readable Trust Decisions with APPROVED/REVIEW_REQUIRED/ESCALATION_REQUIRED/REJECTED/REVOKED verdicts and route gates;
+- canonical authority arithmetic preventing imported packages or local policy from widening Capability Contract boundaries;
+- advisory Agent Skills `allowed-tools` interpretation that preserves unknown expressions for review instead of pretending harness enforcement;
+- compiler-manifest provenance re-verification for the existing Repository Truth package;
+- append-only revocation and digest-drift re-quarantine;
+- data-only seams for ARS-09 reconsideration, ARS-10 route authorization, ARS-11 challenge requirements, and ARS-12 non-inherited trust on content change.
+
+ARS-08 deliberately does not implement the later systems behind those seams.
 
 ---
 
