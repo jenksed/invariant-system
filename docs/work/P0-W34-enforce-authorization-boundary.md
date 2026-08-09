@@ -126,4 +126,58 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 ## Completion record
 
-To be populated at closeout with exact branch head, pull request, checks, diff, remaining unknowns, and the explicit result that P1-S02 remains unauthorized.
+**Result:** Implemented and verified. P1-S02 remains planned and unauthorized. PR #48 remains candidate-only and was not modified, accepted, authorized, rebased, merged, or represented as completion Evidence.
+
+### Verified Repository state
+
+- Base: `ad319d7c748a6b723b9cff4187fa06c60bc3cf06`.
+- Branch: `work/p0-w34-enforce-authorization-boundary`.
+- Pull request: PR #49, draft during repair and closeout.
+- Final enforcement head: `84564c3c01ffa92bd8a382b9b50e6682e8136902`.
+- Exact-head CI: [run 31290919050](https://github.com/jenksed/kiln/actions/runs/31290919050), success.
+- Candidate PR #48 head: `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
+- Closeout rule: the commit that adds this completion record is documentation-only and must receive a fresh exact-head CI run before merge; that final head and run belong in the PR body because a commit cannot contain its own SHA.
+
+### Acceptance status
+
+| Criterion | Status | Evidence | Result |
+| --- | --- | --- | --- |
+| P0-W34-AC01 | Pass | P0-W34-E03 | Proposed-plan fixture rejected for non-Accepted lifecycle state |
+| P0-W34-AC02 | Pass | P0-W34-E03 | missing, untracked, locally issued, branch-issued, arbitrary-owner, malformed, and stale authority fixtures rejected for their expected reasons |
+| P0-W34-AC03 | Pass | P0-W34-E03 | trusted ticket and slice fixtures accepted only after the exact plan and record integrate on trusted `origin/main` and become ancestral |
+| P0-W34-AC04 | Pass | P0-W34-E01, E06 | authority diff preserves P1-S02 as unauthorized and PR #48 as candidate-only |
+| P0-W34-AC05 | Pass | P0-W34-E01 | T01 remains Proposed and references P1-S02-G06, G10, and G16 as prerequisite-only contributions |
+| P0-W34-AC06 | Pass | P0-W34-E07 | Artifact contract states the durable-locator requirement and legacy retrieval gap |
+| P0-W34-AC07 | Pass | P0-W34-E01, E04, E05 | exact enforcement head is CI-green and the runtime-path compare is empty |
+
+### Completion Evidence
+
+- **P0-W34-E01:** The compare from `ad319d7` through `84564c3` contains governance documents, development scripts, and CI configuration only. No Kiln runtime file changed.
+- **P0-W34-E02:** `scripts/agent-preflight` passed for the P0-W34 planning branch locally and in CI step `Validate governing work package`.
+- **P0-W34-E03:** `scripts/test-agent-preflight` passed locally and in CI. Its isolated Git fixtures prove the trusted ticket and slice positive paths and protected negatives for untracked files, locally created records, implementation-branch-created authority, arbitrary owners, Proposed plans, missing records, stale digests, revoked state, malformed base SHA, reordered keys, invalid RFC 3339 values, whitespace-only owner or scope, missing headings, and branch-class spoofing. Each material negative asserts its expected failure reason.
+- **P0-W34-E04:** CI run `31290919050` passed governing-package validation, the preflight regression suite, semantic and JSON Schema contracts, agent assets, formatting, warnings-as-errors compilation, compile-connected cycle checks, full tests, the P1-S01 aggregate gate and Artifact upload, and Vale prose validation.
+- **P0-W34-E05:** `git diff --name-only ad319d7 -- lib test priv mix.exs mix.lock config` produced no paths locally; the PR compare contains no path in that runtime set.
+- **P0-W34-E06:** Repository authority names PR #48 at exact head `60367874bfc3c0e6d8cbd736f58e1ae17938943b` as candidate-only. P1-S02 has no active authorization record.
+- **P0-W34-E07:** `artifacts/p1-s01/README.md` distinguishes ignored local manifests from durable locators and states that the legacy final owner-machine manifest is not retrievable from a fresh checkout.
+
+### Verification executed
+
+Local verification passed:
+
+```text
+scripts/agent-preflight
+scripts/test-agent-preflight
+bash -n scripts/agent-preflight scripts/test-agent-preflight
+python3 scripts/validate_first_month_contracts.py
+scripts/validate-agent-assets
+git diff --check
+git diff --name-only ad319d7 -- lib test priv mix.exs mix.lock config
+```
+
+Local JSON Schema, Vale, and Elixir/Mix checks were unavailable in the trial environment. Exact-head CI run `31290919050` executed and passed those checks; no unavailable local check is represented as locally executed.
+
+### Remaining unknowns
+
+- P0-W34-U01 remains: the owner has not adjudicated the corrected T01 plan or PR #48 candidate diff.
+- P0-W34-U02 remains: the legacy P1-S01 final owner-machine manifest has no durable retrievable locator.
+- P0-W34-U03 remains: later authority must explicitly adjudicate applicability of exact-state P1-S01 Evidence to documentation-only successors when relevant.
