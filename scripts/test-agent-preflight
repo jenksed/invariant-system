@@ -9,98 +9,133 @@ fail() {
 root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
 cd "$root"
 
-valid_ticket=docs/work/P9-S99-T99-preflight-fixture.md
-invalid_ticket=docs/work/P9-S99-T98-preflight-fixture.md
-valid_slice=docs/work/P9-S99-preflight-fixture.md
+fixture_paths=""
 
 cleanup() {
-  rm -f "$valid_ticket" "$invalid_ticket" "$valid_slice"
+  for path in $fixture_paths; do
+    rm -f "$path"
+  done
 }
 trap cleanup EXIT
 
-cat >"$valid_ticket" <<'PLAN'
-# P9-S99-T99: Preflight fixture
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  else
+    shasum -a 256 "$1" | awk '{print $1}'
+  fi
+}
 
-**Document type:** Implementation plan
-**Status:** Proposed
-**Parent slice:** P9-S99
-**Branch:** `work/p9-s99-t99-preflight-fixture`
-**Depends on:** None
+write_ticket_plan() {
+  work_id=$1
+  branch=$2
+  status=$3
+  omit_demo=${4:-no}
+  path="docs/work/${work_id}-preflight-fixture.md"
+  fixture_paths="$fixture_paths $path"
 
-## Slice contribution
-Fixture only.
-## Objective
-Fixture only.
-## Observed current state
-Fixture only.
-## Assumptions and unknowns
-Fixture only.
-## Requirements
-Fixture only.
-## Security boundary
-Fixture only.
-## Proposed changes
-Fixture only.
-## Expected files or components
-Fixture only.
-## Acceptance criteria
-Fixture only.
-## Deterministic verification
-Fixture only.
-## Demo contribution
-Fixture only.
-## Required completion Evidence
-Fixture only.
-## Explicit exclusions
-Fixture only.
-## Completion record
-Fixture only.
-PLAN
+  {
+    printf '# %s: Preflight fixture\n\n' "$work_id"
+    printf '**Document type:** Implementation plan\n'
+    printf '**Status:** %s\n' "$status"
+    printf '**Parent slice:** P9-S99\n'
+    printf '**Branch:** `%s`\n' "$branch"
+    printf '**Depends on:** None\n\n'
+    printf '## Slice contribution\nFixture only.\n'
+    printf '## Objective\nFixture only.\n'
+    printf '## Observed current state\nFixture only.\n'
+    printf '## Assumptions and unknowns\nFixture only.\n'
+    printf '## Requirements\nFixture only.\n'
+    printf '## Security boundary\nFixture only.\n'
+    printf '## Proposed changes\nFixture only.\n'
+    printf '## Expected files or components\nFixture only.\n'
+    printf '## Acceptance criteria\nFixture only.\n'
+    printf '## Deterministic verification\nFixture only.\n'
+    if [[ "$omit_demo" != "yes" ]]; then
+      printf '## Demo contribution\nFixture only.\n'
+    fi
+    printf '## Required completion Evidence\nFixture only.\n'
+    printf '## Explicit exclusions\nFixture only.\n'
+    printf '## Completion record\nFixture only.\n'
+  } >"$path"
+}
 
-cat >"$invalid_ticket" <<'PLAN'
-# P9-S99-T98: Invalid preflight fixture
+write_authorization() {
+  work_id=$1
+  plan=$2
+  state=$3
+  base_sha=$4
+  digest=$5
+  path="docs/authorizations/${work_id}.authorization"
+  fixture_paths="$fixture_paths $path"
 
-**Document type:** Implementation plan
-**Status:** Proposed
-**Parent slice:** P9-S99
-**Branch:** `work/p9-s99-t98-preflight-fixture`
-**Depends on:** None
+  {
+    printf 'work_id=%s\n' "$work_id"
+    printf 'state=%s\n' "$state"
+    printf 'owner=Preflight Fixture\n'
+    printf 'base_sha=%s\n' "$base_sha"
+    printf 'plan_sha256=%s\n' "$digest"
+    printf 'authorized_at=2026-08-08T12:00:00-04:00\n'
+    printf 'scope=Preflight fixture only\n'
+  } >"$path"
+}
 
-## Slice contribution
-Fixture only.
-## Objective
-Fixture only.
-## Observed current state
-Fixture only.
-## Assumptions and unknowns
-Fixture only.
-## Requirements
-Fixture only.
-## Security boundary
-Fixture only.
-## Proposed changes
-Fixture only.
-## Expected files or components
-Fixture only.
-## Acceptance criteria
-Fixture only.
-## Deterministic verification
-Fixture only.
-## Required completion Evidence
-Fixture only.
-## Explicit exclusions
-Fixture only.
-## Completion record
-Fixture only.
-PLAN
+expect_failure() {
+  branch=$1
+  description=$2
+  if KILN_BRANCH="$branch" scripts/agent-preflight >/dev/null 2>&1; then
+    fail "$description passed preflight"
+  fi
+}
 
+head_sha=$(git rev-parse HEAD)
+
+valid_id=P9-S99-T99
+valid_branch=work/p9-s99-t99-preflight-fixture
+valid_plan=docs/work/${valid_id}-preflight-fixture.md
+write_ticket_plan "$valid_id" "$valid_branch" Accepted
+valid_digest=$(sha256_file "$valid_plan")
+write_authorization "$valid_id" "$valid_plan" authorized "$head_sha" "$valid_digest"
+
+proposed_id=P9-S99-T97
+proposed_branch=work/p9-s99-t97-preflight-fixture
+write_ticket_plan "$proposed_id" "$proposed_branch" Proposed
+
+missing_id=P9-S99-T96
+missing_branch=work/p9-s99-t96-preflight-fixture
+write_ticket_plan "$missing_id" "$missing_branch" Accepted
+
+digest_id=P9-S99-T95
+digest_branch=work/p9-s99-t95-preflight-fixture
+digest_plan=docs/work/${digest_id}-preflight-fixture.md
+write_ticket_plan "$digest_id" "$digest_branch" Accepted
+write_authorization "$digest_id" "$digest_plan" authorized "$head_sha" "$(printf '0%.0s' {1..64})"
+
+state_id=P9-S99-T94
+state_branch=work/p9-s99-t94-preflight-fixture
+state_plan=docs/work/${state_id}-preflight-fixture.md
+write_ticket_plan "$state_id" "$state_branch" Accepted
+write_authorization "$state_id" "$state_plan" revoked "$head_sha" "$(sha256_file "$state_plan")"
+
+base_id=P9-S99-T93
+base_branch=work/p9-s99-t93-preflight-fixture
+base_plan=docs/work/${base_id}-preflight-fixture.md
+write_ticket_plan "$base_id" "$base_branch" Accepted
+write_authorization "$base_id" "$base_plan" authorized not-a-commit "$(sha256_file "$base_plan")"
+
+invalid_id=P9-S99-T98
+invalid_branch=work/p9-s99-t98-preflight-fixture
+write_ticket_plan "$invalid_id" "$invalid_branch" Accepted yes
+
+valid_slice=docs/work/P9-S98-preflight-fixture.md
+fixture_paths="$fixture_paths $valid_slice"
 cat >"$valid_slice" <<'PLAN'
-# P9-S99: Slice integration fixture
+# P9-S98: Slice integration fixture
 
 **Document type:** Implementation plan
-**Status:** Proposed
+**Status:** Accepted
 **Parent slice:** None
-**Branch:** `work/p9-s99-preflight-fixture`
+**Branch:** `work/p9-s98-preflight-fixture`
 **Depends on:** None
 
 ## Objective
@@ -126,29 +161,21 @@ Fixture only.
 ## Completion record
 Fixture only.
 PLAN
+write_authorization P9-S98 "$valid_slice" authorized "$head_sha" "$(sha256_file "$valid_slice")"
 
 KILN_BRANCH=work/p0-w28-wave-a-conformance scripts/agent-preflight >/dev/null
-KILN_BRANCH=work/p9-s99-t99-preflight-fixture scripts/agent-preflight >/dev/null
-KILN_BRANCH=work/p9-s99-preflight-fixture scripts/agent-preflight >/dev/null
+KILN_BRANCH="$valid_branch" scripts/agent-preflight >/dev/null
+KILN_BRANCH=work/p9-s98-preflight-fixture scripts/agent-preflight >/dev/null
 
-if KILN_BRANCH=work/p9-s99-t98-preflight-fixture scripts/agent-preflight >/dev/null 2>&1; then
-  fail "ticket plan missing Demo contribution passed preflight"
-fi
-
-if KILN_BRANCH=work/p0-invalid scripts/agent-preflight >/dev/null 2>&1; then
-  fail "invalid work branch passed preflight"
-fi
-
-if KILN_BRANCH=work/p1-s1-t1-bad-width scripts/agent-preflight >/dev/null 2>&1; then
-  fail "invalid slice-ticket width passed preflight"
-fi
-
-if KILN_BRANCH=main scripts/agent-preflight >/dev/null 2>&1; then
-  fail "main passed implementation preflight"
-fi
-
-if KILN_BRANCH=unknown/p0-w28 scripts/agent-preflight >/dev/null 2>&1; then
-  fail "unknown branch class passed preflight"
-fi
+expect_failure "$proposed_branch" "Proposed ticket plan"
+expect_failure "$missing_branch" "ticket plan without authorization"
+expect_failure "$digest_branch" "authorization with stale plan digest"
+expect_failure "$state_branch" "authorization with non-authorized state"
+expect_failure "$base_branch" "authorization with malformed base SHA"
+expect_failure "$invalid_branch" "ticket plan missing Demo contribution"
+expect_failure work/p0-invalid "invalid work branch"
+expect_failure work/p1-s1-t1-bad-width "invalid slice-ticket width"
+expect_failure main "main"
+expect_failure unknown/p0-w28 "unknown branch class"
 
 printf 'test-agent-preflight: pass\n'

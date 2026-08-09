@@ -26,15 +26,18 @@ Before material planning or implementation work, read in this order:
 6. `docs/IMPLEMENTATION-SLICES.md` for current slice detail;
 7. `docs/SLICE-ACCEPTANCE-GATES.md` for future aggregate proof;
 8. accepted ADRs and `docs/PROJECT-INVARIANTS.md`;
-9. the accepted current plan in `docs/work/`;
-10. applicable subject specifications;
-11. current source, tests, Git state, dependencies, and executed Evidence.
+9. `docs/IMPLEMENTATION-AUTHORIZATION.md` and any matching active authorization record;
+10. the accepted current plan in `docs/work/`;
+11. applicable subject specifications;
+12. current source, tests, Git state, dependencies, and executed Evidence.
 
 Historical baselines, earlier roadmaps, work records, and merged pull-request descriptions preserve provenance. They do not override current authority.
 
 ## Current authorization boundary
 
-P1-S01 and its T01, T02, T03, T06, T04, and T05 tickets are integrated at `db02198` via PR #46 and owner-accepted. P1-S02 is planned but not authorized; no P1-S02 runtime implementation begins until a later explicit authorization accepts the P1-S02 implementation package. A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, or proposed ticket sequence does not authorize implementation by itself.
+P1-S01 and its T01, T02, T03, T06, T04, and T05 tickets are integrated at `db02198` via PR #46 and owner-accepted. P1-S02 is planned but not authorized; no P1-S02 runtime implementation begins until a later explicit authorization accepts the P1-S02 implementation package. A named ticket, planning document, passing planning CI, JSON Schema, detailed specification, proposed ticket sequence, pull-request body, available branch, or candidate implementation does not authorize implementation by itself.
+
+PR #48 is candidate P1-S02-T01 implementation produced before valid Repository authorization. It is neither accepted nor merge-authorized. Preserve it for later owner adjudication; do not treat its code, CI, or Claims as retroactive authorization.
 
 Follow `docs/ROADMAP.md`, the current accepted ticket plan, and exact prerequisite Evidence to determine whether any further P1-S02 ticket may proceed.
 
@@ -44,13 +47,14 @@ Before planned work:
 
 1. run `scripts/agent-preflight` to validate the current branch's governing work package, then `scripts/test-agent-preflight` to verify the preflight implementation;
 2. stop and report a known conformance mismatch rather than bypass the check;
-3. read the accepted plan;
-4. read `docs/ENGINEERING-DOCTRINE.md` when the work contains material engineering choices not already decided by accepted authority;
-5. list applicable ADRs and `KILN-INV-*` identifiers;
-6. inspect current source, tests, Git state, and dependency direction;
-7. distinguish current behavior from proposed behavior;
-8. state the expected mutation surface;
-9. state narrow verification and the complete required gate.
+3. read `docs/IMPLEMENTATION-AUTHORIZATION.md` and the matching authorization record when the branch is an implementation ticket or slice;
+4. read the accepted plan;
+5. read `docs/ENGINEERING-DOCTRINE.md` when the work contains material engineering choices not already decided by accepted authority;
+6. list applicable ADRs and `KILN-INV-*` identifiers;
+7. inspect current source, tests, Git state, and dependency direction;
+8. distinguish current behavior from proposed behavior;
+9. state the expected mutation surface;
+10. state narrow verification and the complete required gate.
 
 Use project-local Skills only when their behavior is compatible with the current branch grammar, accepted plan, and current Repository authority. Repository authority outranks a stale Skill default.
 

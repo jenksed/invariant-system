@@ -6,6 +6,83 @@ fail() {
   exit 1
 }
 
+sha256_file() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | awk '{print $1}'
+  elif command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | awk '{print $1}'
+  else
+    fail "sha256sum or shasum is required to validate plan authorization"
+  fi
+}
+
+validate_authorization() {
+  local plan_path=$1
+  local authorization="docs/authorizations/${work_id}.authorization"
+  local line key value line_count=0
+  local record_work_id="" state="" owner="" base_sha="" plan_sha256="" authorized_at="" scope=""
+
+  grep -Eq '^\*\*Status:\*\* Accepted([[:space:](]|$)' "$plan_path" ||
+    fail "$plan_path is not Accepted; proposed or ambiguous lifecycle state cannot authorize implementation"
+
+  [[ -f "$authorization" ]] ||
+    fail "implementation authorization is missing: $authorization"
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    line_count=$((line_count + 1))
+    [[ "$line" == *=* ]] || fail "$authorization line $line_count is not key=value data"
+    key=${line%%=*}
+    value=${line#*=}
+
+    case "$key" in
+      work_id)
+        [[ -z "$record_work_id" ]] || fail "$authorization repeats key: work_id"
+        record_work_id=$value
+        ;;
+      state)
+        [[ -z "$state" ]] || fail "$authorization repeats key: state"
+        state=$value
+        ;;
+      owner)
+        [[ -z "$owner" ]] || fail "$authorization repeats key: owner"
+        owner=$value
+        ;;
+      base_sha)
+        [[ -z "$base_sha" ]] || fail "$authorization repeats key: base_sha"
+        base_sha=$value
+        ;;
+      plan_sha256)
+        [[ -z "$plan_sha256" ]] || fail "$authorization repeats key: plan_sha256"
+        plan_sha256=$value
+        ;;
+      authorized_at)
+        [[ -z "$authorized_at" ]] || fail "$authorization repeats key: authorized_at"
+        authorized_at=$value
+        ;;
+      scope)
+        [[ -z "$scope" ]] || fail "$authorization repeats key: scope"
+        scope=$value
+        ;;
+      *)
+        fail "$authorization contains unknown key: $key"
+        ;;
+    esac
+  done <"$authorization"
+
+  [[ $line_count -eq 7 ]] || fail "$authorization must contain exactly 7 records; found $line_count"
+  [[ "$record_work_id" == "$work_id" ]] || fail "$authorization work_id does not match $work_id"
+  [[ "$state" == "authorized" ]] || fail "$authorization state is not authorized"
+  [[ -n "$owner" ]] || fail "$authorization owner is empty"
+  [[ "$base_sha" =~ ^[0-9a-f]{40}$ ]] || fail "$authorization base_sha is not 40 lowercase hexadecimal characters"
+  [[ "$plan_sha256" =~ ^[0-9a-f]{64}$ ]] || fail "$authorization plan_sha256 is not 64 lowercase hexadecimal characters"
+  [[ "$authorized_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(Z|[+-][0-9]{2}:[0-9]{2})$ ]] ||
+    fail "$authorization authorized_at is not an RFC 3339 timestamp"
+  [[ -n "$scope" ]] || fail "$authorization scope is empty"
+  [[ "$(sha256_file "$plan_path")" == "$plan_sha256" ]] || fail "$authorization plan_sha256 does not match $plan_path"
+  git cat-file -e "${base_sha}^{commit}" 2>/dev/null || fail "$authorization base_sha is not a Repository commit"
+  git merge-base --is-ancestor "$base_sha" HEAD || fail "$authorization base_sha is not an ancestor of HEAD"
+}
+
 root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
 cd "$root"
 
@@ -100,6 +177,16 @@ if [[ -n "$work_id" ]]; then
   for heading in "${required_headings[@]}"; do
     grep -Fqx "## $heading" "$plan" || fail "$plan is missing heading: $heading"
   done
+
+  if [[ "$work_kind" == "ticket" || "$work_kind" == "slice" ]]; then
+    validate_authorization "$plan"
+
+    while IFS= read -r gate_id; do
+      [[ -z "$gate_id" ]] && continue
+      grep -Fq "| $gate_id |" docs/SLICE-ACCEPTANCE-GATES.md ||
+        fail "$plan references unregistered slice gate: $gate_id"
+    done < <(grep -oE 'P[0-9]+-S[0-9]{2}-G[0-9]{2}' "$plan" | sort -u)
+  fi
 fi
 
 printf 'agent-preflight: pass\n'
