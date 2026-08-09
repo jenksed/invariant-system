@@ -239,6 +239,8 @@
       "kind": "implementation-authority",
       "subject_id": "work.kiln.p1-s02-t01",
       "target": {
+        "owner": "owner.joshua-jenks",
+        "scope": "P1-S02-T01 only",
         "repository_sha": "ad319d7c748a6b723b9cff4187fa06c60bc3cf06",
         "plan_path": "docs/work/P1-S02-T01-artifact-evidence-substrate.md",
         "plan_sha256": "sha256:780f9257cccbb38d279784f8dcec4851923f6238686d228a51d1d37c2d791cb3"

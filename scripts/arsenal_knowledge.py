@@ -238,6 +238,9 @@ def validate_snapshot(snapshot: dict[str, Any]) -> list[str]:
             if target.get("repository_sha") != sha:
                 errors.append(f"queries[{i}].target.repository_sha must equal subject.repository_sha")
             if query.get("kind") == "implementation-authority":
+                _require_id(target.get("owner"), f"queries[{i}].target.owner", errors)
+                if not isinstance(target.get("scope"), str) or not target.get("scope"):
+                    errors.append(f"queries[{i}].target.scope is required")
                 if not isinstance(target.get("plan_path"), str) or not target.get("plan_path"):
                     errors.append(f"queries[{i}].target.plan_path is required")
                 if not is_digest(target.get("plan_sha256")):
@@ -419,7 +422,9 @@ def evaluate_authority(snapshot: dict[str, Any], query_id: str) -> dict[str, Any
         candidates = [r for r in snapshot["authorization_records"] if r["subject_id"] == subject_id]
         active = [r for r in candidates if r["status"] == "active"]
         exact = [r for r in active if (
-            r["base_repository_sha"] == target["repository_sha"]
+            r["owner"] == target["owner"]
+            and r["scope"] == target["scope"]
+            and r["base_repository_sha"] == target["repository_sha"]
             and r["plan_path"] == target["plan_path"]
             and r["plan_sha256"] == target["plan_sha256"]
             and sources[r["source_ref"]]["retrieval"]["status"] == "retrieved"

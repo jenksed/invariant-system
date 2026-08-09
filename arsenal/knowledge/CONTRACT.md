@@ -108,6 +108,8 @@ An `authorized` prose claim is necessary context but insufficient authority. An 
 - status;
 - a retrieved, content-digested `owner-authorization` source bound to the same repository state.
 
+An implementation-authority query must carry the expected owner and exact scope in its target alongside the repository SHA, plan path, and plan digest. Record fields are applicability constraints, not presence-only metadata: any owner or scope mismatch fails closed just like SHA or plan drift.
+
 Applicability outcomes are:
 
 | Verdict | Meaning | May implement? |

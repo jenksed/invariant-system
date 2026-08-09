@@ -62,6 +62,16 @@ def main() -> int:
     assert any("unresolved source_ref" in error for error in knowledge.validate_snapshot(unresolved))
     print("PASS unresolved provenance references fail structural validation")
 
+    missing_target_owner = copy.deepcopy(snapshot)
+    del missing_target_owner["queries"][0]["target"]["owner"]
+    assert any("target.owner" in error for error in knowledge.validate_snapshot(missing_target_owner))
+    print("PASS implementation-authority queries require an expected owner")
+
+    missing_target_scope = copy.deepcopy(snapshot)
+    del missing_target_scope["queries"][0]["target"]["scope"]
+    assert any("target.scope" in error for error in knowledge.validate_snapshot(missing_target_scope))
+    print("PASS implementation-authority queries require an expected scope")
+
     top_conflict = copy.deepcopy(snapshot)
     next(s for s in top_conflict["sources"] if s["id"] == "source.kiln.pr48")["authority_rank"] = 0
     blocked = knowledge.evaluate_authority(top_conflict, "query.kft-0.p1-s02-t01-authority")
@@ -107,6 +117,22 @@ def main() -> int:
     assert authorized["may_implement"] is True
     assert authorized["authorization_record_ids"] == ["authorization.test.exact"]
     print("PASS exact owner, scope, base SHA, plan path, and digest can authorize")
+
+    wrong_owner = copy.deepcopy(exact)
+    wrong_owner["authorization_records"][0]["owner"] = "owner.somebody-else"
+    owner_mismatch = knowledge.evaluate_authority(wrong_owner, "query.kft-0.p1-s02-t01-authority")
+    assert owner_mismatch["verdict"] == "STALE"
+    assert owner_mismatch["may_implement"] is False
+    assert owner_mismatch["reason_codes"] == ["AUTHORIZATION_BINDING_MISMATCH"]
+    print("PASS wrong owner cannot authorize an otherwise exact target")
+
+    wrong_scope = copy.deepcopy(exact)
+    wrong_scope["authorization_records"][0]["scope"] = "P1-S02-T99 only"
+    scope_mismatch = knowledge.evaluate_authority(wrong_scope, "query.kft-0.p1-s02-t01-authority")
+    assert scope_mismatch["verdict"] == "STALE"
+    assert scope_mismatch["may_implement"] is False
+    assert scope_mismatch["reason_codes"] == ["AUTHORIZATION_BINDING_MISMATCH"]
+    print("PASS wrong scope cannot authorize an otherwise exact target")
 
     drifted = copy.deepcopy(exact)
     drifted["authorization_records"][0]["plan_sha256"] = "sha256:" + "0" * 64

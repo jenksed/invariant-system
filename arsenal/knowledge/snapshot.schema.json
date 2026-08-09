@@ -199,8 +199,10 @@
         "target": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["repository_sha", "plan_path", "plan_sha256"],
+          "required": ["owner", "scope", "repository_sha", "plan_path", "plan_sha256"],
           "properties": {
+            "owner": {"$ref": "#/$defs/id"},
+            "scope": {"type": "string", "minLength": 1},
             "repository_sha": {"$ref": "#/$defs/gitSha"},
             "plan_path": {"type": "string", "minLength": 1},
             "plan_sha256": {"$ref": "#/$defs/digest"}

@@ -43,7 +43,8 @@ Start from `arsenal/knowledge/snapshot.schema.json` and preserve these rules:
 4. Keep conflicting claims rather than choosing one during extraction.
 5. Separate planning, permission, authorization, implementation, verification, and acceptance claims.
 6. Use an `owner-authorization` source with an exact digest for any authorization record.
-7. Record unavailable Evidence and the retrieval limitation.
-8. Add explicit query seeds so context compilation has a bounded starting point.
+7. Put the expected owner and exact scope on each implementation-authority query target; do not infer either from the candidate record.
+8. Record unavailable Evidence and the retrieval limitation.
+9. Add explicit query seeds so context compilation has a bounded starting point.
 
 The snapshot producer is responsible for truthful observation. The deterministic evaluator validates and resolves the typed input; it does not certify that an extractor read the repository correctly.
