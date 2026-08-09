@@ -1,7 +1,7 @@
 # P1-S02-T01: Artifact content-addressed substrate and typed Evidence module
 
 **Document type:** Implementation plan  
-**Status:** Accepted (prospective authorization for PR #48 adjudication and bounded T01 repair; no retroactive authorization)  
+**Status:** Rejected (PR #48 adjudication completed; plan requires correction before any replacement authorization)  
 **Parent slice:** P1-S02  
 **Branch:** `work/p1-s02-t01-artifact-evidence-substrate`  
 **Depends on:** P1-S01-V01 accepted (P1-S01-T05 slice closeout merged at `db02198` via PR #46)
@@ -188,29 +188,38 @@ P1-S02-D01 durable-substrate prerequisite: create one Artifact row from a determ
 
 ## Completion record
 
-**Result:** Adjudication authorized prospectively; implementation not yet accepted.
+**Result:** Candidate rejected; plan requires governance correction before replacement implementation.
 
-The owner accepted this corrected plan after P0-W34 integrated. Authorization permits rebase of PR #48 onto the trusted authority state, exact-state verification, technical adjudication, and only repairs bounded by this plan. It does not authorize any later P1-S02 ticket and does not retroactively authorize candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
+### Exact adjudication state
+
+- Authority base recorded by P0-W35: `dc375d923c99b9c754d9b53d601b214b0c8941a5`.
+- Invalid first rebase: `01d4258c6abc9f53f0ddb1fb5e3999734af1dbca`; CI run [31293701028](https://github.com/jenksed/kiln/actions/runs/31293701028) failed authorization preflight because P0-W35 carried an incorrect plan digest.
+- Corrected authority source: `d0f9cf424297d1b55f6d3d2bad9478555ebe03ed` through P0-W36.
+- Correctly authorized adjudication head: `7ba158bddff76ade9aca79cb8501e675bd0cded9`.
+- Exact-state CI: [31294035484](https://github.com/jenksed/kiln/actions/runs/31294035484), fully green.
+- Pull request: PR #48, closed without merge.
+- Runtime state on `main`: unchanged; no T01 implementation integrated.
 
 ### Acceptance status
 
 | Criterion | Status | Evidence ID | Result |
 | --- | --- | --- | --- |
-| P1-S02-T01-AC01 | Pending | P1-S02-T01-E01 | rerun after authorized rebase |
-| P1-S02-T01-AC02 | Pending | P1-S02-T01-E02 | rerun after authorized rebase |
-| P1-S02-T01-AC03 | Pending | P1-S02-T01-E03 | rerun after authorized rebase |
-| P1-S02-T01-AC04 | Pending | P1-S02-T01-E04 | rerun after authorized rebase |
-| P1-S02-T01-AC05 | Pending | P1-S02-T01-E05 | rerun after authorized rebase |
-| P1-S02-T01-AC06 | Pending | P1-S02-T01-E06 | source review after authorized rebase |
-| P1-S02-T01-AC07 | Pending | P1-S02-T01-E07 | exact-head CI after authorized rebase |
+| P1-S02-T01-AC01 | Not accepted | P1-S02-T01-E01 | migrations compile/test, but full accepted package failed adjudication |
+| P1-S02-T01-AC02 | Not accepted | P1-S02-T01-E02 | content identity tests pass, but public API is `put/3` rather than accepted `put/2` |
+| P1-S02-T01-AC03 | Not accepted | P1-S02-T01-E03 | bounded rejection tests pass; package rejected on higher-priority defects |
+| P1-S02-T01-AC04 | Fail | P1-S02-T01-E04 | Evidence omits invariant-required result and has no persistence path |
+| P1-S02-T01-AC05 | Fail | P1-S02-T01-E05 | tests do not produce required integrity/contradiction/stale/incomplete classifications |
+| P1-S02-T01-AC06 | Not accepted | P1-S02-T01-E06 | narrow process boundary holds, but package is incomplete |
+| P1-S02-T01-AC07 | Fail as completion Evidence | P1-S02-T01-E07 | CI green but required criteria are not satisfied |
 
-### Verification executed
+### Blocking findings
 
-None under the prospective authorization yet. PR #48's results at pre-authorization commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` remain historical candidate-review inputs only.
+1. `KILN-INV-030` requires Evidence to include method, producer, result, state binding, and freshness; the accepted plan and candidate omit result.
+2. R04 says Evidence is persisted, while the candidate explicitly provides no runtime persistence path.
+3. AC05/R06 requires protected classifications and no false durable state; the tests only observe metadata and defer classification.
+4. Migration 0004 permits durable non-nil TTL and negative TTL through direct persistence.
+5. The accepted plan names `Kiln.Artifact.Store.put/2`; the candidate exposes `put/3`.
 
-### Repository state
+### Required next action
 
-- Authorization base: `dc375d923c99b9c754d9b53d601b214b0c8941a5`.
-- Candidate before authorization: PR #48 at `60367874bfc3c0e6d8cbd736f58e1ae17938943b`.
-- Required next state: a rebased PR #48 head descending from the trusted authority-source commit.
-- Parent slice status: only P1-S02-T01 adjudication and bounded repair are authorized; every later P1-S02 ticket remains unauthorized.
+Return to governance planning. Reconcile the Evidence result/status shape with `KILN-INV-030`, define persistence ownership, specify protected-classification semantics, correct the TTL database invariant, and resolve the Artifact API arity. Only then may the owner accept a replacement T01 plan and issue a new authorization. No P1-S02 runtime work is currently authorized.
