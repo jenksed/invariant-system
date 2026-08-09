@@ -6,15 +6,12 @@ fail() {
   exit 1
 }
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
-cd "$root"
-
-fixture_paths=""
+source_root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+fixture_root=$(mktemp -d)
+template_repo="$fixture_root/template"
 
 cleanup() {
-  for path in $fixture_paths; do
-    rm -f "$path"
-  done
+  rm -rf "$fixture_root"
 }
 trap cleanup EXIT
 
@@ -27,12 +24,11 @@ sha256_file() {
 }
 
 write_ticket_plan() {
-  work_id=$1
-  branch=$2
-  status=$3
-  omit_demo=${4:-no}
-  path="docs/work/${work_id}-preflight-fixture.md"
-  fixture_paths="$fixture_paths $path"
+  local work_id=$1
+  local branch=$2
+  local status=$3
+  local omit_demo=${4:-no}
+  local path="docs/work/${work_id}-preflight-fixture.md"
 
   {
     printf '# %s: Preflight fixture\n\n' "$work_id"
@@ -60,122 +56,307 @@ write_ticket_plan() {
   } >"$path"
 }
 
-write_authorization() {
-  work_id=$1
-  plan=$2
-  state=$3
-  base_sha=$4
-  digest=$5
-  path="docs/authorizations/${work_id}.authorization"
-  fixture_paths="$fixture_paths $path"
+write_slice_plan() {
+  local work_id=$1
+  local branch=$2
+  local status=$3
+  local path="docs/work/${work_id}-preflight-fixture.md"
 
   {
-    printf 'work_id=%s\n' "$work_id"
-    printf 'state=%s\n' "$state"
-    printf 'owner=Preflight Fixture\n'
-    printf 'base_sha=%s\n' "$base_sha"
-    printf 'plan_sha256=%s\n' "$digest"
-    printf 'authorized_at=2026-08-08T12:00:00-04:00\n'
-    printf 'scope=Preflight fixture only\n'
+    printf '# %s: Preflight fixture\n\n' "$work_id"
+    printf '**Document type:** Implementation plan\n'
+    printf '**Status:** %s\n' "$status"
+    printf '**Parent slice:** None\n'
+    printf '**Branch:** `%s`\n' "$branch"
+    printf '**Depends on:** None\n\n'
+    printf '## Objective\nFixture only.\n'
+    printf '## Observed current state\nFixture only.\n'
+    printf '## Assumptions and unknowns\nFixture only.\n'
+    printf '## Requirements\nFixture only.\n'
+    printf '## Proposed changes\nFixture only.\n'
+    printf '## Expected files or components\nFixture only.\n'
+    printf '## Acceptance criteria\nFixture only.\n'
+    printf '## Deterministic verification\nFixture only.\n'
+    printf '## Required completion Evidence\nFixture only.\n'
+    printf '## Explicit exclusions\nFixture only.\n'
+    printf '## Completion record\nFixture only.\n'
   } >"$path"
 }
 
-expect_failure() {
-  branch=$1
-  description=$2
-  if KILN_BRANCH="$branch" scripts/agent-preflight >/dev/null 2>&1; then
-    fail "$description passed preflight"
+write_authorization() {
+  local work_id=$1
+  local state=$2
+  local owner=$3
+  local base_sha=$4
+  local digest=$5
+  local authorized_at=$6
+  local scope=$7
+  local order=${8:-canonical}
+  local path="docs/authorizations/${work_id}.authorization"
+
+  if [[ "$order" == "canonical" ]]; then
+    {
+      printf 'work_id=%s\n' "$work_id"
+      printf 'state=%s\n' "$state"
+      printf 'owner=%s\n' "$owner"
+      printf 'base_sha=%s\n' "$base_sha"
+      printf 'plan_sha256=%s\n' "$digest"
+      printf 'authorized_at=%s\n' "$authorized_at"
+      printf 'scope=%s\n' "$scope"
+    } >"$path"
+  else
+    {
+      printf 'state=%s\n' "$state"
+      printf 'work_id=%s\n' "$work_id"
+      printf 'owner=%s\n' "$owner"
+      printf 'base_sha=%s\n' "$base_sha"
+      printf 'plan_sha256=%s\n' "$digest"
+      printf 'authorized_at=%s\n' "$authorized_at"
+      printf 'scope=%s\n' "$scope"
+    } >"$path"
   fi
 }
 
-head_sha=$(git rev-parse HEAD)
+new_case() {
+  local name=$1
+  prepared_repo="$fixture_root/$name"
+  git clone --quiet --no-hardlinks "$template_repo" "$prepared_repo"
+  mkdir -p "$prepared_repo/docs/work" "$prepared_repo/docs/authorizations"
+  git -C "$prepared_repo" config user.name "Preflight Fixture"
+  git -C "$prepared_repo" config user.email "preflight@example.invalid"
+}
+
+prepare_trusted_ticket() {
+  local name=$1
+  local work_id=$2
+  local branch=$3
+  local status=$4
+  local state=$5
+  local owner=$6
+  local base_mode=$7
+  local digest_mode=$8
+  local authorized_at=$9
+  local scope=${10}
+  local order=${11:-canonical}
+  local base_sha plan digest
+
+  new_case "$name"
+  base_sha=$(git -C "$prepared_repo" rev-parse HEAD)
+  plan="docs/work/${work_id}-preflight-fixture.md"
+
+  (
+    cd "$prepared_repo"
+    write_ticket_plan "$work_id" "$branch" "$status"
+    digest=$(sha256_file "$plan")
+    if [[ "$digest_mode" == "mismatch" ]]; then
+      digest=$(printf '0%.0s' {1..64})
+    fi
+    if [[ "$base_mode" == "malformed" ]]; then
+      base_sha=not-a-commit
+    fi
+    write_authorization "$work_id" "$state" "$owner" "$base_sha" "$digest" "$authorized_at" "$scope" "$order"
+    git add "$plan" "docs/authorizations/${work_id}.authorization"
+    git commit --quiet -m "Add trusted authority fixture"
+    git update-ref refs/remotes/origin/main HEAD
+    git switch --quiet -c "$branch"
+  )
+}
+
+expect_success() {
+  local repo=$1
+  local branch=$2
+  local description=$3
+
+  if ! (cd "$repo" && KILN_BRANCH="$branch" scripts/agent-preflight >/dev/null 2>&1); then
+    fail "$description failed preflight"
+  fi
+}
+
+expect_failure() {
+  local repo=$1
+  local branch=$2
+  local description=$3
+  local expected=${4:-}
+  local output
+
+  if output=$(cd "$repo" && KILN_BRANCH="$branch" scripts/agent-preflight 2>&1); then
+    fail "$description passed preflight"
+  fi
+
+  if [[ -n "$expected" && "$output" != *"$expected"* ]]; then
+    fail "$description failed for the wrong reason: $output"
+  fi
+}
+
+mkdir -p "$template_repo/scripts" "$template_repo/docs/authorizations" "$template_repo/docs/work"
+git init --quiet --initial-branch=main "$template_repo"
+cp "$source_root/scripts/agent-preflight" "$template_repo/scripts/agent-preflight"
+cp "$source_root/docs/authorizations/TRUSTED-OWNERS" "$template_repo/docs/authorizations/TRUSTED-OWNERS"
+touch "$template_repo/AGENTS.md"
+touch "$template_repo/docs/PROJECT-INVARIANTS.md"
+touch "$template_repo/docs/AGENT-FRIENDLY-CODEBASE.md"
+touch "$template_repo/docs/ENGINEERING-QUALITY-RULES.md"
+touch "$template_repo/docs/SLICE-ACCEPTANCE-GATES.md"
+git -C "$template_repo" config user.name "Preflight Fixture"
+git -C "$template_repo" config user.email "preflight@example.invalid"
+git -C "$template_repo" add .
+git -C "$template_repo" commit --quiet -m "Create preflight fixture repository"
 
 valid_id=P9-S99-T99
 valid_branch=work/p9-s99-t99-preflight-fixture
-valid_plan=docs/work/${valid_id}-preflight-fixture.md
-write_ticket_plan "$valid_id" "$valid_branch" Accepted
-valid_digest=$(sha256_file "$valid_plan")
-write_authorization "$valid_id" "$valid_plan" authorized "$head_sha" "$valid_digest"
+prepare_trusted_ticket valid "$valid_id" "$valid_branch" Accepted authorized "Joshua Jenks" valid valid \
+  2026-08-08T12:00:00-04:00 "Preflight fixture only"
+expect_success "$prepared_repo" "$valid_branch" "trusted ticket authorization"
+expect_failure "$prepared_repo" work/p0-w34-enforce-authorization-boundary "spoofed planning branch" \
+  "does not match checked-out branch"
 
-proposed_id=P9-S99-T97
-proposed_branch=work/p9-s99-t97-preflight-fixture
-write_ticket_plan "$proposed_id" "$proposed_branch" Proposed
+new_case valid-slice
+(
+  cd "$prepared_repo"
+  base_sha=$(git rev-parse HEAD)
+  slice_id=P9-S98
+  slice_branch=work/p9-s98-preflight-fixture
+  slice_plan="docs/work/${slice_id}-preflight-fixture.md"
+  write_slice_plan "$slice_id" "$slice_branch" Accepted
+  write_authorization "$slice_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$slice_plan")" \
+    2026-08-08T12:00:00-04:00 "Preflight slice fixture only"
+  git add "$slice_plan" "docs/authorizations/${slice_id}.authorization"
+  git commit --quiet -m "Add trusted slice authority fixture"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$slice_branch"
+)
+expect_success "$prepared_repo" work/p9-s98-preflight-fixture "trusted slice authorization"
 
-missing_id=P9-S99-T96
-missing_branch=work/p9-s99-t96-preflight-fixture
-write_ticket_plan "$missing_id" "$missing_branch" Accepted
+new_case untracked
+(
+  cd "$prepared_repo"
+  branch=work/p9-s99-t98-preflight-fixture
+  work_id=P9-S99-T98
+  git switch --quiet -c "$branch"
+  write_ticket_plan "$work_id" "$branch" Accepted
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  write_authorization "$work_id" authorized "Joshua Jenks" "$(git rev-parse HEAD)" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "Untracked fixture"
+)
+expect_failure "$prepared_repo" work/p9-s99-t98-preflight-fixture "untracked plan and authorization" \
+  "is not tracked Repository authority"
 
-digest_id=P9-S99-T95
-digest_branch=work/p9-s99-t95-preflight-fixture
-digest_plan=docs/work/${digest_id}-preflight-fixture.md
-write_ticket_plan "$digest_id" "$digest_branch" Accepted
-write_authorization "$digest_id" "$digest_plan" authorized "$head_sha" "$(printf '0%.0s' {1..64})"
+new_case local-record
+(
+  cd "$prepared_repo"
+  branch=work/p9-s99-t97-preflight-fixture
+  work_id=P9-S99-T97
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  base_sha=$(git rev-parse HEAD)
+  write_ticket_plan "$work_id" "$branch" Accepted
+  git add "$plan"
+  git commit --quiet -m "Add trusted plan without authorization"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch"
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "Locally issued record"
+)
+expect_failure "$prepared_repo" work/p9-s99-t97-preflight-fixture "locally created untracked authorization" \
+  "is not tracked Repository authority"
 
-state_id=P9-S99-T94
-state_branch=work/p9-s99-t94-preflight-fixture
-state_plan=docs/work/${state_id}-preflight-fixture.md
-write_ticket_plan "$state_id" "$state_branch" Accepted
-write_authorization "$state_id" "$state_plan" revoked "$head_sha" "$(sha256_file "$state_plan")"
+new_case branch-issued
+(
+  cd "$prepared_repo"
+  branch=work/p9-s99-t96-preflight-fixture
+  work_id=P9-S99-T96
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  base_sha=$(git rev-parse HEAD)
+  git switch --quiet -c "$branch"
+  write_ticket_plan "$work_id" "$branch" Accepted
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "Implementation branch self-issue fixture"
+  git add "$plan" "docs/authorizations/${work_id}.authorization"
+  git commit --quiet -m "Self-issue implementation authority"
+)
+expect_failure "$prepared_repo" work/p9-s99-t96-preflight-fixture "implementation-branch-created authority" \
+  "is not identical to trusted Repository authority"
 
-base_id=P9-S99-T93
-base_branch=work/p9-s99-t93-preflight-fixture
-base_plan=docs/work/${base_id}-preflight-fixture.md
-write_ticket_plan "$base_id" "$base_branch" Accepted
-write_authorization "$base_id" "$base_plan" authorized not-a-commit "$(sha256_file "$base_plan")"
+prepare_trusted_ticket arbitrary-owner P9-S99-T95 work/p9-s99-t95-preflight-fixture Accepted authorized \
+  "Arbitrary Agent" valid valid 2026-08-08T12:00:00-04:00 "Arbitrary owner fixture"
+expect_failure "$prepared_repo" work/p9-s99-t95-preflight-fixture "arbitrary owner authorization" \
+  "owner is not registered in trusted Repository authority"
 
-invalid_id=P9-S99-T98
-invalid_branch=work/p9-s99-t98-preflight-fixture
-write_ticket_plan "$invalid_id" "$invalid_branch" Accepted yes
+prepare_trusted_ticket proposed P9-S99-T94 work/p9-s99-t94-preflight-fixture Proposed authorized \
+  "Joshua Jenks" valid valid 2026-08-08T12:00:00-04:00 "Proposed fixture"
+expect_failure "$prepared_repo" work/p9-s99-t94-preflight-fixture "Proposed ticket plan" "is not Accepted"
 
-valid_slice=docs/work/P9-S98-preflight-fixture.md
-fixture_paths="$fixture_paths $valid_slice"
-cat >"$valid_slice" <<'PLAN'
-# P9-S98: Slice integration fixture
+new_case missing-record
+(
+  cd "$prepared_repo"
+  branch=work/p9-s99-t93-preflight-fixture
+  work_id=P9-S99-T93
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  write_ticket_plan "$work_id" "$branch" Accepted
+  git add "$plan"
+  git commit --quiet -m "Add plan without authorization"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch"
+)
+expect_failure "$prepared_repo" work/p9-s99-t93-preflight-fixture "ticket plan without authorization" \
+  "implementation authorization is missing"
 
-**Document type:** Implementation plan
-**Status:** Accepted
-**Parent slice:** None
-**Branch:** `work/p9-s98-preflight-fixture`
-**Depends on:** None
+prepare_trusted_ticket digest P9-S99-T92 work/p9-s99-t92-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid mismatch 2026-08-08T12:00:00-04:00 "Digest fixture"
+expect_failure "$prepared_repo" work/p9-s99-t92-preflight-fixture "authorization with stale plan digest" \
+  "plan_sha256 does not match"
 
-## Objective
-Fixture only.
-## Observed current state
-Fixture only.
-## Assumptions and unknowns
-Fixture only.
-## Requirements
-Fixture only.
-## Proposed changes
-Fixture only.
-## Expected files or components
-Fixture only.
-## Acceptance criteria
-Fixture only.
-## Deterministic verification
-Fixture only.
-## Required completion Evidence
-Fixture only.
-## Explicit exclusions
-Fixture only.
-## Completion record
-Fixture only.
-PLAN
-write_authorization P9-S98 "$valid_slice" authorized "$head_sha" "$(sha256_file "$valid_slice")"
+prepare_trusted_ticket revoked P9-S99-T91 work/p9-s99-t91-preflight-fixture Accepted revoked \
+  "Joshua Jenks" valid valid 2026-08-08T12:00:00-04:00 "Revoked fixture"
+expect_failure "$prepared_repo" work/p9-s99-t91-preflight-fixture "authorization with non-authorized state" \
+  "state is not authorized"
 
-KILN_BRANCH=work/p0-w28-wave-a-conformance scripts/agent-preflight >/dev/null
-KILN_BRANCH="$valid_branch" scripts/agent-preflight >/dev/null
-KILN_BRANCH=work/p9-s98-preflight-fixture scripts/agent-preflight >/dev/null
+prepare_trusted_ticket malformed-base P9-S99-T90 work/p9-s99-t90-preflight-fixture Accepted authorized \
+  "Joshua Jenks" malformed valid 2026-08-08T12:00:00-04:00 "Malformed base fixture"
+expect_failure "$prepared_repo" work/p9-s99-t90-preflight-fixture "authorization with malformed base SHA" \
+  "base_sha is not 40 lowercase hexadecimal characters"
 
-expect_failure "$proposed_branch" "Proposed ticket plan"
-expect_failure "$missing_branch" "ticket plan without authorization"
-expect_failure "$digest_branch" "authorization with stale plan digest"
-expect_failure "$state_branch" "authorization with non-authorized state"
-expect_failure "$base_branch" "authorization with malformed base SHA"
-expect_failure "$invalid_branch" "ticket plan missing Demo contribution"
-expect_failure work/p0-invalid "invalid work branch"
-expect_failure work/p1-s1-t1-bad-width "invalid slice-ticket width"
-expect_failure main "main"
-expect_failure unknown/p0-w28 "unknown branch class"
+prepare_trusted_ticket wrong-order P9-S99-T89 work/p9-s99-t89-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid valid 2026-08-08T12:00:00-04:00 "Order fixture" wrong
+expect_failure "$prepared_repo" work/p9-s99-t89-preflight-fixture "out-of-order authorization keys" \
+  "line 1 must use key work_id"
+
+prepare_trusted_ticket invalid-time P9-S99-T88 work/p9-s99-t88-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid valid 2026-99-99T99:99:99+99:99 "Timestamp fixture"
+expect_failure "$prepared_repo" work/p9-s99-t88-preflight-fixture "invalid RFC 3339 calendar values" \
+  "is not a valid RFC 3339 timestamp"
+
+prepare_trusted_ticket whitespace-owner P9-S99-T87 work/p9-s99-t87-preflight-fixture Accepted authorized \
+  "   " valid valid 2026-08-08T12:00:00-04:00 "Whitespace owner fixture"
+expect_failure "$prepared_repo" work/p9-s99-t87-preflight-fixture "whitespace-only owner" \
+  "owner is empty or whitespace-only"
+
+prepare_trusted_ticket whitespace-scope P9-S99-T86 work/p9-s99-t86-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid valid 2026-08-08T12:00:00-04:00 "   "
+expect_failure "$prepared_repo" work/p9-s99-t86-preflight-fixture "whitespace-only scope" \
+  "scope is empty or whitespace-only"
+
+new_case missing-heading
+(
+  cd "$prepared_repo"
+  branch=work/p9-s99-t85-preflight-fixture
+  work_id=P9-S99-T85
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  write_ticket_plan "$work_id" "$branch" Accepted yes
+  base_sha=$(git rev-parse HEAD)
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "Missing heading fixture"
+  git add "$plan" "docs/authorizations/${work_id}.authorization"
+  git commit --quiet -m "Add incomplete plan fixture"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch"
+)
+expect_failure "$prepared_repo" work/p9-s99-t85-preflight-fixture "ticket plan missing Demo contribution" \
+  "is missing heading: Demo contribution"
+
+(cd "$source_root" && KILN_BRANCH=work/p0-w34-enforce-authorization-boundary scripts/agent-preflight >/dev/null)
+expect_failure "$prepared_repo" work/p0-invalid "invalid work branch"
+expect_failure "$prepared_repo" work/p1-s1-t1-bad-width "invalid slice-ticket width"
+expect_failure "$prepared_repo" main "main"
+expect_failure "$prepared_repo" unknown/p0-w28 "unknown branch class"
 
 printf 'test-agent-preflight: pass\n'

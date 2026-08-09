@@ -23,13 +23,14 @@ Repair the authority conflict exposed by KFT-0 without implementing or accepting
 | P1-S02-T01 reuses `P1-S02-G01` through `G03` with meanings that conflict with the accepted aggregate gate register | T01 plan and `docs/SLICE-ACCEPTANCE-GATES.md` | identifier conflict |
 | P0-W33's completion record remains unpopulated after merge | `docs/work/P0-W33-reconcile-p1-s01-closeout.md` | stale |
 | Required owner-machine manifests are ignored local output and are not retrievable from a fresh checkout | `artifacts/p1-s01/README.md` and KFT-0 retrieval | portability gap |
+| The first P0-W34 preflight revision accepts untracked, self-issued plans and records and does not validate key order, timestamp values, or whitespace-only identity/scope | PR #49 review at `79426582` | blocking enforcement defect |
 
 ## Assumptions and unknowns
 
 ### Assumptions
 
 - **P0-W34-A01:** The owner's instruction to proceed authorizes this governance-only P0-W34 package; it does not retroactively authorize P1-S02-T01.
-- **P0-W34-A02:** A tracked per-work-package authorization record is the smallest deterministic boundary that can carry owner, scope, base SHA, plan digest, and authorization time.
+- **P0-W34-A02:** A tracked per-work-package authorization record plus trusted Repository provenance is the smallest deterministic boundary that can carry owner, scope, base SHA, plan digest, authorization time, and proof that the implementation branch did not self-issue the authority.
 - **P0-W34-A03:** PR #48 can remain open as candidate implementation while authority is repaired, provided no document represents it as accepted or authorized.
 
 ### Unknowns
@@ -42,32 +43,36 @@ Repair the authority conflict exposed by KFT-0 without implementing or accepting
 
 - **P0-W34-R01:** The branch shall remain governance/development-tooling only and shall not modify Kiln runtime source, tests, migrations, dependencies, or PR #48.
 - **P0-W34-R02:** Repository authority shall state that PR #48 is candidate implementation produced before valid repository authorization and is neither accepted nor merge-authorized.
-- **P0-W34-R03:** A ticket or slice implementation branch shall fail preflight unless its governing plan is accepted and a matching tracked authorization record validates.
-- **P0-W34-R04:** An authorization record shall bind work ID, state, owner, exact base SHA, governing-plan SHA-256, authorization time, and bounded scope.
-- **P0-W34-R05:** Preflight tests shall prove rejection of Proposed plans, missing records, plan-digest mismatch, malformed base SHA, and unauthorized state, plus acceptance of one complete valid record.
+- **P0-W34-R03:** A ticket or slice implementation branch shall fail preflight unless its governing plan and matching authorization record are tracked, identical to active trusted Repository authority at canonical `origin/main`, and sourced from a trusted commit ancestral to the implementation state.
+- **P0-W34-R04:** An authorization record shall bind work ID, state, an owner registered by trusted Repository authority, exact base SHA, governing-plan SHA-256, valid RFC 3339 authorization time, and non-whitespace bounded scope in one enforced canonical key order.
+- **P0-W34-R05:** Preflight tests shall prove rejection of Proposed plans, missing records, digest mismatch, malformed base SHA, unauthorized state, locally created or untracked authority, implementation-branch-created authority, arbitrary owners, reordered keys, invalid timestamp values, whitespace-only owner or scope, and branch-class spoofing, plus acceptance of complete trusted ticket and slice records.
 - **P0-W34-R06:** The T01 plan shall remain Proposed, identify PR #48 as candidate-only, remove premature completion Claims, and use accepted aggregate gate identifiers without claiming that T01 satisfies an aggregate gate alone.
 - **P0-W34-R07:** `AGENTS.md`, `docs/PLANNING.md`, `docs/ROADMAP.md`, and `README.md` shall agree on the exact next action and authorization boundary.
 - **P0-W34-R08:** The P0-W33 completion record shall name its actual branch head, merge, PR, scope, and CI Evidence.
 - **P0-W34-R09:** The Artifact location contract shall distinguish ignored local output from durably retrievable Evidence and record the legacy P1-S01 locator gap honestly.
 - **P0-W34-R10:** No P1-S02 implementation shall be authorized, accepted, merged, or modified by this package.
+- **P0-W34-R11:** Pull-request CI shall freshly fetch canonical `main` into the trusted remote-tracking ref before it evaluates implementation authority.
 
 ## Proposed changes
 
-1. Add `docs/IMPLEMENTATION-AUTHORIZATION.md` and `docs/authorizations/README.md` as the human and machine contract for active implementation authorization records.
-2. Extend `scripts/agent-preflight` to require accepted lifecycle state and a valid record for ticket and slice work packages.
-3. Extend `scripts/test-agent-preflight` with positive and protected-negative authorization fixtures.
+1. Add `docs/IMPLEMENTATION-AUTHORIZATION.md`, `docs/authorizations/README.md`, and `docs/authorizations/TRUSTED-OWNERS` as the human and machine contract for active implementation authorization records.
+2. Extend `scripts/agent-preflight` to require accepted lifecycle state, trusted owner identity, canonical record syntax, valid field semantics, tracked files, exact trusted-main blobs, and an ancestral authority-source commit for ticket and slice work packages.
+3. Extend `scripts/test-agent-preflight` with isolated Git repositories that prove trusted positive paths and protected-negative authorization paths without modifying the caller's worktree or index.
 4. Reconcile authority and exact-next-action text in `AGENTS.md`, `README.md`, `docs/PLANNING.md`, and `docs/ROADMAP.md`.
 5. Correct the P1-S02-T01 plan lifecycle, candidate status, base, and aggregate gate contribution.
 6. Close P0-W33's completion record with exact integrated Evidence.
 7. Strengthen `artifacts/p1-s01/README.md` with durable retrieval requirements and the known legacy gap.
+8. Fetch canonical `main` immediately before pull-request preflight so CI evaluates the real trusted remote state.
 
 ## Expected files or components
 
 - `docs/work/P0-W34-enforce-authorization-boundary.md` — governing plan.
 - `docs/IMPLEMENTATION-AUTHORIZATION.md` — authorization authority and lifecycle.
 - `docs/authorizations/README.md` — record format and validation contract.
+- `docs/authorizations/TRUSTED-OWNERS` — exact trusted owner identities.
 - `scripts/agent-preflight` — accepted-plan and authorization enforcement.
 - `scripts/test-agent-preflight` — protected regression matrix.
+- `.github/workflows/ci.yml` — fresh trusted-main fetch before preflight.
 - `AGENTS.md`, `README.md`, `docs/PLANNING.md`, `docs/ROADMAP.md` — synchronized current authority.
 - `docs/work/P1-S02-T01-artifact-evidence-substrate.md` — Proposed candidate-only plan correction.
 - `docs/work/P0-W33-reconcile-p1-s01-closeout.md` — exact closeout record.
@@ -76,8 +81,8 @@ Repair the authority conflict exposed by KFT-0 without implementing or accepting
 ## Acceptance criteria
 
 - **P0-W34-AC01:** Given a ticket or slice plan with any status other than Accepted; When preflight runs; Then it fails before implementation proceeds.
-- **P0-W34-AC02:** Given a ticket or slice plan without a matching valid authorization record; When preflight runs; Then it fails and identifies the missing or invalid field.
-- **P0-W34-AC03:** Given an Accepted plan and valid exact authorization record; When preflight runs; Then it passes the authority gate.
+- **P0-W34-AC02:** Given a ticket or slice plan without a matching valid authorization record, trusted owner, trusted-main identity, or ancestral authority source; When preflight runs; Then it fails and identifies the missing or invalid authority property.
+- **P0-W34-AC03:** Given an Accepted plan and valid exact authorization record integrated on trusted `main`; When an implementation branch descends from that authority source and preflight runs; Then it passes the authority gate.
 - **P0-W34-AC04:** Given the final governance diff; When authority text is inspected; Then P1-S02 remains unauthorized and PR #48 is candidate-only pending explicit adjudication.
 - **P0-W34-AC05:** Given the corrected T01 plan; When compared with the aggregate gate register; Then its gate identifiers exist, its contributions are labeled prerequisite-only, and no completion Claim remains.
 - **P0-W34-AC06:** Given the P1-S01 Artifact contract; When read from a fresh checkout; Then it explains the durable locator requirement and identifies the legacy final-manifest retrieval gap.
@@ -88,6 +93,7 @@ Repair the authority conflict exposed by KFT-0 without implementing or accepting
 ```bash
 scripts/agent-preflight
 scripts/test-agent-preflight
+bash -n scripts/agent-preflight scripts/test-agent-preflight
 scripts/validate-agent-assets
 vale --glob='!{deps,_build}/**' .
 mix format --check-formatted
@@ -103,7 +109,7 @@ The final command must produce no paths. Changes under `scripts/` are developmen
 
 - **P0-W34-E01:** final branch head and compare against `ad319d7`.
 - **P0-W34-E02:** `scripts/agent-preflight` pass for P0-W34.
-- **P0-W34-E03:** `scripts/test-agent-preflight` pass including authority negatives.
+- **P0-W34-E03:** `scripts/test-agent-preflight` pass including untracked, locally self-issued, implementation-branch-issued, arbitrary-owner, branch-spoofing, syntax, semantic-value, and provenance negatives.
 - **P0-W34-E04:** standard Repository validation results.
 - **P0-W34-E05:** empty runtime-path diff for `lib`, `test`, `priv`, `mix.exs`, and `config`.
 - **P0-W34-E06:** exact PR #48 head and candidate-only authority statement.

@@ -67,6 +67,10 @@ jobs:
             | sudo tar -xz -C /usr/local/bin vale
           vale --version
 
+      - name: Fetch trusted implementation authority
+        if: github.event_name == 'pull_request'
+        run: git fetch --no-tags origin main:refs/remotes/origin/main
+
       - name: Validate governing work package
         if: github.event_name == 'pull_request'
         env:

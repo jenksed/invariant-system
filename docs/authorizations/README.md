@@ -14,6 +14,10 @@ authorized_at=<RFC 3339 timestamp>
 scope=<one non-empty line describing the bounded authorized package>
 ```
 
-Values are parsed as data and are never sourced or executed. Blank values, duplicate keys, unknown keys, malformed digests, a non-ancestor base, a work-ID mismatch, or any state other than `authorized` fails preflight.
+The key order shown above is canonical and enforced. Values are parsed as data and are never sourced or executed. Blank or whitespace-only owner and scope values, duplicate or reordered keys, unknown keys, malformed digests, invalid RFC 3339 calendar, clock, or offset values, a non-ancestor base, a work-ID mismatch, an owner absent from `TRUSTED-OWNERS`, or any state other than `authorized` fails preflight.
 
-An authorization record does not prove implementation, verification, acceptance, integration, or delivery. It only permits the bounded package to begin from the recorded authority state.
+The accepted plan and authorization record must both be tracked and byte-identical to their active versions at freshly fetched `refs/remotes/origin/main`. Preflight identifies the trusted commit that contains the exact pair and requires that commit to be ancestral to the implementation state. Creating or committing either file only on an implementation branch cannot issue authority.
+
+`TRUSTED-OWNERS` contains one exact owner identity per line. The registry is read from trusted Repository authority, not from an implementation working-tree edit.
+
+An authorization record does not prove implementation, verification, acceptance, integration, or delivery. It only permits the bounded package to begin after the plan and record integrate through the trusted governance path.
