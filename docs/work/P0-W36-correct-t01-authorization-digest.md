@@ -59,7 +59,6 @@ Correct the active P1-S02-T01 authorization record to the SHA-256 of the exact c
 - **P0-W36-AC02:** P0-W35 history identifies the invalid integrated record and PR #48's preflight rejection.
 - **P0-W36-AC03:** The diff contains no runtime path and does not alter authorization scope.
 - **P0-W36-AC04:** Full Repository CI passes at the exact governance head.
-- **P0-W36-AC05:** A newly rebased PR #48 head passes the authorization preflight before runtime validation runs.
 
 ## Deterministic verification
 
@@ -84,7 +83,7 @@ git diff --name-only d26449e41eb97a316fa6bae4442418397ab29cd3 -- lib test priv m
 - **P0-W36-E02:** exact governance head and CI run.
 - **P0-W36-E03:** empty runtime-path diff.
 - **P0-W36-E04:** exact new main after integration.
-- **P0-W36-E05:** new PR #48 head and authorization preflight result.
+- **Post-integration handoff:** new PR #48 head and authorization preflight result; required before runtime adjudication resumes, but impossible before this authority source integrates.
 
 ## Explicit exclusions
 
@@ -95,10 +94,36 @@ git diff --name-only d26449e41eb97a316fa6bae4442418397ab29cd3 -- lib test priv m
 
 ## Completion record
 
-**Result:** Pending exact-head validation, integration, and a new PR #48 authorization-preflight result.
+**Result:** Authorization digest corrected and governance repair verified. Runtime adjudication remains paused until PR #48 is rebased again onto the integrated P0-W36 authority source and its implementation-head preflight passes.
+
+### Verified Repository state
 
 - Base: `d26449e41eb97a316fa6bae4442418397ab29cd3`.
-- Correct plan digest: `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`.
-- Runtime-path diff: pending.
-- Governance CI: pending.
-- New PR #48 head: pending after integration.
+- Branch: `work/p0-w36-correct-t01-authorization-digest`.
+- Pull request: PR #51.
+- Corrected authority head: `0d0564165e7a94e2017cf77eb413ceda9160c7cb`.
+- Exact accepted-plan blob SHA-256: `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`.
+- Corrected record `plan_sha256`: identical.
+- Exact-head CI: [31293872465](https://github.com/jenksed/kiln/actions/runs/31293872465), success.
+- Runtime-path diff: empty.
+- Final closeout commit: documentation-only and must receive a fresh full CI run before merge.
+
+### Acceptance status
+
+| Criterion | Status | Evidence | Result |
+| --- | --- | --- | --- |
+| P0-W36-AC01 | Pass | P0-W36-E01 | base64-decoded exact GitHub plan blob hashes to `7a064766…`, matching the record |
+| P0-W36-AC02 | Pass | compare | P0-W35 completion now records the invalid merge and failed PR #48 consumer CI |
+| P0-W36-AC03 | Pass | P0-W36-E03 | owner, base, time, scope, and non-retroactivity unchanged; no runtime path changed |
+| P0-W36-AC04 | Pass | P0-W36-E02 | exact corrected authority head is fully CI-green |
+
+### Completion Evidence
+
+- **P0-W36-E01:** `base64 -d` of the GitHub `fadeb6d00f83894539c35f7498790b4f04e3231b` plan blob piped to `sha256sum` produced `7a064766037e1a046f93c6bf82fa8920530aafe943db6933418330c8f43add33`.
+- **P0-W36-E02:** CI run `31293872465` passed governing-package validation, preflight regressions, semantic and JSON Schema validation, agent assets, formatting, warnings-as-errors compilation, cycle checks, direct tests, P1-S01 aggregate gate/upload, and Vale.
+- **P0-W36-E03:** Compare from `d26449e…` changes only the T01 authorization record and P0-W35/P0-W36 governance records.
+- **Post-integration handoff:** after this PR merges, recreate PR #48's unchanged patch on the resulting exact main, require its actual implementation-head preflight to pass, and only then continue technical adjudication.
+
+### Remaining boundary
+
+PR #48 remains unaccepted and unmerged. Its first rebased head `01d4258c…` remains failed Evidence tied to the invalid P0-W35 authority state. No runtime validation result from that head may be promoted. P1-S02-T02 and later work remain unauthorized.
