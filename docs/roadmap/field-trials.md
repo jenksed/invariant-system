@@ -23,6 +23,8 @@ There are two adoption lines:
 
 Kiln may begin a read-only baseline/shadow observation during ARS-09 because that does not route or authorize implementation. **Assisted Kiln development begins only after ARS-09 acceptance and only for work Kiln itself has explicitly authorized.** This lets ARS-10 be designed against real usage without using Arsenal as a backdoor around Kiln's authority model.
 
+The Kiln plan adds explicit promotion gates rather than adopting Arsenal by enthusiasm: KFT-1 requires a minimum prospective evidence package across multiple real episodes before default routing is considered, and KFT-2 re-evaluates continued default use after a bounded cohort. A task class can be demoted back to assisted mode or disabled if the evidence is weak.
+
 ## Field Trial progression
 
 ### FT-0 — Shadow Dogfood
@@ -71,7 +73,7 @@ Kiln's own accepted plans, preflight, invariants, authorization boundaries, tick
 
 The pilot should collect real friction and corrections. It should not manufacture busywork to make Arsenal look useful.
 
-**Exit evidence:** repeated real Kiln tasks show which context/knowledge/capability surfaces help, which create overhead, and what ARS-10 must route or reject.
+**Promotion evidence:** before default routing, the detailed Kiln plan calls for several prospective assisted episodes across multiple task types, a continuation/handoff case, exact repository identity/evidence, measured overhead, zero Arsenal-caused unauthorized implementation, and comparison/ablation evidence strong enough to influence ARS-10. Negative episodes may block promotion.
 
 ### FT-2 — Routed Work
 
@@ -98,6 +100,8 @@ For Kiln, the Intent Compiler must treat current Kiln implementation authorizati
 Arsenal may recommend or compose write-capable work only inside already-authorized capability and repository boundaries. It does not gain production access, secrets, remote-cloud authority, or other consequential authority merely because it routes the task.
 
 Control/treatment or shadow comparisons remain required so we can detect when Arsenal adds ceremony without improving outcomes.
+
+Default use is revisited after a bounded cohort. The supported outcomes include retain, narrow, return to assisted mode, disable for that task class, or open a capability/knowledge/evaluation defect.
 
 ### FT-3 — Evidence-Gated Completion
 
