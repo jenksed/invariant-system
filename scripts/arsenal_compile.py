@@ -211,11 +211,17 @@ def render_agent_skill(
     source_rel: Path,
     bundled: dict[str, bytes],
     embedded_instructions: list[tuple[str, bytes]],
+    resource_map: dict[str, dict[str, str]],
 ) -> str:
+    """Render the generated SKILL.md body.
+
+    The resource_map is an explicit asset_id -> {path, role, load} mapping
+    built by build_agent_skill so the renderer never has to guess or
+    reverse-lookup. Every declared resource must appear in the map.
+    """
     cap = export["_cap_record"]["capability"]
     package = export["package_name"]
     source_asset_id = cap["implementation"]["primary_asset"]
-    ref_name = source_rel.name
     required = ", ".join(f"`{x}`" for x in cap["authority"]["required"]) or "none"
     optional = ", ".join(f"`{x}`" for x in cap["authority"]["optional"]) or "none"
     forbidden = ", ".join(f"`{x}`" for x in cap["authority"]["forbidden"]) or "none"
@@ -242,41 +248,38 @@ def render_agent_skill(
 
     invocation = cap.get("invocation", "agent")
 
-    # Build the bundled-resources section deterministically from the bundled
-    # file map. The primary asset's reference is rendered with an explicit
-    # canonical anchor; other resources are listed in sorted order.
+    # Build the bundled-resources section deterministically from the
+    # explicit resource_map. The primary asset gets a stable "Primary
+    # reference" anchor; every other declared resource is listed in
+    # sorted asset_id order with its explicit packaging path.
     cap_resources = cap.get("implementation", {}).get("resources") or []
     primary_id = cap["implementation"]["primary_asset"]
     resource_lines_parts: list[str] = []
     seen_paths: set[str] = set()
-    primary_rel = f"references/{source_rel.name}"
-    if primary_rel in bundled:
+    if primary_id in resource_map:
+        primary_rel = resource_map[primary_id]["path"]
         resource_lines_parts.append(f"- Primary reference: [`{primary_rel}`]({primary_rel})")
         seen_paths.add(primary_rel)
     for entry in sorted(cap_resources, key=lambda e: e["asset_id"]):
-        # The asset_id itself is recorded as the load role hint.
         asset_id = entry["asset_id"]
-        role = entry["role"]
-        load = entry["load"]
-        # Path resolution mirrors resource_target_path.
         if asset_id == primary_id:
-            target_rel = primary_rel
-        else:
-            # Look up the asset's filename from bundled by reverse search.
-            target_rel = None
-            base_dir = ROLE_DIR.get(role, "references")
-            for path in bundled:
-                if path.startswith(f"{base_dir}/") and path not in seen_paths:
-                    # best-effort: pick the bundled path under the role dir
-                    # whose name matches this asset's known filename. The
-                    # audit guarantees uniqueness within a role directory.
-                    target_rel = path
-                    break
-        if target_rel and target_rel in bundled and target_rel not in seen_paths:
-            resource_lines_parts.append(
-                f"- `{asset_id}` ({role}/{load}): [`{target_rel}`]({target_rel})"
+            continue
+        info = resource_map.get(asset_id)
+        if not info:
+            raise AssertionError(
+                f"declared resource {asset_id!r} is not present in the explicit resource map"
             )
-            seen_paths.add(target_rel)
+        target_rel = info["path"]
+        role = info["role"]
+        load = info["load"]
+        if target_rel in seen_paths:
+            raise AssertionError(
+                f"resource {asset_id!r} packaged to {target_rel!r} collides with another declared resource"
+            )
+        resource_lines_parts.append(
+            f"- `{asset_id}` ({role}/{load}): [`{target_rel}`]({target_rel})"
+        )
+        seen_paths.add(target_rel)
     resource_lines = "\n".join(resource_lines_parts) if resource_lines_parts else "_(none)_"
 
     # Always-loaded instructions content is appended to the body so the
@@ -408,7 +411,9 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
 
     bundled: dict[str, bytes] = {}
     embedded_instructions: list[tuple[str, bytes]] = []
-    declared_paths: set[str] = set()
+    declared_paths: set[tuple[str, str]] = set()  # (asset_id, target_str)
+    target_to_assets: dict[str, list[str]] = {}
+    resource_map: dict[str, dict[str, str]] = {}
 
     for entry in resources:
         asset_id = entry["asset_id"]
@@ -426,13 +431,24 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
             )
         target_rel = resource_target_path(role, asset_path)
         target_str = target_rel.as_posix()
-        if target_str in declared_paths:
+        # Track which assets map to which packaging paths. Two assets with
+        # the same role and source basename would collide; surface that
+        # explicitly instead of silently overwriting one.
+        target_to_assets.setdefault(target_str, []).append(asset_id)
+        if len(target_to_assets[target_str]) > 1:
+            existing = ", ".join(target_to_assets[target_str])
             raise AssertionError(
-                f"duplicate resource packaging path {target_str!r} for asset {asset_id!r}"
+                f"packaging path collision at {target_str!r}: assets {existing} share the "
+                f"role=reference basename; rename the underlying files or assign distinct roles"
             )
-        declared_paths.add(target_str)
+        declared_paths.add((asset_id, target_str))
         content = abs_path.read_bytes()
         bundled[target_str] = content
+        if asset_id in resource_map:
+            raise AssertionError(
+                f"asset_id {asset_id!r} declared as a resource multiple times"
+            )
+        resource_map[asset_id] = {"path": target_str, "role": role, "load": load}
         if role == "instructions" and load == "always":
             embedded_instructions.append((asset_id, content))
 
@@ -445,12 +461,37 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
             f"promote to role=reference or split the resource"
         )
 
+    # Per-resource always-loaded policy: each individual always-loaded
+    # resource must fit the documented soft limit. Aggregate is checked
+    # above; per-resource protects against one giant instructions asset
+    # silently inflating the entrypoint body.
+    for asset_id, content in embedded_instructions:
+        if len(content) > INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES:
+            raise AssertionError(
+                f"always-loaded resource {asset_id!r} exceeds documented soft limit "
+                f"({len(content)} > {INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES} bytes); "
+                f"promote to role=reference or split the resource"
+            )
+
+    # Record per-resource digests in the manifest so qualification can
+    # measure actual packaged bytes rather than trust metadata.
+    resource_digests = [
+        {"asset_id": asset_id, "path": info["path"], "sha256": sha256_bytes(bundled[info["path"]])}
+        for asset_id, info in sorted(resource_map.items())
+    ]
+
     generated: dict[str, bytes] = {
-        "SKILL.md": render_agent_skill(export, source_rel, bundled, embedded_instructions).encode("utf-8"),
+        "SKILL.md": render_agent_skill(export, source_rel, bundled, embedded_instructions, resource_map).encode("utf-8"),
     }
     generated.update(bundled)
 
     content_digest = digest_file_map(generated)
+
+    # Compute per-resource always-loaded totals from packaged bytes.
+    always_loaded_bytes_per_resource = {
+        asset_id: len(content) for asset_id, content in embedded_instructions
+    }
+    always_loaded_bytes_total = sum(always_loaded_bytes_per_resource.values())
 
     manifest = {
         "schema_version": "1.0.0",
@@ -469,7 +510,14 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
         "authority": cap["authority"],
         "mutation": cap["mutation"],
         "execution": cap["execution"],
+        "invocation": cap["invocation"],
         "resources": resources,
+        "resource_digests": resource_digests,
+        "always_loaded_policy": {
+            "soft_limit_bytes": INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES,
+            "per_resource_bytes": always_loaded_bytes_per_resource,
+            "total_bytes": always_loaded_bytes_total,
+        },
         "source": {
             "capability_path": cap_record["path"].relative_to(root).as_posix(),
             "capability_sha256": sha256_bytes(cap_record["path"].read_bytes()),
@@ -478,13 +526,15 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
             "primary_asset_sha256": sha256_bytes(source_path.read_bytes()),
         },
         # Adapter qualification is a separate evidence claim from capability
-        # lifecycle. It starts at unassessed and is updated by Arsenal Bench
-        # (scripts/arsenal_bench.py qualify) based on the four-axis cases.
+        # lifecycle. The compiler owns this stub (status=unassessed) and
+        # records only the identifier of the suite that should be used to
+        # evaluate it. Truth lives in the receipt produced by
+        # scripts/arsenal_bench.py qualify.
         "distribution_qualification": {
             "status": "unassessed",
             "target": export["target"],
             "adapter_version": export["adapter_version"],
-            "suite_id": f"suite.distribution-qualification-v0",
+            "suite_id": derive_default_suite_id(cap["id"]),
             "evidence_paths": [],
         },
         "package": {
@@ -498,6 +548,15 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
     }
     generated["arsenal-manifest.json"] = canonical_json(manifest)
     return generated, manifest
+
+
+def derive_default_suite_id(capability_id: str) -> str:
+    """Deterministic mapping from capability_id to default qualification suite.
+
+    The compiler only records the suite identifier it expects the bench to
+    evaluate against; actual qualification truth is owned by receipts.
+    """
+    return f"suite.distribution-qualification-{capability_id.removeprefix('capability.')}-v0"
 
 
 def build_outputs(root: Path, output_root: Path, plan_path: Path) -> tuple[dict[str, Any], list[Path]]:
