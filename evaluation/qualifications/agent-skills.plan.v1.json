@@ -1,0 +1,130 @@
+{
+  "adapter_version": "1.0.0",
+  "axes": {
+    "activation": {
+      "executed": 2,
+      "failed": 0,
+      "passed": 2,
+      "total": 3
+    },
+    "behavioral_efficacy": {
+      "executed": 0,
+      "failed": 0,
+      "passed": 0,
+      "total": 2
+    },
+    "boundary_preservation": {
+      "executed": 5,
+      "failed": 0,
+      "passed": 5,
+      "total": 5
+    },
+    "context_efficiency": {
+      "executed": 3,
+      "failed": 0,
+      "passed": 3,
+      "total": 3
+    }
+  },
+  "candidate_ready": true,
+  "capability_id": "capability.plan",
+  "case_results": [
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-discovery-matches-derive",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-should-not-invoke-brainstorm",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-collision-with-spec",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "behavioral_efficacy",
+      "case_id": "dq-plan-behavioral-efficacy-vs-baseline",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "behavioral_efficacy",
+      "case_id": "dq-plan-behavioral-efficacy-vs-prior-revision",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-identity",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-mutation",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-authority",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-execution",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-invocation",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-entrypoint-size",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-reference-count",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-no-oversized-always",
+      "execution": "executed",
+      "status": "PASS"
+    }
+  ],
+  "claim_scope": "Structural evidence over manifest content only. Behavioral efficacy evidence remains designed-not-run in v0 and is required for qualified status. Adapter qualification is a separate evidence claim from capability lifecycle and does not promote canonical capability state.",
+  "counts": {
+    "designed_not_run": 3,
+    "executed": 10,
+    "failed": 0,
+    "passed": 10,
+    "total": 13
+  },
+  "limitations": [
+    "Designed-not-run cases provide no execution evidence.",
+    "Structural checks verify manifest content; they cannot detect runtime misbehavior by the harness.",
+    "Behavioral efficacy requires model invocation that is out of scope for the deterministic v0 Bench."
+  ],
+  "qualification_id": "qualification.capability.plan.agent-skills.1.0.0",
+  "qualified_ready": false,
+  "schema_version": "1.0.0",
+  "status": "candidate",
+  "suite_id": "suite.distribution-qualification-plan-v0",
+  "target": "agent-skills"
+}

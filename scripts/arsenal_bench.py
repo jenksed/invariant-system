@@ -141,7 +141,8 @@ def validate_suites(suites: list[dict]) -> list[str]:
         if not isinstance(cases, list) or not cases:
             errors.append(f"{sid}: cases must be non-empty")
             continue
-        totals[suite.get("track", "<missing>")] = len(cases)
+        track = suite.get("track", "<missing>")
+        totals[track] = totals.get(track, 0) + len(cases)
         for case in cases:
             errors.extend(validate_case(case))
             cid = case.get("id")
@@ -414,7 +415,8 @@ def cmd_validate(_args) -> int:
         return 1
     by_track: dict[str, int] = {}
     for suite in suites:
-        by_track[suite.get("track", "<missing>")] = len(suite.get("cases", []))
+        track = suite.get("track", "<missing>")
+        by_track[track] = by_track.get(track, 0) + len(suite.get("cases", []))
     core = by_track.get("core-engineering", 0)
     lc = by_track.get("local-cloud", 0)
     dq = by_track.get("distribution-qualification", 0)

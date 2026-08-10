@@ -28,7 +28,9 @@ def expect_fail(label: str, plan: dict) -> None:
 def main() -> int:
     plan = compiler.load_json(ROOT / "arsenal/compiler/export-plan.json")
     exports = compiler.validate_plan_data(plan, ROOT)
-    assert len(exports) == 1
+    assert len(exports) >= 1
+    cap_ids = [e["capability_id"] for e in exports]
+    assert "capability.repository-truth" in cap_ids, cap_ids
     print("PASS valid ARS-03 export plan")
 
     bad = copy.deepcopy(plan)
@@ -60,7 +62,9 @@ def main() -> int:
         lock_a, files_a = compiler.build_outputs(ROOT, tmp_root / "a", ROOT / "arsenal/compiler/export-plan.json")
         lock_b, files_b = compiler.build_outputs(ROOT, tmp_root / "b", ROOT / "arsenal/compiler/export-plan.json")
         assert compiler.canonical_json(lock_a) == compiler.canonical_json(lock_b)
-        assert len(files_a) == len(files_b) == 3
+        # 3 generated files per export (SKILL.md, arsenal-manifest.json, references/<asset>).
+        expected_files = 3 * len(exports)
+        assert len(files_a) == len(files_b) == expected_files, (len(files_a), len(files_b), expected_files)
 
         out_rel = Path(plan["exports"][0]["output_path"])
         problems = compiler.compare_trees(tmp_root / "a" / out_rel, tmp_root / "b" / out_rel)

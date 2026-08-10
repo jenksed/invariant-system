@@ -121,6 +121,42 @@ def main() -> int:
         assert receipt["qualified_ready"] is False
         print("PASS distribution-qualification tracer reaches candidate status")
 
+    # Second distribution-qualification tracer: Plan capability compiled to
+    # agent-skills. Slice 5 establishes that the qualification track scales
+    # beyond the original Repository Truth tracer.
+    with tempfile.TemporaryDirectory(prefix="arsenal-bench-qualify-plan-test-") as tmp:
+        receipt_path = Path(tmp) / "qualification.json"
+        argv = [
+            "qualify",
+            "--suite", "suite.distribution-qualification-plan-v0",
+            "--receipt", str(receipt_path),
+        ]
+        original_argv = sys.argv
+        original_stderr = sys.stderr
+        sys.argv = ["arsenal_bench"] + argv
+        sys.stderr = StringIO()
+        try:
+            rc = bench.main()
+            err_output = sys.stderr.getvalue()
+        finally:
+            sys.argv = original_argv
+            sys.stderr = original_stderr
+        assert rc == 0, f"qualify command exited with {rc}, expected 0 (candidate); stderr: {err_output}"
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        assert receipt["status"] == "candidate", f"expected status=candidate, got {receipt['status']!r}"
+        assert receipt["target"] == "agent-skills"
+        assert receipt["adapter_version"] == "1.0.0"
+        assert receipt["capability_id"] == "capability.plan"
+        assert receipt["candidate_ready"] is True
+        # Slice 5 deliberately exercises the largest existing workflow asset
+        # (2817 lines) to confirm the size discipline still holds.
+        body_size = next(
+            (r for r in receipt["case_results"] if r["case_id"] == "dq-plan-context-efficiency-entrypoint-size"),
+            None,
+        )
+        assert body_size is not None, "Plan context-efficiency case missing"
+        print("PASS distribution-qualification Plan tracer reaches candidate status")
+
     return 0
 
 
