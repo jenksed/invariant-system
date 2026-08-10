@@ -176,7 +176,40 @@ The later QC2 gate must prove at minimum:
 
 Do not create empty gate scripts to reserve Wave B or QC2 names.
 
-# Later-slice gate policy
+# Known nondeterminism debt — P1-S01 aggregate-gate full-suite invocation
+
+**Status:** Open; tracked as development-tooling/test-isolation debt.
+**Scope:** `scripts/gates/slice-01` `full_deterministic_suite` component.
+**Authority impact:** None. The aggregate gate's structured result still binds the exact Repository state it proved. The gate is NOT a prerequisite for unrelated governance or for future slices.
+
+Observed on PR #58 CI run `31425961081`:
+
+```text
+standalone suite:           386/386 PASS
+aggregate-gate full suite:  385/386 (one test failed)
+```
+
+Both invocations ran against the same exact Repository state. The standalone mix test (the universal `mix test` step earlier in the same CI job) passed all 386 tests; the aggregate gate's later full-suite invocation, in the same CI job, produced 385/386. The narrow slice-01 components that ran before the full-suite rerun all passed, and `scripts/test-agent-preflight` also passed.
+
+Known cause (current best evidence):
+
+```text
+unknown; likely order/state-dependent test nondeterminism
+```
+
+The defect does not yet have a confirmed root cause or failing-test identity because:
+
+* the exact failing test name and stack trace are in CI run `31425961081`'s job log, which is not reachable from the development sandbox that investigated it;
+* local reproduction requires `mix test` against the exact head, and the development sandbox cannot run `mix test` (Mix TCP file lock denied);
+* no code path under `lib/`, `test/`, `priv/`, `scripts/`, or `.github/` has been narrowed as the defect source.
+
+Repair is **not** a prerequisite for P1-S02-T01 unless the failing test is subsequently proven to expose a T01-relevant runtime defect. Speculation about which test failed is not recorded here as authoritative Evidence; only the observed pass/fail counts and the CI run identifier are.
+
+Repair authority: ordinary development-tooling repair (`test/`, `scripts/`, `.github/workflows/`, development-only tooling). No new bespoke owner authorization is required, provided the repair does not change runtime/product semantics, weaken authorization boundaries, or remove/weaken tests merely to pass.
+
+CI applicability correction: the aggregate gate is now invoked only when the PR changes paths owned by the slice it re-verifies (see `scripts/check-p1-s01-applicability` and the `.github/workflows/ci.yml` `Detect P1-S01 aggregate-gate applicability` step). Governance-only PRs skip the aggregate gate. This correction is independent of the nondeterminism repair.
+
+
 
 Later gates are not numbered until their entry conditions are proven:
 

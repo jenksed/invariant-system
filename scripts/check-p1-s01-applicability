@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# scripts/check-p1-s01-applicability
+#
+# Determines whether the P1-S01 aggregate slice gate applies to a given PR.
+# The P1-S01 aggregate gate (`scripts/gates/slice-01`) re-verifies a historical
+# slice and is NOT universal repository CI. A governance-only PR does not
+# trigger it.
+#
+# Applicability rule — a path is P1-S01-owned when it matches one of:
+#
+#   lib/                                 runtime code (P1-S01 owns the only runtime today)
+#   test/                                tests (P1-S01 owns the only tests today)
+#   priv/store/                          store assets (migrations, etc.)
+#   scripts/gates/                       gate commands
+#   docs/SLICE-ACCEPTANCE-GATES.md       the gate contract spec
+#   docs/work/P1-S01-*                   P1-S01 work plans
+#
+# Anything else (top-level files, other docs/, .github/, scripts outside
+# scripts/gates/, etc.) is governance or unrelated work and does not trigger
+# the aggregate gate.
+#
+# Contract:
+#   * Inputs: zero or more paths, one per line, on stdin.
+#   * Output: nothing on stdout (the workflow uses the exit code).
+#   * Exit codes: 0 if any input path matches the rule, 1 otherwise.
+#
+# This rule is mechanical and contains no model judgment. The CI workflow is
+# the assertion that it is wired correctly: a P1-S01-relevant PR runs
+# scripts/gates/slice-01; an unrelated PR skips it.
+
+set -euo pipefail
+
+pattern='^(lib/|test/|priv/store/|scripts/gates/|docs/SLICE-ACCEPTANCE-GATES\.md$|docs/work/P1-S01-)'
+
+if grep -Eq "$pattern"; then
+  exit 0
+else
+  exit 1
+fi

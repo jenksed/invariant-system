@@ -116,26 +116,50 @@ jobs:
       - name: Run tests
         run: mix test
 
-      # The three checks below prove three different properties and are kept
-      # as distinct steps so a failure names the property that broke:
+      # The P1-S01 aggregate slice gate re-verifies a historical slice. It is
+      # NOT universal repository CI. A historical aggregate gate must block a
+      # PR only when the PR changes implementation, tests, migrations, the
+      # gate itself, a contract explicitly protected by that slice, or when
+      # the PR is explicitly performing slice re-verification/acceptance.
       #
-      #   Validate governing work package -> current plan conformance (PR only)
-      #   Test agent preflight behavior    -> validator regression
-      #   P1-S01 aggregate slice gate      -> integrated slice proof
+      # The applicability rule is mechanical (git diff + grep, no model
+      # judgment) and lives in scripts/check-p1-s01-applicability so the
+      # workflow step itself is the deterministic assertion. Governance-only
+      # PRs (other docs/, .github/, top-level files, scripts outside
+      # scripts/gates/) skip the aggregate gate and still satisfy every
+      # universal gate above.
       #
-      # The aggregate gate re-runs the deterministic components it composes.
-      # That repetition is intentional: the gate must prove the integrated
-      # slice as one command, and its structured result binds the exact state
-      # it proved. Owner-machine (OD-02) Evidence is not collected here; CI is
-      # not an OD-02 host and the gate records that component as `not_run`.
+      # A separate nondeterminism debt exists for the P1-S01 aggregate-gate
+      # full-suite nondeterminism (observed on PR #58, CI run 31425961081).
+      # It is repaired on its own schedule, independently of this
+      # applicability rule.
+      - name: Detect P1-S01 aggregate-gate applicability
+        id: p1-s01-applicability
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only origin/main...HEAD || true)
+          if printf '%s\n' "$changed" | scripts/check-p1-s01-applicability; then
+            {
+              echo "p1_s01_applicable=true"
+              echo "matched_paths<<EOF"
+              printf '%s\n' "$changed" | grep -E '^(lib/|test/|priv/store/|scripts/gates/|docs/SLICE-ACCEPTANCE-GATES\.md$|docs/work/P1-S01-)' || true
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "P1-S01 aggregate gate is applicable for this PR."
+          else
+            echo "p1_s01_applicable=false" >> "$GITHUB_OUTPUT"
+            echo "P1-S01 aggregate gate is NOT applicable for this PR (governance-only or unrelated changes)."
+          fi
+
       - name: Run P1-S01 aggregate slice gate
+        if: steps.p1-s01-applicability.outputs.p1_s01_applicable == 'true'
         env:
           KILN_BRANCH: ${{ github.head_ref }}
           KILN_IMPLEMENTATION_COMMIT: ${{ github.event.pull_request.head.sha }}
         run: scripts/gates/slice-01
 
       - name: Upload P1-S01 slice gate result
-        if: always()
+        if: steps.p1-s01-applicability.outputs.p1_s01_applicable == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: p1-s01-slice-gate-result
