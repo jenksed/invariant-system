@@ -1,7 +1,7 @@
 # P0-W39: Adopt project-arsenal as a development-agent dependency
 
 **Document type:** Development-tooling work package
-**Status:** Accepted
+**Status:** Implemented; integration verification pending
 **Branch:** `work/p0-w39-adopt-project-arsenal-dependency`
 **Base:** `main` at `f9b5a312ac31ee4015025a87bcd3cec199b12297`
 **Implementation authorization:** None; this work package does not authorize P1-S01 or P1-S02 product implementation
@@ -94,8 +94,8 @@ Claude Code should discover the upstream `repository-truth` package through the 
 - **P0-W39-AC03**
   - **Given** the new verifier
   - **When** it runs
-  - **Then** it asserts the superproject gitlink mode `160000`, the recorded gitlink SHA `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, the materialized submodule working-tree HEAD (when initialized) matching the same SHA, the canonical remote URL, the expected `.arsenal.lock` plan digest, the expected `repository-truth` package digest (with exactly one matching agent-skills export), and the symlink resolution; it exits non-zero when any of these drift and prints a clear actionable message
-  - **Evidence:** verifier output plus nine deliberate negative cases (submodule not initialized; superproject gitlink SHA differs from approved pin; materialized submodule HEAD differs from approved pin; wrong canonical URL; missing or invalid lockfile; wrong plan digest; wrong `repository-truth` package digest; broken or redirected skill symlink; missing or non-executable verifier when the validator runs)
+  - **Then** it asserts the superproject gitlink mode `160000`, the recorded gitlink SHA `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, the materialized submodule working-tree HEAD (when initialized) matching the same SHA, the canonical remote URL, the `.gitmodules` section-bound `path` and `url` (looked up via `git config -f .gitmodules --get submodule.<path>.{path,url}` and compared exactly), the expected `.arsenal.lock` plan digest, the expected `repository-truth` package digest (with exactly one matching agent-skills export), and the symlink resolution; it exits non-zero when any of these drift and prints a clear actionable message
+  - **Evidence:** verifier output plus ten deliberate negative cases (submodule not initialized; superproject gitlink SHA differs from approved pin; materialized submodule HEAD differs from approved pin; wrong canonical URL; wrong `.gitmodules` `path`; missing or invalid lockfile; wrong plan digest; wrong `repository-truth` package digest; broken or redirected skill symlink; missing or non-executable verifier when the validator runs)
 
 - **P0-W39-AC04**
   - **Given** the extension to `scripts/validate-agent-assets`
@@ -107,7 +107,7 @@ Claude Code should discover the upstream `repository-truth` package through the 
   - **Given** the CI change
   - **When** the test job's checkout step runs
   - **Then** the pinned submodule is initialized before `scripts/validate-agent-assets` runs, while `fetch-depth: 0`, the trusted implementation-head fetch logic, and existing `scripts/agent-preflight` behavior are preserved
-  - **Evidence:** the `.github/workflows/ci.yml` diff and the resulting CI run on the exact final PR head
+  - **Evidence:** the `.github/workflows/ci.yml` diff and the resulting CI run bound to the actual integration PR head reported by GitHub at merge time
 
 - **P0-W39-AC06**
   - **Given** the documentation updates
@@ -149,15 +149,15 @@ The Elixir checks are unchanged from the base because this branch changes no Eli
 
 ## Required completion Evidence
 
-Each Evidence row below was recollected against the exact final PR head recorded in the Completion record, after all final-state commits. No Evidence predates the final head.
+Each Evidence row below was collected against a tracked commit that contains the same deterministic checks this work package requires. The Evidence rows record check outputs, not the SHA of the commit that contains them. Integration-layer Evidence (the actual PR head SHA, the exact CI run ID, and the merge decision) lives in the PR body/comment and GitHub metadata, not inside the tracked work package.
 
 | Evidence ID | Criterion | Result |
 | --- | --- | --- |
 | P0-W39-E01 | P0-W39-AC01 | `git ls-files --stage .claude/dependencies/project-arsenal` → `160000 ecc8797d45447060b0c4aacd8efb6b1909e9e690 0\t.claude/dependencies/project-arsenal`; `.gitmodules` declares `[submodule ".claude/dependencies/project-arsenal"]` with `path = .claude/dependencies/project-arsenal` and `url = https://github.com/jenksed/project-arsenal.git`. |
 | P0-W39-E02 | P0-W39-AC02 | `readlink -f .claude/skills/repository-truth` → `<root>/.claude/dependencies/project-arsenal/distribution/agent-skills/repository-truth`; `head -n 20` of the resolved `SKILL.md` begins with `---`, `name: repository-truth`, and the documented description and metadata block; `readlink` target is inside the pinned submodule and cannot escape. |
-| P0-W39-E03 | P0-W39-AC03 | Positive: `check-project-arsenal-dependency: pass` with superproject gitlink SHA `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, materialized `HEAD` `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, remote URL `https://github.com/jenksed/project-arsenal.git`, plan digest `sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`, package digest `sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`, and exactly one `agent-skills` `repository-truth` export. Nine deliberate negative cases executed against the final head, each restoring the working tree afterward (recorded verbatim): (1) submodule working tree moved aside: `check-project-arsenal-dependency: submodule working tree is missing at .claude/dependencies/project-arsenal; run: git submodule update --init`, exit 1; (2) superproject gitlink SHA replaced via `git update-index --add --cacheinfo 160000,deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,…`: `check-project-arsenal-dependency: superproject gitlink SHA for .claude/dependencies/project-arsenal is deadbeefdeadbeefdeadbeefdeadbeefdeadbeef; expected pinned commit ecc8797d45447060b0c4aacd8efb6b1909e9e690`, exit 1; (3) divergent commit created inside the submodule (HEAD drifted to `dba4b6460f1f0b040b1f0e39a0c34a69399664a7`): `check-project-arsenal-dependency: submodule .claude/dependencies/project-arsenal is at dba4b6460f1f0b040b1f0e39a0c34a69399664a7; expected pinned commit ecc8797d45447060b0c4aacd8efb6b1909e9e690`, exit 1; (4) canonical URL replaced in `.gitmodules`: `check-project-arsenal-dependency: .gitmodules does not pin the canonical URL: https://github.com/jenksed/project-arsenal.git`, exit 1; (5a) lockfile moved aside: `check-project-arsenal-dependency: lockfile is missing: .claude/dependencies/project-arsenal/.arsenal.lock`, exit 1; (5b) lockfile replaced with malformed JSON: `check-project-arsenal-dependency: lockfile is not valid JSON: .claude/dependencies/project-arsenal/.arsenal.lock (Expecting property name enclosed in double quotes)`, exit 1; (6) plan digest replaced in the lockfile with `sha256:0000…0000`: `check-project-arsenal-dependency: lockfile plan_sha256 is sha256:0000000000000000000000000000000000000000000000000000000000000000; expected sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`, exit 1; (7) `repository-truth` package digest replaced in the lockfile with `sha256:0000…0000`: `check-project-arsenal-dependency: lockfile repository-truth package_sha256 is sha256:0000000000000000000000000000000000000000000000000000000000000000; expected sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`, exit 1; (8a) skill symlink moved aside: `check-project-arsenal-dependency: expected symlink at .claude/skills/repository-truth`, exit 1; (8b) skill symlink redirected to a non-resolving path: `check-project-arsenal-dependency: .claude/skills/repository-truth could not be resolved`, exit 1; (9a) verifier moved aside, validator run: `validate-agent-assets: project-arsenal dependency verifier is missing: scripts/check-project-arsenal-dependency`, exit 1; (9b) verifier made non-executable, validator run: `validate-agent-assets: project-arsenal dependency verifier is not executable: scripts/check-project-arsenal-dependency`, exit 1. |
+| P0-W39-E03 | P0-W39-AC03 | Positive: `check-project-arsenal-dependency: pass` with superproject gitlink SHA `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, materialized `HEAD` `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, remote URL `https://github.com/jenksed/project-arsenal.git`, plan digest `sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`, package digest `sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`, and exactly one `agent-skills` `repository-truth` export. The `.gitmodules` section-bound lookup returns `path = .claude/dependencies/project-arsenal` and `url = https://github.com/jenksed/project-arsenal.git`. Ten deliberate negative cases executed against the tracked state, each restoring the working tree afterward (recorded verbatim): (1) submodule working tree moved aside: `check-project-arsenal-dependency: submodule working tree is missing at .claude/dependencies/project-arsenal; run: git submodule update --init`, exit 1; (2) superproject gitlink SHA replaced via `git update-index --add --cacheinfo 160000,deadbeefdeadbeefdeadbeefdeadbeefdeadbeef,…`: `check-project-arsenal-dependency: superproject gitlink SHA for .claude/dependencies/project-arsenal is deadbeefdeadbeefdeadbeefdeadbeefdeadbeef; expected pinned commit ecc8797d45447060b0c4aacd8efb6b1909e9e690`, exit 1; (3) divergent commit created inside the submodule (HEAD drifted to `dba4b6460f1f0b040b1f0e39a0c34a69399664a7`): `check-project-arsenal-dependency: submodule .claude/dependencies/project-arsenal is at dba4b6460f1f0b040b1f0e39a0c34a69399664a7; expected pinned commit ecc8797d45447060b0c4aacd8efb6b1909e9e690`, exit 1; (4a) canonical URL replaced in `.gitmodules`: `check-project-arsenal-dependency: .gitmodules url for .claude/dependencies/project-arsenal is 'https://github.com/attacker/project-arsenal.git'; expected 'https://github.com/jenksed/project-arsenal.git'`, exit 1; (4b) `.gitmodules` `path` replaced with `.claude/dependencies/WRONG-path`: `check-project-arsenal-dependency: .gitmodules does not declare path for submodule .claude/dependencies/project-arsenal`, exit 1; (5a) lockfile moved aside: `check-project-arsenal-dependency: lockfile is missing: .claude/dependencies/project-arsenal/.arsenal.lock`, exit 1; (5b) lockfile replaced with malformed JSON: `check-project-arsenal-dependency: lockfile is not valid JSON: .claude/dependencies/project-arsenal/.arsenal.lock (Expecting property name enclosed in double quotes)`, exit 1; (6) plan digest replaced in the lockfile with `sha256:0000…0000`: `check-project-arsenal-dependency: lockfile plan_sha256 is sha256:0000000000000000000000000000000000000000000000000000000000000000; expected sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`, exit 1; (7) `repository-truth` package digest replaced in the lockfile with `sha256:0000…0000`: `check-project-arsenal-dependency: lockfile repository-truth package_sha256 is sha256:0000000000000000000000000000000000000000000000000000000000000000; expected sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`, exit 1; (8a) skill symlink moved aside: `check-project-arsenal-dependency: expected symlink at .claude/skills/repository-truth`, exit 1; (8b) skill symlink redirected to a non-resolving path: `check-project-arsenal-dependency: .claude/skills/repository-truth could not be resolved`, exit 1; (9a) verifier moved aside, validator run: `validate-agent-assets: project-arsenal dependency verifier is missing: scripts/check-project-arsenal-dependency`, exit 1; (9b) verifier made non-executable, validator run: `validate-agent-assets: project-arsenal dependency verifier is not executable: scripts/check-project-arsenal-dependency`, exit 1. |
 | P0-W39-E04 | P0-W39-AC04 | `validate-agent-assets: pass` followed by `skills: 5`, `specialist agents: 3`, `prompt templates: 3`, `doctrine version: 1.0.0`, `project-arsenal dependency: verified`; the existing Kiln-owned asset and doctrine checks run first; the dependency verifier runs after them; the validator fails closed when the verifier is missing or non-executable (see E03 case 9). |
-| P0-W39-E05 | P0-W39-AC05 | `.github/workflows/ci.yml` test-job `actions/checkout@v6` step is extended with `submodules: recursive` while preserving `fetch-depth: 0`, the trusted implementation-head fetch logic (`Fetch trusted implementation authority`), and `scripts/agent-preflight` semantics. The resulting CI run on the exact final PR head (recorded in the Completion record) is green and the `Validate project agent assets` step succeeds against the materialized submodule. |
+| P0-W39-E05 | P0-W39-AC05 | `.github/workflows/ci.yml` test-job `actions/checkout@v6` step is extended with `submodules: recursive` while preserving `fetch-depth: 0`, the trusted implementation-head fetch logic (`Fetch trusted implementation authority`), and `scripts/agent-preflight` semantics. The `Validate project agent assets` step must inspect the materialized submodule on the actual integration PR head; CI run ID and conclusion are recorded in the PR body/comment, not inside this tracked file. |
 | P0-W39-E06 | P0-W39-AC06 | `docs/AGENT-ASSET-NOTES.md` "Third-party development-agent dependencies" section records the submodule path, canonical URL, pinned commit `ecc8797d45447060b0c4aacd8efb6b1909e9e690`, both reviewed lockfile digests, the Claude skill symlink, the verifier and validator wiring, the `git submodule update --init --recursive` initialization command, the explicit authority boundary that Arsenal MUST NOT widen Kiln scope or override `AGENTS.md`, and the known upstream limitations at the reviewed commit. `README.md` Development section records `git submodule update --init --recursive` in the development setup block and a brief third-party-dependency note describing the pinned SHA and reference-content boundary. |
 | P0-W39-E07 | P0-W39-AC07 | `git diff main --stat` reports the changed files in the Completion record. No `mix.exs`, `mix.lock`, `lib/`, `test/`, `priv/`, `config/`, runtime schema, P1-S01 implementation, P1-S02 implementation, or implementation-authorization record. |
 
@@ -176,11 +176,9 @@ Each Evidence row below was recollected against the exact final PR head recorded
 
 ## Completion record
 
-**Result:** Accepted
+**Result:** Implemented; integration verification pending
 
 **Canonical base SHA:** `f9b5a312ac31ee4015025a87bcd3cec199b12297` (`main`)
-
-**Exact final PR head SHA:** `612dc58714de8cdb00a22ef8660fa6688405e175`
 
 **Project Arsenal gitlink SHA:** `ecc8797d45447060b0c4aacd8efb6b1909e9e690`
 
@@ -191,29 +189,31 @@ Each Evidence row below was recollected against the exact final PR head recorded
 - plan: `sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d`
 - `repository-truth` package: `sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84`
 
-**Final-state binding:** All Evidence rows above were collected against the exact final PR head `612dc58714de8cdb00a22ef8660fa6688405e175` on `work/p0-w39-adopt-project-arsenal-dependency` after all implementation, CI, and documentation commits landed. No Evidence predates the final head. Earlier `P0-W38` Evidence collected against commit `104e7489f5ea1736173cf2e50b1ef3000797348a` is treated as provisional historical Evidence and is not used to claim current completion.
+**Integration candidate and CI binding (recorded in PR body/comment, not inside this tracked file):**
 
-**Verification gates and outcomes at completion (re-run against the final head):**
+The integration candidate is the actual PR head reported by GitHub for PR #55 at merge time. Merge eligibility requires successful CI whose `head_sha` exactly equals that PR head, plus a green prose job, a green test job, a green `Validate governing work package`, a green `Validate project agent assets` step that has actually inspected the materialized submodule (not skipped), and a green `Run P1-S01 aggregate slice gate`. The exact PR-head SHA and the exact CI run ID are integration-layer Evidence that lives in GitHub PR metadata and an owner-facing PR comment; this tracked work package deliberately does not store the SHA of the commit that contains this paragraph, because changing this file would change the SHA.
+
+**Tracked deterministic checks (re-run by CI on the actual integration PR head):**
 
 - `scripts/agent-preflight`: pass (branch `work/p0-w39-adopt-project-arsenal-dependency` matches work package `P0-W39`; checkout commit equals validated implementation commit).
-- `scripts/test-agent-preflight`: pass on the canonical `work/p0-w34-enforce-authorization-boundary` fixture branch; this is the branch that owns the preflight branch-class enforcement and is the only branch on which that test can report a green outcome by design.
+- `scripts/test-agent-preflight`: pass when run from the canonical `work/p0-w34-enforce-authorization-boundary` fixture branch; that branch is the only branch on which this test is designed to report a green outcome, because it asserts the preflight branch-class enforcement that branch introduced. The test is not a regression of this PR and is not required to pass on the P0-W39 branch itself.
 - `python3 scripts/validate_first_month_contracts.py`: pass.
-- `python3 scripts/validate_json_schema_contracts.py`: pass.
+- `python3 scripts/validate_json_schema_contracts.py`: pass when run with the `jsonschema` Python package available (per `requirements/conformance.txt`).
 - `scripts/check-project-arsenal-dependency`: pass (positive case).
 - `scripts/validate-agent-assets`: pass; the dependency verifier is invoked after the Kiln-owned asset and doctrine checks; the validator fails closed if the verifier is missing or non-executable.
-- `shellcheck scripts/check-project-arsenal-dependency scripts/validate-agent-assets`: pass.
+- `shellcheck scripts/check-project-arsenal-dependency scripts/validate-agent-assets scripts/gates/slice-01`: pass.
 - `git ls-files --stage .claude/dependencies/project-arsenal`: `160000 ecc8797d45447060b0c4aacd8efb6b1909e9e690 0\t.claude/dependencies/project-arsenal` (authoritative superproject pin).
 - `git -C .claude/dependencies/project-arsenal rev-parse HEAD`: `ecc8797d45447060b0c4aacd8efb6b1909e9e690` (authoritative materialized HEAD).
 - `git -C .claude/dependencies/project-arsenal config --get remote.origin.url`: `https://github.com/jenksed/project-arsenal.git`.
 - `readlink -f .claude/skills/repository-truth`: resolves to the pinned submodule's `distribution/agent-skills/repository-truth` directory; the resolved path is inside the pinned submodule and cannot escape.
 - `head -n 20 .claude/skills/repository-truth/SKILL.md`: begins with the upstream frontmatter (`name: repository-truth`, `arsenal-capability: capability.repository-truth`, etc.).
 - `vale --glob='!{deps,_build,.claude/dependencies}/**' .`: 0 errors, 0 warnings, 0 suggestions. The pinned submodule is excluded from Kiln marketing and completion-term lints, consistent with `KILN-INV-032` (Project Arsenal is untrusted reference content).
+- `scripts/gates/slice-01` prose component now invokes `vale --glob='!{deps,_build,.claude/dependencies}/**' .` for the same ownership boundary. This is a verification-boundary correction caused by introducing a materialized reference dependency, not a P1-S01 runtime implementation change.
 - `mix format --check-formatted`: pass.
 - `mix compile --warnings-as-errors`: pass.
 - `mix xref graph --format cycles --label compile-connected --fail-above 0`: no cycles found.
-- `mix test`: pass on a machine with the `jsonschema` Python venv active (per the project's verification toolchain memory). The repository-required environment is documented in `README.md` Development section.
-
-**CI run binding:** A single exact-head CI run on the final PR head (recorded above) is green. The `Validate project agent assets` step is green, proving the submodule is initialized and the validator inspects a materialized dependency rather than skipping it. No CI run predates the final head is recorded as Evidence.
+- `mix test`: pass when run with the `jsonschema` Python venv available (per memory `Verification toolchain`; required environment documented in `README.md` Development section).
+- `KILN_BRANCH="$(git branch --show-current)" KILN_IMPLEMENTATION_COMMIT="$(git rev-parse HEAD)" scripts/gates/slice-01`: prose component green after the `scripts/gates/slice-01` Vale glob extension; other required components pass on the tracked state. CI run attached to the actual integration PR head must also be green.
 
 **Changed files (diff vs canonical `main`):**
 
@@ -226,11 +226,12 @@ Each Evidence row below was recollected against the exact final PR head recorded
 - `docs/work/P0-W39-adopt-project-arsenal-dependency.md` (this work package)
 - `scripts/check-project-arsenal-dependency` (deterministic verifier)
 - `scripts/validate-agent-assets` (fail-closed dependency verifier wiring)
+- `scripts/gates/slice-01` (Vale glob extended to exclude the pinned submodule content from the aggregate gate's prose component)
 
 **Runtime-path diff result:** zero changes to `mix.exs`, `mix.lock`, `lib/`, `test/`, `priv/`, `config/`, runtime schemas, P1-S01 implementation, P1-S02 implementation, or any implementation-authorization record.
 
 **Authority boundary:** Project Arsenal cannot widen Kiln scope, grant permissions, override `AGENTS.md`, override `docs/ENGINEERING-DOCTRINE.md`, or prove Kiln runtime implementation. Its presence grants no authority beyond `filesystem.read` and `git.read` of the upstream paths inside the pinned submodule.
 
-**Negative-test results:** see P0-W39-E03 above. All nine required negative cases exit non-zero with actionable messages and leave no uncommitted test mutation in the final branch.
+**Negative-test results:** see P0-W39-E03 above for the nine verifier/validator negative cases. The P0-W39-R03 case set also includes (N4b) a deliberately wrong `.gitmodules` `path` value, which now fails closed with `.gitmodules does not declare path for submodule .claude/dependencies/project-arsenal`, exit 1. Each negative case exits non-zero with an actionable message and restores the working tree.
 
 **P1-S02 status:** P1-S02 remains unauthorized. No implementation-authorization record was created. PR #48 is unchanged. PR #53 is unchanged.

@@ -51,12 +51,19 @@ if [[ "$Index_Sha" != "$Pinned_Commit" ]]; then
   fail "superproject gitlink SHA for $Submodule_Path is $Index_Sha; expected pinned commit $Pinned_Commit"
 fi
 
-# 2. .gitmodules must declare the canonical URL and the expected submodule path.
+# 2. .gitmodules must bind the canonical URL and the expected submodule path
+#    into the same `[submodule "<path>"]` section. Section-bound config
+#    lookup proves the two values co-locate; independent `grep` checks
+#    would accept a split or rearranged file.
 [[ -f .gitmodules ]] || fail ".gitmodules is missing"
-grep -Fqx "	url = $Pinned_Url" .gitmodules \
-  || fail ".gitmodules does not pin the canonical URL: $Pinned_Url"
-grep -Fqx "[submodule \"$Submodule_Path\"]" .gitmodules \
-  || fail ".gitmodules does not declare submodule $Submodule_Path"
+Configured_Path=$(git config -f .gitmodules --get "submodule.$Submodule_Path.path" 2>/dev/null) \
+  || fail ".gitmodules does not declare path for submodule $Submodule_Path"
+Configured_Url=$(git config -f .gitmodules --get "submodule.$Submodule_Path.url" 2>/dev/null) \
+  || fail ".gitmodules does not declare url for submodule $Submodule_Path"
+[[ "$Configured_Path" == "$Submodule_Path" ]] \
+  || fail ".gitmodules path for $Submodule_Path is '$Configured_Path'; expected '$Submodule_Path'"
+[[ "$Configured_Url" == "$Pinned_Url" ]] \
+  || fail ".gitmodules url for $Submodule_Path is '$Configured_Url'; expected '$Pinned_Url'"
 
 # 3. Materialized working tree must exist and be at the same reviewed commit.
 #    The verifier requires an initialized submodule; a missing directory or an
