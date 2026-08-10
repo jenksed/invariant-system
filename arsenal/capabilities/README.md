@@ -22,6 +22,16 @@ Do not encode harness packaging here. Codex, Claude, Agent Skills, plugin, slash
 
 All nine begin at capability lifecycle `draft`. ARS-01 establishes representability and validation; it does not create evaluation evidence. ARS-02 Arsenal Bench owns lifecycle evidence for `testing` and `stable`.
 
+## ARS-04 expansion set
+
+- `plan.json` — Plan, seeded by `agent.execution-plan`
+- `triage.json` — Triage, seeded by `agent.triage-to-agent-ready`
+- `spec.json` — Spec, seeded by `software.spec-from-context`
+- `prototype.json` — Prototype, seeded by `software.prototype`
+- `handoff.json` — Handoff, seeded by `agent.session-handoff`
+
+These five are added at capability lifecycle `draft` with `evaluation.status = unassessed`. ARS-04 surfaces existing workflow assets as canonical capabilities; lifecycle evidence for `testing` and `stable` remains owned by ARS-02 Arsenal Bench.
+
 ## Commands
 
 ```bash

@@ -1,0 +1,78 @@
+{
+  "schema_version": "2.1.0",
+  "capability": {
+    "id": "capability.prototype",
+    "version": "0.1.0",
+    "display_name": "Prototype",
+    "aliases": ["Prototype To Answer Question"],
+    "purpose": "Build the cheapest disposable artifact with enough fidelity to answer one explicit design question and preserve the resulting evidence.",
+    "lifecycle": "draft",
+    "invocation": "agent",
+    "discovery": {
+      "use_when": [
+        {"text": "A design question cannot be answered by reasoning alone and requires empirical evidence at limited fidelity", "kind": "positive"},
+        {"text": "The cost of building the prototype must remain disposable so the artifact does not become implicit production code", "kind": "positive"},
+        {"text": "The resulting evidence must be preserved as a decision record rather than rediscovered later", "kind": "positive"}
+      ],
+      "do_not_use_when": [
+        {"text": "The question can be resolved by reading, reasoning, or existing repository inspection without new code", "kind": "negative"},
+        {"text": "The work has crossed into production code paths and prototype discipline no longer applies", "kind": "negative"},
+        {"text": "The question requires a full implementation rather than the cheapest disposable evidence", "kind": "negative"}
+      ]
+    },
+    "inputs": [
+      {"name": "design_question", "required": true, "description": "Single explicit question the prototype exists to answer, framed so yes or no plus evidence is meaningful."},
+      {"name": "fidelity_envelope", "required": true, "description": "Cheapest fidelity sufficient to answer the question and the explicit cost or scope ceiling."},
+      {"name": "evidence_preservation_target", "required": false, "description": "Where the resulting evidence and decision record must be stored for future retrieval."}
+    ],
+    "outputs": [
+      {"name": "prototype_artifact", "description": "Cheapest disposable artifact scoped to the design question."},
+      {"name": "design_evidence", "description": "Empirical evidence that answers the design question."},
+      {"name": "decision_record", "description": "Durable decision record linking the question, evidence, and conclusion for later retrieval."}
+    ],
+    "preconditions": [
+      {"id": "question_falsifiable", "description": "The design question is concrete enough that evidence can answer it."},
+      {"id": "disposable_scope_committed", "description": "Scope is explicitly bounded so the prototype does not silently become production code."}
+    ],
+    "context": {
+      "required": ["task.intent", "project.design_question"],
+      "preferred": ["repository.current_state", "project.decisions", "project.specification"]
+    },
+    "implementation": {
+      "primary_asset": "software.prototype",
+      "asset_ids": ["software.prototype"],
+      "resources": [
+        {"asset_id": "software.prototype", "role": "reference", "load": "on-demand"}
+      ]
+    },
+    "authority": {
+      "required": ["filesystem.read", "filesystem.write", "shell.execute"],
+      "optional": ["git.read"],
+      "forbidden": ["git.write", "network.write", "tracker.write", "secrets.read", "cloud.remote", "production.mutate"]
+    },
+    "mutation": {"class": "workspace-write", "reversible": true},
+    "execution": {
+      "preferred": ["local-process"],
+      "allowed": ["repository-read", "local-process", "user-mediated"],
+      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
+    },
+    "verification": {
+      "requirements": [
+        {"id": "question_answered", "description": "The design question is answered with empirical evidence from the prototype.", "evidence_kind": "report"},
+        {"id": "disposable_scope_preserved", "description": "Prototype does not silently graduate to production code paths.", "evidence_kind": "verdict"},
+        {"id": "evidence_preserved", "description": "Evidence and decision record are stored in the preservation target for later retrieval.", "evidence_kind": "artifact"}
+      ],
+      "receipt_required": false
+    },
+    "evidence_outputs": [
+      {"name": "design_evidence", "description": "Empirical answer to the bounded design question."},
+      {"name": "decision_record", "description": "Durable decision record linking question, evidence, and conclusion."}
+    ],
+    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+    "provenance": {"asset_ids": ["software.prototype"]},
+    "compatibility": {
+      "supersedes": [],
+      "notes": "Public display name Prototype is independent of canonical asset id software.prototype."
+    }
+  }
+}

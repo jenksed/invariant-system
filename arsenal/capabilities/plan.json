@@ -1,0 +1,83 @@
+{
+  "schema_version": "2.1.0",
+  "capability": {
+    "id": "capability.plan",
+    "version": "0.1.0",
+    "display_name": "Plan",
+    "aliases": ["Execution Plan"],
+    "purpose": "Convert a broad objective and current project state into a dependency-aware, phased execution plan with proof-based acceptance gates.",
+    "lifecycle": "draft",
+    "invocation": "agent",
+    "discovery": {
+      "use_when": [
+        {"text": "An objective is too broad to execute safely as a single task and needs dependency-aware phasing", "kind": "positive"},
+        {"text": "A specification or set of decisions must become a concrete implementation sequence with validation gates", "kind": "positive"},
+        {"text": "Multiple agents or sessions must execute the work without rediscovering dependencies or completion criteria", "kind": "positive"},
+        {"text": "An existing plan is vague, fragmented, organized as an undifferentiated backlog, or has drifted from current state", "kind": "positive"}
+      ],
+      "do_not_use_when": [
+        {"text": "The work is a small, isolated change that can be implemented and verified directly", "kind": "negative"},
+        {"text": "The primary need is to discover the product strategy or decide whether the objective should exist", "kind": "negative"},
+        {"text": "The user needs only a brainstorm, idea list, or prioritization matrix rather than an executable plan", "kind": "negative"},
+        {"text": "The required output is a design specification, ADR, or research report rather than an execution plan", "kind": "negative"}
+      ]
+    },
+    "inputs": [
+      {"name": "objective", "required": true, "description": "Outcome being pursued, who benefits, and what becomes possible when work is complete."},
+      {"name": "current_project_state", "required": true, "description": "Existing artifacts, partial work, in-progress items, and prior decisions that constrain next steps."},
+      {"name": "specification", "required": false, "description": "Requirements, expected behaviors, quality expectations, and known acceptance criteria."},
+      {"name": "constraints", "required": false, "description": "Scope, time, technology, compatibility, security, and repository or organizational conventions."},
+      {"name": "status_claims", "required": false, "description": "Existing completion or roadmap claims to verify before extending the plan."}
+    ],
+    "outputs": [
+      {"name": "execution_plan", "description": "Dependency-aware phased plan with deliverables, acceptance gates, migrations, rollback, and risks."},
+      {"name": "acceptance_gates", "description": "Proof-based validation methods tied to each phase and to overall completion."},
+      {"name": "decision_record", "description": "Reversible vs irreversible decisions, assumptions, unknowns, and stopping conditions."}
+    ],
+    "preconditions": [
+      {"id": "objective_bounded", "description": "The objective is sufficiently defined to distinguish success from failure."},
+      {"id": "current_state_known", "description": "Current project state has been established or can be recovered during planning."}
+    ],
+    "context": {
+      "required": ["task.intent", "repository.current_state"],
+      "preferred": ["repository.instructions", "repository.history", "project.specification", "project.constraints", "project.decisions"]
+    },
+    "implementation": {
+      "primary_asset": "agent.execution-plan",
+      "asset_ids": ["agent.execution-plan"],
+      "resources": [
+        {"asset_id": "agent.execution-plan", "role": "reference", "load": "on-demand"}
+      ]
+    },
+    "authority": {
+      "required": ["filesystem.read"],
+      "optional": ["git.read", "shell.execute"],
+      "forbidden": ["filesystem.write", "git.write", "network.write", "tracker.write", "secrets.read", "cloud.remote", "production.mutate"]
+    },
+    "mutation": {"class": "read-only", "reversible": true},
+    "execution": {
+      "preferred": ["repository-read"],
+      "allowed": ["repository-read", "local-process"],
+      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
+    },
+    "verification": {
+      "requirements": [
+        {"id": "objective_observable", "description": "The intended end state is observable and distinguishable from failure.", "evidence_kind": "report"},
+        {"id": "gates_proof_based", "description": "Each phase and overall completion has a proof-based acceptance gate.", "evidence_kind": "decision-record"},
+        {"id": "dependencies_exposed", "description": "Critical dependencies and sequencing constraints are surfaced before phases are scheduled.", "evidence_kind": "report"},
+        {"id": "plan_does_not_implement", "description": "The plan artifact itself is produced; implementation work is scoped to subsequent capabilities.", "evidence_kind": "verdict"}
+      ],
+      "receipt_required": false
+    },
+    "evidence_outputs": [
+      {"name": "execution_plan", "description": "Phased plan with deliverables, dependencies, and risks."},
+      {"name": "acceptance_gates", "description": "Concrete validation methods and stopping conditions per phase and overall."}
+    ],
+    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+    "provenance": {"asset_ids": ["agent.execution-plan"]},
+    "compatibility": {
+      "supersedes": [],
+      "notes": "Public display name Plan is independent of canonical asset id agent.execution-plan; alias Execution Plan preserves existing usage."
+    }
+  }
+}

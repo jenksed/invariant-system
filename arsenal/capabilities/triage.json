@@ -1,0 +1,77 @@
+{
+  "schema_version": "2.1.0",
+  "capability": {
+    "id": "capability.triage",
+    "version": "0.1.0",
+    "display_name": "Triage",
+    "aliases": ["Request Triage"],
+    "purpose": "Move an incoming bug, feature request, or external change from raw report to a defensible next state and durable agent-ready brief when appropriate.",
+    "lifecycle": "draft",
+    "invocation": "human",
+    "discovery": {
+      "use_when": [
+        {"text": "A new request has arrived in needs-triage state and must be evaluated against project vocabulary and prior decisions", "kind": "positive"},
+        {"text": "A reported bug or external change needs the core claim verified before being expanded into scope", "kind": "positive"},
+        {"text": "A request must be routed to ready-for-agent, ready-for-human, needs-information, or rejected with an evidence-based reason", "kind": "positive"}
+      ],
+      "do_not_use_when": [
+        {"text": "The request already has a single actionable state and an agent-ready brief and only needs implementation", "kind": "negative"},
+        {"text": "Implementation is already in progress and the next action is to continue work rather than classify the request", "kind": "negative"}
+      ]
+    },
+    "inputs": [
+      {"name": "request", "required": true, "description": "Incoming bug, feature request, or external change including discussion, labels, attachments, and any code samples."},
+      {"name": "project_vocabulary", "required": false, "description": "Project domain language and durable decisions used to interpret the request."},
+      {"name": "rejected_decision_memory", "required": false, "description": "Prior decisions on the same concept, including reasons and reconsideration triggers."}
+    ],
+    "outputs": [
+      {"name": "classified_state", "description": "Single actionable state with evidence-based reason: ready-for-agent, ready-for-human, needs-information, or rejected."},
+      {"name": "agent_ready_brief", "description": "Durable behavioral brief with summary, current and desired behavior, interfaces, acceptance criteria, out-of-scope, and pointers."},
+      {"name": "rejected_decision_record", "description": "Concept, reason, prior request pointer, and reconsideration trigger when state is rejected."}
+    ],
+    "preconditions": [
+      {"id": "request_artifact_available", "description": "The original request, discussion, and attachments are available for inspection."},
+      {"id": "state_taxonomy_known", "description": "The project's triage state vocabulary is known or a defensible default taxonomy is adopted."}
+    ],
+    "context": {
+      "required": ["task.intent"],
+      "preferred": ["project.vocabulary", "project.decisions", "repository.current_state", "project.rejected_decisions"]
+    },
+    "implementation": {
+      "primary_asset": "agent.triage-to-agent-ready",
+      "asset_ids": ["agent.triage-to-agent-ready"],
+      "resources": [
+        {"asset_id": "agent.triage-to-agent-ready", "role": "reference", "load": "on-demand"}
+      ]
+    },
+    "authority": {
+      "required": ["filesystem.read", "tracker.read"],
+      "optional": ["git.read"],
+      "forbidden": ["filesystem.write", "git.write", "tracker.write", "network.write", "secrets.read", "cloud.remote", "production.mutate"]
+    },
+    "mutation": {"class": "read-only", "reversible": true},
+    "execution": {
+      "preferred": ["repository-read"],
+      "allowed": ["repository-read", "user-mediated"],
+      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
+    },
+    "verification": {
+      "requirements": [
+        {"id": "single_actionable_state", "description": "The request ends in exactly one actionable state with an evidence-based reason.", "evidence_kind": "report"},
+        {"id": "core_claim_verified", "description": "The core claim is reproduced or refuted before the request is expanded.", "evidence_kind": "verdict"},
+        {"id": "rejected_decisions_recorded", "description": "Rejected durable decisions include concept, reason, prior pointer, and reconsideration trigger.", "evidence_kind": "decision-record"}
+      ],
+      "receipt_required": false
+    },
+    "evidence_outputs": [
+      {"name": "classified_state", "description": "Defensible triage state with evidence-based reason."},
+      {"name": "agent_ready_brief", "description": "Behavioral brief sufficient for autonomous work when state is ready-for-agent."}
+    ],
+    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+    "provenance": {"asset_ids": ["agent.triage-to-agent-ready"]},
+    "compatibility": {
+      "supersedes": [],
+      "notes": "Public display name Triage is independent of canonical asset id agent.triage-to-agent-ready."
+    }
+  }
+}

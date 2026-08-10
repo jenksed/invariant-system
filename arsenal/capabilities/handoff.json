@@ -1,0 +1,79 @@
+{
+  "schema_version": "2.1.0",
+  "capability": {
+    "id": "capability.handoff",
+    "version": "0.1.0",
+    "display_name": "Handoff",
+    "aliases": ["Session Handoff"],
+    "purpose": "Capture enough verified context for another model or later session to continue without repeating discovery work.",
+    "lifecycle": "draft",
+    "invocation": "agent",
+    "discovery": {
+      "use_when": [
+        {"text": "A substantial work session is ending and verified continuation context must be preserved", "kind": "positive"},
+        {"text": "Work is being paused with unfinished items, unresolved decisions, or partial validation results", "kind": "positive"},
+        {"text": "Ownership of the work is transferring to another agent, model, or engineer who must resume without rediscovering state", "kind": "positive"}
+      ],
+      "do_not_use_when": [
+        {"text": "The session produced no consequential changes, decisions, or unresolved work worth preserving", "kind": "negative"},
+        {"text": "The work is small enough that the next action is obvious without a durable handoff artifact", "kind": "negative"}
+      ]
+    },
+    "inputs": [
+      {"name": "session_transcript", "required": true, "description": "Session transcript or notes recording the work actually attempted."},
+      {"name": "repository_state", "required": true, "description": "Repository, branch, commit, and working-tree state precise enough to resume safely."},
+      {"name": "validation_results", "required": false, "description": "Validation performed including failed, skipped, or unavailable checks."},
+      {"name": "unresolved_decisions", "required": false, "description": "Decisions left open and the exact next action needed to resolve each one."}
+    ],
+    "outputs": [
+      {"name": "handoff_pack", "description": "Status, completed work, files changed, validation, decisions, known issues, immediate next action, and continuation instructions."},
+      {"name": "continuation_point", "description": "Exact defensible next action with the first files or commands to inspect."},
+      {"name": "uncertainty_register", "description": "Confirmed, strong signal, reasonable hypothesis, weak signal, and unknown items distinguished."}
+    ],
+    "preconditions": [
+      {"id": "session_artifact_available", "description": "Session transcript, notes, or repository state is available to summarize."},
+      {"id": "repository_state_recoverable", "description": "Current repository, branch, and working-tree state can be inspected precisely."}
+    ],
+    "context": {
+      "required": ["task.intent", "repository.current_state"],
+      "preferred": ["repository.history", "project.decisions", "project.validation_results"]
+    },
+    "implementation": {
+      "primary_asset": "agent.session-handoff",
+      "asset_ids": ["agent.session-handoff"],
+      "resources": [
+        {"asset_id": "agent.session-handoff", "role": "reference", "load": "on-demand"}
+      ]
+    },
+    "authority": {
+      "required": ["filesystem.read", "git.read"],
+      "optional": ["shell.execute"],
+      "forbidden": ["filesystem.write", "git.write", "network.write", "tracker.write", "secrets.read", "cloud.remote", "production.mutate"]
+    },
+    "mutation": {"class": "read-only", "reversible": true},
+    "execution": {
+      "preferred": ["repository-read"],
+      "allowed": ["repository-read", "local-process"],
+      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
+    },
+    "verification": {
+      "requirements": [
+        {"id": "claims_supported", "description": "Completed work is recorded only when supported by repository state or validation evidence.", "evidence_kind": "report"},
+        {"id": "dirty_state_disclosed", "description": "Failed tests, skipped checks, and dirty working-tree state are disclosed rather than hidden.", "evidence_kind": "verdict"},
+        {"id": "next_action_concrete", "description": "The continuation point names the exact next action and the first files or commands to inspect.", "evidence_kind": "decision-record"},
+        {"id": "uncertainty_bounded", "description": "Confirmed, strong signal, reasonable hypothesis, weak signal, and unknown items are separated.", "evidence_kind": "report"}
+      ],
+      "receipt_required": false
+    },
+    "evidence_outputs": [
+      {"name": "handoff_pack", "description": "Compact handoff artifact with status, completed work, files changed, validation, decisions, and next action."},
+      {"name": "continuation_point", "description": "Concrete next action and first inspection steps."}
+    ],
+    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+    "provenance": {"asset_ids": ["agent.session-handoff"]},
+    "compatibility": {
+      "supersedes": [],
+      "notes": "Public display name Handoff is independent of canonical asset id agent.session-handoff."
+    }
+  }
+}
