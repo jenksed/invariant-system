@@ -92,6 +92,37 @@ def main() -> int:
 
     expect_failure("stable without evaluation", stable_without_evidence, "stable capability requires qualified evaluation evidence")
 
+    def missing_discovery(docs):
+        del docs["verify.json"]["capability"]["discovery"]
+
+    expect_failure("missing discovery", missing_discovery, "missing fields ['discovery']")
+
+    def empty_use_when(docs):
+        docs["verify.json"]["capability"]["discovery"]["use_when"] = []
+
+    expect_failure("empty use_when", empty_use_when, "discovery.use_when must be a non-empty array")
+
+    def overlapping_discovery(docs):
+        cap = docs["verify.json"]["capability"]
+        text = cap["discovery"]["use_when"][0]["text"]
+        cap["discovery"]["do_not_use_when"].append({"text": text, "kind": "negative"})
+
+    expect_failure("overlapping discovery", overlapping_discovery, "discovery.use_when and do_not_use_when overlap")
+
+    def duplicate_discovery(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["discovery"]["use_when"].append(dict(cap["discovery"]["use_when"][0]))
+
+    expect_failure("duplicate use_when", duplicate_discovery, "discovery.use_when duplicate text")
+
+    def discovery_harness_leak(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["discovery"]["use_when"].append(
+            {"text": "Use when this Codex adapter is configured", "kind": "positive"}
+        )
+
+    expect_failure("discovery harness leakage", discovery_harness_leak, "discovery.use_when leaked harness marker")
+
     print("Capability Contract negative suite: PASS")
     return 0
 

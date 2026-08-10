@@ -1,6 +1,6 @@
 ---
 name: repository-truth
-description: "Establishes the actual read-only state of a software repository before planning, continuation, recovery, or implementation. Use when inheriting a repo, resuming work, reconciling status claims, or when documentation, branches, tests, or completion claims may be stale."
+description: "Repository Truth read-only audit of a software repository's actual state. Use when status documents, branches, tests, or completion claims may be stale or contested."
 compatibility: "Requires repository read access and a coding-agent harness capable of reading files and Git state. Read-only shell or test execution is optional. Repository mutation requires separate authorization after the audit is complete."
 metadata:
   arsenal-capability: "capability.repository-truth"
@@ -11,11 +11,23 @@ metadata:
   arsenal-generated: "true"
   arsenal-lifecycle: "draft"
   arsenal-evaluation: "unassessed"
+  arsenal-invocation: "agent"
 ---
 
 # Repository Truth
 
 Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.
+
+## When to use
+
+- Inheriting a repository whose current state is unknown or contested
+- Resuming work after a session boundary where status documents may have drifted
+- Reconciling completion or roadmap claims against the actual implementation before planning or recovery
+
+## Do not use when
+
+- Implementing new behavior where the current state is already verified and bounded
+- Diagnosing a specific runtime failure whose reproduction is the priority
 
 ## Canonical behavior
 
@@ -43,6 +55,8 @@ Do not hand-edit this package. Regenerate it with `python3 scripts/arsenal_compi
 - Prohibited execution surfaces: `remote-sandbox`, `shared-nonproduction`, `staging`, `production`
 
 Compilation never grants authority beyond this contract. Runtime execution must continue to honor the canonical capability and workflow boundaries.
+
+Invocation boundary: this capability is `agent`-invoked and may be exposed to autonomous model invocation.
 
 ## Expected outputs
 

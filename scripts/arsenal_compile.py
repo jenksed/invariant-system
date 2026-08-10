@@ -18,6 +18,14 @@ LOCK_PATH = ROOT / ".arsenal.lock"
 COMPILER_VERSION = "0.1.0"
 LOCK_SCHEMA_VERSION = "1.0.0"
 SUPPORTED_TARGETS = {"agent-skills"}
+# Invocation requirements that each target adapter must demonstrate it preserves.
+# Targets whose metadata cannot preserve the boundary must fail closed.
+TARGET_INVOCATION_SUPPORT: dict[str, set[str]] = {
+    # Agent Skills frontmatter does not currently expose explicit invocation
+    # semantics; until the target can preserve the boundary, only
+    # invocation != "human" may be exported.
+    "agent-skills": {"agent", "composed"},
+}
 PACKAGE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
@@ -128,6 +136,34 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
         if not isinstance(export["compatibility"], str) or len(export["compatibility"]) > 500:
             raise AssertionError("Agent Skills compatibility must be a string <= 500 characters")
 
+        # Invocation preservation: target adapters that cannot preserve
+        # the capability's required invocation boundary must fail closed.
+        cap = capabilities[cap_id]["capability"]
+        invocation = cap.get("invocation")
+        supported = TARGET_INVOCATION_SUPPORT.get(target)
+        if supported is None:
+            raise AssertionError(f"target {target!r} has no declared invocation support policy")
+        if invocation not in supported:
+            raise AssertionError(
+                f"target {target!r} cannot preserve invocation {invocation!r}; "
+                f"supported invocations: {sorted(supported)}"
+            )
+
+        # Behavior-neutrality: behavioral discovery must come from canonical data.
+        # The export plan may keep target-specific packaging hints but must not
+        # duplicate the canonical discovery text.
+        discovery = cap.get("discovery") or {}
+        canonical_use = " | ".join(
+            e.get("text", "").strip()
+            for e in discovery.get("use_when", []) or []
+            if isinstance(e, dict)
+        )
+        if canonical_use and canonical_use in export["description"]:
+            raise AssertionError(
+                "export plan description duplicates canonical discovery.use_when text; "
+                "let the compiler derive discovery rather than re-stating it"
+            )
+
         cap = capabilities[cap_id]["capability"]
         primary_asset_id = cap["implementation"]["primary_asset"]
         if primary_asset_id not in assets:
@@ -169,6 +205,35 @@ def render_agent_skill(export: dict[str, Any], source_rel: Path) -> str:
         f"- `{item['name']}` — {item['description']}" for item in cap["outputs"]
     )
 
+    # Discovery is canonical truth; render it deterministically here so the
+    # generated body does not need to receive it via the export plan.
+    discovery = cap.get("discovery") or {}
+    use_when = discovery.get("use_when") or []
+    do_not_use_when = discovery.get("do_not_use_when") or []
+    use_lines = "\n".join(f"- {entry['text']}" for entry in use_when if isinstance(entry, dict))
+    do_not_use_lines = "\n".join(f"- {entry['text']}" for entry in do_not_use_when if isinstance(entry, dict))
+    discovery_block = (
+        f"## When to use\n\n{use_lines}\n"
+        if use_lines else ""
+    )
+    if do_not_use_lines:
+        discovery_block += f"\n## Do not use when\n\n{do_not_use_lines}\n"
+
+    invocation = cap.get("invocation", "agent")
+    invocation_note = {
+        "human": (
+            "Invocation boundary: this capability is `human`-invoked. "
+            "The harness should not expose autonomous model invocation "
+            "when the adapter cannot preserve that boundary."
+        ),
+        "agent": (
+            "Invocation boundary: this capability is `agent`-invoked and may be exposed to autonomous model invocation."
+        ),
+        "composed": (
+            "Invocation boundary: this capability is `composed`. It is meaningful only as part of a composed sequence and should not be exposed as a standalone autonomous invocation."
+        ),
+    }.get(invocation, "")
+
     return f"""---
 name: {package}
 description: {yaml_string(export["description"])}
@@ -182,12 +247,14 @@ metadata:
   arsenal-generated: "true"
   arsenal-lifecycle: {yaml_string(cap["lifecycle"])}
   arsenal-evaluation: {yaml_string(cap["evaluation"]["status"])}
+  arsenal-invocation: {yaml_string(invocation)}
 ---
 
 # {cap["display_name"]}
 
 {cap["purpose"]}
 
+{discovery_block}
 ## Canonical behavior
 
 Read [`references/{ref_name}`](references/{ref_name}) in full and execute it as the authoritative workflow for this capability.
@@ -214,6 +281,8 @@ Do not hand-edit this package. Regenerate it with `python3 scripts/arsenal_compi
 - Prohibited execution surfaces: {prohibited}
 
 Compilation never grants authority beyond this contract. Runtime execution must continue to honor the canonical capability and workflow boundaries.
+
+{invocation_note}
 
 ## Expected outputs
 

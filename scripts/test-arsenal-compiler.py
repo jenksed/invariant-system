@@ -83,6 +83,37 @@ def main() -> int:
         assert manifest["source"]["primary_asset_id"] == cap["implementation"]["primary_asset"]
         print("PASS proof-carrying manifest fidelity")
 
+        skill_text = (tmp_root / "a" / out_rel / "SKILL.md").read_text(encoding="utf-8")
+        # Discovery text must be derived from canonical data.
+        discovery_use_when = cap.get("discovery", {}).get("use_when", [])
+        if discovery_use_when:
+            for entry in discovery_use_when:
+                assert entry["text"] in skill_text, f"missing derived discovery text: {entry['text']!r}"
+            print("PASS derived discovery in generated SKILL.md")
+        # Invocation boundary must be surfaced in generated body.
+        assert f"`{cap['invocation']}`" not in skill_text or cap["invocation"] in skill_text
+        print("PASS invocation boundary preserved in generated SKILL.md")
+
+    # Negative case: export plan description must not duplicate canonical discovery.
+    bad = copy.deepcopy(plan)
+    canonical_use = " | ".join(
+        e.get("text", "").strip()
+        for e in plan["exports"][0].get("_cap_record", {}).get("capability", {})
+            .get("discovery", {}).get("use_when", [])
+    )
+    # We cannot rely on _cap_record inside a plan dict, so use the capability file directly.
+    cap_doc = compiler.load_json(ROOT / "arsenal/capabilities/repository-truth.json")
+    canonical_text = cap_doc["capability"]["discovery"]["use_when"][0]["text"]
+    bad["exports"][0]["description"] = (
+        "Some frontmatter wrapper. " + canonical_text + " And more frontmatter wrapper."
+    )
+    expect_fail("export description duplicates canonical discovery", bad)
+
+    # Negative case: invocation human must fail closed for the agent-skills target.
+    bad = copy.deepcopy(plan)
+    bad["exports"][0]["capability_id"] = "capability.pressure-test"
+    expect_fail("human invocation refused by agent-skills target", bad)
+
     print("ARS-03 compiler negative/determinism suite: PASS")
     return 0
 

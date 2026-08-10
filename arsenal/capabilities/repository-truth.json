@@ -1,5 +1,5 @@
 {
-  "schema_version": "2.0.0",
+  "schema_version": "2.1.0",
   "capability": {
     "id": "capability.repository-truth",
     "version": "0.1.0",
@@ -8,6 +8,17 @@
     "purpose": "Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.",
     "lifecycle": "draft",
     "invocation": "agent",
+    "discovery": {
+      "use_when": [
+        {"text": "Inheriting a repository whose current state is unknown or contested", "kind": "positive"},
+        {"text": "Resuming work after a session boundary where status documents may have drifted", "kind": "positive"},
+        {"text": "Reconciling completion or roadmap claims against the actual implementation before planning or recovery", "kind": "positive"}
+      ],
+      "do_not_use_when": [
+        {"text": "Implementing new behavior where the current state is already verified and bounded", "kind": "negative"},
+        {"text": "Diagnosing a specific runtime failure whose reproduction is the priority", "kind": "negative"}
+      ]
+    },
     "inputs": [
       {"name": "repository_scope", "required": true, "description": "Repository or workspace whose current state must be established."},
       {"name": "objective", "required": true, "description": "Current project objective or decision that makes repository truth relevant."},

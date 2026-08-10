@@ -1,6 +1,6 @@
 # Arsenal Capability Contract v2
 
-Schema-Version: 2.0.0
+Schema-Version: 2.1.0
 
 Project Arsenal distinguishes **assets** from **capabilities**.
 
@@ -41,6 +41,33 @@ A display-name change does not require an ID change.
 Aliases are compatibility and discovery metadata only. They must never be used as canonical machine keys. Public names may therefore evolve from **Grill** to **Pressure Test** and from **Wayfind/Wayfinding** to **Recon** without rewriting existing asset IDs or losing historical provenance.
 
 Display names and aliases are case-insensitively unique across the merged capability set.
+
+## Discovery
+
+Every capability defines:
+
+- `discovery.use_when` — non-empty array of positive applicability statements;
+- `discovery.do_not_use_when` — optional array of meaningful exclusions and collisions.
+
+Discovery statements must be behavioral and harness-neutral. They must not encode target-specific marketing copy, harness identifiers, or prompt-style imperative language. The `purpose` field remains the concise observable outcome; discovery expands *when* the outcome applies without restating *what* the outcome is.
+
+Discovery belongs to canonical capability truth. Compiler adapters may derive target-specific frontmatter (such as Agent Skills `description` fields) from canonical discovery plus target-specific packaging metadata, but must not duplicate the discovery statements in adapter-only fields.
+
+## Invocation semantics
+
+Capabilities declare one of three harness-neutral invocation semantics:
+
+- `human` — the capability expects explicit human initiation and confirmation;
+- `agent` — the capability is appropriate for autonomous agent invocation;
+- `composed` — the capability is meaningful only as part of a composed sequence.
+
+Target adapters must preserve the declared invocation boundary. Adapters that cannot preserve a required boundary must either:
+
+- refuse to export the capability for that target;
+- emit an explicit unsupported/incompatible state;
+- require a target adapter policy that demonstrably preserves the boundary.
+
+Adapters must not silently flatten invocation semantics.
 
 ## Behavioral interface
 

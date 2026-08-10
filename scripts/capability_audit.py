@@ -9,7 +9,8 @@ import re
 import sys
 from pathlib import Path
 
-CAPABILITY_SCHEMA_VERSION = "2.0.0"
+CAPABILITY_SCHEMA_VERSION = "2.1.0"
+CAPABILITY_SCHEMA_LEGACY = "2.0.0"
 ASSET_SCHEMA_VERSION = "1.0.0"
 
 AUTHORITY = {
@@ -52,9 +53,10 @@ REQUIRED_CAPABILITIES = {
 }
 CAPABILITY_FIELDS = {
     "id", "version", "display_name", "aliases", "purpose", "lifecycle",
-    "invocation", "inputs", "outputs", "preconditions", "context",
-    "implementation", "authority", "mutation", "execution", "verification",
-    "evidence_outputs", "evaluation", "provenance", "compatibility",
+    "invocation", "discovery", "inputs", "outputs", "preconditions",
+    "context", "implementation", "authority", "mutation", "execution",
+    "verification", "evidence_outputs", "evaluation", "provenance",
+    "compatibility",
 }
 
 
@@ -105,7 +107,7 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
         if set(doc) != {"schema_version", "capability"}:
             errors.append(f"{path}: fragment must contain only schema_version and capability")
             continue
-        if doc.get("schema_version") != CAPABILITY_SCHEMA_VERSION:
+        if doc.get("schema_version") not in (CAPABILITY_SCHEMA_VERSION, CAPABILITY_SCHEMA_LEGACY):
             errors.append(f"{path}: unsupported capability schema_version {doc.get('schema_version')!r}")
             continue
         capability = doc.get("capability")
@@ -154,6 +156,57 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
         errors.append(f"{cap_id}: display_name is required")
     if not isinstance(cap.get("aliases"), list) or any(not isinstance(x, str) for x in cap["aliases"]):
         errors.append(f"{cap_id}: aliases must be an array of strings")
+
+    discovery = cap.get("discovery")
+    if not isinstance(discovery, dict):
+        errors.append(f"{cap_id}: discovery must be an object")
+    else:
+        use_when = discovery.get("use_when")
+        if not isinstance(use_when, list) or not use_when:
+            errors.append(f"{cap_id}: discovery.use_when must be a non-empty array")
+        else:
+            seen_texts: set[str] = set()
+            for entry in use_when:
+                if not isinstance(entry, dict):
+                    errors.append(f"{cap_id}: discovery.use_when entries must be objects")
+                    continue
+                text = entry.get("text")
+                kind = entry.get("kind", "positive")
+                if not isinstance(text, str) or len(text.strip()) < 8:
+                    errors.append(f"{cap_id}: discovery.use_when entries require text >= 8 chars")
+                    continue
+                if kind not in {"positive", "negative"}:
+                    errors.append(f"{cap_id}: discovery.use_when kind must be positive or negative")
+                if text.strip().casefold() in seen_texts:
+                    errors.append(f"{cap_id}: discovery.use_when duplicate text {text!r}")
+                seen_texts.add(text.strip().casefold())
+                if not all(isinstance(x, str) and x.strip() for x in [text]) or text.strip() != text:
+                    errors.append(f"{cap_id}: discovery.use_when text must be non-empty trimmed string")
+        do_not_use_when = discovery.get("do_not_use_when", [])
+        if not isinstance(do_not_use_when, list):
+            errors.append(f"{cap_id}: discovery.do_not_use_when must be an array")
+        else:
+            for entry in do_not_use_when:
+                if not isinstance(entry, dict):
+                    errors.append(f"{cap_id}: discovery.do_not_use_when entries must be objects")
+                    continue
+                text = entry.get("text")
+                kind = entry.get("kind", "negative")
+                if not isinstance(text, str) or len(text.strip()) < 8:
+                    errors.append(f"{cap_id}: discovery.do_not_use_when entries require text >= 8 chars")
+                if kind not in {"positive", "negative"}:
+                    errors.append(f"{cap_id}: discovery.do_not_use_when kind must be positive or negative")
+        if isinstance(use_when, list) and isinstance(do_not_use_when, list):
+            overlap = {
+                entry.get("text", "").strip().casefold()
+                for entry in use_when if isinstance(entry, dict)
+            } & {
+                entry.get("text", "").strip().casefold()
+                for entry in do_not_use_when if isinstance(entry, dict)
+            }
+            overlap.discard("")
+            if overlap:
+                errors.append(f"{cap_id}: discovery.use_when and do_not_use_when overlap: {sorted(overlap)}")
 
     _unique_named(cap_id, "inputs", cap.get("inputs"), "name", errors)
     _unique_named(cap_id, "outputs", cap.get("outputs"), "name", errors)
@@ -254,6 +307,23 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
     for marker in HARNESS_MARKERS:
         if marker in serialized:
             errors.append(f"{cap_id}: harness-specific marker leaked into canonical capability data: {marker}")
+
+    # Discovery harness-neutrality: each statement text must not contain harness markers
+    if isinstance(discovery, dict):
+        for key in ("use_when", "do_not_use_when"):
+            entries = discovery.get(key) or []
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                text = entry.get("text")
+                if not isinstance(text, str):
+                    continue
+                lowered = text.lower()
+                for marker in HARNESS_MARKERS:
+                    if marker in lowered:
+                        errors.append(f"{cap_id}: discovery.{key} leaked harness marker {marker!r}")
 
 
 def validate_repository(root: Path, capability_dir: Path | None = None):
