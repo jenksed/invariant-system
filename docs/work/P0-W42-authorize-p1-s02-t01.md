@@ -152,7 +152,7 @@ No other path is authorized.
     - warning-free compile and compile-connected cycles (`mix compile --warnings-as-errors`, `mix xref graph --format cycles --label compile-connected --fail-above 0`);
     - normal standalone runtime suite (`mix test`);
     - exact-head CI is green.
-  - **P1-S01 aggregate re-verification:** **not applicable** to P0-W42; known nondeterminism tracked separately at `docs/SLICE-ACCEPTANCE-GATES.md` ("Known nondeterminism debt — P1-S01 aggregate-gate full-suite invocation"). P0-W42 does not claim the historical aggregate gate passed.
+  - **P1-S01 aggregate re-verification:** **applicable to this exact candidate** and **passed**. P1-S01 aggregate re-verification is not universally required for unrelated governance work. It was applicable to this exact P0-W42 candidate because P0-W42 modifies `docs/SLICE-ACCEPTANCE-GATES.md`, which the corrected applicability contract explicitly classifies as a P1-S01-owned gate-contract path. Exact-head CI run `31433634055` therefore executed `scripts/gates/slice-01`, and the deterministic aggregate gate passed. The separate nondeterminism observed in CI run `31425961081` remains tracked technical debt and is not treated as resolved by this successful run.
   - **Evidence:** exact-head CI run identifier; non-defective local check exit codes; explicit identification of the W34 harness defect as excluded prerequisite debt; explicit identification of the P1-S01 aggregate-gate debt.
 - **P0-W42-AC07** (post-integration T01 entry-gate verification; observable only after merge)
   - **Given** the resulting canonical `main` after this package merges, with `docs/authorizations/P1-S02-T01.authorization` byte-identical to the trusted authority source;
@@ -181,7 +181,7 @@ git diff --name-only 8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf -- lib test priv c
 git diff --check
 ```
 
-Exact-head CI must be green under the corrected applicability contract (see `docs/SLICE-ACCEPTANCE-GATES.md`). The historical P1-S01 aggregate gate `scripts/gates/slice-01` is not applicable to P0-W42 because P0-W42 does not change any P1-S01-owned path; the CI applicability step will therefore skip that aggregate gate on the P0-W42 head. From the developer's named checkout, every command except `scripts/test-agent-preflight` must exit `0`. `scripts/test-agent-preflight` has a pre-existing named-branch structural harness defect fixed to a historical W34 branch identity; it exits non-zero from any non-W34 named checkout, including this one, and that single local failure is identified as excluded prerequisite debt in `P0-W42-AC06`, not P0-W42 regression Evidence. The same script is invoked by CI in a state where the flaw does not manifest; the CI step must pass for merge. The plan-preservation diff command must exit `0`. The runtime-path diff command must print no path. Exact-head remote CI is external integration Evidence bound to the final candidate head and is recorded in PR and CI metadata, not in this tracked record.
+Exact-head CI must be green under the corrected applicability contract (see `docs/SLICE-ACCEPTANCE-GATES.md`). Because this PR modifies `docs/SLICE-ACCEPTANCE-GATES.md`, the applicability rule classifies this exact candidate as P1-S01-relevant. Exact-head CI run `31433634055` therefore executed `scripts/gates/slice-01` and the gate passed. Ordinary governance-only PRs that do not modify a P1-S01-owned path remain eligible to skip historical aggregate re-verification. From the developer's named checkout, every command except `scripts/test-agent-preflight` must exit `0`. `scripts/test-agent-preflight` has a pre-existing named-branch structural harness defect fixed to a historical W34 branch identity; it exits non-zero from any non-W34 named checkout, including this one, and that single local failure is identified as excluded prerequisite debt in `P0-W42-AC06`, not P0-W42 regression Evidence. The same script is invoked by CI in a state where the flaw does not manifest; the CI step must pass for merge. The plan-preservation diff command must exit `0`. The runtime-path diff command must print no path. Exact-head remote CI is external integration Evidence bound to the final candidate head and is recorded in PR and CI metadata, not in this tracked record.
 
 ## Exact next action after P0-W42 merges
 
@@ -200,7 +200,7 @@ Exact-head CI must be green under the corrected applicability contract (see `doc
 | P0-W42-E03 | P0-W42-AC03 | empty runtime-path diff vs canonical `main` |
 | P0-W42-E04 | P0-W42-AC04 | PR #48, PR #53, PR #56, PR #57 references in synchronized text |
 | P0-W42-E05 | P0-W42-AC05 | synchronized governance text in six documents |
-| P0-W42-E06 | P0-W42-AC06 | exact-head CI run identifier; non-defective local check exit codes; W34 harness defect identified as excluded prerequisite debt; P1-S01 aggregate-gate debt identified as not applicable to P0-W42 |
+| P0-W42-E06 | P0-W42-AC06 | exact-head CI run `31433634055`; all universal checks passed; P1-S01 aggregate gate was applicable due to the gate-contract documentation change and passed; previous aggregate nondeterminism remains separately tracked debt |
 | P0-W42-E07 | P0-W42-AC07 | fresh implementation branch HEAD; byte-identity of plan and authorization record against trusted authority source; `scripts/agent-preflight` output on the implementation branch (Pending post-integration entry-gate verification) |
 
 ## Explicit exclusions
@@ -266,7 +266,7 @@ Exact-head remote CI for the final branch head is external integration Evidence 
 | P0-W42-AC03 | Pass | P0-W42-E03 | runtime-path diff empty |
 | P0-W42-AC04 | Pass | P0-W42-E04 | PR #48 rejected/unmerged, PR #53 historical/unmerged, PR #56 integrated correction carrier, PR #57 integrated owner-acceptance |
 | P0-W42-AC05 | Pass | P0-W42-E05 | six governance documents synchronized to accepted-and-authorized-but-not-yet-implemented state |
-| P0-W42-AC06 | Pass | P0-W42-E06 | exact-head CI green under the corrected applicability contract; applicable universal gates pass; W34 `scripts/test-agent-preflight` harness defect identified as excluded prerequisite debt; P1-S01 aggregate re-verification recorded as not applicable to P0-W42 |
+| P0-W42-AC06 | Pass | P0-W42-E06 | exact-head CI green; universal gates pass; P1-S01 aggregate gate applicable because the gate-contract path changed and passed; historical nondeterminism remains separately tracked debt |
 | P0-W42-AC07 | Pending post-integration entry-gate verification | P0-W42-E07 | future implementation-branch `scripts/agent-preflight` acceptance; not yet observable; not claimed as a current PASS |
 
 ### Required next action
