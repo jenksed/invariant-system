@@ -1,0 +1,7 @@
+work_id=P1-S02-T01
+state=authorized
+owner=Joshua Jenks
+base_sha=8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf
+plan_sha256=b61f1c611d1a9df65b0334f7c71aa8c723e7d8c0dc4efe9fd5a053a78313e6e5
+authorized_at=2026-08-10T09:16:00-04:00
+scope=Implement only P1-S02-T01 Durable Artifact and Evidence substrate as defined by the accepted plan on a fresh replacement implementation branch; no PR #48 reuse, no P1-S02-T02 or later work, and no denied capability surface.

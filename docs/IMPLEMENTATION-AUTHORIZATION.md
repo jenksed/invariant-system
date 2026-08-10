@@ -2,7 +2,7 @@
 
 **Document type:** Current implementation-authorization authority
 **Status:** Accepted
-**Current result:** No P1-S02 ticket or slice is authorized; the corrected P1-S02-T01 plan was owner-accepted via P0-W41 and the next governance action is a separate T01 implementation-authorization package
+**Current result:** The bounded P1-S02-T01 implementation package is authorized by `docs/authorizations/P1-S02-T01.authorization` on canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf` against Accepted-state plan digest `b61f1c611d1a9df65b0334f7c71aa8c723e7d8c0dc4efe9fd5a053a78313e6e5`; no P1-S02 runtime implementation exists yet; P1-S02-T02 and later remain unauthorized
 
 An accepted plan describes work. An authorization record permits one bounded implementation package to begin. Passing CI, a pull-request body, an available branch, generated code, or an implementation Claim does not substitute for either.
 
@@ -40,8 +40,9 @@ Planning work under `work/p<phase>-w<work>-*` can create or amend proposed imple
 - Candidate commit `60367874bfc3c0e6d8cbd736f58e1ae17938943b` remains premature pre-authorization work; the adjudication never rewrote its history.
 - P0-W38 corrected and replaced the T01 plan; the corrected plan integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12`.
 - PR #53 is the closed and unmerged historical predecessor; it is not an accepted source.
-- P0-W41 records the owner acceptance of the corrected P1-S02-T01 plan against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`.
-- The active T01 authorization record is absent. Every P1-S02 ticket and the aggregate slice are unauthorized.
-- The next legitimate action is a separate governance action that creates `docs/authorizations/P1-S02-T01.authorization` on canonical `main` after the P0-W41 merge and binds the Accepted-state plan digest, the new canonical `main` SHA, the trusted owner, and the bounded T01-v2 scope. Acceptance alone does not authorize implementation. PR #48 must remain closed and unmerged.
+- P0-W41 records the owner acceptance of the corrected P1-S02-T01 plan against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`; that acceptance integrated through PR #57 at canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`.
+- P0-W42 creates the bounded T01 implementation authorization by adding `docs/authorizations/P1-S02-T01.authorization` against canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`, binding `work_id=P1-S02-T01`, `state=authorized`, `owner=Joshua Jenks`, `base_sha=8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`, `plan_sha256=b61f1c611d1a9df65b0334f7c71aa8c723e7d8c0dc4efe9fd5a053a78313e6e5`, `authorized_at=2026-08-10T09:16:00-04:00`, and the bounded T01-v2 scope.
+- No P1-S02 runtime implementation exists yet; authorization permits but does not start implementation.
+- The next legitimate action after this authorization integrates on canonical `main` is a fresh replacement implementation branch `work/p1-s02-t01-artifact-evidence-substrate-v2` from the resulting canonical `main`. PR #48 must remain closed and unmerged. P1-S02-T02 and later remain unauthorized.
 
 Authorization is effective only while the exact record and accepted plan remain active at trusted canonical `main` and unchanged in the explicit implementation commit. Revocation or supersession requires a governance change that updates or removes the trusted record before further implementation proceeds.

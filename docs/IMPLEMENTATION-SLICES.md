@@ -1,10 +1,10 @@
 # Vertical Implementation Slices
 
-**Document type:** Implementation roadmap detail  
-**Decision status:** Accepted by Prompt 8-A  
-**Integration status:** P1-S01 integrated at `db02198`; PR #48 rejected; corrected P1-S02-T01 plan owner-accepted via P0-W41; all P1-S02 work unauthorized
-**Implementation status:** P1-S01 — Durable single-Run foundation integrated and owner-accepted  
-**Order authority:** `docs/ROADMAP.md`  
+**Document type:** Implementation roadmap detail
+**Decision status:** Accepted by Prompt 8-A
+**Integration status:** P1-S01 integrated at `db02198`; PR #48 rejected; corrected P1-S02-T01 plan owner-accepted via P0-W41 at canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`; bounded T01 implementation authorized via P0-W42 by `docs/authorizations/P1-S02-T01.authorization`; T01 implementation Not yet implemented; P1-S02-T02 and later remain unauthorized
+**Implementation status:** P1-S01 — Durable single-Run foundation integrated and owner-accepted
+**Order authority:** `docs/ROADMAP.md`
 **Quality Compiler placement:** QC0/QC1 planned in P1-S02; QC2 planned with bounded delegation; QC3/QC4 evidence-gated later
 
 ## Purpose
@@ -72,8 +72,8 @@ Every authorized slice shall:
 
 # P1-S01 — Durable single-Run foundation
 
-**Status:** Integrated at `db02198` via PR #46; owner-accepted. Manifest: `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` (`overall: pass`, 18 components, owner-machine OD-02 pass)  
-**Milestone:** Durable work boundary  
+**Status:** Integrated at `db02198` via PR #46; owner-accepted. Manifest: `artifacts/p1-s01/slice-01-5792ffdd3af6c45f07e07b8334ce150ad642495b.json` (`overall: pass`, 18 components, owner-machine OD-02 pass)
+**Milestone:** Durable work boundary
 **Target:** aggressive first foundation sequence; timing does not weaken gates
 
 ## User-visible value
@@ -238,8 +238,8 @@ Kiln has a durable work foundation that survives restart without reconstructing 
 
 # P1-S02 — Evidence-backed Single-Run Change Alpha plus QC0/QC1
 
-**Status:** Planned; corrected T01 plan Accepted; not authorized  
-**Entry gate:** P1-S01 aggregate gate, demo, verification manifest, owner-machine Evidence, and Prompt 8-A authorization conditions remain satisfied; the corrected T01 plan is owner-accepted via P0-W41; the next governance action is a separate T01 implementation-authorization package that creates `docs/authorizations/P1-S02-T01.authorization` on canonical `main`.
+**Status:** Planned; corrected T01 plan Accepted; bounded T01 implementation Authorized; T01 implementation Not yet implemented; T02 and later Unauthorized
+**Entry gate:** P1-S01 aggregate gate, demo, verification manifest, owner-machine Evidence, and Prompt 8-A authorization conditions remain satisfied; the corrected T01 plan is owner-accepted via P0-W41; the bounded T01 implementation is authorized via P0-W42 by `docs/authorizations/P1-S02-T01.authorization` on canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`; implementation begins only after the authorization record integrates on canonical `main`; the exact next action is a fresh replacement implementation branch `work/p1-s02-t01-artifact-evidence-substrate-v2` from the resulting canonical `main`.
 
 ## User-visible value
 

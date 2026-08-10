@@ -4,7 +4,7 @@
 **Decision status:** Accepted by Prompt 8-A  
 **Integration status:** P1-S01 integrated at `db02198` via PR #46 (closeout SHA `5792ffd`, evidence SHA `444c5a5`)  
 **Implementation status:** P1-S01 durable single-Run foundation integrated and owner-accepted on the OD-02 acceptance machine  
-**Authorization level:** P1-S02 remains planned and unauthorized  
+**Authorization level:** P1-S02-T01 implementation authorized by P0-W42; T01 implementation Not yet implemented; P1-S02-T02 and later remain unauthorized
 **Quality Compiler placement:** Planned across P1-S02, Wave B, and later evidence-gated expansion; not independently authorized
 
 ## Roadmap rule
@@ -171,7 +171,7 @@ P1-S01 passes only when the exact integrated state proves:
 
 # P1-S02 — Evidence-backed Single-Run Change Alpha plus QC0/QC1
 
-**Status:** Planned but not authorized; PR #48 rejected  
+**Status:** Planned; corrected T01 plan Accepted; bounded T01 implementation Authorized; T01 implementation Not yet implemented; PR #48 rejected
 **Entry gate:** P1-S01 must merge and pass its aggregate gate and owner-machine Evidence.
 
 ## Intended outcome
@@ -325,4 +325,4 @@ Development pauses when:
 
 ## Exact next action
 
-P1-S01 is complete and accepted. PR #48 was adjudicated at exact head `7ba158bd`, passed CI, failed technical acceptance, and closed without merge. The corrected T01 plan integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12`; PR #53 remained the historical unmerged predecessor. P0-W41 records the owner acceptance of the corrected T01 plan against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`. Acceptance grants no implementation authority; no `docs/authorizations/P1-S02-T01.authorization` record exists; P1-S02 remains unauthorized. The next legitimate action is a separate, governance-only T01 implementation-authorization package that creates the authorization record on canonical `main` after the P0-W41 merge and binds the Accepted-state plan digest, the new canonical `main` SHA, the trusted owner, and the bounded T01-v2 scope. Plan acceptance and an exact implementation authorization remain separate decisions.
+P1-S01 is complete and accepted. PR #48 was adjudicated at exact head `7ba158bd`, passed CI, failed technical acceptance, and closed without merge. The corrected T01 plan integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12`; PR #53 remained the historical unmerged predecessor. P0-W41 records the owner acceptance of the corrected T01 plan against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`; that acceptance integrated through PR #57 at canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`. P0-W42 authorizes the bounded T01 implementation by creating `docs/authorizations/P1-S02-T01.authorization` against canonical `main` `8555b81a9b13cb5a424cdf20b17fb4e2b30b43cf`, binding the Accepted-state plan digest, the trusted owner, and the bounded T01-v2 scope. Authorization permits but does not start implementation; no P1-S02 runtime implementation exists yet. The exact next legitimate action after P0-W42 integrates is a fresh replacement implementation branch `work/p1-s02-t01-artifact-evidence-substrate-v2` from the resulting canonical `main`. Plan acceptance and exact implementation authorization remain separate decisions.
