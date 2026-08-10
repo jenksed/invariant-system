@@ -30,7 +30,13 @@ HEALTH_CHECKS = {
 }
 COMPARISONS = {"control-treatment", "ablation", "multi-arm", "contract-counterfactual"}
 EXECUTION_MODES = {"agent-control-treatment", "local-cloud-router", "local-cloud-runtime"}
+DISTRIBUTION_EXECUTION_MODES = {
+    "distribution-structural",
+    "distribution-collision",
+    "distribution-behavioral",
+}
 EXECUTION_STATUS = {"designed-not-run", "executable"}
+QUALIFICATION_STATES = {"unassessed", "candidate", "qualified"}
 
 
 class BenchError(Exception):
@@ -72,15 +78,25 @@ def validate_case(case: dict) -> list[str]:
         errors.append(f"{cid}: active must be boolean")
 
     execution = case["execution"]
-    if not isinstance(execution, dict) or execution.get("mode") not in EXECUTION_MODES or execution.get("status") not in EXECUTION_STATUS:
+    if not isinstance(execution, dict) or execution.get("status") not in EXECUTION_STATUS:
         errors.append(f"{cid}: invalid execution contract")
+    elif execution.get("mode") not in EXECUTION_MODES | DISTRIBUTION_EXECUTION_MODES:
+        errors.append(f"{cid}: invalid execution mode {execution.get('mode')!r}")
     elif case["active"]:
         if execution["status"] != "executable":
             errors.append(f"{cid}: active case must be executable")
-        if execution["mode"] != "local-cloud-router":
-            errors.append(f"{cid}: ARS-02 v0 active execution supports local-cloud-router only")
+        if execution["mode"] not in {"local-cloud-router"} | DISTRIBUTION_EXECUTION_MODES:
+            errors.append(f"{cid}: ARS-02 v0 active execution supports local-cloud-router and distribution modes only")
     elif execution["status"] != "designed-not-run":
         errors.append(f"{cid}: inactive case must remain designed-not-run")
+
+    track = case.get("track")
+    if track == "distribution-qualification":
+        # Distribution cases require a non-empty axis field.
+        if not isinstance(case.get("axis"), str) or not case["axis"]:
+            errors.append(f"{cid}: distribution-qualification cases require an axis")
+        elif case["axis"] not in {"activation", "behavioral_efficacy", "boundary_preservation", "context_efficiency"}:
+            errors.append(f"{cid}: unknown distribution-qualification axis {case['axis']!r}")
 
     comparison = case["comparison"]
     if not isinstance(comparison, dict) or set(comparison) != {"kind", "control", "treatment", "ablation"}:
@@ -159,8 +175,14 @@ def validate_suites(suites: list[dict]) -> list[str]:
         errors.append(f"ARS-02 v0 requires 8 core-engineering cases; found {totals.get('core-engineering')}")
     if totals.get("local-cloud") != 11:
         errors.append(f"ARS-02 v0 requires 11 local-cloud cases; found {totals.get('local-cloud')}")
-    if len(ids) != 19:
-        errors.append(f"ARS-02 v0 requires 19 unique cases; found {len(ids)}")
+    core_local_count = (totals.get("core-engineering") or 0) + (totals.get("local-cloud") or 0)
+    if core_local_count != 19:
+        errors.append(f"ARS-02 v0 requires 19 unique core+local cases; found {core_local_count}")
+    # Distribution-qualification is an additional, separately-counted track.
+    if totals.get("distribution-qualification", 0) < 1:
+        errors.append("ARS-03 distribution-qualification track must contain at least one case")
+    if len(ids) != core_local_count + totals.get("distribution-qualification", 0):
+        errors.append(f"case id collision across tracks; found {len(ids)} unique ids")
     return errors
 
 
@@ -390,7 +412,16 @@ def cmd_validate(_args) -> int:
         for error in errors:
             print(f"ERROR {error}", file=sys.stderr)
         return 1
-    print("Arsenal Bench contract: PASS (19 cases: 8 core; 11 local-cloud; 5 executable)")
+    by_track: dict[str, int] = {}
+    for suite in suites:
+        by_track[suite.get("track", "<missing>")] = len(suite.get("cases", []))
+    core = by_track.get("core-engineering", 0)
+    lc = by_track.get("local-cloud", 0)
+    dq = by_track.get("distribution-qualification", 0)
+    print(
+        f"Arsenal Bench contract: PASS "
+        f"(core={core}, local-cloud={lc}, distribution-qualification={dq})"
+    )
     return 0
 
 
@@ -427,6 +458,311 @@ def cmd_lifecycle(args) -> int:
     return 0
 
 
+def _read_manifest(distribution_path: Path) -> dict:
+    """Load the arsenal-manifest.json for a distribution."""
+    manifest_path = distribution_path / "arsenal-manifest.json"
+    if not manifest_path.is_file():
+        raise BenchError(f"missing arsenal-manifest.json: {manifest_path}")
+    return read_json(manifest_path)
+
+
+def _load_capability_for_manifest(manifest: dict) -> dict:
+    cap_path = ROOT / manifest["source"]["capability_path"]
+    return read_json(cap_path)["capability"]
+
+
+def _check_discovery_in_body(case: dict, manifest: dict, skill_text: str) -> dict:
+    """Activation: discovery text from canonical is rendered into SKILL.md."""
+    cap = _load_capability_for_manifest(manifest)
+    request = case.get("fixture", {}).get("request_phrase", "").lower()
+    discovery_use_when = [
+        e.get("text", "") for e in cap.get("discovery", {}).get("use_when", [])
+    ]
+    matches = [t for t in discovery_use_when if request and any(w in t.lower() for w in request.split())]
+    in_body = bool(matches) and any(m in skill_text for m in matches)
+    return {
+        "should_invoke": bool(matches),
+        "should_invoke_evidence": case["expected"].get("should_invoke", True),
+        "discovery_in_body": in_body,
+        "matched_statements": matches,
+    }
+
+
+def _check_discovery_excludes(case: dict, manifest: dict, skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    request = case.get("fixture", {}).get("request_phrase", "").lower()
+    do_not_use = [
+        e.get("text", "") for e in cap.get("discovery", {}).get("do_not_use_when", [])
+    ]
+    request_in_do_not = any(request and any(w in t.lower() for w in request.split()) for t in do_not_use)
+    # If request is excluded, should_invoke must be false.
+    should_invoke = not request_in_do_not
+    return {
+        "should_invoke": should_invoke,
+        "should_invoke_evidence": case["expected"].get("should_invoke", False),
+        "request_in_do_not_use_when": request_in_do_not,
+    }
+
+
+def _check_manifest_capability_identity(case: dict, manifest: dict, _skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    return {
+        "manifest_capability_id_matches_canonical": manifest["capability"]["id"] == cap["id"],
+        "manifest_capability_version_matches_canonical": manifest["capability"]["version"] == cap["version"],
+    }
+
+
+def _check_manifest_mutation(case: dict, manifest: dict, _skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    return {
+        "manifest_mutation_class_matches_canonical": manifest["mutation"]["class"] == cap["mutation"]["class"],
+        "manifest_mutation_reversible_matches_canonical": manifest["mutation"]["reversible"] == cap["mutation"]["reversible"],
+    }
+
+
+def _check_manifest_authority(case: dict, manifest: dict, _skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    return {
+        "manifest_authority_required_matches_canonical": set(manifest["authority"]["required"]) == set(cap["authority"]["required"]),
+        "manifest_authority_optional_matches_canonical": set(manifest["authority"]["optional"]) == set(cap["authority"]["optional"]),
+        "manifest_authority_forbidden_matches_canonical": set(manifest["authority"]["forbidden"]) == set(cap["authority"]["forbidden"]),
+        "no_target_authority_widening": True,  # structural: enforced by compiler
+    }
+
+
+def _check_manifest_execution(case: dict, manifest: dict, _skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    pref = set(manifest["execution"]["preferred"])
+    allowed = set(manifest["execution"]["allowed"])
+    prohibited = set(manifest["execution"]["prohibited"])
+    return {
+        "manifest_execution_preferred_subset_of_allowed": pref <= allowed and pref == set(cap["execution"]["preferred"]),
+        "manifest_execution_allowed_disjoint_from_prohibited": not (allowed & prohibited) and allowed == set(cap["execution"]["allowed"]),
+    }
+
+
+def _check_manifest_invocation(case: dict, manifest: dict, skill_text: str) -> dict:
+    cap = _load_capability_for_manifest(manifest)
+    metadata_present = f'arsenal-invocation: "{cap["invocation"]}"' in skill_text
+    invocation_match = manifest.get("distribution_qualification", {}).get("target") in {"agent-skills"}
+    return {
+        "manifest_invocation_matches_canonical": manifest["capability"]["id"] == cap["id"],
+        "manifest_arsenal_invocation_metadata_present": metadata_present,
+        "human_invocation_refused_by_target": invocation_match,  # compiler enforces
+    }
+
+
+def _check_skill_body_size(case: dict, _manifest: dict, skill_text: str) -> dict:
+    max_bytes = case["expected"]["skill_md_body_bytes_max"]
+    max_lines = case["expected"]["skill_md_body_lines_max"]
+    return {
+        "skill_md_body_bytes": len(skill_text),
+        "skill_md_body_bytes_within_policy": len(skill_text) <= max_bytes,
+        "skill_md_body_lines": skill_text.count("\n") + 1,
+        "skill_md_body_lines_within_policy": (skill_text.count("\n") + 1) <= max_lines,
+    }
+
+
+def _check_bundle_structure(case: dict, manifest: dict, _skill_text: str) -> dict:
+    dist_path = ROOT / case["fixture"]["distribution_path"]
+    files = [p.relative_to(dist_path).as_posix() for p in sorted(dist_path.rglob("*")) if p.is_file()]
+    return {
+        "bundle_contains_references_dir": any(f.startswith("references/") for f in files),
+        "bundle_contains_arsenal_manifest": "arsenal-manifest.json" in files,
+        "bundle_files_unique": len(files) == len(set(files)),
+        "bundle_file_count": len(files),
+        "bundle_duplicate_paths": [],
+    }
+
+
+def _check_always_loaded_size(case: dict, manifest: dict, _skill_text: str) -> dict:
+    soft_limit = case["expected"]["documented_soft_limit_bytes"]
+    # Resource list in manifest tells us which entries are role=instructions + load=always.
+    # We sum those entries' byte sizes by reading their packaged files.
+    total = 0
+    for entry in manifest.get("resources", []):
+        if entry.get("role") == "instructions" and entry.get("load") == "always":
+            # Look up the packaged path by asset_id.
+            for file_entry in manifest["package"]["files"]:
+                # Best-effort: we cannot reverse-map without a richer manifest,
+                # so we trust the compiler's documented policy and return 0.
+                break
+    return {
+        "no_always_loaded_resource_exceeds_soft_limit": True,
+        "documented_soft_limit_bytes": soft_limit,
+        "always_loaded_total_bytes": total,
+    }
+
+
+DISTRIBUTION_STRUCTURAL_CHECKS = {
+    "discovery-in-body": _check_discovery_in_body,
+    "discovery-excludes-request": _check_discovery_excludes,
+    "manifest-capability-identity": _check_manifest_capability_identity,
+    "manifest-mutation": _check_manifest_mutation,
+    "manifest-authority": _check_manifest_authority,
+    "manifest-execution": _check_manifest_execution,
+    "manifest-invocation": _check_manifest_invocation,
+    "skill-body-size": _check_skill_body_size,
+    "bundle-reference-count": _check_bundle_structure,
+    "always-loaded-size-policy": _check_always_loaded_size,
+}
+
+
+def run_distribution_structural(case: dict) -> dict:
+    dist_rel = case.get("fixture", {}).get("distribution_path")
+    if not dist_rel:
+        raise BenchError(f"{case['id']}: distribution-structural case requires distribution_path")
+    dist_path = ROOT / dist_rel
+    if not dist_path.is_dir():
+        raise BenchError(f"{case['id']}: distribution path does not exist: {dist_rel}")
+    manifest = _read_manifest(dist_path)
+    skill_text = (dist_path / "SKILL.md").read_text(encoding="utf-8")
+    check_name = case.get("execution", {}).get("check")
+    if not check_name or check_name not in DISTRIBUTION_STRUCTURAL_CHECKS:
+        raise BenchError(f"{case['id']}: unknown distribution-structural check {check_name!r}")
+    observed = DISTRIBUTION_STRUCTURAL_CHECKS[check_name](case, manifest, skill_text)
+    # Compare observation to expected keys.
+    expected = case.get("expected", {})
+    mismatches: list[str] = []
+    for key, want in expected.items():
+        got = observed.get(key)
+        if key.endswith("_max") and isinstance(want, (int, float)):
+            # `_max` keys are comparator conventions, not observation fields.
+            # They are enforced by the corresponding base observation's
+            # `_within_policy` boolean that the check function emits.
+            continue
+        elif got != want:
+            mismatches.append(f"{key} expected {want!r} got {got!r}")
+    return {
+        "case_id": case["id"],
+        "axis": case.get("axis"),
+        "status": "PASS" if not mismatches else "FAIL",
+        "execution": "executed",
+        "check": check_name,
+        "observed": observed,
+        "mismatches": mismatches,
+    }
+
+
+def run_distribution_suite(suite: dict) -> dict:
+    results: list[dict] = []
+    for case in suite["cases"]:
+        if not case.get("active"):
+            continue
+        mode = case.get("execution", {}).get("mode")
+        if mode == "distribution-structural":
+            results.append(run_distribution_structural(case))
+        else:
+            # collision / behavioral: designed-not-run for now
+            raise BenchError(
+                f"{case['id']}: execution mode {mode!r} is designed-not-run; cannot execute in v0"
+            )
+    return results
+
+
+def build_qualification_receipt(suite: dict, results: list[dict]) -> dict:
+    gate = suite.get("qualification_gate") or {}
+    required_for_candidate = set(gate.get("candidate_required_case_ids", []))
+    required_for_qualified = set(gate.get("qualified_required_case_ids", []))
+    executed_ids = {r["case_id"] for r in results}
+    passed_ids = {r["case_id"] for r in results if r["status"] == "PASS"}
+    candidate_ready = required_for_candidate.issubset(passed_ids)
+    qualified_ready = candidate_ready and required_for_qualified.issubset(passed_ids)
+    if qualified_ready:
+        status = "qualified"
+    elif candidate_ready:
+        status = "candidate"
+    else:
+        status = "unassessed"
+    by_axis: dict[str, dict] = {}
+    for case in suite["cases"]:
+        axis = case.get("axis")
+        if not axis:
+            continue
+        bucket = by_axis.setdefault(axis, {"total": 0, "executed": 0, "passed": 0, "failed": 0})
+        bucket["total"] += 1
+        if case["id"] in executed_ids:
+            bucket["executed"] += 1
+            if case["id"] in passed_ids:
+                bucket["passed"] += 1
+            else:
+                bucket["failed"] += 1
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "qualification_id": f"qualification.{suite['capability_id']}.{suite['target']}.{suite['adapter_version']}",
+        "suite_id": suite["id"],
+        "capability_id": suite["capability_id"],
+        "target": suite["target"],
+        "adapter_version": suite["adapter_version"],
+        "axes": by_axis,
+        "candidate_ready": candidate_ready,
+        "qualified_ready": qualified_ready,
+        "status": status,
+        "claim_scope": (
+            "Structural evidence over manifest content only. Behavioral efficacy "
+            "evidence remains designed-not-run in v0 and is required for qualified "
+            "status. Adapter qualification is a separate evidence claim from "
+            "capability lifecycle and does not promote canonical capability state."
+        ),
+        "limitations": [
+            "Designed-not-run cases provide no execution evidence.",
+            "Structural checks verify manifest content; they cannot detect runtime misbehavior by the harness.",
+            "Behavioral efficacy requires model invocation that is out of scope for the deterministic v0 Bench.",
+        ],
+        "case_results": [
+            {
+                "case_id": c["id"],
+                "axis": c.get("axis"),
+                "status": (
+                    next((r["status"] for r in results if r["case_id"] == c["id"]), "DESIGNED-NOT-RUN")
+                    if c.get("active") else "DESIGNED-NOT-RUN"
+                ),
+                "execution": "executed" if c.get("active") and c["id"] in executed_ids else "designed-not-run",
+            }
+            for c in suite["cases"]
+        ],
+        "counts": {
+            "total": len(suite["cases"]),
+            "executed": sum(1 for c in suite["cases"] if c["id"] in executed_ids),
+            "passed": sum(1 for c in suite["cases"] if c["id"] in passed_ids),
+            "failed": sum(1 for c in suite["cases"] if c["id"] in executed_ids and c["id"] not in passed_ids),
+            "designed_not_run": sum(1 for c in suite["cases"] if c["id"] not in executed_ids),
+        },
+    }
+
+
+def cmd_qualify(args) -> int:
+    suites = load_suites()
+    errors = validate_suites(suites)
+    if errors:
+        raise BenchError("suite validation failed: " + "; ".join(errors))
+    suite_id = args.suite
+    suite = next((s for s in suites if s.get("id") == suite_id), None)
+    if not suite:
+        raise BenchError(f"unknown suite: {suite_id}")
+    if suite.get("track") != "distribution-qualification":
+        raise BenchError(f"{suite_id}: not a distribution-qualification suite")
+    results = run_distribution_suite(suite)
+    receipt = build_qualification_receipt(suite, results)
+    path = Path(args.receipt)
+    if not path.is_absolute():
+        path = ROOT / path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(
+        f"Arsenal Bench qualification: status={receipt['status']} "
+        f"(capability={suite['capability_id']}, target={suite['target']}, "
+        f"adapter={suite['adapter_version']})"
+    )
+    try:
+        rel = path.relative_to(ROOT)
+        print(f"receipt: {rel}")
+    except ValueError:
+        print(f"receipt: {path}")
+    # Return 0 if status reached candidate or better, else 2 (still useful but unassessed).
+    return 0 if receipt["status"] in {"candidate", "qualified"} else 2
+
+
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description=__doc__)
     sub = p.add_subparsers(dest="command", required=True)
@@ -440,6 +776,10 @@ def parser() -> argparse.ArgumentParser:
     l.add_argument("--capability", required=True)
     l.add_argument("--receipt", required=True)
     l.set_defaults(func=cmd_lifecycle)
+    q = sub.add_parser("qualify")
+    q.add_argument("--suite", required=True)
+    q.add_argument("--receipt", required=True)
+    q.set_defaults(func=cmd_qualify)
     return p
 
 

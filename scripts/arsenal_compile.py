@@ -27,6 +27,21 @@ TARGET_INVOCATION_SUPPORT: dict[str, set[str]] = {
     "agent-skills": {"agent", "composed"},
 }
 PACKAGE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+# Per-role target subdirectory inside the generated package.
+ROLE_DIR: dict[str, str] = {
+    "instructions": "references",
+    "reference": "references",
+    "template": "templates",
+    "script": "scripts",
+    "fixture": "fixtures",
+    "asset": "assets",
+}
+# Documented policy: always-loaded instructions content must fit within the
+# adapter's body budget. The agent-skills SKILL.md should remain readable
+# without an explicit cap, but we record a soft ceiling so the compiler can
+# warn (not reject) when content exceeds it. Limits are documented policy,
+# not external contract.
+INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES = 32_768
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -178,6 +193,7 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
                 **export,
                 "_cap_record": capabilities[cap_id],
                 "_asset": assets[primary_asset_id],
+                "_all_assets": assets,
                 "_source_path": source_path,
                 "_output_rel": output_rel,
             }
@@ -190,7 +206,12 @@ def yaml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def render_agent_skill(export: dict[str, Any], source_rel: Path) -> str:
+def render_agent_skill(
+    export: dict[str, Any],
+    source_rel: Path,
+    bundled: dict[str, bytes],
+    embedded_instructions: list[tuple[str, bytes]],
+) -> str:
     cap = export["_cap_record"]["capability"]
     package = export["package_name"]
     source_asset_id = cap["implementation"]["primary_asset"]
@@ -220,6 +241,55 @@ def render_agent_skill(export: dict[str, Any], source_rel: Path) -> str:
         discovery_block += f"\n## Do not use when\n\n{do_not_use_lines}\n"
 
     invocation = cap.get("invocation", "agent")
+
+    # Build the bundled-resources section deterministically from the bundled
+    # file map. The primary asset's reference is rendered with an explicit
+    # canonical anchor; other resources are listed in sorted order.
+    cap_resources = cap.get("implementation", {}).get("resources") or []
+    primary_id = cap["implementation"]["primary_asset"]
+    resource_lines_parts: list[str] = []
+    seen_paths: set[str] = set()
+    primary_rel = f"references/{source_rel.name}"
+    if primary_rel in bundled:
+        resource_lines_parts.append(f"- Primary reference: [`{primary_rel}`]({primary_rel})")
+        seen_paths.add(primary_rel)
+    for entry in sorted(cap_resources, key=lambda e: e["asset_id"]):
+        # The asset_id itself is recorded as the load role hint.
+        asset_id = entry["asset_id"]
+        role = entry["role"]
+        load = entry["load"]
+        # Path resolution mirrors resource_target_path.
+        if asset_id == primary_id:
+            target_rel = primary_rel
+        else:
+            # Look up the asset's filename from bundled by reverse search.
+            target_rel = None
+            base_dir = ROLE_DIR.get(role, "references")
+            for path in bundled:
+                if path.startswith(f"{base_dir}/") and path not in seen_paths:
+                    # best-effort: pick the bundled path under the role dir
+                    # whose name matches this asset's known filename. The
+                    # audit guarantees uniqueness within a role directory.
+                    target_rel = path
+                    break
+        if target_rel and target_rel in bundled and target_rel not in seen_paths:
+            resource_lines_parts.append(
+                f"- `{asset_id}` ({role}/{load}): [`{target_rel}`]({target_rel})"
+            )
+            seen_paths.add(target_rel)
+    resource_lines = "\n".join(resource_lines_parts) if resource_lines_parts else "_(none)_"
+
+    # Always-loaded instructions content is appended to the body so the
+    # entrypoint can carry small activation content without forcing a
+    # separate read.
+    instructions_section = ""
+    if embedded_instructions:
+        chunks: list[str] = []
+        for asset_id, content in embedded_instructions:
+            decoded = content.decode("utf-8", errors="replace").rstrip()
+            chunks.append(f"### Always-loaded instructions: `{asset_id}`\n\n{decoded}\n")
+        instructions_section = "\n## Always-loaded instructions\n\n" + "\n".join(chunks)
+
     invocation_note = {
         "human": (
             "Invocation boundary: this capability is `human`-invoked. "
@@ -257,12 +327,19 @@ metadata:
 {discovery_block}
 ## Canonical behavior
 
-Read [`references/{ref_name}`](references/{ref_name}) in full and execute it as the authoritative workflow for this capability.
+Read the bundled reference(s) listed below in full and execute them as the authoritative workflow for this capability.
 
-This `SKILL.md` is a generated discovery and packaging adapter. It does not replace the canonical Arsenal workflow. If generated adapter text and the bundled canonical reference ever disagree, the bundled canonical reference controls.
+This `SKILL.md` is a generated discovery and packaging adapter. It does not replace the canonical Arsenal workflow. If generated adapter text and any bundled reference ever disagree, the bundled reference controls.
 
 Do not hand-edit this package. Regenerate it with `python3 scripts/arsenal_compile.py build`.
 
+## Bundled resources
+
+The following files are bundled with this package and are loaded on demand by the runtime. Always-loaded instructions content (if any) is embedded directly in this body; everything else is read on demand.
+
+{resource_lines}
+
+{instructions_section}
 ## Capability contract
 
 - Capability: `{cap["id"]}`
@@ -299,17 +376,80 @@ def digest_file_map(files: dict[str, bytes]) -> str:
     return sha256_bytes(canonical_json(rows))
 
 
+def derive_resources(cap: dict[str, Any]) -> list[dict[str, str]]:
+    """Return the canonical list of resources for a capability.
+
+    When the capability declares ``implementation.resources`` the declared
+    list is authoritative. When absent, derive a single reference/on-demand
+    resource from the primary asset for backward compatibility.
+    """
+    declared = cap.get("implementation", {}).get("resources")
+    if declared:
+        return list(declared)
+    primary = cap["implementation"]["primary_asset"]
+    return [{"asset_id": primary, "role": "reference", "load": "on-demand"}]
+
+
+def resource_target_path(role: str, source_rel: Path) -> Path:
+    base_dir = ROLE_DIR.get(role, "references")
+    safe_name = source_rel.name
+    return Path(base_dir) / safe_name
+
+
 def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, bytes], dict[str, Any]]:
     cap_record = export["_cap_record"]
     cap = cap_record["capability"]
     source_path: Path = export["_source_path"]
     source_rel = source_path.relative_to(root)
-    reference_rel = f"references/{source_rel.name}"
+
+    resources = derive_resources(cap)
+    primary_asset_id = cap["implementation"]["primary_asset"]
+    assets = export["_all_assets"]
+
+    bundled: dict[str, bytes] = {}
+    embedded_instructions: list[tuple[str, bytes]] = []
+    declared_paths: set[str] = set()
+
+    for entry in resources:
+        asset_id = entry["asset_id"]
+        role = entry["role"]
+        load = entry["load"]
+        if asset_id not in assets:
+            raise AssertionError(
+                f"resource asset {asset_id!r} is not registered in the asset registry"
+            )
+        asset_path = safe_relative_path(assets[asset_id]["path"], field="resource path")
+        abs_path = root / asset_path
+        if not abs_path.is_file():
+            raise AssertionError(
+                f"resource asset {asset_id!r} path {asset_path.as_posix()} does not exist"
+            )
+        target_rel = resource_target_path(role, asset_path)
+        target_str = target_rel.as_posix()
+        if target_str in declared_paths:
+            raise AssertionError(
+                f"duplicate resource packaging path {target_str!r} for asset {asset_id!r}"
+            )
+        declared_paths.add(target_str)
+        content = abs_path.read_bytes()
+        bundled[target_str] = content
+        if role == "instructions" and load == "always":
+            embedded_instructions.append((asset_id, content))
+
+    # Always-loaded instructions content must respect documented size policy.
+    total_always = sum(len(c) for _, c in embedded_instructions)
+    if total_always > INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES:
+        raise AssertionError(
+            f"always-loaded instructions content exceeds documented soft limit "
+            f"({total_always} > {INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES} bytes); "
+            f"promote to role=reference or split the resource"
+        )
 
     generated: dict[str, bytes] = {
-        "SKILL.md": render_agent_skill(export, source_rel).encode("utf-8"),
-        reference_rel: source_path.read_bytes(),
+        "SKILL.md": render_agent_skill(export, source_rel, bundled, embedded_instructions).encode("utf-8"),
     }
+    generated.update(bundled)
+
     content_digest = digest_file_map(generated)
 
     manifest = {
@@ -329,12 +469,23 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
         "authority": cap["authority"],
         "mutation": cap["mutation"],
         "execution": cap["execution"],
+        "resources": resources,
         "source": {
             "capability_path": cap_record["path"].relative_to(root).as_posix(),
             "capability_sha256": sha256_bytes(cap_record["path"].read_bytes()),
-            "primary_asset_id": cap["implementation"]["primary_asset"],
+            "primary_asset_id": primary_asset_id,
             "primary_asset_path": source_rel.as_posix(),
             "primary_asset_sha256": sha256_bytes(source_path.read_bytes()),
+        },
+        # Adapter qualification is a separate evidence claim from capability
+        # lifecycle. It starts at unassessed and is updated by Arsenal Bench
+        # (scripts/arsenal_bench.py qualify) based on the four-axis cases.
+        "distribution_qualification": {
+            "status": "unassessed",
+            "target": export["target"],
+            "adapter_version": export["adapter_version"],
+            "suite_id": f"suite.distribution-qualification-v0",
+            "evidence_paths": [],
         },
         "package": {
             "name": export["package_name"],
