@@ -9,8 +9,8 @@ import re
 import sys
 from pathlib import Path
 
-CAPABILITY_SCHEMA_VERSION = "2.1.0"
-CAPABILITY_SCHEMA_LEGACY = "2.0.0"
+CAPABILITY_SCHEMA_VERSION = "2.2.0"
+CAPABILITY_SCHEMA_LEGACY = {"2.0.0", "2.1.0"}
 ASSET_SCHEMA_VERSION = "1.0.0"
 
 AUTHORITY = {
@@ -107,7 +107,7 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
         if set(doc) != {"schema_version", "capability"}:
             errors.append(f"{path}: fragment must contain only schema_version and capability")
             continue
-        if doc.get("schema_version") not in (CAPABILITY_SCHEMA_VERSION, CAPABILITY_SCHEMA_LEGACY):
+        if doc.get("schema_version") not in (CAPABILITY_SCHEMA_VERSION, *CAPABILITY_SCHEMA_LEGACY):
             errors.append(f"{path}: unsupported capability schema_version {doc.get('schema_version')!r}")
             continue
         capability = doc.get("capability")
@@ -227,6 +227,56 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
         for ref in refs:
             if ref not in asset_ids:
                 errors.append(f"{cap_id}: unknown registered asset {ref} in implementation")
+
+        # Resource strategy: optional. When present, every entry must be
+        # well-formed and the role/load combination must be valid.
+        resources = implementation.get("resources")
+        if resources is not None:
+            if not isinstance(resources, list):
+                errors.append(f"{cap_id}: implementation.resources must be an array")
+            else:
+                seen_resource_assets: set[str] = set()
+                # role × load compatibility rules
+                readable_roles = {"instructions", "reference", "template"}
+                executable_roles = {"script", "fixture", "asset"}
+                valid_loads = {"always", "on-demand", "execute-not-read"}
+                for idx, entry in enumerate(resources):
+                    if not isinstance(entry, dict):
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] must be an object")
+                        continue
+                    asset_id = entry.get("asset_id")
+                    role = entry.get("role")
+                    load = entry.get("load")
+                    if not isinstance(asset_id, str) or len(asset_id) < 3:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}].asset_id must be a string")
+                        continue
+                    if asset_id not in asset_ids:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] unknown registered asset {asset_id!r}")
+                    if asset_id in seen_resource_assets:
+                        errors.append(f"{cap_id}: implementation.resources duplicate asset_id {asset_id!r}")
+                    seen_resource_assets.add(asset_id)
+                    if role not in {"instructions", "reference", "script", "template", "fixture", "asset"}:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] invalid role {role!r}")
+                    if load not in valid_loads:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] invalid load {load!r}")
+                    if role in readable_roles and load == "execute-not-read":
+                        errors.append(
+                            f"{cap_id}: implementation.resources[{idx}] role {role!r} cannot use execute-not-read"
+                        )
+                    if role in executable_roles and load == "always":
+                        errors.append(
+                            f"{cap_id}: implementation.resources[{idx}] role {role!r} cannot be always-loaded"
+                        )
+                    # Primary asset should appear as a resource (typically as
+                    # the reference); if declared in resources, the audit
+                    # accepts it but flags mismatches.
+                    if asset_id == primary:
+                        # primary asset's role should normally be reference or instructions
+                        if role not in {"reference", "instructions"}:
+                            errors.append(
+                                f"{cap_id}: primary asset {primary!r} should normally be role "
+                                f"'reference' or 'instructions'; got {role!r}"
+                            )
 
     provenance = cap.get("provenance")
     if not isinstance(provenance, dict) or not isinstance(provenance.get("asset_ids"), list) or not provenance["asset_ids"]:

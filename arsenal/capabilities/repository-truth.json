@@ -37,7 +37,10 @@
     },
     "implementation": {
       "primary_asset": "agent.repository-truth-audit",
-      "asset_ids": ["agent.repository-truth-audit"]
+      "asset_ids": ["agent.repository-truth-audit"],
+      "resources": [
+        {"asset_id": "agent.repository-truth-audit", "role": "reference", "load": "on-demand"}
+      ]
     },
     "authority": {
       "required": ["filesystem.read", "git.read"],

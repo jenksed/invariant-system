@@ -47,6 +47,27 @@
         "kind": {"enum": ["positive", "negative"]}
       }
     },
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asset_id", "role", "load"],
+      "properties": {
+        "asset_id": {"type": "string", "minLength": 3},
+        "role": {
+          "enum": [
+            "instructions",
+            "reference",
+            "script",
+            "template",
+            "fixture",
+            "asset"
+          ]
+        },
+        "load": {
+          "enum": ["always", "on-demand", "execute-not-read"]
+        }
+      }
+    },
     "discovery": {
       "type": "object",
       "additionalProperties": false,
@@ -126,7 +147,12 @@
           "type": "object", "additionalProperties": false, "required": ["primary_asset", "asset_ids"],
           "properties": {
             "primary_asset": {"type": "string", "minLength": 3},
-            "asset_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}}
+            "asset_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 3}},
+            "resources": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {"$ref": "#/$defs/resource"}
+            }
           }
         },
         "authority": {

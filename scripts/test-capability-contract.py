@@ -123,6 +123,47 @@ def main() -> int:
 
     expect_failure("discovery harness leakage", discovery_harness_leak, "discovery.use_when leaked harness marker")
 
+    def invalid_resource_role(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["implementation"]["resources"] = [
+            {"asset_id": "agent.independent-verification", "role": "bogus", "load": "always"}
+        ]
+
+    expect_failure("invalid resource role", invalid_resource_role, "invalid role")
+
+    def readable_role_execute_not_read(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["implementation"]["resources"] = [
+            {"asset_id": "agent.independent-verification", "role": "reference", "load": "execute-not-read"}
+        ]
+
+    expect_failure("readable role + execute-not-read", readable_role_execute_not_read, "cannot use execute-not-read")
+
+    def executable_role_always_loaded(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["implementation"]["resources"] = [
+            {"asset_id": "agent.independent-verification", "role": "script", "load": "always"}
+        ]
+
+    expect_failure("script role + always load", executable_role_always_loaded, "cannot be always-loaded")
+
+    def duplicate_resource_asset(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["implementation"]["resources"] = [
+            {"asset_id": "agent.independent-verification", "role": "reference", "load": "on-demand"},
+            {"asset_id": "agent.independent-verification", "role": "instructions", "load": "always"},
+        ]
+
+    expect_failure("duplicate resource asset", duplicate_resource_asset, "duplicate asset_id")
+
+    def unknown_resource_asset(docs):
+        cap = docs["verify.json"]["capability"]
+        cap["implementation"]["resources"] = [
+            {"asset_id": "agent.does-not-exist", "role": "reference", "load": "on-demand"}
+        ]
+
+    expect_failure("unknown resource asset", unknown_resource_asset, "unknown registered asset")
+
     print("Capability Contract negative suite: PASS")
     return 0
 

@@ -1,6 +1,6 @@
 # Arsenal Capability Contract v2
 
-Schema-Version: 2.1.0
+Schema-Version: 2.2.0
 
 Project Arsenal distinguishes **assets** from **capabilities**.
 
@@ -68,6 +68,34 @@ Target adapters must preserve the declared invocation boundary. Adapters that ca
 - require a target adapter policy that demonstrably preserves the boundary.
 
 Adapters must not silently flatten invocation semantics.
+
+## Resources and loading
+
+Capabilities declare an optional `implementation.resources` array describing each bundled asset's role and load policy. Resources let a capability express progressive disclosure instead of dumping every implementation asset into model context.
+
+Resource roles:
+
+- `instructions` — small activation content that belongs in the always-loaded entrypoint;
+- `reference` — bundled canonical workflow that the model reads on demand;
+- `script` — executable code that the runtime should invoke rather than read;
+- `template` — reusable file or content template that the model fills in;
+- `fixture` — bounded state used to test or demonstrate the capability;
+- `asset` — any other bundled artifact.
+
+Loading policies:
+
+- `always` — bundled into the always-loaded entrypoint (subject to documented size policy);
+- `on-demand` — bundled separately; the model reads the reference when it needs the content;
+- `execute-not-read` — bundled as a callable artifact; the runtime executes rather than the model reading the content.
+
+Role × load compatibility:
+
+- `instructions`, `reference`, `template` may use `always` or `on-demand` (never `execute-not-read`);
+- `script`, `fixture`, `asset` may use `on-demand` or `execute-not-read`.
+
+The `primary_asset` remains the canonical behavioral reference. When `resources` is absent the compiler derives a single `reference` / `on-demand` resource from the primary asset for backward compatibility; when present the declared resources are authoritative.
+
+Resource paths are not specified inline. The compiler derives safe repository-relative paths from the registered asset paths and rejects path traversal at compile time.
 
 ## Behavioral interface
 
