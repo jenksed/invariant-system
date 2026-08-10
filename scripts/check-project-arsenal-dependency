@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # Read-only verifier for the project-arsenal development-agent dependency.
 #
-# Asserts:
-#   * the submodule is initialized and points at the reviewed commit;
-#   * the recorded remote URL is the canonical project-arsenal URL;
-#   * the symlink at .claude/skills/repository-truth resolves inside the
-#     pinned submodule to the upstream package directory;
-#   * the lockfile at .claude/dependencies/project-arsenal/.arsenal.lock
-#     records the reviewed plan and package digests.
+# Asserts, against the exact current repository state:
+#   1. the superproject's gitlink for .claude/dependencies/project-arsenal is
+#      mode 160000 and records exactly the reviewed upstream commit;
+#   2. .gitmodules declares the canonical upstream URL for that submodule;
+#   3. the materialized submodule working tree (when initialized) is at the
+#      same reviewed commit;
+#   4. .claude/skills/repository-truth is a symbolic link that resolves inside
+#      the pinned submodule to the expected package directory;
+#   5. the lockfile at .claude/dependencies/project-arsenal/.arsenal.lock
+#      records the reviewed plan and repository-truth package digests and
+#      does not record more than one matching agent-skills export.
 #
-# This script is read-only and does not modify the repository.
+# This script performs no mutation. It does not fetch, reset, init, or update
+# the submodule. A failed check MUST mean "do not proceed"; each failure path
+# prints an actionable message to stderr.
 
 set -euo pipefail
 
@@ -30,84 +36,100 @@ Submodule_Path=".claude/dependencies/project-arsenal"
 Symlink_Path=".claude/skills/repository-truth"
 Lockfile_Path="${Submodule_Path}/.arsenal.lock"
 
-# 1. Submodule gitlink must be present in the index at mode 160000.
-Index_Mode=$(git ls-files --stage "$Submodule_Path" 2>/dev/null | awk 'NR==1 { print $1; exit }')
-if [[ -z "$Index_Mode" ]]; then
-  fail "submodule gitlink is missing: $Submodule_Path"
-fi
+# 1. Superproject gitlink: require BOTH mode 160000 AND the exact recorded SHA.
+# `git ls-files --stage` is the authoritative record of what the superproject
+# believes the pinned dependency revision is; this is independent of whether
+# the working tree has been materialized.
+Index_Entry=$(git ls-files --stage "$Submodule_Path" 2>/dev/null) || true
+[[ -n "$Index_Entry" ]] || fail "submodule gitlink is missing from index: $Submodule_Path"
+Index_Mode=$(printf '%s' "$Index_Entry" | awk 'NR==1 { print $1; exit }')
+Index_Sha=$(printf '%s' "$Index_Entry" | awk 'NR==1 { print $2; exit }')
 if [[ "$Index_Mode" != "160000" ]]; then
-  fail "submodule $Submodule_Path is not a gitlink (mode $Index_Mode)"
+  fail "submodule $Submodule_Path is not a gitlink (index mode is $Index_Mode)"
+fi
+if [[ "$Index_Sha" != "$Pinned_Commit" ]]; then
+  fail "superproject gitlink SHA for $Submodule_Path is $Index_Sha; expected pinned commit $Pinned_Commit"
 fi
 
-# 2. .gitmodules must declare the canonical URL.
-if [[ ! -f .gitmodules ]]; then
-  fail ".gitmodules is missing"
-fi
+# 2. .gitmodules must declare the canonical URL and the expected submodule path.
+[[ -f .gitmodules ]] || fail ".gitmodules is missing"
 grep -Fqx "	url = $Pinned_Url" .gitmodules \
   || fail ".gitmodules does not pin the canonical URL: $Pinned_Url"
 grep -Fqx "[submodule \"$Submodule_Path\"]" .gitmodules \
   || fail ".gitmodules does not declare submodule $Submodule_Path"
 
-# 3. The submodule working tree must be initialized and on the reviewed commit.
+# 3. Materialized working tree must exist and be at the same reviewed commit.
+#    The verifier requires an initialized submodule; a missing directory or an
+#    uninitialized checkout both fail closed with actionable messages. CI and
+#    local developers must run `git submodule update --init --recursive`.
 if [[ ! -d "$Submodule_Path" ]]; then
-  fail "submodule working tree is not initialized at $Submodule_Path; run: git submodule update --init"
+  fail "submodule working tree is missing at $Submodule_Path; run: git submodule update --init"
 fi
 if [[ ! -e "$Submodule_Path/.git" ]]; then
-  fail "submodule working tree at $Submodule_Path is not a valid Git checkout"
+  fail "submodule working tree at $Submodule_Path is not a valid Git checkout; run: git submodule update --init"
 fi
-Actual_Commit=$(git -C "$Submodule_Path" rev-parse HEAD 2>/dev/null) \
+Materialized_Head=$(git -C "$Submodule_Path" rev-parse HEAD 2>/dev/null) \
   || fail "submodule $Submodule_Path HEAD could not be resolved"
-if [[ "$Actual_Commit" != "$Pinned_Commit" ]]; then
-  fail "submodule $Submodule_Path is at $Actual_Commit; expected pinned commit $Pinned_Commit"
+if [[ "$Materialized_Head" != "$Pinned_Commit" ]]; then
+  fail "submodule $Submodule_Path is at $Materialized_Head; expected pinned commit $Pinned_Commit"
 fi
-Actual_Url=$(git -C "$Submodule_Path" config --get remote.origin.url 2>/dev/null) \
+Materialized_Url=$(git -C "$Submodule_Path" config --get remote.origin.url 2>/dev/null) \
   || fail "submodule $Submodule_Path has no remote.origin.url configured"
-if [[ "$Actual_Url" != "$Pinned_Url" ]]; then
-  fail "submodule $Submodule_Path remote URL is $Actual_Url; expected $Pinned_Url"
+if [[ "$Materialized_Url" != "$Pinned_Url" ]]; then
+  fail "submodule $Submodule_Path remote URL is $Materialized_Url; expected $Pinned_Url"
 fi
 
-# 4. The Claude skill symlink must resolve inside the pinned submodule.
-if [[ ! -L "$Symlink_Path" ]]; then
-  fail "expected symlink at $Symlink_Path"
-fi
+# 4. The Claude skill symlink must resolve inside the pinned submodule and
+#    MUST NOT escape to anywhere outside the expected package directory.
+[[ -L "$Symlink_Path" ]] || fail "expected symlink at $Symlink_Path"
 Resolved=$(readlink -f "$Symlink_Path" 2>/dev/null) \
   || fail "$Symlink_Path could not be resolved"
 Expected_Resolved="$root/$Submodule_Path/distribution/agent-skills/repository-truth"
 if [[ "$Resolved" != "$Expected_Resolved" ]]; then
   fail "$Symlink_Path resolves to $Resolved; expected $Expected_Resolved"
 fi
-if [[ ! -f "$Resolved/SKILL.md" ]]; then
-  fail "resolved skill path is missing SKILL.md: $Resolved"
-fi
+[[ -f "$Resolved/SKILL.md" ]] || fail "resolved skill path is missing SKILL.md: $Resolved"
 
-# 5. The lockfile must record the reviewed plan and package digests.
+# 5. The lockfile must parse as JSON, expose the reviewed plan digest, and
+#    record exactly one repository-truth agent-skills export with the
+#    reviewed package digest. Multiple matches must fail closed to avoid
+#    silently validating an ambiguous export.
 if [[ ! -f "$Lockfile_Path" ]]; then
   fail "lockfile is missing: $Lockfile_Path"
 fi
+
 if ! Lockfile_Json=$(python3 - "$Lockfile_Path" <<'PY'
 import json, sys
 try:
-    with open(sys.argv[1]) as fh:
-        fh.seek(0, 2)
-        size = fh.tell()
-        fh.seek(0)
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
         data = json.load(fh)
 except json.JSONDecodeError as exc:
     print(f"__invalid_json__:{exc.msg}", end="")
     sys.exit(0)
-if fh is None:
-    pass
+except OSError as exc:
+    print(f"__io_error__:{exc.strerror}", end="")
+    sys.exit(0)
 print(json.dumps(data))
 PY
 ); then
-  fail "lockfile could not be parsed: $Lockfile_Path"
+  fail "lockfile could not be read: $Lockfile_Path"
 fi
-if [[ "$Lockfile_Json" == "__invalid_json__:"* ]]; then
+
+if [[ "$Lockfile_Json" == __invalid_json__:* ]]; then
   Reason=${Lockfile_Json#__invalid_json__:}
   fail "lockfile is not valid JSON: $Lockfile_Path ($Reason)"
 fi
+if [[ "$Lockfile_Json" == __io_error__:* ]]; then
+  Reason=${Lockfile_Json#__io_error__:}
+  fail "lockfile could not be opened: $Lockfile_Path ($Reason)"
+fi
 
-Actual_Plan=$(printf '%s' "$Lockfile_Json" | python3 -c "import json,sys; print(json.load(sys.stdin).get('plan_sha256',''))")
+Actual_Plan=$(printf '%s' "$Lockfile_Json" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+value = data.get('plan_sha256', '')
+print(value)
+")
 [[ -n "$Actual_Plan" ]] || fail "lockfile does not record plan_sha256"
 if [[ "$Actual_Plan" != "$Plan_Digest" ]]; then
   fail "lockfile plan_sha256 is $Actual_Plan; expected $Plan_Digest"
@@ -116,20 +138,29 @@ fi
 Actual_Package=$(printf '%s' "$Lockfile_Json" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
+matches = []
 for capability in data.get('capabilities', []):
     for export in capability.get('exports', []):
         if export.get('target') == 'agent-skills' and export.get('package_name') == 'repository-truth':
-            print(export.get('package_sha256', ''))
-            break
+            matches.append(export.get('package_sha256', ''))
+if len(matches) != 1:
+    print(f'__ambiguous__:{len(matches)}')
+else:
+    print(matches[0])
 ")
+
+if [[ "$Actual_Package" == __ambiguous__:* ]]; then
+  Count=${Actual_Package#__ambiguous__:}
+  fail "lockfile records $Count repository-truth agent-skills exports; expected exactly 1"
+fi
 [[ -n "$Actual_Package" ]] || fail "lockfile does not record the repository-truth package digest"
 if [[ "$Actual_Package" != "$Package_Digest" ]]; then
   fail "lockfile repository-truth package_sha256 is $Actual_Package; expected $Package_Digest"
 fi
 
 printf 'check-project-arsenal-dependency: pass\n'
-printf 'pinned commit: %s\n' "$Actual_Commit"
-printf 'remote url:    %s\n' "$Actual_Url"
+printf 'pinned commit: %s\n' "$Pinned_Commit"
+printf 'remote url:    %s\n' "$Pinned_Url"
 printf 'plan digest:   %s\n' "$Actual_Plan"
 printf 'pkg digest:    %s\n' "$Actual_Package"
 printf 'skill symlink: %s -> %s\n' "$Symlink_Path" "$Resolved"

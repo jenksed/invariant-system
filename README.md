@@ -274,9 +274,19 @@ Kiln targets Elixir 1.20 on Erlang/OTP 28.
 ```bash
 mise install
 mix deps.get
+git submodule update --init --recursive
 scripts/agent-preflight
 scripts/check
 ```
+
+The third-party `project-arsenal` development-agent dependency at
+`.claude/dependencies/project-arsenal` is a pinned Git submodule. CI and
+`scripts/validate-agent-assets` both expect the submodule to be initialized
+and at the reviewed commit (`ecc8797d45447060b0c4aacd8efb6b1909e9e690`);
+re-initialize it on every fresh checkout with
+`git submodule update --init --recursive` before running the agent-asset
+validator. The dependency is reference content only and is not a Kiln runtime
+component.
 
 Current development-agent conformance still requires reconciliation before Phase 1 tickets begin.
 

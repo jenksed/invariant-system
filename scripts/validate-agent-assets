@@ -130,10 +130,19 @@ doctrine_version=$(sed -n 's/^Doctrine-Version: //p' "$doctrine_file" | head -1)
 # Delegate its identity and placement checks to a dedicated verifier; the
 # upstream package is not a Kiln-authored .agents/skills asset and is
 # therefore not scanned as one here.
+#
+# The dependency verifier is required infrastructure: its absence, replacement
+# by a non-regular file, or loss of its executable bit must fail closed. Only
+# after the verifier returns success do we record `verified`.
 dependency_check=scripts/check-project-arsenal-dependency
-if [[ -x "$dependency_check" ]]; then
-  "$dependency_check" || fail "project-arsenal dependency check failed; see scripts/check-project-arsenal-dependency"
-fi
+[[ -e "$dependency_check" ]] \
+  || fail "project-arsenal dependency verifier is missing: $dependency_check"
+[[ -f "$dependency_check" ]] \
+  || fail "project-arsenal dependency verifier is not a regular file: $dependency_check"
+[[ -x "$dependency_check" ]] \
+  || fail "project-arsenal dependency verifier is not executable: $dependency_check"
+"$dependency_check" \
+  || fail "project-arsenal dependency check failed; see scripts/check-project-arsenal-dependency"
 
 printf 'validate-agent-assets: pass\n'
 printf 'skills: %s\n' "${#skills[@]}"
