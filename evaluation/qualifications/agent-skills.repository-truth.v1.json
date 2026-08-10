@@ -14,10 +14,10 @@
       "total": 2
     },
     "boundary_preservation": {
-      "executed": 5,
+      "executed": 6,
       "failed": 0,
-      "passed": 5,
-      "total": 5
+      "passed": 6,
+      "total": 6
     },
     "context_efficiency": {
       "executed": 3,
@@ -26,18 +26,25 @@
       "total": 3
     }
   },
+  "binding": {
+    "capability_sha256": "sha256:70cedefb54715678e9f245cb4827f9e5502b27cac320632af2294d7756f080d4",
+    "distribution_path": "distribution/agent-skills/repository-truth",
+    "manifest_sha256": "sha256:1b42086b91b82813a7ee570329da6113411b6d2f0b54368a771544f8c15f4e17",
+    "package_content_sha256": "sha256:71cdd574722becfff7f8cc34187d37701eaa7099324c16218087e45338d32aa4"
+  },
   "candidate_ready": true,
   "capability_id": "capability.repository-truth",
+  "capability_version": "0.1.0",
   "case_results": [
     {
       "axis": "activation",
-      "case_id": "dq-activation-discovery-matches-derive",
+      "case_id": "dq-activation-discovery-preservation",
       "execution": "executed",
       "status": "PASS"
     },
     {
       "axis": "activation",
-      "case_id": "dq-activation-should-not-invoke-feature-build",
+      "case_id": "dq-activation-discovery-exclusion",
       "execution": "executed",
       "status": "PASS"
     },
@@ -106,20 +113,27 @@
       "case_id": "dq-context-efficiency-no-oversized-always",
       "execution": "executed",
       "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-package-digest-binding",
+      "execution": "executed",
+      "status": "PASS"
     }
   ],
-  "claim_scope": "Structural evidence over manifest content only. Behavioral efficacy evidence remains designed-not-run in v0 and is required for qualified status. Adapter qualification is a separate evidence claim from capability lifecycle and does not promote canonical capability state.",
+  "claim_scope": "Structural evidence over manifest and bundled distribution content only. Behavioral efficacy evidence remains designed-not-run in v0 and is required for qualified status. Activation claims refer to canonical discovery preservation in the generated SKILL.md body, not to model activation behavior. Adapter qualification is a separate evidence claim from capability lifecycle and does not promote canonical capability state.",
   "counts": {
     "designed_not_run": 3,
-    "executed": 10,
+    "executed": 11,
     "failed": 0,
-    "passed": 10,
-    "total": 13
+    "passed": 11,
+    "total": 14
   },
   "limitations": [
-    "Designed-not-run cases provide no execution evidence.",
+    "Designed-not-run cases provide no execution evidence and cannot contribute to qualification.",
     "Structural checks verify manifest content; they cannot detect runtime misbehavior by the harness.",
-    "Behavioral efficacy requires model invocation that is out of scope for the deterministic v0 Bench."
+    "Behavioral efficacy requires model invocation that is out of scope for the deterministic v0 Bench.",
+    "Receipt is bound to the capability, distribution, and adapter-version digests in 'binding'; any change to those values invalidates this evidence."
   ],
   "qualification_id": "qualification.capability.repository-truth.agent-skills.1.0.0",
   "qualified_ready": false,
