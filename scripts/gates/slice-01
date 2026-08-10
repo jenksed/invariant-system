@@ -207,7 +207,7 @@ run_required agent_asset_contract \
 
 run_required_tool prose_quality \
   'project prose satisfies the accepted style rules' \
-  vale vale --glob='!{deps,_build}/**' .
+  vale vale --glob='!{deps,_build,.claude/dependencies}/**' .
 
 # ------------------------------------------------------------------
 # Component 2: Deterministic build integrity
