@@ -1,10 +1,10 @@
 # P1-S02-T01: Durable Artifact and Evidence substrate
 
 **Document type:** Implementation plan
-**Status:** Proposed (corrected replacement plan; owner acceptance and new authorization required)
+**Status:** Accepted (corrected replacement plan; owner acceptance recorded; implementation authorization absent and not granted)
 **Parent slice:** P1-S02
 **Branch:** `work/p1-s02-t01-artifact-evidence-substrate-v2` (fresh replacement; rejected branch `work/p1-s02-t01-artifact-evidence-substrate` must not be reused)
-**Depends on:** P1-S01-V01 accepted and integrated at `db021984a9278ed582804d0bf3acd74207ad32e9`; corrected plan owner-accepted; new exact T01 authorization integrated on canonical `main`
+**Depends on:** P1-S01-V01 accepted and integrated at `db021984a9278ed582804d0bf3acd74207ad32e9`; corrected plan owner-accepted against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`; new exact T01 authorization integrated on canonical `main`
 
 ## Slice contribution
 
@@ -574,7 +574,7 @@ T01 does not update or satisfy the aggregate P1-S02 verification manifest.
 
 ## Completion record
 
-**Result:** Proposed corrected replacement plan; not owner-accepted, authorized, implemented, verified, or accepted.
+**Result:** Corrected replacement plan owner-accepted against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`. Not authorized, not implemented, not verified, and not accepted.
 
 ### Rejected-plan history
 
@@ -584,6 +584,7 @@ T01 does not update or satisfy the aggregate P1-S02 verification manifest.
 - Technical adjudication rejected the candidate for missing Evidence result, missing Evidence persistence ownership, false protected-classification claims, inadequate TTL database constraints, and `put/2` versus `put/3` disagreement.
 - PR #48 closed without merge. No runtime code from it entered `main`.
 - P0-W37 removed the consumed authorization and integrated through PR #52 at `f9b5a312ac31ee4015025a87bcd3cec199b12297`.
+- The corrected plan was integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12`; PR #53 remained the historical unmerged predecessor.
 
 The corrected plan preserves that negative Evidence. It does not retroactively authorize, accept, or rehabilitate any rejected implementation state.
 
@@ -591,8 +592,8 @@ The corrected plan preserves that negative Evidence. It does not retroactively a
 
 | Stage | Status | Result |
 | --- | --- | --- |
-| Corrected planning | Proposed | ready for owner adjudication after P0-W38 integration |
-| Owner acceptance | Not granted | a separate owner decision is required |
+| Corrected planning | Accepted | owner-accepted against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072` |
+| Owner acceptance | Granted | P0-W41 records the explicit owner decision |
 | Implementation authorization | Not granted | no active authorization record exists |
 | Replacement implementation | Not started | a fresh branch and package are required after authorization |
 | Verification | Not run | only a later exact replacement head can supply runtime Evidence |
@@ -600,4 +601,4 @@ The corrected plan preserves that negative Evidence. It does not retroactively a
 
 ### Required next action
 
-After P0-W38 merges, the owner must accept, revise, or reject this corrected plan. Acceptance alone does not authorize implementation. A later governance action must record the exact accepted plan digest, reviewed base SHA, owner, time, and bounded scope in a new T01 authorization on canonical `main`. Only then may a fresh replacement implementation branch begin; PR #48 must remain closed and unmerged.
+A later, separate governance action must record the Accepted-state plan digest, the new canonical `main` SHA produced by the P0-W41 merge, owner, time, and bounded scope in a new T01 authorization on canonical `main`. Only then may a fresh replacement implementation branch begin; PR #48 must remain closed and unmerged.

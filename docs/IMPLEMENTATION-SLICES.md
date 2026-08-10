@@ -2,7 +2,7 @@
 
 **Document type:** Implementation roadmap detail  
 **Decision status:** Accepted by Prompt 8-A  
-**Integration status:** P1-S01 integrated at `db02198`; PR #48 rejected; P0-W38 correction proposed; all P1-S02 work unauthorized
+**Integration status:** P1-S01 integrated at `db02198`; PR #48 rejected; corrected P1-S02-T01 plan owner-accepted via P0-W41; all P1-S02 work unauthorized
 **Implementation status:** P1-S01 — Durable single-Run foundation integrated and owner-accepted  
 **Order authority:** `docs/ROADMAP.md`  
 **Quality Compiler placement:** QC0/QC1 planned in P1-S02; QC2 planned with bounded delegation; QC3/QC4 evidence-gated later
@@ -13,7 +13,7 @@ This document defines the bounded vertical workflows that implement Kiln.
 
 A slice must produce usable behavior. It must not complete a horizontal framework merely because later architecture describes it.
 
-P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 and owner-accepted (P1-S01-V01 manifest `overall: pass`, owner-machine OD-02 pass). PR #48 was adjudicated and rejected without merge. P0-W38 proposes a corrected T01 contract for later owner adjudication; every P1-S02 ticket and aggregate slice remain unauthorized.
+P1-S01 — Durable single-Run foundation is integrated at `db02198` via PR #46 and owner-accepted (P1-S01-V01 manifest `overall: pass`, owner-machine OD-02 pass). PR #48 was adjudicated and rejected without merge. PR #53 remained historical and unmerged. The corrected P1-S02-T01 plan was integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12` and owner-accepted via P0-W41 against canonical `main` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`; acceptance grants no implementation authority; every P1-S02 ticket and aggregate slice remain unauthorized.
 
 The Quality Compiler is a cross-slice product spine rather than a separate pre-product subsystem. QC0 and QC1 must be delivered through the P1-S02 Single-Run change workflow. Child Runs and QC2 enter only after accepted Single-Run Alpha Evidence and Wave B planning and authorization. QC3 and QC4 remain later evidence-gated expansion.
 
@@ -238,8 +238,8 @@ Kiln has a durable work foundation that survives restart without reconstructing 
 
 # P1-S02 — Evidence-backed Single-Run Change Alpha plus QC0/QC1
 
-**Status:** Planned; not authorized  
-**Entry gate:** P1-S01 aggregate gate, demo, verification manifest, owner-machine Evidence, and Prompt 8-A authorization conditions remain satisfied.
+**Status:** Planned; corrected T01 plan Accepted; not authorized  
+**Entry gate:** P1-S01 aggregate gate, demo, verification manifest, owner-machine Evidence, and Prompt 8-A authorization conditions remain satisfied; the corrected T01 plan is owner-accepted via P0-W41; the next governance action is a separate T01 implementation-authorization package that creates `docs/authorizations/P1-S02-T01.authorization` on canonical `main`.
 
 ## User-visible value
 

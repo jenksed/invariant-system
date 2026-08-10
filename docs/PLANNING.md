@@ -2,7 +2,7 @@
 
 **Document type:** Planning and authority index  
 **Status:** Wave A adjudicated  
-**Build authorization:** P1-S01 consumed by PR #46; P1-S02-T01 adjudication consumed by rejected PR #48; no P1-S02 work authorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
+**Build authorization:** P1-S01 consumed by PR #46; P1-S02-T01 adjudication consumed by rejected PR #48; corrected T01 plan owner-accepted via P0-W41; no P1-S02 work authorized; active records governed by `docs/IMPLEMENTATION-AUTHORIZATION.md`
 
 ## Integrated Wave A baseline
 
@@ -150,4 +150,4 @@ Wave B then still requires Prompt 6-B, Prompt 7-B, and Prompt 8-B before delegat
 
 ## Exact next action
 
-P1-S01 integration and authority enforcement are complete. PR #48 was rejected. P0-W38 proposes a corrected T01 Evidence/result, accepted binding and conformance projection, persistence, protected-classification, state-based freshness, identity, transaction, replay/currentness, numeric bounds, migration, and API contract. It preserves P0-W24 and does not add time-based freshness. After P0-W38 integrates, seek an explicit owner decision on that proposal. Do not accept it implicitly, create an authorization record, restore PR #48, or implement any P1-S02 ticket.
+P1-S01 integration and authority enforcement are complete. PR #48 was rejected. P0-W38 proposed a corrected T01 Evidence/result, accepted binding and conformance projection, persistence, protected-classification, state-based freshness, identity, transaction, replay/currentness, numeric bounds, migration, and API contract; it integrated through PR #56 at `e57678874a36de1700aa666413b51aae31ea9b12`. PR #53 remained the historical unmerged predecessor. P0-W41 records the owner acceptance of the corrected T01 plan against canonical `main` `e57678874a36de1700aa666413b51aae31ea9b12` from reviewed Proposed-state digest `fb4dcad0d278ca096c383d835b19dc9bc1d66ca9dc66c7feaddc6daa728ea072`. Acceptance grants no implementation authority and no `docs/authorizations/P1-S02-T01.authorization` record exists. The next legitimate action is a separate, governance-only T01 implementation-authorization package that creates the authorization record on canonical `main` after the P0-W41 merge and binds the Accepted-state plan digest, the new canonical `main` SHA, the trusted owner, and the bounded T01-v2 scope. Do not accept the corrected plan implicitly, create an authorization record, restore PR #48, or implement any P1-S02 ticket.
