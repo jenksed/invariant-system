@@ -558,6 +558,54 @@ def test_enabled_targets_explicit_empty_compiles_nothing() -> None:
         assert "agent-skills" in enabled_absent, enabled_absent
 
 
+def test_adapter_version_must_match_target_registry() -> None:
+    """BLOCKER 3 proof: the export's adapter_version must equal the
+    target registry's adapter_version. Otherwise the export-plan
+    silently invents a separate version authority.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "arsenal", root / "arsenal")
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+        _shutil.copytree(ROOT / "agent_workflows", root / "agent_workflows")
+        _shutil.copytree(ROOT / "software_engineering", root / "software_engineering")
+
+        # Copy export plan and mutate adapter_version to a wrong value.
+        plan_path = root / "arsenal" / "compiler" / "export-plan.json"
+        _shutil.copy(ROOT / "arsenal" / "compiler" / "export-plan.json", plan_path)
+        plan = json.loads(plan_path.read_text())
+        plan["exports"][0]["adapter_version"] = "99.99.99"
+        plan_path.write_text(json.dumps(plan, indent=2, sort_keys=True) + "\n")
+        # Project config enables the target so the only failure must be
+        # adapter-version mismatch, not enabled-target rejection.
+        (root / "arsenal.project.json").write_text(json.dumps({
+            "schema_version": "1.0.0",
+            "project": {"org": "fake", "repo": "fake"},
+            "distribution": {"enabled_targets": ["agent-skills"]},
+        }, indent=2, sort_keys=True))
+
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "arsenal_compile_av_test", ROOT / "scripts/arsenal_compile.py"
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        try:
+            mod.validate_plan_data(json.loads(plan_path.read_text()), root)
+        except AssertionError as e:
+            msg = str(e)
+            assert "99.99.99" in msg, msg
+            assert "adapter_version" in msg, msg
+            assert "registry" in msg.lower() or "authoritative" in msg.lower(), msg
+        else:
+            raise AssertionError(
+                "export adapter_version mismatch must be rejected"
+            )
+
+
 def main() -> int:
     tests = [v for k, v in globals().items() if k.startswith("test_")]
     failures = 0

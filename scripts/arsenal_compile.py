@@ -149,6 +149,18 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
                 f"in the export plan"
             )
 
+        # Adapter version is owned by the target registry. The export
+        # plan must assert the registry version, not invent its own.
+        registry_adapter_version = enabled_targets[target]["adapter_version"]
+        if export["adapter_version"] != registry_adapter_version:
+            raise AssertionError(
+                f"export adapter_version {export['adapter_version']!r} does not match "
+                f"target registry adapter_version {registry_adapter_version!r} for "
+                f"target {target!r}; the target registry at "
+                f"distribution/compiler/targets.json is the authoritative "
+                f"source of adapter version per target"
+            )
+
         package_name = export["package_name"]
         # Package-name pattern comes from the target registry, not from
         # the compiler. Each target may declare its own pattern; the
