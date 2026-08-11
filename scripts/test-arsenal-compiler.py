@@ -28,9 +28,14 @@ def expect_fail(label: str, plan: dict) -> None:
 def main() -> int:
     plan = compiler.load_json(ROOT / "arsenal/compiler/export-plan.json")
     exports = compiler.validate_plan_data(plan, ROOT)
-    assert len(exports) >= 1
-    cap_ids = [e["capability_id"] for e in exports]
-    assert "capability.repository-truth" in cap_ids, cap_ids
+    cap_ids = sorted(e["capability_id"] for e in exports)
+    # Exact-set assertion: this PR has precisely two exports,
+    # Repository Truth and Plan, both to agent-skills 1.0.0. Adding or
+    # removing an export must be a deliberate change, not silent
+    # loosening of this test.
+    assert cap_ids == ["capability.plan", "capability.repository-truth"], cap_ids
+    assert all(e["target"] == "agent-skills" for e in exports)
+    assert all(e["adapter_version"] == "1.0.0" for e in exports)
     print("PASS valid ARS-03 export plan")
 
     bad = copy.deepcopy(plan)

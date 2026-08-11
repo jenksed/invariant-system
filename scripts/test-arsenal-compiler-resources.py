@@ -110,7 +110,8 @@ def main() -> int:
                 export["_output_rel"] = Path(export["output_path"])
                 compiler.build_agent_skill(export, ROOT)
             except AssertionError as exc:
-                if "duplicate resource packaging path" in str(exc):
+                msg = str(exc)
+                if "packaging path collision" in msg or "duplicate resource packaging path" in msg:
                     print("PASS negative case: duplicate resource packaging path rejected")
                 else:
                     raise
