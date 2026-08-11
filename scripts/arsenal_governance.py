@@ -180,6 +180,6 @@ EXIT_CODE = {
     "INVALID_REFERENCE": 3,    # registered artifact/fact does not exist
     "DUPLICATE_IDENTITY": 4,   # duplicate artifact or fact id
     "ROLE_VIOLATION": 5,       # role/ownership/mat value not in vocab
-    "CONFLICTING_OWNER": 6,    # a fact has more than one normative owner
+    "CONFLICTING_OWNER": 6,    # a fact has more than one owner
     "UNKNOWN": 8,
 }

@@ -11,12 +11,19 @@ Validation surface:
 * canonical closed vocabularies for ownership, state role, and
   materialization;
 * duplicate artifact and fact identities;
-* one normative owner per fact (the model is not a second copy of
-  domain values);
+* exactly one owning artifact per fact (the model is not a second
+  copy of domain values); the artifact's state_role tells us whether
+  the fact is normative, derived, historical, or narrative;
 * every owner_artifact resolves to a declared artifact id;
-* every pattern-style artifact points to files that actually exist;
+* every pattern-style artifact points to files or directories that
+  actually exist (loader and validator agree);
 * the model itself is structurally consistent with its JSON schema
-  (only the keys the schema permits).
+  (closed-shape is enforced by the loader; the validator complements
+  the loader's structural checks with semantic invariants).
+
+Closed-shape enforcement for unknown keys lives in
+``arsenal_source_model.load_source_model``. The validator here does
+NOT re-check structural shape -- it would be redundant.
 """
 
 from __future__ import annotations
@@ -92,8 +99,10 @@ def _check_fact_owners(errors: list[str], model: dict) -> None:
             continue
         if fid in fact_owner and fact_owner[fid] != owner:
             errors.append(
-                f"fact {fid!r}: has more than one normative owner "
-                f"({fact_owner[fid]!r}, {owner!r})"
+                f"fact {fid!r}: has more than one owner "
+                f"({fact_owner[fid]!r}, {owner!r}); the state_role of the "
+                f"owning artifact determines whether each owner's fact is "
+                f"normative, derived, historical, or narrative"
             )
         elif fid not in fact_owner:
             fact_owner[fid] = owner

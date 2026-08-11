@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://project-arsenal.dev/schema/governance-source-model-1.0.0.json",
   "title": "Project Arsenal Governance Source Model",
-  "description": "Machine-readable index of where governance facts are owned and what state role each carrying artifact plays. This schema constrains the source model itself; it does NOT carry domain values such as supported targets, schema versions, adapter versions, suite IDs, or capability lifecycle/evaluation state. See scripts/arsenal_governance.py for the closed vocabularies referenced here.",
+  "description": "Machine-readable index of where governance facts are owned and what state role each carrying artifact plays. This schema constrains the source model itself; it does NOT carry domain values such as supported targets, schema versions, adapter versions, suite IDs, or capability lifecycle/evaluation state. The `notes` field on each artifact is non-authoritative explanatory metadata and MUST NOT be consulted for domain truth. See scripts/arsenal_governance.py for the closed vocabularies referenced here.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schema_version", "artifacts", "facts"],
@@ -21,7 +21,7 @@
     "artifact": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "path", "ownership", "state_role", "owns_facts"],
+      "required": ["id", "ownership", "state_role", "owns_facts"],
       "properties": {
         "id": {
           "type": "string",
@@ -32,12 +32,12 @@
         "path": {
           "type": "string",
           "minLength": 1,
-          "description": "Repository-relative path to the artifact. Glob patterns are not allowed at the artifact level; use artifact_id_patterns to address a family of files."
+          "description": "Repository-relative path to the artifact. Glob patterns are not allowed at the artifact level; use path_pattern to address a family of files or directories."
         },
         "path_pattern": {
           "type": "string",
           "minLength": 1,
-          "description": "Optional bounded glob pattern (e.g. 'arsenal/capabilities/*.json'). Repository-relative, no traversal. Used to address a family of artifacts that all share ownership and state role."
+          "description": "Optional bounded glob pattern (e.g. 'arsenal/capabilities/*.json' or 'distribution/agent-skills/*'). Repository-relative, no traversal. Used to address a family of artifacts that all share ownership and state role; the pattern may match files or directories."
         },
         "ownership": {
           "type": "string",
@@ -55,11 +55,11 @@
           "type": "array",
           "items": {"$ref": "#/$defs/idRef"},
           "uniqueItems": true,
-          "description": "Fact IDs whose normative source is this artifact. Empty array allowed only for narrative or derived artifacts that do not own any fact."
+          "description": "Fact IDs whose owner is this artifact. The artifact's state_role tells what kind of representation those facts are (normative/derived/historical/narrative). Empty array allowed only for narrative or derived artifacts that do not own any fact."
         },
         "notes": {
           "type": "string",
-          "description": "Optional human-readable comment. The validator never reads this field for value assertions; it is purely documentation."
+          "description": "NON-AUTHORITATIVE explanatory metadata. Free-form human-readable comment. Validators, projections, and governance queries MUST NOT consult this field for domain truth. It exists purely for documentation and must not become the only machine-relevant source of mutable current state."
         }
       },
       "oneOf": [

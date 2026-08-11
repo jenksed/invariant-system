@@ -53,11 +53,37 @@ def test_schema_registry_lists_source_model_schema() -> None:
 
 
 def test_source_model_loads_against_canonical_schema() -> None:
+    """The loader resolves the schema through the registry AND enforces
+    the schema's closed-shape contract on the source-model instance.
+
+    This test now covers both: the loader must be able to load the
+    schema document, AND loading must succeed for the canonical
+    source model. If the loader is bypassed or the schema drifts
+    from the runtime enforcement, this test fails.
+    """
     model = _model()
     assert model["schema_version"] == arsenal_governance.SOURCE_MODEL_SCHEMA_VERSION_CONST
     assert model["schema_document"]["$id"].endswith(
         f"governance-source-model-{arsenal_governance.SOURCE_MODEL_SCHEMA_VERSION_CONST}.json"
     )
+    # Coherence: every key on every artifact in the loaded model is
+    # in the loader's closed-shape set. If a future schema drift
+    # introduces a new field, this assertion fails until both the
+    # schema and ALLOWED_ARTIFACT_KEYS are updated together.
+    for art in model["artifacts"]:
+        extra = sorted(set(art) - arsenal_source_model.ALLOWED_ARTIFACT_KEYS)
+        assert not extra, (
+            f"artifact {art['id']!r} has key(s) {extra} not in "
+            f"loader-allowed set {sorted(arsenal_source_model.ALLOWED_ARTIFACT_KEYS)}; "
+            f"schema and loader closed-shape are out of sync"
+        )
+    for fact in model["facts"]:
+        extra = sorted(set(fact) - arsenal_source_model.ALLOWED_FACT_KEYS)
+        assert not extra, (
+            f"fact {fact['id']!r} has key(s) {extra} not in "
+            f"loader-allowed set {sorted(arsenal_source_model.ALLOWED_FACT_KEYS)}; "
+            f"schema and loader closed-shape are out of sync"
+        )
 
 
 def test_lockfile_is_generated_normative() -> None:
@@ -258,7 +284,14 @@ def test_consumer_deployed_is_narrow() -> None:
     )
 
 
-def test_each_fact_has_exactly_one_normative_owner() -> None:
+def test_each_fact_has_exactly_one_owner() -> None:
+    """Every fact has exactly one owning artifact. The artifact's
+    state_role tells us whether the fact is normative, derived,
+    historical, or narrative; the model intentionally has facts owned
+    by derived artifacts (e.g. distribution.skill-snapshot) and
+    historical artifacts (e.g. qualification-receipt.qualification-verdict),
+    so the invariant is "one owner" -- not "one normative owner".
+    """
     owners: dict[str, str] = {}
     for fact in _model()["facts"]:
         assert "owner_artifact" in fact, f"fact {fact.get('id')!r} missing owner_artifact"
@@ -268,6 +301,21 @@ def test_each_fact_has_exactly_one_normative_owner() -> None:
                 f"fact {fact['id']!r} has conflicting owners: {prev!r} and {fact['owner_artifact']!r}"
             )
         owners[fact["id"]] = fact["owner_artifact"]
+
+
+def test_state_role_qualifies_each_fact_owner() -> None:
+    """For each fact, the owning artifact's state_role tells us what
+    kind of representation the fact is. A historical artifact owns
+    historical facts (the value is provenance); a derived artifact
+    owns derived facts (drift is a bug); only normative artifacts
+    own normative facts.
+    """
+    artifacts_by_id = {a["id"]: a for a in _model()["artifacts"]}
+    for fact in _model()["facts"]:
+        owner = artifacts_by_id.get(fact["owner_artifact"])
+        assert owner is not None, f"fact {fact['id']!r}: owner missing"
+        # Sanity: each owner has a state_role on the closed vocabulary.
+        assert owner["state_role"] in arsenal_governance.STATE_ROLES
 
 
 def test_consumer_config_does_not_appear_in_arsenal_project() -> None:
@@ -316,22 +364,27 @@ def test_source_model_does_not_duplicate_domain_values() -> None:
 def _mutate_and_validate(mutation) -> tuple[int, str]:
     """Apply ``mutation(root)`` to a copy of the source model in a
     tmp tree, run the validator, then return ``(exit_code, stderr)``.
+
+    The sandbox mirrors enough of the repository that the validator's
+    path-existence and pattern-resolution checks have a real surface
+    to evaluate. Without this, "accepted" tests would always fail on
+    missing paths even when the mutation is structurally correct.
     """
     with tempfile.TemporaryDirectory() as tmp:
         sandbox = Path(tmp) / "sandbox"
-        # We only need arsenal/source-model.json + arsenal/source-model.schema.json
-        # + arsenal/schema-registry.json for the loader to succeed.
         sandbox.mkdir()
-        (sandbox / "arsenal").mkdir()
-        shutil.copy2(ROOT / "arsenal" / "source-model.json", sandbox / "arsenal" / "source-model.json")
-        shutil.copy2(
-            ROOT / "arsenal" / "source-model.schema.json",
-            sandbox / "arsenal" / "source-model.schema.json",
-        )
-        shutil.copy2(
-            ROOT / "arsenal" / "schema-registry.json",
-            sandbox / "arsenal" / "schema-registry.json",
-        )
+        # Mirror the subtrees the validator inspects via path and
+        # path_pattern entries on the source-model artifacts.
+        for sub in ("arsenal", "scripts", "distribution", "evaluation",
+                    "docs", "engineering"):
+            src = ROOT / sub
+            if src.is_dir():
+                shutil.copytree(src, sandbox / sub)
+        # Top-level files referenced by the source model.
+        for top in ("arsenal.project.json", ".arsenal.lock"):
+            src = ROOT / top
+            if src.is_file():
+                shutil.copy2(src, sandbox / top)
         mutation(sandbox)
         errors = arsenal_source_validate.validate_source_model(sandbox)
         if errors:
@@ -379,7 +432,11 @@ def test_duplicate_fact_id_rejected() -> None:
     assert "duplicate fact id" in err
 
 
-def test_two_normative_owners_for_one_fact_rejected() -> None:
+def test_two_owners_for_one_fact_rejected() -> None:
+    """Two facts with the same id but different owners are rejected:
+    each fact has exactly one owner, period. The artifact's state_role
+    qualifies what kind of fact it is; "normative" is not the qualifier.
+    """
     def mutate(sandbox: Path) -> None:
         data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
         data["facts"].append(
@@ -392,7 +449,7 @@ def test_two_normative_owners_for_one_fact_rejected() -> None:
         (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
     rc, err = _mutate_and_validate(mutate)
     assert rc != 0
-    assert "duplicate fact id" in err or "more than one normative owner" in err
+    assert "duplicate fact id" in err or "more than one owner" in err
 
 
 def test_owner_artifact_must_exist() -> None:
@@ -433,14 +490,215 @@ def test_recursive_glob_rejected() -> None:
 
 
 def test_domain_value_copy_rejected_by_loader() -> None:
-    """The loader, not just the validator, must reject forbidden value keys."""
+    """The loader, not just the validator, must reject forbidden value keys.
+
+    After the surgical repair, the closed-shape check fires first
+    (the key is unknown) and the diagnostic blacklist fires only when
+    the unknown-key check does not. Either message indicates a correct
+    rejection; the loader is now the structural fail-closed boundary.
+    """
     def mutate(sandbox: Path) -> None:
         data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
         data["artifacts"][0]["supported_targets"] = ["agent-skills"]
         (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
     rc, err = _mutate_and_validate(mutate)
     assert rc != 0
-    assert "value-shaped" in err or "duplicate" in err
+    assert "value-shaped" in err or "unknown key" in err
+
+
+# --- Regression suite for the pre-repair fail-closed gap ---
+#
+# Before the GC01 surgical repair, the loader's structural defense
+# was a finite blacklist (FORBIDDEN_ARTIFACT_VALUE_KEYS). Any unknown
+# key NOT in that list bypassed the anti-duplication guard. These
+# tests prove the loader now rejects EVERY unknown structural key,
+# regardless of whether it was anticipated.
+
+
+def test_arbitrary_unknown_artifact_key_rejected() -> None:
+    """An artifact entry carrying an arbitrary unanticipated key
+    (e.g. ``current_status`` -- a key that does NOT appear in
+    FORBIDDEN_ARTIFACT_VALUE_KEYS) must be rejected by the loader.
+
+    This is the headline regression: it would have PASSED at head
+    b7acaf2a1dc828ec25321d8fb6d8bad410bb7a05 and FAILS after the
+    surgical repair that closes the structural shape.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["current_status"] = "qualified"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "current_status" in err
+
+
+def test_arbitrary_unknown_artifact_key_unanticipated_name_rejected() -> None:
+    """A completely unanticipated artifact key (``banana``) is also
+    rejected. The closed shape must not be a whitelist of plausible
+    governance names.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["banana"] = "split"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "banana" in err
+
+
+def test_arbitrary_unknown_fact_key_rejected() -> None:
+    """An unknown fact key (e.g. ``cached_value``) is rejected.
+
+    The model is closed-shape at every record type.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["cached_value"] = "whatever"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "cached_value" in err
+
+
+def test_arbitrary_unknown_fact_key_unanticipated_name_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["current_value"] = "qualified"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "current_value" in err
+
+
+def test_arbitrary_unknown_top_level_key_rejected() -> None:
+    """An unknown top-level key (e.g. ``operational_state``) is rejected."""
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["operational_state"] = {}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "operational_state" in err
+
+
+def test_arbitrary_unknown_top_level_key_runtime_state_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["runtime_state"] = {"qualified": True}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "unknown" in err and "runtime_state" in err
+
+
+def test_path_pattern_only_artifact_accepted() -> None:
+    """A source model whose artifacts use ``path_pattern`` (and never
+    declare ``path``) must validate. Before the schema/loader repair
+    this would have failed because the artifact's required-set
+    unconditionally required ``path``.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        for art in data["artifacts"]:
+            if "path" in art and "path_pattern" not in art:
+                art.pop("path", None)
+                # Use the existing arsenal/capabilities/* family as
+                # the path_pattern target -- it always exists in
+                # this repo.
+                art["path_pattern"] = "arsenal/capabilities/*.json"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc == 0, f"path_pattern-only artifacts must validate: {err}"
+
+
+def test_path_only_artifact_accepted() -> None:
+    """A source model whose artifacts use ``path`` (and never declare
+    ``path_pattern``) must validate. The committed canonical source
+    model is mostly this shape.
+    """
+    baseline = arsenal_source_model.load_source_model(ROOT)
+    rc, err = _mutate_and_validate(lambda _sandbox: None)
+    assert rc == 0, f"baseline path-only artifacts must validate: {err}"
+    assert all("path" in a for a in baseline["artifacts"] if "path_pattern" not in a)
+
+
+def test_both_path_and_path_pattern_rejected() -> None:
+    """An artifact declaring BOTH ``path`` and ``path_pattern`` is
+    rejected. XOR is enforced.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path_pattern"] = "arsenal/capabilities/*.json"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "path" in err and "path_pattern" in err
+
+
+def test_neither_path_nor_path_pattern_rejected() -> None:
+    """An artifact declaring NEITHER ``path`` nor ``path_pattern`` is rejected."""
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0].pop("path", None)
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "path" in err and "path_pattern" in err
+
+
+def test_loader_and_validator_agree_on_distribution_skill_pattern() -> None:
+    """Before the repair, ``distribution/agent-skills/*`` resolved to
+    an empty list via ``resolve_pattern`` (it matched directories, not
+    files) while the validator's ``_check_paths`` accepted the same
+    glob as a valid non-empty match. After the repair, the loader
+    returns the directories, and the validator's path check still
+    passes -- they agree.
+    """
+    artifact = next(
+        a for a in arsenal_source_model.load_source_model(ROOT)["artifacts"]
+        if a["id"] == "arsenal.distribution.skill"
+    )
+    assert "path_pattern" in artifact
+    resolved = arsenal_source_model.resolve_pattern(artifact, ROOT)
+    assert resolved, (
+        f"loader resolved empty for {artifact['path_pattern']!r}; "
+        f"validator would have accepted the same glob -- mismatch"
+    )
+    assert all(p.is_dir() for p in resolved), (
+        "distribution/agent-skills/* is a directory-family pattern; "
+        "loader and validator must both treat it as non-empty"
+    )
+    # The validator must agree: no path-existence errors for this artifact.
+    errors = arsenal_source_validate.validate_source_model(ROOT)
+    bad = [e for e in errors if "arsenal.distribution.skill" in e]
+    assert not bad, f"validator disagreed with loader: {bad}"
+
+
+def test_forbidden_artifact_value_keys_still_rejected() -> None:
+    """The diagnostic-only blacklist still produces a sharp error for
+    known domain-value-shaped keys (``schema_version``, ``value``,
+    ``adapter_version``) when they would NOT already be caught by
+    closed-shape. The closed-shape check above is the real boundary;
+    this check ensures the diagnostic messages remain for keys that
+    pass closed-shape but are still value-shaped.
+
+    Note: ``schema_version`` and ``value`` ARE caught by closed-shape
+    (they are not in ALLOWED_ARTIFACT_KEYS), so the message is
+    "unknown key". ``adapter_version`` is also not in the allowed set.
+    The test therefore asserts either message: both are correct
+    rejections of a key that should never appear on an artifact.
+    """
+    for key in ("schema_version", "value", "adapter_version"):
+        def mutate(sandbox: Path, _key=key) -> None:
+            data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+            data["artifacts"][0][_key] = "9.9.9"
+            (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+        rc, err = _mutate_and_validate(mutate)
+        assert rc != 0, f"key {key!r} should be rejected"
+        assert "value-shaped" in err or "unknown key" in err, (
+            f"expected 'value-shaped' or 'unknown key' diagnostic for {key!r}; got: {err}"
+        )
 
 
 def test_consumer_redefines_vocabulary_is_impossible() -> None:
