@@ -676,6 +676,80 @@ def verify_build(root: Path, plan_path: Path) -> None:
         if problems:
             raise AssertionError("\n".join(problems))
 
+    # Cross-check: any checked-in qualification receipt must bind to the
+    # exact distribution the compiler currently produces. A drift in
+    # capability fragment, manifest, or package content invalidates the
+    # receipt and `verify` must fail.
+    qualification_problems = _verify_qualification_bindings(root, exports)
+    if qualification_problems:
+        raise AssertionError("qualification binding drift:\n" + "\n".join(qualification_problems))
+
+
+def _verify_qualification_bindings(root: Path, exports: list[dict]) -> list[str]:
+    """Check every checked-in receipt against current compiler outputs.
+
+    Returns a list of drift problems. Empty list means all receipts
+    bind to the exact distribution the compiler currently produces.
+    """
+    problems: list[str] = []
+    qualifications_dir = root / "evaluation" / "qualifications"
+    if not qualifications_dir.is_dir():
+        return problems
+    for receipt_path in sorted(qualifications_dir.glob("*.json")):
+        try:
+            receipt = load_json(receipt_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            problems.append(f"{receipt_path.relative_to(root)}: invalid JSON: {exc}")
+            continue
+        binding = receipt.get("binding")
+        if not isinstance(binding, dict):
+            problems.append(f"{receipt_path.relative_to(root)}: receipt missing binding block")
+            continue
+        distribution_path = binding.get("distribution_path")
+        if not isinstance(distribution_path, str):
+            problems.append(f"{receipt_path.relative_to(root)}: binding.distribution_path missing")
+            continue
+        dist_path = root / distribution_path
+        if not dist_path.is_dir():
+            problems.append(
+                f"{receipt_path.relative_to(root)}: binding.distribution_path {distribution_path!r} does not exist"
+            )
+            continue
+        manifest_path = dist_path / "arsenal-manifest.json"
+        if not manifest_path.is_file():
+            problems.append(
+                f"{receipt_path.relative_to(root)}: missing arsenal-manifest.json at {distribution_path}"
+            )
+            continue
+        actual_manifest_sha = sha256_bytes(manifest_path.read_bytes())
+        if binding.get("manifest_sha256") and binding["manifest_sha256"] != actual_manifest_sha:
+            problems.append(
+                f"{receipt_path.relative_to(root)}: manifest_sha256 drift; "
+                f"expected {binding['manifest_sha256']}, got {actual_manifest_sha}"
+            )
+        try:
+            manifest = load_json(manifest_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            problems.append(f"{receipt_path.relative_to(root)}: invalid manifest JSON: {exc}")
+            continue
+        actual_package_sha = manifest.get("package", {}).get("content_sha256")
+        if binding.get("package_content_sha256") and binding["package_content_sha256"] != actual_package_sha:
+            problems.append(
+                f"{receipt_path.relative_to(root)}: package_content_sha256 drift; "
+                f"expected {binding['package_content_sha256']}, got {actual_package_sha}"
+            )
+        cap_rel = manifest.get("source", {}).get("capability_path")
+        if isinstance(cap_rel, str):
+            cap_path = root / cap_rel
+            if cap_path.is_file():
+                actual_cap_sha = sha256_bytes(cap_path.read_bytes())
+                if binding.get("capability_sha256") and binding["capability_sha256"] != actual_cap_sha:
+                    problems.append(
+                        f"{receipt_path.relative_to(root)}: capability_sha256 drift; "
+                        f"expected {binding['capability_sha256']}, got {actual_cap_sha}"
+                    )
+    return problems
+
     print(f"Arsenal compiler verification: PASS ({len(exports)} exports)")
     for export in exports:
         print(f"  {export['capability_id']} -> {export['target']} -> {export['_output_rel'].as_posix()}")
