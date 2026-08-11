@@ -791,75 +791,117 @@ def verify_build(root: Path, plan_path: Path) -> None:
     if qualification_problems:
         raise AssertionError("qualification binding drift:\n" + "\n".join(qualification_problems))
 
+    print(f"Arsenal compiler verification: PASS ({len(exports)} exports)")
+    for export in exports:
+        print(f"  {export['capability_id']} -> {export['target']} -> {export['_output_rel'].as_posix()}")
+
 
 def _verify_qualification_bindings(root: Path, exports: list[dict]) -> list[str]:
     """Check every checked-in receipt against current compiler outputs.
 
     Returns a list of drift problems. Empty list means all receipts
     bind to the exact distribution the compiler currently produces.
+
+    BLOCKER 5: every required binding field must be present, typed
+    correctly, shape-valid (sha256:<64 hex>), and value-equal to the
+    current compiler output. A missing field is not silently skipped;
+    it fails closed.
     """
     problems: list[str] = []
     qualifications_dir = root / "evaluation" / "qualifications"
     if not qualifications_dir.is_dir():
         return problems
+    required_fields = (
+        "capability_sha256", "manifest_sha256", "package_content_sha256",
+        "distribution_path",
+    )
     for receipt_path in sorted(qualifications_dir.glob("*.json")):
+        rel = receipt_path.relative_to(root)
         try:
             receipt = load_json(receipt_path)
         except (OSError, json.JSONDecodeError) as exc:
-            problems.append(f"{receipt_path.relative_to(root)}: invalid JSON: {exc}")
+            problems.append(f"{rel}: invalid JSON: {exc}")
             continue
         binding = receipt.get("binding")
         if not isinstance(binding, dict):
-            problems.append(f"{receipt_path.relative_to(root)}: receipt missing binding block")
+            problems.append(f"{rel}: receipt missing binding block")
             continue
+        # Required fields must be present and well-typed. Track which
+        # fields are missing so the drift comparisons below skip them
+        # rather than raise KeyError on a deleted field.
+        missing_digest_fields: set[str] = set()
+        for field in required_fields:
+            if field not in binding:
+                problems.append(f"{rel}: binding.{field} missing")
+                missing_digest_fields.add(field)
+                continue
+            value = binding[field]
+            if field == "distribution_path":
+                if not isinstance(value, str) or not value:
+                    problems.append(f"{rel}: binding.{field} must be a non-empty string")
+                    continue
+            else:
+                if not isinstance(value, str) or not _is_valid_sha256(value):
+                    problems.append(
+                        f"{rel}: binding.{field} must be a sha256:<64 lowercase hex> string; got {value!r}"
+                    )
+                    missing_digest_fields.add(field)
+                    continue
+        # If required structural fields are absent, the receipt is not
+        # valid evidence; skip drift comparisons that would KeyError.
+        if "distribution_path" in missing_digest_fields:
+            continue
+        # distribution_path resolves and the manifest must exist.
         distribution_path = binding.get("distribution_path")
-        if not isinstance(distribution_path, str):
-            problems.append(f"{receipt_path.relative_to(root)}: binding.distribution_path missing")
-            continue
         dist_path = root / distribution_path
         if not dist_path.is_dir():
             problems.append(
-                f"{receipt_path.relative_to(root)}: binding.distribution_path {distribution_path!r} does not exist"
+                f"{rel}: binding.distribution_path {distribution_path!r} does not exist"
             )
             continue
         manifest_path = dist_path / "arsenal-manifest.json"
         if not manifest_path.is_file():
             problems.append(
-                f"{receipt_path.relative_to(root)}: missing arsenal-manifest.json at {distribution_path}"
+                f"{rel}: missing arsenal-manifest.json at {distribution_path}"
             )
             continue
         actual_manifest_sha = sha256_bytes(manifest_path.read_bytes())
-        if binding.get("manifest_sha256") and binding["manifest_sha256"] != actual_manifest_sha:
-            problems.append(
-                f"{receipt_path.relative_to(root)}: manifest_sha256 drift; "
-                f"expected {binding['manifest_sha256']}, got {actual_manifest_sha}"
-            )
+        if "manifest_sha256" not in missing_digest_fields:
+            if binding.get("manifest_sha256") != actual_manifest_sha:
+                problems.append(
+                    f"{rel}: manifest_sha256 drift; "
+                    f"expected {binding.get('manifest_sha256')}, got {actual_manifest_sha}"
+                )
         try:
             manifest = load_json(manifest_path)
         except (OSError, json.JSONDecodeError) as exc:
-            problems.append(f"{receipt_path.relative_to(root)}: invalid manifest JSON: {exc}")
+            problems.append(f"{rel}: invalid manifest JSON: {exc}")
             continue
         actual_package_sha = manifest.get("package", {}).get("content_sha256")
-        if binding.get("package_content_sha256") and binding["package_content_sha256"] != actual_package_sha:
-            problems.append(
-                f"{receipt_path.relative_to(root)}: package_content_sha256 drift; "
-                f"expected {binding['package_content_sha256']}, got {actual_package_sha}"
-            )
+        if "package_content_sha256" not in missing_digest_fields:
+            if binding.get("package_content_sha256") != actual_package_sha:
+                problems.append(
+                    f"{rel}: package_content_sha256 drift; "
+                    f"expected {binding.get('package_content_sha256')}, got {actual_package_sha}"
+                )
         cap_rel = manifest.get("source", {}).get("capability_path")
         if isinstance(cap_rel, str):
             cap_path = root / cap_rel
             if cap_path.is_file():
                 actual_cap_sha = sha256_bytes(cap_path.read_bytes())
-                if binding.get("capability_sha256") and binding["capability_sha256"] != actual_cap_sha:
-                    problems.append(
-                        f"{receipt_path.relative_to(root)}: capability_sha256 drift; "
-                        f"expected {binding['capability_sha256']}, got {actual_cap_sha}"
-                    )
+                if "capability_sha256" not in missing_digest_fields:
+                    if binding.get("capability_sha256") != actual_cap_sha:
+                        problems.append(
+                            f"{rel}: capability_sha256 drift; "
+                            f"expected {binding.get('capability_sha256')}, got {actual_cap_sha}"
+                        )
     return problems
 
-    print(f"Arsenal compiler verification: PASS ({len(exports)} exports)")
-    for export in exports:
-        print(f"  {export['capability_id']} -> {export['target']} -> {export['_output_rel'].as_posix()}")
+
+def _is_valid_sha256(value: str) -> bool:
+    """Return True if value matches sha256:<64 lowercase hex characters>."""
+    import re as _re
+    return bool(_re.fullmatch(r"sha256:[0-9a-f]{64}", value))
 
 
 def explain(root: Path, plan_path: Path) -> None:

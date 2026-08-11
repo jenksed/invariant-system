@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -712,6 +713,151 @@ def test_qualification_identity_matches_manifest_and_receipt() -> None:
             f"{cap_id}: suite_id disagreement: manifest={dq['suite_id']!r} "
             f"receipt={qi['suite_id']!r} expected={suite_id!r}"
         )
+
+
+def test_receipt_binding_missing_field_fails() -> None:
+    """BLOCKER 5 proof: removing each binding field from a receipt
+    causes arsenal_compile.py verify to fail closed.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+
+    with _tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "arsenal", root / "arsenal")
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+        _shutil.copytree(ROOT / "evaluation", root / "evaluation")
+        _shutil.copytree(ROOT / "agent_workflows", root / "agent_workflows")
+        _shutil.copytree(ROOT / "software_engineering", root / "software_engineering")
+        # Copy a real receipt and mutate it.
+        original = (root / "evaluation" / "qualifications"
+                    / "agent-skills.repository-truth.v1.json")
+        _shutil.copy(ROOT / "evaluation" / "qualifications"
+                     / "agent-skills.repository-truth.v1.json", original)
+
+        # Import arsenal_compile and run verify.
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "arsenal_compile_bind_test",
+            ROOT / "scripts/arsenal_compile.py",
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        # Confirm baseline: verify passes with the original receipt.
+        try:
+            mod.verify_build(root, root / "arsenal" / "compiler" / "export-plan.json")
+        except AssertionError as e:
+            raise AssertionError(
+                f"baseline verify must pass on the unchanged receipt; got: {e}"
+            )
+
+        # Mutate: remove each binding field in turn and verify.
+        for field in ("capability_sha256", "manifest_sha256",
+                      "package_content_sha256", "distribution_path"):
+            backup = original.read_text()
+            try:
+                doc = json.loads(backup)
+                # Only delete if the field exists.
+                if "binding" in doc and field in doc["binding"]:
+                    del doc["binding"][field]
+                    original.write_text(
+                        json.dumps(doc, indent=2, sort_keys=True) + "\n"
+                    )
+                try:
+                    mod.verify_build(
+                        root, root / "arsenal" / "compiler" / "export-plan.json"
+                    )
+                except AssertionError as e:
+                    msg = str(e)
+                    assert field in msg, (
+                        f"removing {field!r} must be reported by name; got: {msg!r}"
+                    )
+                else:
+                    raise AssertionError(
+                        f"removing {field!r} must fail verify; verify passed"
+                    )
+            finally:
+                original.write_text(backup)
+
+
+def test_receipt_binding_malformed_digest_fails() -> None:
+    """BLOCKER 5 proof: malformed digests (empty, non-sha256 prefix,
+    wrong length, non-hex) fail closed.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+
+    with _tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "arsenal", root / "arsenal")
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+        _shutil.copytree(ROOT / "evaluation", root / "evaluation")
+        _shutil.copytree(ROOT / "agent_workflows", root / "agent_workflows")
+        _shutil.copytree(ROOT / "software_engineering", root / "software_engineering")
+        original = (root / "evaluation" / "qualifications"
+                    / "agent-skills.repository-truth.v1.json")
+        _shutil.copy(ROOT / "evaluation" / "qualifications"
+                     / "agent-skills.repository-truth.v1.json", original)
+
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "arsenal_compile_malformed_test",
+            ROOT / "scripts/arsenal_compile.py",
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        for bad_value in [
+            "",
+            "not-a-digest",
+            "sha256:zz",  # non-hex
+            "sha256:" + "a" * 63,  # too short
+            "sha256:" + "a" * 65,  # too long
+            "md5:5d41402abc4b2a76b9719d911017c592",  # wrong algorithm
+        ]:
+            backup = original.read_text()
+            try:
+                doc = json.loads(backup)
+                doc["binding"]["manifest_sha256"] = bad_value
+                original.write_text(
+                    json.dumps(doc, indent=2, sort_keys=True) + "\n"
+                )
+                try:
+                    mod.verify_build(
+                        root, root / "arsenal" / "compiler" / "export-plan.json"
+                    )
+                except AssertionError as e:
+                    msg = str(e)
+                    assert "manifest_sha256" in msg, msg
+                else:
+                    raise AssertionError(
+                        f"malformed digest {bad_value!r} must fail verify"
+                    )
+            finally:
+                original.write_text(backup)
+
+
+def test_compiler_verify_emits_pass_output() -> None:
+    """BLOCKER 6 proof: successful verify must emit its PASS output.
+    Guards against the unreachable-after-return regression.
+    """
+    result = subprocess.run(
+        ["python3", "scripts/arsenal_compile.py", "verify"],
+        cwd=ROOT, capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise AssertionError(
+            f"arsenal_compile.py verify must exit 0; got rc={result.returncode}; "
+            f"stderr={result.stderr!r}"
+        )
+    out = result.stdout
+    assert "Arsenal compiler verification: PASS" in out, (
+        f"missing PASS output in verify stdout: {out!r}"
+    )
+    assert "exports" in out, f"missing 'exports' summary in verify stdout: {out!r}"
 
 
 def main() -> int:
