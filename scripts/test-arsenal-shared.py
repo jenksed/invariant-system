@@ -155,45 +155,40 @@ def test_targets_default_to_all_supported_when_no_project_config() -> None:
     supported target. This preserves the pre-refactor default where
     export-plan.json enumerated the targets directly.
     """
-    # Ensure no arsenal.project.json interferes.
-    config_path = ROOT / "arsenal.project.json"
-    had_config = config_path.is_file()
-    saved = config_path.read_text() if had_config else None
-    if had_config:
-        config_path.unlink()
-    try:
-        enabled = arsenal_targets.resolve_enabled_targets(ROOT)
+    # Isolated fixture: copy the Arsenal target registry into a
+    # sandbox root that has NO arsenal.project.json. The outer
+    # Project Arsenal checkout is not touched.
+    import shutil as _shutil
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+        # Intentionally do NOT copy arsenal.project.json.
+        enabled = arsenal_targets.resolve_enabled_targets(root)
         assert "agent-skills" in enabled
-    finally:
-        if had_config:
-            config_path.write_text(saved)
 
 
 def test_targets_unsupported_target_is_rejected() -> None:
     """A project cannot enable a target Arsenal does not ship."""
-    config_path = ROOT / "arsenal.project.json"
-    had_config = config_path.is_file()
-    saved = config_path.read_text() if had_config else None
-    if had_config:
-        config_path.unlink()
-    try:
+    import shutil as _shutil
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
         bad = {
             "schema_version": arsenal_targets.PROJECT_CONFIG_VERSION,
             "project": {"org": "test", "repo": "test"},
             "distribution": {"enabled_targets": ["bogus-target"]},
         }
-        config_path.write_text(json.dumps(bad, indent=2, sort_keys=True))
+        (root / "arsenal.project.json").write_text(
+            json.dumps(bad, indent=2, sort_keys=True)
+        )
         try:
-            arsenal_targets.resolve_enabled_targets(ROOT)
+            arsenal_targets.resolve_enabled_targets(root)
         except ValueError as e:
             assert "bogus-target" in str(e)
             return
         raise AssertionError("resolve_enabled_targets should reject unsupported target")
-    finally:
-        if had_config:
-            config_path.write_text(saved)
-        else:
-            config_path.unlink(missing_ok=True)
 
 
 def test_targets_rejects_unknown_invocation_support() -> None:

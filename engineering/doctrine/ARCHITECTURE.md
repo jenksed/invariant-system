@@ -193,6 +193,28 @@ These are guaranteed by the architecture, not by tests alone:
    and `docs/field-trials/` record observed PRs and observed
    repositories. These are evidence, not configuration.
 
+6. **Authoritative records and configuration must remain distinct
+   from derived projections and transient operational state.**
+   "Authoritative" here means the record is the source of truth for
+   its scope — its content defines what is true. "Immutable" is a
+   separate property. Authoritative records are not necessarily
+   immutable; lifecycle and qualification state are authoritative
+   for lifecycle and qualification while legitimately changing
+   under a strict schema. What must not happen is that a derived
+   prose projection, a transient operational observation, or a
+   status note silently redefines a technical contract. The
+   prohibition is on silent redefinition of technical contract
+   authority by derived or unrelated mutable metadata, not on
+   authoritative records being mutable.
+   `arsenal.project.json` is configuration, not operational state;
+   it does not absorb current branch, current PR, current
+   qualification observation, or any value that mutates because
+   work happened rather than because a project owner changed
+   configuration. This boundary is enforced by review, not by
+   validators; introducing structured governance projections is
+   explicitly deferred to post-#24 work tracked at
+   `docs/roadmap/post-pr-24-deferred-architecture.md`.
+
 ## Validation cadence
 
 CI runs the full evidence suite on every PR:
