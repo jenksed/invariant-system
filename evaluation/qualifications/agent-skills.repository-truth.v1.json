@@ -27,9 +27,9 @@
     }
   },
   "binding": {
-    "capability_sha256": "sha256:70cedefb54715678e9f245cb4827f9e5502b27cac320632af2294d7756f080d4",
+    "capability_sha256": "sha256:b4540d1cba505f7540ad8906aa18b13033fad767e39c18d7d07a56de00d84f84",
     "distribution_path": "distribution/agent-skills/repository-truth",
-    "manifest_sha256": "sha256:1b42086b91b82813a7ee570329da6113411b6d2f0b54368a771544f8c15f4e17",
+    "manifest_sha256": "sha256:f4740e892e299241644b431bac6dd57dc380f782b3a707f7e116829833a62880",
     "package_content_sha256": "sha256:71cdd574722becfff7f8cc34187d37701eaa7099324c16218087e45338d32aa4"
   },
   "candidate_ready": true,

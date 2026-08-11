@@ -438,6 +438,126 @@ def test_legacy_21_fragment_with_2_2_resources_must_fail() -> None:
         )
 
 
+def test_enabled_targets_actually_gates_compile() -> None:
+    """BLOCKER 2 proof: the compiler rejects an export whose target is
+    Arsenal-supported but disabled by the project config. Without
+    this gate, arsenal.project.json is misleading configuration.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        # Copy real arsenal/ distribution files into the fake root so
+        # arsenal_targets can resolve supported targets, plus the
+        # canonical primary asset sources the compiler checks.
+        _shutil.copytree(ROOT / "arsenal", root / "arsenal")
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+        # Copy the primary asset sources referenced by the capability
+        # fragments (only those we touch in this test).
+        _shutil.copytree(ROOT / "agent_workflows", root / "agent_workflows")
+        _shutil.copytree(ROOT / "software_engineering", root / "software_engineering")
+        # Copy export plan with both supported targets referenced.
+        _shutil.copy(ROOT / "arsenal" / "compiler" / "export-plan.json",
+                     root / "arsenal" / "compiler" / "export-plan.json")
+        # Project config declares agent-skills ENABLED but not codex
+        # (which Arsenal doesn't support). Add a fake UNSUPPORTED
+        # target to the plan to prove it fails.
+        plan = json.loads((root / "arsenal" / "compiler" / "export-plan.json").read_text())
+        plan["exports"].append({
+            "capability_id": "capability.repository-truth",
+            "target": "fake-unsupported-target",
+            "adapter_version": "1.0.0",
+            "package_name": "fake",
+            "output_path": "distribution/fake-unsupported-target/repository-truth",
+            "description": "Use when test gate rejects unsupported targets. " * 2,
+            "compatibility": "Test fixture for unsupported-target rejection.",
+        })
+        (root / "arsenal" / "compiler" / "export-plan.json").write_text(
+            json.dumps(plan, indent=2, sort_keys=True) + "\n"
+        )
+        # Add the synthetic target to the supported registry so the
+        # plan's target becomes Arsenal-supported but NOT enabled.
+        targets = json.loads((root / "distribution" / "compiler" / "targets.json").read_text())
+        targets["targets"]["fake-unsupported-target"] = {
+            "adapter_version": "1.0.0",
+            "invocation_support": ["agent"],
+        }
+        (root / "distribution" / "compiler" / "targets.json").write_text(
+            json.dumps(targets, indent=2, sort_keys=True) + "\n"
+        )
+        # Project config disables fake-unsupported-target explicitly.
+        (root / "arsenal.project.json").write_text(json.dumps({
+            "schema_version": "1.0.0",
+            "project": {"org": "fake", "repo": "fake"},
+            "distribution": {"enabled_targets": ["agent-skills"]},
+        }, indent=2, sort_keys=True))
+
+        # Import arsenal_compile fresh and run validate against the
+        # fake root.
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "arsenal_compile_test", ROOT / "scripts/arsenal_compile.py"
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        try:
+            mod.validate_plan_data(
+                json.loads((root / "arsenal" / "compiler" / "export-plan.json").read_text()),
+                root,
+            )
+        except AssertionError as e:
+            assert "fake-unsupported-target" in str(e), str(e)
+            assert "enabled" in str(e).lower() or "not in" in str(e).lower(), str(e)
+        else:
+            raise AssertionError(
+                "supported-but-disabled target must be rejected by compiler"
+            )
+
+
+def test_enabled_targets_explicit_empty_compiles_nothing() -> None:
+    """BLOCKER 2 proof: explicit empty enabled_targets list is distinct
+    from config-absent. config-absent enables everything Arsenal
+    supports; explicit empty enables nothing.
+    """
+    import shutil as _shutil
+    import tempfile as _tempfile
+    with _tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "fake-project"
+        root.mkdir()
+        _shutil.copytree(ROOT / "arsenal", root / "arsenal")
+        _shutil.copytree(ROOT / "distribution", root / "distribution")
+
+        # Project config present with enabled_targets: [].
+        (root / "arsenal.project.json").write_text(json.dumps({
+            "schema_version": "1.0.0",
+            "project": {"org": "fake", "repo": "fake"},
+            "distribution": {"enabled_targets": []},
+        }, indent=2, sort_keys=True))
+
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "arsenal_targets_test", ROOT / "scripts/arsenal_targets.py"
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        enabled = mod.resolve_enabled_targets(root)
+        assert enabled == {}, (
+            f"explicit empty enabled_targets must compile nothing; got {enabled!r}"
+        )
+
+        # Compare with config-absent state.
+        (root / "arsenal.project.json").unlink()
+        enabled_absent = mod.resolve_enabled_targets(root)
+        assert enabled_absent != {}, (
+            f"absent arsenal.project.json must default to all supported targets; "
+            f"got {enabled_absent!r}"
+        )
+        assert "agent-skills" in enabled_absent, enabled_absent
+
+
 def main() -> int:
     tests = [v for k, v in globals().items() if k.startswith("test_")]
     failures = 0

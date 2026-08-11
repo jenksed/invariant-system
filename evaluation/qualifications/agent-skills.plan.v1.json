@@ -27,9 +27,9 @@
     }
   },
   "binding": {
-    "capability_sha256": "sha256:1c71f2f396b09319e2d64138723897ae5047745a606f50e77410b66add66e7c2",
+    "capability_sha256": "sha256:8aa8861b046e8dc1c2836242740f74004f1983fbde53440fa3bf2305ea6f95d4",
     "distribution_path": "distribution/agent-skills/plan",
-    "manifest_sha256": "sha256:f632fe637c61854858149205f36cc8e4ffcfed1dde2131812e5d130e2aed4dda",
+    "manifest_sha256": "sha256:cd547e563b34711782c24b77051b6e2c1c1a01a6e0dc4098fa5d17bc4be0ec3f",
     "package_content_sha256": "sha256:67c02f4f344c2d10fe36c044300291c65e9ce61c0474b859e3234f81629cb692"
   },
   "candidate_ready": true,

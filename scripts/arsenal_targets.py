@@ -116,22 +116,39 @@ def load_project_config(root: Path) -> dict:
     return doc
 
 
+def project_config_present(root: Path) -> bool:
+    """Return True iff arsenal.project.json exists.
+
+    This distinguishes "config absent" (default: compile everything
+    Arsenal supports) from "config present, enabled_targets: []"
+    (explicit user intent: compile nothing).
+    """
+    return (root / PROJECT_CONFIG_PATH).is_file()
+
+
 def resolve_enabled_targets(root: Path) -> dict[str, dict]:
     """Return the subset of supported targets enabled for this project.
+
+    Three states are distinguished:
+
+    - arsenal.project.json absent: enable every Arsenal-supported
+      target (backward-compatible default).
+    - arsenal.project.json present with `enabled_targets: []`:
+      compile nothing (explicit user intent; not a fallback).
+    - arsenal.project.json present with `enabled_targets: [...]`:
+      compile exactly that subset. References to targets not in
+      the Arsenal-owned registry fail closed.
 
     Raises if the project config enables a target that is not in the
     Arsenal-owned supported registry. This is the only authority for
     "what targets does this project compile for."
     """
     supported = load_supported_targets(root)
+    if not project_config_present(root):
+        # Default: compile every supported target.
+        return supported
     project = load_project_config(root)
     enabled = project.get("distribution", {}).get("enabled_targets", [])
-    if not enabled:
-        # Default to all supported targets when the project config
-        # does not opt in. This preserves existing behavior: a project
-        # without arsenal.project.json compiles everything Arsenal
-        # ships.
-        return supported
     out: dict[str, dict] = {}
     for target_id in enabled:
         if target_id not in supported:

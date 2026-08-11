@@ -125,13 +125,29 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
 
         if cap_id not in capabilities:
             raise AssertionError(f"unknown capability in export plan: {cap_id}")
+        # Target must be both Arsenal-supported AND enabled for this
+        # project. The two are distinct ownerships:
+        #   supported_targets: what Arsenal knows how to compile.
+        #   enabled_targets:    what this project permits to be compiled.
+        # resolve_enabled_targets consults both, defaulting to
+        # "enable all supported" only when arsenal.project.json is
+        # absent. An explicit empty enabled_targets list compiles
+        # nothing.
         if target not in supported_targets:
-            # Already rejected above; kept as defense-in-depth for the
-            # rare case where supported_targets is empty.
             raise AssertionError(
-                f"target {target!r} is not in the Arsenal-supported target registry"
+                f"target {target!r} is not in the Arsenal-supported target registry "
+                f"({sorted(supported_targets)}); add it to distribution/compiler/targets.json "
+                f"or pick a different target in the export plan"
             )
-            raise AssertionError(f"unsupported export target: {target}")
+        enabled_targets = resolve_enabled_targets(root)
+        if target not in enabled_targets:
+            raise AssertionError(
+                f"target {target!r} is supported by Arsenal but not enabled by this "
+                f"project. arsenal.project.json::distribution.enabled_targets "
+                f"must include {target!r} (currently {sorted(enabled_targets)}); "
+                f"consumer configuration cannot enable a target by declaring it "
+                f"in the export plan"
+            )
 
         package_name = export["package_name"]
         # Package-name pattern comes from the target registry, not from
