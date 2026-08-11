@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0.0",
+  "host": "project-arsenal.dev",
+  "schemas": {
+    "capability-fragment": {
+      "version": "2.0.0",
+      "path": "arsenal/capability.schema.json"
+    },
+    "competence-lock": {
+      "version": "1.0.0",
+      "path": "arsenal/lock.schema.json"
+    },
+    "evaluation-case": {
+      "version": "1.0.0",
+      "path": "evaluation/evaluation-case.schema.json"
+    },
+    "case-health-receipt": {
+      "version": "1.0.0",
+      "path": "evaluation/case-health-receipt.schema.json"
+    },
+    "evaluation-receipt": {
+      "version": "1.0.0",
+      "path": "evaluation/evaluation-receipt.schema.json"
+    },
+    "flight-record": {
+      "version": "1.0.0",
+      "path": "arsenal/observability/flight-record.schema.json"
+    },
+    "knowledge-snapshot": {
+      "version": "1.0.0",
+      "path": "arsenal/knowledge/snapshot.schema.json"
+    },
+    "trust-policy": {
+      "version": "1.0.0",
+      "path": "arsenal/trust/policy.schema.json"
+    },
+    "trust-review": {
+      "version": "1.0.0",
+      "path": "arsenal/trust/review.schema.json"
+    },
+    "trust-decision": {
+      "version": "1.0.0",
+      "path": "arsenal/trust/decision.schema.json"
+    },
+    "trust-candidate": {
+      "version": "1.0.0",
+      "path": "arsenal/trust/candidate.schema.json"
+    }
+  }
+}

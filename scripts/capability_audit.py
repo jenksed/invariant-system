@@ -25,6 +25,7 @@ from arsenal_protocol import (
     SUBSTRATES,
     WRITE_AUTHORITY,
 )
+from arsenal_schema_registry import load_schema_registry, schema_id_for
 
 # Local aliases preserve the existing call sites in the rest of the
 # script body without churn.
@@ -385,7 +386,11 @@ def validate_repository(root: Path, capability_dir: Path | None = None):
     schema_path = root / "arsenal" / "capability.schema.json"
     try:
         schema = _json(schema_path)
-        if schema.get("$id") != "https://project-arsenal.dev/schema/capability-fragment-2.0.0.json":
+        # The canonical $id is owned by arsenal/schema-registry.json,
+        # not by this script. Consumer configuration cannot redefine
+        # schema identity; only the Arsenal distribution can.
+        expected_id = schema_id_for(root, "capability-fragment")
+        if schema.get("$id") != expected_id:
             errors.append("arsenal/capability.schema.json: unexpected $id")
     except Exception as exc:
         errors.append(f"arsenal/capability.schema.json: invalid JSON: {exc}")
