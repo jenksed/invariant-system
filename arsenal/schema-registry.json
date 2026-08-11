@@ -26,6 +26,10 @@
       "path": "arsenal/observability/flight-record.schema.json",
       "version": "1.0.0"
     },
+    "governance-source-model": {
+      "path": "arsenal/source-model.schema.json",
+      "version": "1.0.0"
+    },
     "knowledge-snapshot": {
       "path": "arsenal/knowledge/snapshot.schema.json",
       "version": "1.0.0"

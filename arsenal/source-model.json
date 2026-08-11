@@ -1,0 +1,299 @@
+{
+  "schema_version": "1.0.0",
+  "artifacts": [
+    {
+      "id": "arsenal.protocol",
+      "path": "scripts/arsenal_protocol.py",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.vocabulary"],
+      "notes": "Canonical core protocol/execution vocabulary. Every domain validator imports from this module."
+    },
+    {
+      "id": "arsenal.capability-fragment-schema",
+      "path": "arsenal/capability.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.capability-fragment-schema"],
+      "notes": "Structural schema for one capability fragment."
+    },
+    {
+      "id": "arsenal.competence-lock-schema",
+      "path": "arsenal/lock.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.competence-lock-schema"],
+      "notes": "Structural schema for .arsenal.lock."
+    },
+    {
+      "id": "arsenal.evaluation-case-schema",
+      "path": "evaluation/evaluation-case.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.evaluation-case-schema"]
+    },
+    {
+      "id": "arsenal.evaluation-receipt-schema",
+      "path": "evaluation/evaluation-receipt.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.evaluation-receipt-schema"]
+    },
+    {
+      "id": "arsenal.case-health-receipt-schema",
+      "path": "evaluation/case-health-receipt.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.case-health-receipt-schema"]
+    },
+    {
+      "id": "arsenal.flight-record-schema",
+      "path": "arsenal/observability/flight-record.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.flight-record-schema"]
+    },
+    {
+      "id": "arsenal.knowledge-snapshot-schema",
+      "path": "arsenal/knowledge/snapshot.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.knowledge-snapshot-schema"]
+    },
+    {
+      "id": "arsenal.trust-plane-schemas",
+      "path": "arsenal/trust/policy.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.trust-plane-schemas"],
+      "notes": "The four trust schemas (policy, candidate, review, decision) are co-versioned and treated as one provenance surface."
+    },
+    {
+      "id": "arsenal.governance-source-model-schema",
+      "path": "arsenal/source-model.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.governance-source-model-schema"]
+    },
+    {
+      "id": "arsenal.governance-source-model",
+      "path": "arsenal/source-model.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "governance.artifact-classification",
+        "governance.source-assignment"
+      ],
+      "notes": "The source model is normative for *which artifact owns which fact*. It does NOT own any domain value."
+    },
+    {
+      "id": "arsenal.distribution.compiler.targets",
+      "path": "distribution/compiler/targets.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.supported-targets"],
+      "notes": "Supported compiler targets, adapter versions, invocation policy, package-name patterns."
+    },
+    {
+      "id": "arsenal.distribution.compiler.export-plan",
+      "path": "arsenal/compiler/export-plan.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.compiler.export-plan"]
+    },
+    {
+      "id": "arsenal.distribution.schema-registry",
+      "path": "arsenal/schema-registry.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.schema-ids"]
+    },
+    {
+      "id": "arsenal.capability-fragments",
+      "path_pattern": "arsenal/capabilities/*.json",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "capability.lifecycle",
+        "capability.evaluation",
+        "capability.authority",
+        "capability.execution",
+        "capability.evidence"
+      ],
+      "notes": "Each capability fragment owns its own facts. The source model addresses the family; per-capability detail lives in the fragment."
+    },
+    {
+      "id": "arsenal.registry",
+      "path": "arsenal/registry.json",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["asset.identity"],
+      "notes": "Asset registry is the merged view of arsenal/registry.json + arsenal/registry.d/*.json. Each fragment is independently authoritative; the merged file is the canonical pointer."
+    },
+    {
+      "id": "arsenal.registry.d",
+      "path_pattern": "arsenal/registry.d/*.json",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Each registry.d fragment is independently authored; the merged registry is the canonical owner of asset.identity."
+    },
+    {
+      "id": "arsenal.project",
+      "path": "arsenal.project.json",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "project.identity",
+        "project.doctrine-pointer",
+        "project.enabled-targets"
+      ],
+      "notes": "Consumer/deployment configuration. PR #24 explicitly forbids absorbing current branch, current PR, current qualification, or any value that mutates because work happened."
+    },
+    {
+      "id": "arsenal.competence-lockfile",
+      "path": ".arsenal.lock",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "generated",
+      "owns_facts": ["lockfile.competence-pin"],
+      "notes": "Generated by the compiler, but consumer-accepted as the current competence pin. This is the canonical 'generated + normative' counter-example to a 'generated == derived' rule."
+    },
+    {
+      "id": "arsenal.distribution.skill",
+      "path_pattern": "distribution/agent-skills/*",
+      "ownership": "arsenal-distribution",
+      "state_role": "derived",
+      "materialization": "generated",
+      "owns_facts": [
+        "distribution.skill-snapshot",
+        "distribution.skill-reference",
+        "distribution.skill-manifest"
+      ],
+      "notes": "Every file under distribution/agent-skills/<pkg>/ is a deterministic projection of capability fragment + export plan + target adapter. A fresh compile must produce byte-identical output."
+    },
+    {
+      "id": "arsenal.bench.case",
+      "path_pattern": "evaluation/cases/*.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["bench.case"]
+    },
+    {
+      "id": "arsenal.bench.distribution-qualification",
+      "path_pattern": "evaluation/cases/distribution-qualification*.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["bench.distribution-qualification"]
+    },
+    {
+      "id": "arsenal.bench.distribution-qualification-receipt",
+      "path_pattern": "evaluation/qualifications/*.json",
+      "ownership": "consumer-deployed",
+      "state_role": "historical",
+      "materialization": "generated",
+      "owns_facts": ["bench.distribution-qualification-receipt"],
+      "notes": "Generated by the bench runner. The value is evidence of a past execution; the receipt must NOT be edited to match present state. Canonical 'generated + historical' counter-example."
+    },
+    {
+      "id": "arsenal.knowledge.snapshot-fixture-kft-0",
+      "path": "arsenal/knowledge/fixtures/kft-0-kiln.json",
+      "ownership": "consumer-deployed",
+      "state_role": "historical",
+      "materialization": "generated",
+      "owns_facts": ["knowledge.snapshot-fixture-kft-0"],
+      "notes": "Generated Knowledge Snapshot used as a permanent regression fixture. Frozen as evidence of the KFT-0 episode."
+    },
+    {
+      "id": "arsenal.field-trial.kft-0-report",
+      "path": "docs/field-trials/KFT-0-kiln.md",
+      "ownership": "consumer-deployed",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": ["field-trial.kft-0-report"],
+      "notes": "Human-readable report of the KFT-0 episode. Per the snapshot contract, it must not be edited merely because current truth has changed."
+    },
+    {
+      "id": "arsenal.architecture.doctrine",
+      "path": "engineering/doctrine/ARCHITECTURE.md",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["architecture.ownership-layers"],
+      "notes": "Architecture doctrine is normative: it sets authoritative ownership/state-role boundaries for the repository."
+    },
+    {
+      "id": "arsenal.roadmap.post-pr-24",
+      "path": "docs/roadmap/post-pr-24-deferred-architecture.md",
+      "ownership": "consumer-deployed",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Program roadmap with explicit OBSERVED/INFERRED/PROPOSED/ACCEPTED/DEFERRED/REJECTED labels. Not protocol authority."
+    },
+    {
+      "id": "arsenal.roadmap.capability-system",
+      "path": "docs/roadmap/capability-system.md",
+      "ownership": "consumer-deployed",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": []
+    }
+  ],
+  "facts": [
+    {"id": "protocol.vocabulary", "owner_artifact": "arsenal.protocol", "locator": "module-level constants"},
+    {"id": "protocol.capability-fragment-schema", "owner_artifact": "arsenal.capability-fragment-schema", "locator": "schema"},
+    {"id": "protocol.competence-lock-schema", "owner_artifact": "arsenal.competence-lock-schema", "locator": "schema"},
+    {"id": "protocol.evaluation-case-schema", "owner_artifact": "arsenal.evaluation-case-schema", "locator": "schema"},
+    {"id": "protocol.evaluation-receipt-schema", "owner_artifact": "arsenal.evaluation-receipt-schema", "locator": "schema"},
+    {"id": "protocol.case-health-receipt-schema", "owner_artifact": "arsenal.case-health-receipt-schema", "locator": "schema"},
+    {"id": "protocol.flight-record-schema", "owner_artifact": "arsenal.flight-record-schema", "locator": "schema"},
+    {"id": "protocol.knowledge-snapshot-schema", "owner_artifact": "arsenal.knowledge-snapshot-schema", "locator": "schema"},
+    {"id": "protocol.trust-plane-schemas", "owner_artifact": "arsenal.trust-plane-schemas", "locator": "schema"},
+    {"id": "protocol.governance-source-model-schema", "owner_artifact": "arsenal.governance-source-model-schema", "locator": "schema"},
+    {"id": "distribution.supported-targets", "owner_artifact": "arsenal.distribution.compiler.targets", "locator": "targets"},
+    {"id": "distribution.compiler.export-plan", "owner_artifact": "arsenal.distribution.compiler.export-plan", "locator": "exports"},
+    {"id": "distribution.schema-ids", "owner_artifact": "arsenal.distribution.schema-registry", "locator": "schemas"},
+    {"id": "capability.lifecycle", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.lifecycle"},
+    {"id": "capability.evaluation", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.evaluation"},
+    {"id": "capability.authority", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.authority"},
+    {"id": "capability.execution", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.execution"},
+    {"id": "capability.evidence", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.evidence_outputs"},
+    {"id": "asset.identity", "owner_artifact": "arsenal.registry", "locator": "assets[]"},
+    {"id": "project.identity", "owner_artifact": "arsenal.project", "locator": "project"},
+    {"id": "project.doctrine-pointer", "owner_artifact": "arsenal.project", "locator": "project.doctrine_path"},
+    {"id": "project.enabled-targets", "owner_artifact": "arsenal.project", "locator": "distribution.enabled_targets"},
+    {"id": "lockfile.competence-pin", "owner_artifact": "arsenal.competence-lockfile", "locator": "lockfile"},
+    {"id": "distribution.skill-snapshot", "owner_artifact": "arsenal.distribution.skill", "locator": "SKILL.md"},
+    {"id": "distribution.skill-reference", "owner_artifact": "arsenal.distribution.skill", "locator": "references/"},
+    {"id": "distribution.skill-manifest", "owner_artifact": "arsenal.distribution.skill", "locator": "arsenal-manifest.json"},
+    {"id": "bench.case", "owner_artifact": "arsenal.bench.case", "locator": "suite.cases[]"},
+    {"id": "bench.distribution-qualification", "owner_artifact": "arsenal.bench.distribution-qualification", "locator": "suite"},
+    {"id": "bench.distribution-qualification-receipt", "owner_artifact": "arsenal.bench.distribution-qualification-receipt", "locator": "receipt"},
+    {"id": "knowledge.snapshot-fixture-kft-0", "owner_artifact": "arsenal.knowledge.snapshot-fixture-kft-0", "locator": "snapshot"},
+    {"id": "field-trial.kft-0-report", "owner_artifact": "arsenal.field-trial.kft-0-report", "locator": "report"},
+    {"id": "architecture.ownership-layers", "owner_artifact": "arsenal.architecture.doctrine", "locator": "ownership-layers"},
+    {"id": "governance.artifact-classification", "owner_artifact": "arsenal.governance-source-model", "locator": "artifacts[]"},
+    {"id": "governance.source-assignment", "owner_artifact": "arsenal.governance-source-model", "locator": "facts[]"}
+  ]
+}

@@ -121,6 +121,9 @@ adopter cannot relax this assertion to make CI green.
 | `scripts/arsenal_observe.py` | Flight Recorder validation | CI |
 | `scripts/arsenal_dagger.py` | Dagger executable world contract | CI |
 | `scripts/arsenal_audit.py` | Asset registry integrity | CI |
+| `scripts/arsenal_governance.py` | Closed governance vocabulary (ownership, state role, materialization) | governance loader/validator |
+| `scripts/arsenal_source_model.py` | Source-model loader (canonical index of which artifact owns which fact) | `arsenal_source_validate` |
+| `scripts/arsenal_source_validate.py` | Source-model fail-closed validator | CI |
 | `scripts/test-*.py` | Domain test suites | CI |
 | `scripts/test-arsenal-shared.py` | Shared module characterization | CI |
 
@@ -215,11 +218,69 @@ These are guaranteed by the architecture, not by tests alone:
    explicitly deferred to post-#24 work tracked at
    `docs/roadmap/post-pr-24-deferred-architecture.md`.
 
+7. **Governance vocabulary is closed and consumer-nonconfigurable.**
+   The ownership/state-role/materialization vocabularies live in
+   `scripts/arsenal_governance.py` as frozensets. No code path in
+   the governance loaders reads `arsenal.project.json`; the closed
+   vocabularies are the only source. A consumer project therefore
+   cannot redefine the state role of an artifact by editing
+   configuration. The canonical index of "which artifact owns which
+   fact" lives in `arsenal/source-model.json`; the model is
+   normative for classification and source assignment, but it does
+   not duplicate domain values. The validator in
+   `scripts/arsenal_source_validate.py` fails closed on unknown
+   roles, duplicate identities, missing owners, two normative
+   owners for one fact, and value-shaped keys inside the source
+   model.
+
+## Ownership and state role
+
+Two orthogonal dimensions describe a load-bearing artifact:
+
+* **Ownership** — who is allowed to define this artifact? The
+  canonical set is `arsenal-protocol`, `arsenal-distribution`,
+  `consumer-deployed`. These are three layers; the old four-layer
+  prose included a "fixtures, tests, historical evidence" layer,
+  but that mixes ownership with epistemic role. The new model
+  separates them: historical is captured by `state_role`, not by
+  ownership.
+
+* **State role** — what relationship does this artifact have to
+  the truth it carries? The canonical set is `normative`,
+  `derived`, `historical`, `narrative`. A normative artifact is
+  the source of truth for the facts it owns within its scope and
+  may legitimately change under its own schema. A derived artifact
+  is a deterministic projection of one or more normative sources
+  and must regenerate byte-identically. A historical artifact
+  records what was observed or executed at a specific time/state
+  and must not be rewritten to match present truth. A narrative
+  artifact is human-oriented explanation or commentary and must
+  not silently become the only machine-relevant source of mutable
+  current state.
+
+A third dimension, **materialization**, is recorded per-artifact
+where meaningful: `authored` or `generated`. This dimension is
+optional and explicitly separate from state role. A consumer-
+accepted competence lockfile is `generated + normative`; a
+qualification receipt is `generated + historical`; a generated
+SKILL package is `generated + derived`. The slice records both
+`generated + normative` and `generated + historical` classifications
+to prove that materialization is not a synonym for `derived`.
+
+The closed vocabulary lives in `scripts/arsenal_governance.py`. The
+machine-readable source model lives in
+`arsenal/source-model.json` (schema `arsenal/source-model.schema.json`).
+The model is an *index*: it records which artifact owns which fact
+and what role each artifact plays, but it does not carry a second
+mutable copy of the domain value. Editing a fact's value still
+happens in the artifact that owns it.
+
 ## Validation cadence
 
 CI runs the full evidence suite on every PR:
 
 ```
+arsenal_source_validate.py
 capability_audit.py
 test-capability-contract.py
 arsenal_audit.py
@@ -230,6 +291,7 @@ test-arsenal-compiler.py
 test-arsenal-compiler-resources.py
 test-arsenal-qualification.py
 test-arsenal-shared.py
+test-arsenal-governance.py
 test-arsenal-graph.py
 test-arsenal-knowledge.py
 test-arsenal-observe.py

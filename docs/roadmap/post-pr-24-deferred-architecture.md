@@ -13,6 +13,37 @@ roadmap and findings record. It is not doctrine; it does not bind
 later implementation choices, and it deliberately preserves the
 distinction between observations, inferences, and proposals.
 
+## Status update (post-Governance-Compression-01)
+
+Slice 1 of Track A has been implemented and merged as a separate
+PR. The change introduced a closed governance vocabulary in
+`scripts/arsenal_governance.py`, a small source-model schema and
+instance at `arsenal/source-model.json`, a loader
+(`scripts/arsenal_source_model.py`), a fail-closed validator
+(`scripts/arsenal_source_validate.py`), and characterization tests
+(`scripts/test-arsenal-governance.py`). The implementation:
+
+* keeps the canonical governance vocabulary out of
+  `arsenal_protocol.py` (governance is a separate closed surface,
+  not a protocol/execution concern);
+* treats ownership and state role as orthogonal dimensions, with
+  `state_role` further separated from materialization
+  (`authored` vs `generated`) where the evidence demands it;
+* makes the source model an *index* of where facts live rather
+  than a duplicate copy of their values; the loader rejects
+  value-shaped keys inside the model;
+* classifies `.arsenal.lock` as `generated + normative` and a
+  qualification receipt as `generated + historical` to prove that
+  materialization is not a synonym for `derived`.
+
+The roadmap below is updated to record:
+
+* Track A item 1 (`Artifact / state role vocabulary`) is now
+  `ACCEPTED` in shape and the implementation is merged; only
+  *extensions* remain to be discussed.
+* Track A items 2–8 remain `PROPOSED`/`DEFERRED`.
+* Track B items remain independent of Track A.
+
 ## Classification scheme
 
 Each item carries one or more of the following labels. The labels are
@@ -48,9 +79,13 @@ narrative status summaries; this track addresses that directly.
 
 Ordering inside Track A:
 
-1. Artifact/state role vocabulary (ACCEPTED problem, PROPOSED shape).
+1. Artifact/state role vocabulary (ACCEPTED problem, ACCEPTED
+   shape — implemented as `scripts/arsenal_governance.py` plus
+   `scripts/arsenal_source_model.py` / `arsenal_source_validate.py`).
 2. Minimal authoritative source model — the list of files that own
-   which facts (PROPOSED).
+   which facts (ACCEPTED in foundation; the source-model index is
+   implemented, but its coverage of every governance fact across
+   the program remains PROPOSED).
 3. Structured Decision Records + commit-role vocabulary (PROPOSED).
 4. First generated governance-status projection (PROPOSED,
    deferred).
@@ -216,14 +251,94 @@ The following are explicitly rejected and remain rejected:
   (Track A item 8) are deterministic; an NLP classifier of PR
   prose is not.
 
+## Empirical classification results
+
+The Governance Compression 01 slice produced the following
+classifications from repository evidence (not from prior
+assumption). They are recorded here so that future slices do not
+have to re-litigate them.
+
+* `arsenal/capability.schema.json`,
+  `arsenal/lock.schema.json`, all evaluation/observability/knowledge/
+  trust schemas, `scripts/arsenal_protocol.py`, and the
+  governance source-model schema are `arsenal-protocol` +
+  `normative` + `authored`.
+* `arsenal/schema-registry.json`, `distribution/compiler/targets.json`,
+  and `arsenal/compiler/export-plan.json` are
+  `arsenal-distribution` + `normative` + `authored`.
+* `arsenal/capabilities/*.json` are `consumer-deployed` +
+  `normative` + `authored` (a bounded family; the source model
+  addresses the family, per-capability detail lives in the
+  fragment).
+* `arsenal/registry.json` + `arsenal/registry.d/*.json` are
+  `consumer-deployed` + `normative` + `authored` (merged view of
+  asset identity).
+* `arsenal.project.json` is `consumer-deployed` + `normative` +
+  `authored`; it never absorbs current branch / current PR /
+  current qualification.
+* `.arsenal.lock` is `consumer-deployed` + `normative` +
+  `generated` — the canonical counter-example to the
+  `generated == derived` shortcut. Its lifecycle/evaluation state
+  is authoritative.
+* `distribution/agent-skills/<pkg>/{SKILL.md, references/, arsenal-manifest.json}`
+  are `arsenal-distribution` + `derived` + `generated`; byte-equal
+  on rebuild.
+* `evaluation/qualifications/*.json` is `consumer-deployed` +
+  `historical` + `generated` — the canonical counter-example
+  showing that a generated artifact is not disposable if its value
+  is evidence of a past execution. The receipt must not be edited
+  to match present state.
+* `arsenal/knowledge/fixtures/kft-0-kiln.json` is
+  `consumer-deployed` + `historical` + `generated`.
+* `docs/field-trials/KFT-0-kiln.md` is `consumer-deployed` +
+  `historical` + `authored`.
+* `engineering/doctrine/ARCHITECTURE.md` is `arsenal-protocol` +
+  `normative` + `authored` (it sets authoritative ownership/state
+  boundaries; treat it as canonical architecture, not as a
+  free-form explainer).
+* `docs/roadmap/post-pr-24-deferred-architecture.md` and
+  `docs/roadmap/capability-system.md` are `consumer-deployed` +
+  `narrative` + `authored`; readers must not treat them as
+  protocol authority.
+
+The source-model also exposes an "impossible in this repository"
+property: a generated artifact may be `generated + normative`
+(the lockfile) or `generated + historical` (a receipt) without
+becoming `derived`. Future slices that propose a universal
+`authored/generated` vocabulary as a first-class axis should
+weigh whether their evidence requires the dimension before
+encoding it.
+
+## Discovered ambiguities
+
+* The old "Layer 4 — Fixtures, tests, historical evidence"
+  conflates ownership with epistemic role. The implementation
+  records three ownership layers (`arsenal-protocol`,
+  `arsenal-distribution`, `consumer-deployed`) and lets
+  `state_role = historical` carry the "evidence" half. This is
+  the more honest decomposition and avoids permanently encoding
+  the older ambiguity.
+* `materialization` is recorded per-artifact where it is
+  meaningful rather than declared as a mandatory third axis. The
+  slice does not assume a future axis is needed.
+
 ## Items carried forward
 
 The remaining items from the earlier draft are retained with their
 priority within Track A or Track B. They are not re-litigated here.
 
-Track A order (post vocabulary): source model, Decision Records +
-commit roles, governance projection, lifecycle separation artifact,
-stop-condition taxonomy, consistency lint, generated review summary.
+Track A order (post vocabulary, post-source-model foundation):
+Decision Records + commit roles, governance projection, lifecycle
+separation artifact, stop-condition taxonomy, consistency lint,
+generated review summary.
+
+The source model itself is intentionally narrow in this slice:
+coverage of the load-bearing artifacts above is in. A future slice
+should consider whether the source model should additionally index
+domain facts that are currently described only in prose
+(architecture boundaries, program-roadmap items, evaluation
+claim-scope text). That expansion is PROPOSED and remains
+non-blocking.
 
 Track B order: consumer integration contract, checkout topology
 qualification, dependency / materialization ownership, local / CI
