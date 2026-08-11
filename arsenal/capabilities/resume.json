@@ -1,1 +1,196 @@
-{"schema_version":"2.0.0","capability":{"id":"capability.resume","version":"0.1.0","display_name":"Resume","aliases":["Resume from Checkpoint","Continue from Checkpoint"],"purpose":"Verify a prior checkpoint against the workspace and execute the explicitly named next coherent slice without rediscovery drift.","lifecycle":"draft","invocation":"agent","inputs":[{"name":"checkpoint","required":true,"description":"Prior verified handoff or work summary describing current state and explicit continuation."},{"name":"repository_scope","required":true,"description":"Repository containing the state to reconcile and continue."}],"outputs":[{"name":"completed_slice","description":"Implemented and validated next coherent slice when authorized by the checkpoint/current invocation."},{"name":"updated_handoff","description":"Exact continuation state, validation evidence, and remaining work."}],"preconditions":[{"id":"continuation_named","description":"The checkpoint or governing roadmap identifies a bounded next slice or recoverable continuation point."}],"context":{"required":["checkpoint","repository.current_state"],"preferred":["repository.instructions","roadmap","acceptance.gates","prior.receipts"]},"implementation":{"primary_asset":"agent.resume-from-checkpoint","asset_ids":["agent.resume-from-checkpoint","agent.repository-truth-audit","agent.independent-verification","agent.session-handoff"]},"authority":{"required":["filesystem.read","filesystem.write","shell.execute","git.read"],"optional":["git.write","network.read","tracker.read","tracker.write"],"forbidden":["network.write","secrets.read","cloud.remote","production.mutate"]},"mutation":{"class":"workspace-write","reversible":true},"execution":{"preferred":["repository-read","local-process"],"allowed":["repository-read","local-process","local-container","user-mediated"],"prohibited":["remote-sandbox","shared-nonproduction","staging","production"]},"verification":{"requirements":[{"id":"checkpoint_reconciled","description":"Important checkpoint claims are checked against the actual repository before dependent work begins.","evidence_kind":"report"},{"id":"slice_gate","description":"The named slice's required acceptance evidence is executed and recorded.","evidence_kind":"command"},{"id":"handoff_exact","description":"Final state names the verified revision, evidence, limitations, and next authorized frontier.","evidence_kind":"receipt"}],"receipt_required":true},"evidence_outputs":[{"name":"slice_receipt","description":"Evidence for the completed continuation slice."},{"name":"continuation_handoff","description":"Compact operational state for the next session."}],"evaluation":{"status":"unassessed","suite_asset_ids":[]},"provenance":{"asset_ids":["agent.resume-from-checkpoint","agent.repository-truth-audit","agent.independent-verification","agent.session-handoff"]},"compatibility":{"supersedes":[],"notes":"Resume may optionally use git or tracker writes only when current/repository instructions authorize them; optional authority is not self-granted."}}}
+{
+  "capability": {
+    "aliases": [
+      "Resume from Checkpoint",
+      "Continue from Checkpoint"
+    ],
+    "authority": {
+      "forbidden": [
+        "network.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "git.write",
+        "network.read",
+        "tracker.read",
+        "tracker.write"
+      ],
+      "required": [
+        "filesystem.read",
+        "filesystem.write",
+        "shell.execute",
+        "git.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Resume may optionally use git or tracker writes only when current/repository instructions authorize them; optional authority is not self-granted.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "repository.instructions",
+        "roadmap",
+        "acceptance.gates",
+        "prior.receipts"
+      ],
+      "required": [
+        "checkpoint",
+        "repository.current_state"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "No checkpoint exists and the current state must be established from scratch via Repository Truth"
+        },
+        {
+          "kind": "negative",
+          "text": "The next work is a multi-session effort that requires Recon rather than a single slice"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "A verified checkpoint or handoff names a bounded next slice or recoverable continuation point"
+        },
+        {
+          "kind": "positive",
+          "text": "The repository state and the named continuation can be reconciled before dependent work begins"
+        }
+      ]
+    },
+    "display_name": "Resume",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Evidence for the completed continuation slice.",
+        "name": "slice_receipt"
+      },
+      {
+        "description": "Compact operational state for the next session.",
+        "name": "continuation_handoff"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "local-process",
+        "local-container",
+        "user-mediated"
+      ],
+      "preferred": [
+        "repository-read",
+        "local-process"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.resume",
+    "implementation": {
+      "asset_ids": [
+        "agent.resume-from-checkpoint",
+        "agent.repository-truth-audit",
+        "agent.independent-verification",
+        "agent.session-handoff"
+      ],
+      "primary_asset": "agent.resume-from-checkpoint",
+      "resources": [
+        {
+          "asset_id": "agent.resume-from-checkpoint",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "agent.repository-truth-audit",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "agent.independent-verification",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "agent.session-handoff",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Prior verified handoff or work summary describing current state and explicit continuation.",
+        "name": "checkpoint",
+        "required": true
+      },
+      {
+        "description": "Repository containing the state to reconcile and continue.",
+        "name": "repository_scope",
+        "required": true
+      }
+    ],
+    "invocation": "agent",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "workspace-write",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Implemented and validated next coherent slice when authorized by the checkpoint/current invocation.",
+        "name": "completed_slice"
+      },
+      {
+        "description": "Exact continuation state, validation evidence, and remaining work.",
+        "name": "updated_handoff"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "The checkpoint or governing roadmap identifies a bounded next slice or recoverable continuation point.",
+        "id": "continuation_named"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.resume-from-checkpoint",
+        "agent.repository-truth-audit",
+        "agent.independent-verification",
+        "agent.session-handoff"
+      ]
+    },
+    "purpose": "Verify a prior checkpoint against the workspace and execute the explicitly named next coherent slice without rediscovery drift.",
+    "verification": {
+      "receipt_required": true,
+      "requirements": [
+        {
+          "description": "Important checkpoint claims are checked against the actual repository before dependent work begins.",
+          "evidence_kind": "report",
+          "id": "checkpoint_reconciled"
+        },
+        {
+          "description": "The named slice's required acceptance evidence is executed and recorded.",
+          "evidence_kind": "command",
+          "id": "slice_gate"
+        },
+        {
+          "description": "Final state names the verified revision, evidence, limitations, and next authorized frontier.",
+          "evidence_kind": "receipt",
+          "id": "handoff_exact"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

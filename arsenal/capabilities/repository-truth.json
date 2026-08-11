@@ -1,61 +1,178 @@
 {
-  "schema_version": "2.0.0",
   "capability": {
-    "id": "capability.repository-truth",
-    "version": "0.1.0",
-    "display_name": "Repository Truth",
-    "aliases": ["Repository Audit"],
-    "purpose": "Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.",
-    "lifecycle": "draft",
-    "invocation": "agent",
-    "inputs": [
-      {"name": "repository_scope", "required": true, "description": "Repository or workspace whose current state must be established."},
-      {"name": "objective", "required": true, "description": "Current project objective or decision that makes repository truth relevant."},
-      {"name": "status_claims", "required": false, "description": "Existing completion, branch, roadmap, or handoff claims to verify."}
+    "aliases": [
+      "Repository Audit"
     ],
-    "outputs": [
-      {"name": "current_state_report", "description": "Evidence-backed repository state, claim comparison, drift, risks, and validation results."},
-      {"name": "continuation_point", "description": "Exact defensible point from which planning or execution should continue."}
-    ],
-    "preconditions": [
-      {"id": "repository_available", "description": "The repository or equivalent inspectable workspace is available within scope."}
-    ],
-    "context": {
-      "required": ["task.intent", "repository.current_state"],
-      "preferred": ["repository.instructions", "repository.history", "repository.tests", "project.status_claims"]
-    },
-    "implementation": {
-      "primary_asset": "agent.repository-truth-audit",
-      "asset_ids": ["agent.repository-truth-audit"]
-    },
     "authority": {
-      "required": ["filesystem.read", "git.read"],
-      "optional": ["shell.execute"],
-      "forbidden": ["filesystem.write", "network.write", "git.write", "tracker.write", "secrets.read", "cloud.remote", "production.mutate"]
-    },
-    "mutation": {"class": "read-only", "reversible": true},
-    "execution": {
-      "preferred": ["repository-read"],
-      "allowed": ["repository-read", "local-process"],
-      "prohibited": ["remote-sandbox", "shared-nonproduction", "staging", "production"]
-    },
-    "verification": {
-      "requirements": [
-        {"id": "claims_grounded", "description": "Important status claims are compared against repository evidence.", "evidence_kind": "report"},
-        {"id": "validation_bounded", "description": "Performed, skipped, unavailable, and unverified checks are distinguished.", "evidence_kind": "report"},
-        {"id": "read_only_preserved", "description": "The audit does not intentionally mutate repository state.", "evidence_kind": "verdict"}
+      "forbidden": [
+        "filesystem.write",
+        "network.write",
+        "git.write",
+        "tracker.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
       ],
-      "receipt_required": false
+      "optional": [
+        "shell.execute"
+      ],
+      "required": [
+        "filesystem.read",
+        "git.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Public display name is independent of the canonical asset ID agent.repository-truth-audit.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "repository.instructions",
+        "repository.history",
+        "repository.tests",
+        "project.status_claims"
+      ],
+      "required": [
+        "task.intent",
+        "repository.current_state"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "Implementing new behavior where the current state is already verified and bounded"
+        },
+        {
+          "kind": "negative",
+          "text": "Diagnosing a specific runtime failure whose reproduction is the priority"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "Inheriting a repository whose current state is unknown or contested"
+        },
+        {
+          "kind": "positive",
+          "text": "Resuming work after a session boundary where status documents may have drifted"
+        },
+        {
+          "kind": "positive",
+          "text": "Reconciling completion or roadmap claims against the actual implementation before planning or recovery"
+        }
+      ]
+    },
+    "display_name": "Repository Truth",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
     },
     "evidence_outputs": [
-      {"name": "repository_truth_report", "description": "Inspectable current-state report with evidence and uncertainty."},
-      {"name": "continuation_point", "description": "Grounded next work boundary rather than a guessed plan."}
+      {
+        "description": "Inspectable current-state report with evidence and uncertainty.",
+        "name": "repository_truth_report"
+      },
+      {
+        "description": "Grounded next work boundary rather than a guessed plan.",
+        "name": "continuation_point"
+      }
     ],
-    "evaluation": {"status": "unassessed", "suite_asset_ids": []},
-    "provenance": {"asset_ids": ["agent.repository-truth-audit"]},
-    "compatibility": {
-      "supersedes": [],
-      "notes": "Public display name is independent of the canonical asset ID agent.repository-truth-audit."
-    }
-  }
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "local-process"
+      ],
+      "preferred": [
+        "repository-read"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.repository-truth",
+    "implementation": {
+      "asset_ids": [
+        "agent.repository-truth-audit"
+      ],
+      "primary_asset": "agent.repository-truth-audit",
+      "resources": [
+        {
+          "asset_id": "agent.repository-truth-audit",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Repository or workspace whose current state must be established.",
+        "name": "repository_scope",
+        "required": true
+      },
+      {
+        "description": "Current project objective or decision that makes repository truth relevant.",
+        "name": "objective",
+        "required": true
+      },
+      {
+        "description": "Existing completion, branch, roadmap, or handoff claims to verify.",
+        "name": "status_claims",
+        "required": false
+      }
+    ],
+    "invocation": "agent",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "read-only",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Evidence-backed repository state, claim comparison, drift, risks, and validation results.",
+        "name": "current_state_report"
+      },
+      {
+        "description": "Exact defensible point from which planning or execution should continue.",
+        "name": "continuation_point"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "The repository or equivalent inspectable workspace is available within scope.",
+        "id": "repository_available"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.repository-truth-audit"
+      ]
+    },
+    "purpose": "Establish the actual read-only state of a repository before planning, continuation, recovery, or implementation.",
+    "verification": {
+      "receipt_required": false,
+      "requirements": [
+        {
+          "description": "Important status claims are compared against repository evidence.",
+          "evidence_kind": "report",
+          "id": "claims_grounded"
+        },
+        {
+          "description": "Performed, skipped, unavailable, and unverified checks are distinguished.",
+          "evidence_kind": "report",
+          "id": "validation_bounded"
+        },
+        {
+          "description": "The audit does not intentionally mutate repository state.",
+          "evidence_kind": "verdict",
+          "id": "read_only_preserved"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
 }

@@ -13,11 +13,8 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_POLICY = ROOT / "arsenal/trust/policy.json"
 
-AUTHORITY = {
-    "filesystem.read", "filesystem.write", "shell.execute", "network.read", "network.write",
-    "git.read", "git.write", "tracker.read", "tracker.write", "secrets.read", "cloud.local",
-    "cloud.remote", "production.mutate", "human.confirmation",
-}
+# Canonical Arsenal protocol vocabulary.
+from arsenal_protocol import AUTHORITY  # noqa: E402
 EXIT = {"APPROVED": 0, "QUARANTINED": 3, "REVIEW_REQUIRED": 4,
         "ESCALATION_REQUIRED": 5, "REJECTED": 6, "REVOKED": 7}
 READ_ONLY_GIT = ("git status", "git log", "git show", "git diff", "git rev-parse",

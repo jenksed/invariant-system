@@ -1,0 +1,156 @@
+{
+  "adapter_version": "1.0.0",
+  "axes": {
+    "activation": {
+      "executed": 2,
+      "failed": 0,
+      "passed": 2,
+      "total": 3
+    },
+    "behavioral_efficacy": {
+      "executed": 0,
+      "failed": 0,
+      "passed": 0,
+      "total": 2
+    },
+    "boundary_preservation": {
+      "executed": 7,
+      "failed": 0,
+      "passed": 7,
+      "total": 7
+    },
+    "context_efficiency": {
+      "executed": 3,
+      "failed": 0,
+      "passed": 3,
+      "total": 3
+    }
+  },
+  "binding": {
+    "capability_sha256": "sha256:8aa8861b046e8dc1c2836242740f74004f1983fbde53440fa3bf2305ea6f95d4",
+    "distribution_path": "distribution/agent-skills/plan",
+    "manifest_sha256": "sha256:ae399f681d7b56d24bd3e36b58f7880ed33101b6abb3874fbbbff637f3768e2c",
+    "package_content_sha256": "sha256:67c02f4f344c2d10fe36c044300291c65e9ce61c0474b859e3234f81629cb692"
+  },
+  "candidate_ready": true,
+  "capability_id": "capability.plan",
+  "capability_version": "0.1.0",
+  "case_results": [
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-discovery-preservation",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-discovery-exclusion",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "activation",
+      "case_id": "dq-plan-activation-collision-with-spec",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "behavioral_efficacy",
+      "case_id": "dq-plan-behavioral-efficacy-vs-baseline",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "behavioral_efficacy",
+      "case_id": "dq-plan-behavioral-efficacy-vs-prior-revision",
+      "execution": "designed-not-run",
+      "status": "DESIGNED-NOT-RUN"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-identity",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-mutation",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-authority",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-execution",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-boundary-preservation-invocation",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-entrypoint-size",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-reference-count",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "context_efficiency",
+      "case_id": "dq-plan-context-efficiency-no-oversized-always",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-package-digest-binding",
+      "execution": "executed",
+      "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-plan-manifest-suite-alignment",
+      "execution": "executed",
+      "status": "PASS"
+    }
+  ],
+  "claim_scope": "Structural evidence over manifest and bundled distribution content only. Behavioral efficacy evidence remains designed-not-run in v0 and is required for qualified status. Activation claims refer to canonical discovery preservation in the generated SKILL.md body, not to model activation behavior. Adapter qualification is a separate evidence claim from capability lifecycle and does not promote canonical capability state.",
+  "counts": {
+    "designed_not_run": 3,
+    "executed": 12,
+    "failed": 0,
+    "passed": 12,
+    "total": 15
+  },
+  "limitations": [
+    "Designed-not-run cases provide no execution evidence and cannot contribute to qualification.",
+    "Structural checks verify manifest content; they cannot detect runtime misbehavior by the harness.",
+    "Behavioral efficacy requires model invocation that is out of scope for the deterministic v0 Bench.",
+    "Receipt is bound to the capability, distribution, and adapter-version digests in 'binding'; any change to those values invalidates this evidence."
+  ],
+  "qualification_id": "qualification.capability.plan.agent-skills.1.0.0",
+  "qualification_identity": {
+    "adapter_version": "1.0.0",
+    "capability_id": "capability.plan",
+    "suite_id": "suite.distribution-qualification-plan-v0",
+    "target": "agent-skills"
+  },
+  "qualified_ready": false,
+  "schema_version": "1.0.0",
+  "status": "candidate",
+  "suite_id": "suite.distribution-qualification-plan-v0",
+  "target": "agent-skills"
+}

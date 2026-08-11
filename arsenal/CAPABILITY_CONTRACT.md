@@ -1,6 +1,6 @@
 # Arsenal Capability Contract v2
 
-Schema-Version: 2.0.0
+Schema-Version: 2.2.0
 
 Project Arsenal distinguishes **assets** from **capabilities**.
 
@@ -41,6 +41,61 @@ A display-name change does not require an ID change.
 Aliases are compatibility and discovery metadata only. They must never be used as canonical machine keys. Public names may therefore evolve from **Grill** to **Pressure Test** and from **Wayfind/Wayfinding** to **Recon** without rewriting existing asset IDs or losing historical provenance.
 
 Display names and aliases are case-insensitively unique across the merged capability set.
+
+## Discovery
+
+Every capability defines:
+
+- `discovery.use_when` — non-empty array of positive applicability statements;
+- `discovery.do_not_use_when` — optional array of meaningful exclusions and collisions.
+
+Discovery statements must be behavioral and harness-neutral. They must not encode target-specific marketing copy, harness identifiers, or prompt-style imperative language. The `purpose` field remains the concise observable outcome; discovery expands *when* the outcome applies without restating *what* the outcome is.
+
+Discovery belongs to canonical capability truth. Compiler adapters may derive target-specific frontmatter (such as Agent Skills `description` fields) from canonical discovery plus target-specific packaging metadata, but must not duplicate the discovery statements in adapter-only fields.
+
+## Invocation semantics
+
+Capabilities declare one of three harness-neutral invocation semantics:
+
+- `human` — the capability expects explicit human initiation and confirmation;
+- `agent` — the capability is appropriate for autonomous agent invocation;
+- `composed` — the capability is meaningful only as part of a composed sequence.
+
+Target adapters must preserve the declared invocation boundary. Adapters that cannot preserve a required boundary must either:
+
+- refuse to export the capability for that target;
+- emit an explicit unsupported/incompatible state;
+- require a target adapter policy that demonstrably preserves the boundary.
+
+Adapters must not silently flatten invocation semantics.
+
+## Resources and loading
+
+Capabilities declare an optional `implementation.resources` array describing each bundled asset's role and load policy. Resources let a capability express progressive disclosure instead of dumping every implementation asset into model context.
+
+Resource roles:
+
+- `instructions` — small activation content that belongs in the always-loaded entrypoint;
+- `reference` — bundled canonical workflow that the model reads on demand;
+- `script` — executable code that the runtime should invoke rather than read;
+- `template` — reusable file or content template that the model fills in;
+- `fixture` — bounded state used to test or demonstrate the capability;
+- `asset` — any other bundled artifact.
+
+Loading policies:
+
+- `always` — bundled into the always-loaded entrypoint (subject to documented size policy);
+- `on-demand` — bundled separately; the model reads the reference when it needs the content;
+- `execute-not-read` — bundled as a callable artifact; the runtime executes rather than the model reading the content.
+
+Role × load compatibility:
+
+- `instructions`, `reference`, `template` may use `always` or `on-demand` (never `execute-not-read`);
+- `script`, `fixture`, `asset` may use `on-demand` or `execute-not-read`.
+
+The `primary_asset` remains the canonical behavioral reference. When `resources` is absent the compiler derives a single `reference` / `on-demand` resource from the primary asset for backward compatibility; when present the declared resources are authoritative.
+
+Resource paths are not specified inline. The compiler derives safe repository-relative paths from the registered asset paths and rejects path traversal at compile time.
 
 ## Behavioral interface
 

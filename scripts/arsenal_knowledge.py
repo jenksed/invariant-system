@@ -13,6 +13,13 @@ from pathlib import Path
 import sys
 from typing import Any
 
+# Shared I/O primitives.
+from arsenal_io import load_json
+
+def load_json(path: Path) -> Any:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
 ROOT = Path(__file__).resolve().parents[1]
 
 KINDS = {

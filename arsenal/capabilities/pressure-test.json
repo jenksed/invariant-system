@@ -1,1 +1,176 @@
-{"schema_version":"2.0.0","capability":{"id":"capability.pressure-test","version":"0.1.0","display_name":"Pressure Test","aliases":["Grill","Grilling"],"purpose":"Resolve consequential ambiguity that can be settled within one reliable working session.","lifecycle":"draft","invocation":"human","inputs":[{"name":"decision_scope","required":true,"description":"Plan, design, or decision surface whose consequential ambiguity must be resolved."},{"name":"existing_evidence","required":false,"description":"Recoverable facts, prior decisions, constraints, or source material."}],"outputs":[{"name":"settled_decisions","description":"Resolved decisions with tradeoffs and rationale."},{"name":"remaining_frontier","description":"Unknowns that remain or require research, prototyping, or broader Wayfinding."}],"preconditions":[{"id":"one_session_candidate","description":"The unresolved decision tree appears capable of meaningful progress within one session."}],"context":{"required":["task.intent"],"preferred":["project.decisions","repository.evidence","domain.language"]},"implementation":{"primary_asset":"agent.grill","asset_ids":["agent.grill","foundation.grilling"]},"authority":{"required":[],"optional":["filesystem.read","network.read","tracker.read"],"forbidden":["filesystem.write","network.write","git.write","tracker.write","secrets.read","cloud.remote","production.mutate"]},"mutation":{"class":"read-only","reversible":true},"execution":{"preferred":["user-mediated","reasoning-only"],"allowed":["user-mediated","reasoning-only","repository-read"],"prohibited":["remote-sandbox","shared-nonproduction","staging","production"]},"verification":{"requirements":[{"id":"frontier_recomputed","description":"The current unresolved decision frontier is recomputed after consequential answers.","evidence_kind":"decision-record"},{"id":"unsupported_guess_avoided","description":"Research, prototype, or repository questions are split out instead of forced into guesses.","evidence_kind":"verdict"},{"id":"handoff_or_confirmation","description":"The result either reaches shared understanding or identifies the correct escalation.","evidence_kind":"decision-record"}],"receipt_required":false},"evidence_outputs":[{"name":"decision_record","description":"Settled decisions and rationale suitable for downstream work."},{"name":"decision_frontier","description":"Remaining consequential uncertainty, if any."}],"evaluation":{"status":"unassessed","suite_asset_ids":[]},"provenance":{"asset_ids":["agent.grill","foundation.grilling"]},"compatibility":{"supersedes":[],"notes":"Pressure Test is the public capability name for the existing Grill/grilling lineage; aliases do not replace asset IDs."}}}
+{
+  "capability": {
+    "aliases": [
+      "Grill",
+      "Grilling"
+    ],
+    "authority": {
+      "forbidden": [
+        "filesystem.write",
+        "network.write",
+        "git.write",
+        "tracker.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "filesystem.read",
+        "network.read",
+        "tracker.read"
+      ],
+      "required": []
+    },
+    "compatibility": {
+      "notes": "Pressure Test is the public capability name for the existing Grill/grilling lineage; aliases do not replace asset IDs.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "project.decisions",
+        "repository.evidence",
+        "domain.language"
+      ],
+      "required": [
+        "task.intent"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The dependent uncertainty exceeds one session and requires multi-session Wayfinding"
+        },
+        {
+          "kind": "negative",
+          "text": "The blocker is missing repository evidence the agent can retrieve"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "A consequential plan or design decision can be settled inside one reliable working session"
+        },
+        {
+          "kind": "positive",
+          "text": "The unresolved decisions are bounded enough to enumerate as a dependency-aware frontier"
+        }
+      ]
+    },
+    "display_name": "Pressure Test",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Settled decisions and rationale suitable for downstream work.",
+        "name": "decision_record"
+      },
+      {
+        "description": "Remaining consequential uncertainty, if any.",
+        "name": "decision_frontier"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "user-mediated",
+        "reasoning-only",
+        "repository-read"
+      ],
+      "preferred": [
+        "user-mediated",
+        "reasoning-only"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.pressure-test",
+    "implementation": {
+      "asset_ids": [
+        "agent.grill",
+        "foundation.grilling"
+      ],
+      "primary_asset": "agent.grill",
+      "resources": [
+        {
+          "asset_id": "agent.grill",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "foundation.grilling",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Plan, design, or decision surface whose consequential ambiguity must be resolved.",
+        "name": "decision_scope",
+        "required": true
+      },
+      {
+        "description": "Recoverable facts, prior decisions, constraints, or source material.",
+        "name": "existing_evidence",
+        "required": false
+      }
+    ],
+    "invocation": "human",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "read-only",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Resolved decisions with tradeoffs and rationale.",
+        "name": "settled_decisions"
+      },
+      {
+        "description": "Unknowns that remain or require research, prototyping, or broader Wayfinding.",
+        "name": "remaining_frontier"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "The unresolved decision tree appears capable of meaningful progress within one session.",
+        "id": "one_session_candidate"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.grill",
+        "foundation.grilling"
+      ]
+    },
+    "purpose": "Resolve consequential ambiguity that can be settled within one reliable working session.",
+    "verification": {
+      "receipt_required": false,
+      "requirements": [
+        {
+          "description": "The current unresolved decision frontier is recomputed after consequential answers.",
+          "evidence_kind": "decision-record",
+          "id": "frontier_recomputed"
+        },
+        {
+          "description": "Research, prototype, or repository questions are split out instead of forced into guesses.",
+          "evidence_kind": "verdict",
+          "id": "unsupported_guess_avoided"
+        },
+        {
+          "description": "The result either reaches shared understanding or identifies the correct escalation.",
+          "evidence_kind": "decision-record",
+          "id": "handoff_or_confirmation"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

@@ -6,10 +6,21 @@
       "capability_id": "capability.repository-truth",
       "target": "agent-skills",
       "adapter_version": "1.0.0",
+      "qualification_suite_id": "suite.distribution-qualification-v0",
       "package_name": "repository-truth",
       "output_path": "distribution/agent-skills/repository-truth",
-      "description": "Establishes the actual read-only state of a software repository before planning, continuation, recovery, or implementation. Use when inheriting a repo, resuming work, reconciling status claims, or when documentation, branches, tests, or completion claims may be stale.",
+      "description": "Repository Truth read-only audit of a software repository's actual state. Use when status documents, branches, tests, or completion claims may be stale or contested.",
       "compatibility": "Requires repository read access and a coding-agent harness capable of reading files and Git state. Read-only shell or test execution is optional. Repository mutation requires separate authorization after the audit is complete."
+    },
+    {
+      "capability_id": "capability.plan",
+      "target": "agent-skills",
+      "adapter_version": "1.0.0",
+      "qualification_suite_id": "suite.distribution-qualification-plan-v0",
+      "package_name": "plan",
+      "output_path": "distribution/agent-skills/plan",
+      "description": "Execution Plan with acceptance gates converts a broad objective and current state into a dependency-aware, phased plan with proof-based completion criteria. Use when work must be split into releases or phases, dependencies determine order, or another agent must execute without rediscovering the project.",
+      "compatibility": "Requires repository read access and a coding-agent harness capable of reading files and Git state. Read-only shell or test execution is optional. Implementation work is out of scope for this skill; subsequent capabilities (Resume, TDD, Verify) execute the plan once it exists."
     }
   ]
 }

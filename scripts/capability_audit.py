@@ -9,28 +9,30 @@ import re
 import sys
 from pathlib import Path
 
-CAPABILITY_SCHEMA_VERSION = "2.0.0"
-ASSET_SCHEMA_VERSION = "1.0.0"
+# Canonical Arsenal protocol vocabulary. The capability_audit script
+# is the canonical enforcer of these vocabularies; values flow from
+# arsenal_protocol so the schema, audit, and Capability Contract
+# documentation cannot drift from one another.
+from arsenal_protocol import (
+    AUTHORITY,
+    ASSET_SCHEMA_VERSION,
+    CAPABILITY_SCHEMA_LEGACY,
+    CAPABILITY_SCHEMA_VERSION,
+    EVALUATION_STATES,
+    INVOCATIONS,
+    LIFECYCLE_STATES,
+    MUTATION_CLASSES,
+    SUBSTRATES,
+    WRITE_AUTHORITY,
+)
+from arsenal_schema_registry import load_schema_registry, schema_id_for
 
-AUTHORITY = {
-    "filesystem.read", "filesystem.write", "shell.execute",
-    "network.read", "network.write", "git.read", "git.write",
-    "tracker.read", "tracker.write", "secrets.read", "cloud.local",
-    "cloud.remote", "production.mutate", "human.confirmation",
-}
-WRITE_AUTHORITY = {
-    "filesystem.write", "network.write", "git.write", "tracker.write",
-    "cloud.local", "cloud.remote", "production.mutate",
-}
-SUBSTRATES = {
-    "reasoning-only", "repository-read", "local-process", "local-container",
-    "local-emulator", "local-cluster", "remote-sandbox",
-    "shared-nonproduction", "staging", "production", "user-mediated",
-}
-MUTATION_CLASSES = {"read-only", "workspace-write", "external-write", "high-consequence"}
-LIFECYCLES = {"draft", "testing", "stable", "deprecated"}
-INVOCATIONS = {"human", "agent", "composed"}
-EVALUATION_STATES = {"unassessed", "planned", "candidate", "qualified"}
+# Local aliases preserve the existing call sites in the rest of the
+# script body without churn.
+CAPABILITY_SCHEMA_VERSION = CAPABILITY_SCHEMA_VERSION
+CAPABILITY_SCHEMA_LEGACY = CAPABILITY_SCHEMA_LEGACY
+ASSET_SCHEMA_VERSION = ASSET_SCHEMA_VERSION
+LIFECYCLES = LIFECYCLE_STATES
 EVIDENCE_KINDS = {
     "report", "artifact", "command", "test", "diff", "receipt",
     "decision-record", "runtime-observation", "verdict",
@@ -52,9 +54,10 @@ REQUIRED_CAPABILITIES = {
 }
 CAPABILITY_FIELDS = {
     "id", "version", "display_name", "aliases", "purpose", "lifecycle",
-    "invocation", "inputs", "outputs", "preconditions", "context",
-    "implementation", "authority", "mutation", "execution", "verification",
-    "evidence_outputs", "evaluation", "provenance", "compatibility",
+    "invocation", "discovery", "inputs", "outputs", "preconditions",
+    "context", "implementation", "authority", "mutation", "execution",
+    "verification", "evidence_outputs", "evaluation", "provenance",
+    "compatibility",
 }
 
 
@@ -92,7 +95,7 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
     if not directory.is_absolute():
         directory = root / directory
     errors: list[str] = []
-    fragments: list[tuple[Path, dict]] = []
+    fragments: list[tuple[Path, str, dict]] = []
     files = sorted(directory.glob("*.json"))
     if not files:
         return [], [f"{directory}: no capability JSON fragments found"]
@@ -105,14 +108,14 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
         if set(doc) != {"schema_version", "capability"}:
             errors.append(f"{path}: fragment must contain only schema_version and capability")
             continue
-        if doc.get("schema_version") != CAPABILITY_SCHEMA_VERSION:
+        if doc.get("schema_version") not in (CAPABILITY_SCHEMA_VERSION, *CAPABILITY_SCHEMA_LEGACY):
             errors.append(f"{path}: unsupported capability schema_version {doc.get('schema_version')!r}")
             continue
         capability = doc.get("capability")
         if not isinstance(capability, dict):
             errors.append(f"{path}: capability must be an object")
             continue
-        fragments.append((path, capability))
+        fragments.append((path, doc.get("schema_version"), capability))
     return fragments, errors
 
 
@@ -131,7 +134,8 @@ def _unique_named(cap_id: str, field: str, items, key: str, errors: list[str]):
         seen.add(value)
 
 
-def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> None:
+def validate_capability(cap: dict, asset_ids: set[str], errors: list[str],
+                        *, schema_version: str | None = None) -> None:
     cap_id = cap.get("id", "<missing-id>")
     missing = CAPABILITY_FIELDS - set(cap)
     extra = set(cap) - CAPABILITY_FIELDS
@@ -155,6 +159,57 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
     if not isinstance(cap.get("aliases"), list) or any(not isinstance(x, str) for x in cap["aliases"]):
         errors.append(f"{cap_id}: aliases must be an array of strings")
 
+    discovery = cap.get("discovery")
+    if not isinstance(discovery, dict):
+        errors.append(f"{cap_id}: discovery must be an object")
+    else:
+        use_when = discovery.get("use_when")
+        if not isinstance(use_when, list) or not use_when:
+            errors.append(f"{cap_id}: discovery.use_when must be a non-empty array")
+        else:
+            seen_texts: set[str] = set()
+            for entry in use_when:
+                if not isinstance(entry, dict):
+                    errors.append(f"{cap_id}: discovery.use_when entries must be objects")
+                    continue
+                text = entry.get("text")
+                kind = entry.get("kind", "positive")
+                if not isinstance(text, str) or len(text.strip()) < 8:
+                    errors.append(f"{cap_id}: discovery.use_when entries require text >= 8 chars")
+                    continue
+                if kind not in {"positive", "negative"}:
+                    errors.append(f"{cap_id}: discovery.use_when kind must be positive or negative")
+                if text.strip().casefold() in seen_texts:
+                    errors.append(f"{cap_id}: discovery.use_when duplicate text {text!r}")
+                seen_texts.add(text.strip().casefold())
+                if not all(isinstance(x, str) and x.strip() for x in [text]) or text.strip() != text:
+                    errors.append(f"{cap_id}: discovery.use_when text must be non-empty trimmed string")
+        do_not_use_when = discovery.get("do_not_use_when", [])
+        if not isinstance(do_not_use_when, list):
+            errors.append(f"{cap_id}: discovery.do_not_use_when must be an array")
+        else:
+            for entry in do_not_use_when:
+                if not isinstance(entry, dict):
+                    errors.append(f"{cap_id}: discovery.do_not_use_when entries must be objects")
+                    continue
+                text = entry.get("text")
+                kind = entry.get("kind", "negative")
+                if not isinstance(text, str) or len(text.strip()) < 8:
+                    errors.append(f"{cap_id}: discovery.do_not_use_when entries require text >= 8 chars")
+                if kind not in {"positive", "negative"}:
+                    errors.append(f"{cap_id}: discovery.do_not_use_when kind must be positive or negative")
+        if isinstance(use_when, list) and isinstance(do_not_use_when, list):
+            overlap = {
+                entry.get("text", "").strip().casefold()
+                for entry in use_when if isinstance(entry, dict)
+            } & {
+                entry.get("text", "").strip().casefold()
+                for entry in do_not_use_when if isinstance(entry, dict)
+            }
+            overlap.discard("")
+            if overlap:
+                errors.append(f"{cap_id}: discovery.use_when and do_not_use_when overlap: {sorted(overlap)}")
+
     _unique_named(cap_id, "inputs", cap.get("inputs"), "name", errors)
     _unique_named(cap_id, "outputs", cap.get("outputs"), "name", errors)
     _unique_named(cap_id, "preconditions", cap.get("preconditions") or [], "id", errors) if cap.get("preconditions") else None
@@ -174,6 +229,69 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
         for ref in refs:
             if ref not in asset_ids:
                 errors.append(f"{cap_id}: unknown registered asset {ref} in implementation")
+
+        # Resource strategy: optional. When present, every entry must be
+        # well-formed and the role/load combination must be valid.
+        # NOTE: The `resources` field was introduced in Capability
+        # Contract 2.2.0. Legacy 2.0.0 / 2.1.0 fragments may not
+        # declare `resources` and must continue to validate. A fragment
+        # claiming an older schema version while declaring `resources`
+        # is an impersonator: it describes current-only semantics with
+        # a legacy version stamp. Reject explicitly so version
+        # semantics remain enforceable.
+        resources = implementation.get("resources")
+        if resources is not None and schema_version in CAPABILITY_SCHEMA_LEGACY:
+            errors.append(
+                f"{cap_id}: implementation.resources is a Capability Contract 2.2.0 field "
+                f"but the fragment declares schema_version={schema_version!r}; "
+                f"legacy fragments must omit 2.2-only fields"
+            )
+        if resources is not None:
+            if not isinstance(resources, list):
+                errors.append(f"{cap_id}: implementation.resources must be an array")
+            else:
+                seen_resource_assets: set[str] = set()
+                # role × load compatibility rules
+                readable_roles = {"instructions", "reference", "template"}
+                executable_roles = {"script", "fixture", "asset"}
+                valid_loads = {"always", "on-demand", "execute-not-read"}
+                for idx, entry in enumerate(resources):
+                    if not isinstance(entry, dict):
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] must be an object")
+                        continue
+                    asset_id = entry.get("asset_id")
+                    role = entry.get("role")
+                    load = entry.get("load")
+                    if not isinstance(asset_id, str) or len(asset_id) < 3:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}].asset_id must be a string")
+                        continue
+                    if asset_id not in asset_ids:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] unknown registered asset {asset_id!r}")
+                    if asset_id in seen_resource_assets:
+                        errors.append(f"{cap_id}: implementation.resources duplicate asset_id {asset_id!r}")
+                    seen_resource_assets.add(asset_id)
+                    if role not in {"instructions", "reference", "script", "template", "fixture", "asset"}:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] invalid role {role!r}")
+                    if load not in valid_loads:
+                        errors.append(f"{cap_id}: implementation.resources[{idx}] invalid load {load!r}")
+                    if role in readable_roles and load == "execute-not-read":
+                        errors.append(
+                            f"{cap_id}: implementation.resources[{idx}] role {role!r} cannot use execute-not-read"
+                        )
+                    if role in executable_roles and load == "always":
+                        errors.append(
+                            f"{cap_id}: implementation.resources[{idx}] role {role!r} cannot be always-loaded"
+                        )
+                    # Primary asset should appear as a resource (typically as
+                    # the reference); if declared in resources, the audit
+                    # accepts it but flags mismatches.
+                    if asset_id == primary:
+                        # primary asset's role should normally be reference or instructions
+                        if role not in {"reference", "instructions"}:
+                            errors.append(
+                                f"{cap_id}: primary asset {primary!r} should normally be role "
+                                f"'reference' or 'instructions'; got {role!r}"
+                            )
 
     provenance = cap.get("provenance")
     if not isinstance(provenance, dict) or not isinstance(provenance.get("asset_ids"), list) or not provenance["asset_ids"]:
@@ -255,6 +373,23 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
         if marker in serialized:
             errors.append(f"{cap_id}: harness-specific marker leaked into canonical capability data: {marker}")
 
+    # Discovery harness-neutrality: each statement text must not contain harness markers
+    if isinstance(discovery, dict):
+        for key in ("use_when", "do_not_use_when"):
+            entries = discovery.get(key) or []
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                if not isinstance(entry, dict):
+                    continue
+                text = entry.get("text")
+                if not isinstance(text, str):
+                    continue
+                lowered = text.lower()
+                for marker in HARNESS_MARKERS:
+                    if marker in lowered:
+                        errors.append(f"{cap_id}: discovery.{key} leaked harness marker {marker!r}")
+
 
 def validate_repository(root: Path, capability_dir: Path | None = None):
     root = root.resolve()
@@ -265,7 +400,11 @@ def validate_repository(root: Path, capability_dir: Path | None = None):
     schema_path = root / "arsenal" / "capability.schema.json"
     try:
         schema = _json(schema_path)
-        if schema.get("$id") != "https://project-arsenal.dev/schema/capability-fragment-2.0.0.json":
+        # The canonical $id is owned by arsenal/schema-registry.json,
+        # not by this script. Consumer configuration cannot redefine
+        # schema identity; only the Arsenal distribution can.
+        expected_id = schema_id_for(root, "capability-fragment")
+        if schema.get("$id") != expected_id:
             errors.append("arsenal/capability.schema.json: unexpected $id")
     except Exception as exc:
         errors.append(f"arsenal/capability.schema.json: invalid JSON: {exc}")
@@ -273,12 +412,13 @@ def validate_repository(root: Path, capability_dir: Path | None = None):
     capabilities: list[dict] = []
     ids: set[str] = set()
     public_names: dict[str, str] = {}
-    for path, cap in fragments:
+    for path, schema_version, cap in fragments:
         cap_id = cap.get("id", f"<{path.name}>")
         if cap_id in ids:
             errors.append(f"{cap_id}: duplicate capability id")
         ids.add(cap_id)
-        validate_capability(cap, asset_ids, errors)
+        validate_capability(cap, asset_ids, errors,
+                            schema_version=schema_version)
         capabilities.append(cap)
         for public in [cap.get("display_name"), *(cap.get("aliases") or [])]:
             if not isinstance(public, str):

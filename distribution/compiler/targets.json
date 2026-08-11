@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0.0",
+  "targets": {
+    "agent-skills": {
+      "adapter_version": "1.0.0",
+      "invocation_support": [
+        "agent",
+        "composed"
+      ],
+      "package_name_pattern": "[a-z0-9]+(?:-[a-z0-9]+)*",
+      "output_subdir": "agent-skills",
+      "notes": "Agent Skills frontmatter does not currently expose explicit invocation semantics; the compiler refuses to export invocation=human for this target."
+    }
+  }
+}

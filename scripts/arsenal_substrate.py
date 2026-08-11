@@ -14,19 +14,16 @@ CATALOG_PATH = ROOT / "arsenal/substrates/catalog.json"
 PROOF_PATH = ROOT / "arsenal/substrates/proof-requirements.json"
 GRAPH_PATH = ROOT / "arsenal/graph/graph.json"
 
-AUTHORITY_VOCAB = {
-    "filesystem.read", "filesystem.write", "shell.execute",
-    "network.read", "network.write", "git.read", "git.write",
-    "tracker.read", "tracker.write", "secrets.read", "cloud.local",
-    "cloud.remote", "production.mutate", "human.confirmation",
-}
-EXECUTION_SURFACES = {
-    "reasoning-only", "repository-read", "local-process",
-    "local-container", "local-emulator", "local-cluster",
-    "remote-sandbox", "shared-nonproduction", "staging",
-    "production", "user-mediated",
-}
-EXPLICIT_ONLY_SURFACES = {"remote-sandbox", "shared-nonproduction", "staging", "production"}
+# Canonical Arsenal protocol vocabulary.
+from arsenal_protocol import (
+    AUTHORITY,
+    SUBSTRATES,
+    EXPLICIT_ONLY_SUBSTRATES,
+)
+
+AUTHORITY_VOCAB = AUTHORITY  # alias for clarity in this module
+EXECUTION_SURFACES = SUBSTRATES  # alias for clarity in this module
+EXPLICIT_ONLY_SURFACES = EXPLICIT_ONLY_SUBSTRATES  # alias
 TRAIT_RE = re.compile(r"^[a-z][a-z0-9.-]*$")
 EXIT_CODES = {
     "SELECTED": 0,
