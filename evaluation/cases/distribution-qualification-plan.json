@@ -1,16 +1,575 @@
 {
   "schema_version": "1.0.0",
   "suite": {
-    "id": "suite.distribution-qualification-plan-v0",
-    "title": "Distribution Qualification: agent-skills adapter for Plan",
-    "track": "distribution-qualification",
-    "capability_id": "capability.plan",
-    "target": "agent-skills",
     "adapter_version": "1.0.0",
-    "qualification_track": "four-axis",
-    "axes": ["activation", "behavioral_efficacy", "boundary_preservation", "context_efficiency"],
+    "axes": [
+      "activation",
+      "behavioral_efficacy",
+      "boundary_preservation",
+      "context_efficiency"
+    ],
+    "capability_id": "capability.plan",
+    "cases": [
+      {
+        "active": true,
+        "axis": "activation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Generated SKILL.md without derived discovery statements.",
+          "kind": "contract-counterfactual",
+          "treatment": "Generated SKILL.md with every canonical use_when statement rendered verbatim."
+        },
+        "execution": {
+          "check": "structural-discovery-preservation",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "canonical_use_when_missing": [],
+          "should_invoke": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan",
+          "request_phrase": "objective is too broad to execute safely as a single task"
+        },
+        "id": "dq-plan-activation-discovery-preservation",
+        "metrics": [
+          "canonical_use_when_rendered_count",
+          "canonical_use_when_missing"
+        ],
+        "title": "Activation (structural discovery preservation): every canonical use_when statement is rendered verbatim into the generated SKILL.md",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "activation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Generated SKILL.md without the canonical exclusion list rendered.",
+          "kind": "contract-counterfactual",
+          "treatment": "Generated SKILL.md with every canonical do_not_use_when statement rendered verbatim."
+        },
+        "execution": {
+          "check": "structural-discovery-exclusion",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "canonical_do_not_use_when_missing": [],
+          "request_in_do_not_use_when": true,
+          "should_invoke": false
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan",
+          "request_phrase": "brainstorm a feature idea"
+        },
+        "id": "dq-plan-activation-discovery-exclusion",
+        "metrics": [
+          "canonical_do_not_use_when_rendered_count",
+          "canonical_do_not_use_when_missing"
+        ],
+        "title": "Activation (structural discovery exclusion): every canonical do_not_use_when statement is rendered verbatim into the generated SKILL.md",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": false,
+        "axis": "activation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "acceptance_observable",
+            "solution_not_leaked",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Skill without explicit collision handling.",
+          "kind": "control-treatment",
+          "treatment": "Skill with collision surfaced to the model."
+        },
+        "execution": {
+          "mode": "distribution-collision",
+          "status": "designed-not-run"
+        },
+        "expected": {
+          "prohibited": [
+            "silently activating one capability over another"
+          ],
+          "treatment_behaviors": [
+            "collision surfaced without silent selection"
+          ]
+        },
+        "fixture": {
+          "description": "A request that plausibly activates both Plan and Spec.",
+          "kind": "model-harness-task"
+        },
+        "id": "dq-plan-activation-collision-with-spec",
+        "metrics": [
+          "collision_resolution_rate"
+        ],
+        "title": "Activation: collision detection with neighboring capability (designed-not-run)",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": false,
+        "axis": "behavioral_efficacy",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "acceptance_observable",
+            "solution_not_leaked",
+            "verifier_independent",
+            "no_remote_credentials"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Same model/harness without the compiled skill.",
+          "kind": "control-treatment",
+          "treatment": "Same model/harness with the compiled skill."
+        },
+        "execution": {
+          "mode": "distribution-behavioral",
+          "status": "designed-not-run"
+        },
+        "expected": {
+          "prohibited": [
+            "producing an undifferentiated task dump"
+          ],
+          "treatment_behaviors": [
+            "produces a phased plan with acceptance gates",
+            "exposes dependencies before sequencing work"
+          ]
+        },
+        "fixture": {
+          "description": "Same model/harness on a broad objective with no skill, then with the Plan skill.",
+          "kind": "model-harness-task"
+        },
+        "id": "dq-plan-behavioral-efficacy-vs-baseline",
+        "metrics": [
+          "task_success_rate",
+          "false_assumption_count",
+          "tokens",
+          "execution_time"
+        ],
+        "title": "Behavioral efficacy: compiled skill vs no-skill baseline (designed-not-run)",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": false,
+        "axis": "behavioral_efficacy",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "acceptance_observable",
+            "solution_not_leaked",
+            "verifier_independent",
+            "no_remote_credentials"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Previous adapter revision (N-1).",
+          "kind": "multi-arm",
+          "treatment": "Current adapter revision (N)."
+        },
+        "execution": {
+          "mode": "distribution-behavioral",
+          "status": "designed-not-run"
+        },
+        "expected": {
+          "prohibited": [
+            "silent authority widening"
+          ],
+          "treatment_behaviors": [
+            "non-regression on established planning behaviors",
+            "improvement on declared slice if applicable"
+          ]
+        },
+        "fixture": {
+          "description": "Run the same planning task with adapter version N-1 then N; record observed outcome deltas.",
+          "kind": "model-harness-task"
+        },
+        "id": "dq-plan-behavioral-efficacy-vs-prior-revision",
+        "metrics": [
+          "non_regression_rate",
+          "behavior_delta"
+        ],
+        "title": "Behavioral efficacy: current adapter revision vs prior (designed-not-run)",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Manifest whose capability.id or source digest differs from canonical.",
+          "kind": "contract-counterfactual",
+          "treatment": "Manifest whose capability.id, version, source digest, and primary_asset_id all equal canonical."
+        },
+        "execution": {
+          "check": "manifest-capability-identity",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_capability_id_matches_canonical": true,
+          "manifest_capability_version_matches_canonical": true,
+          "manifest_primary_asset_id_matches_canonical": true,
+          "manifest_source_capability_sha_matches_canonical": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-boundary-preservation-identity",
+        "metrics": [
+          "identity_drift_count"
+        ],
+        "title": "Boundary preservation: capability identity and source digest survive compilation",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Mutation class weakened by adapter.",
+          "kind": "contract-counterfactual",
+          "treatment": "Mutation class preserved exactly; read-only capability carries no write authority."
+        },
+        "execution": {
+          "check": "manifest-mutation",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_mutation_class_matches_canonical": true,
+          "manifest_mutation_reversible_matches_canonical": true,
+          "read_only_no_silent_write_authority": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-boundary-preservation-mutation",
+        "metrics": [
+          "mutation_class_drift_count"
+        ],
+        "title": "Boundary preservation: mutation class survives compilation without silent write authority",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Adapter silently widens authority or removes a forbidden token.",
+          "kind": "contract-counterfactual",
+          "treatment": "Adapter preserves required/optional/forbidden sets exactly with no widening and no relaxation."
+        },
+        "execution": {
+          "check": "manifest-authority",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_authority_forbidden_matches_canonical": true,
+          "manifest_authority_optional_matches_canonical": true,
+          "manifest_authority_required_matches_canonical": true,
+          "no_added_authority": true,
+          "no_relaxed_forbidden": true,
+          "no_target_authority_widening": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-boundary-preservation-authority",
+        "metrics": [
+          "authority_drift_count"
+        ],
+        "title": "Boundary preservation: authority required/optional/forbidden survive compilation without widening or relaxation",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Adapter adds an execution surface not in canonical or drops a prohibited surface.",
+          "kind": "contract-counterfactual",
+          "treatment": "Adapter preserves preferred/allowed/prohibited sets exactly."
+        },
+        "execution": {
+          "check": "manifest-execution",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_execution_allowed_disjoint_from_prohibited": true,
+          "manifest_execution_allowed_matches_canonical": true,
+          "manifest_execution_preferred_matches_canonical": true,
+          "manifest_execution_preferred_subset_of_allowed": true,
+          "manifest_execution_prohibited_matches_canonical": true,
+          "no_target_execution_widening": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-boundary-preservation-execution",
+        "metrics": [
+          "execution_drift_count"
+        ],
+        "title": "Boundary preservation: execution preferred/allowed/prohibited survive compilation without widening",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Adapter silently flattens human invocation into agent invocation or drops the metadata field.",
+          "kind": "contract-counterfactual",
+          "treatment": "Manifest records canonical invocation; SKILL.md frontmatter exposes the metadata; compiler refuses human-invocation exports for agent-skills."
+        },
+        "execution": {
+          "check": "manifest-invocation",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "human_invocation_refused_by_target": true,
+          "manifest_arsenal_invocation_metadata_present": true,
+          "manifest_invocation_matches_canonical": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-boundary-preservation-invocation",
+        "metrics": [
+          "invocation_drift_count"
+        ],
+        "title": "Boundary preservation: invocation boundary is recorded in manifest and refuses human-invocation for agent-skills",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "context_efficiency",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Generated body inlines the full reference (2817 lines).",
+          "kind": "contract-counterfactual",
+          "treatment": "Generated body references on-demand files; stays bounded."
+        },
+        "execution": {
+          "check": "skill-body-size",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "skill_md_body_bytes_max": 8192,
+          "skill_md_body_bytes_within_policy": true,
+          "skill_md_body_lines_max": 250,
+          "skill_md_body_lines_within_policy": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-context-efficiency-entrypoint-size",
+        "metrics": [
+          "skill_md_body_bytes",
+          "skill_md_body_lines"
+        ],
+        "title": "Context efficiency: SKILL.md body remains bounded despite the bundled 2817-line reference",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "context_efficiency",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Adapter bundles duplicate or shadow resources or omits declared ones.",
+          "kind": "contract-counterfactual",
+          "treatment": "Adapter bundles exactly the declared resources; no undeclared packaged files."
+        },
+        "execution": {
+          "check": "bundle-reference-count",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "bundle_contains_arsenal_manifest": true,
+          "bundle_contains_references_dir": true,
+          "bundle_files_unique": true,
+          "every_declared_resource_packaged": true,
+          "no_undeclared_packaged_files": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-context-efficiency-reference-count",
+        "metrics": [
+          "bundle_file_count",
+          "missing_from_package",
+          "undeclared_in_package"
+        ],
+        "title": "Context efficiency: package bundles exactly the declared resources",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "context_efficiency",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Adapter silently bundles oversized always-loaded content while reporting empty metadata.",
+          "kind": "contract-counterfactual",
+          "treatment": "Compiler measures actual packaged bytes per resource and aggregate; bench re-measures and rejects drift."
+        },
+        "execution": {
+          "check": "always-loaded-size-policy",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "aggregate_always_loaded_within_limit": true,
+          "documented_soft_limit_bytes": 32768,
+          "every_always_loaded_resource_within_limit": true,
+          "metadata_matches_actual_packaged_bytes": true,
+          "no_always_loaded_resource_exceeds_soft_limit": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-context-efficiency-no-oversized-always",
+        "metrics": [
+          "always_loaded_total_bytes",
+          "always_loaded_per_resource_bytes"
+        ],
+        "title": "Context efficiency: actual packaged always-loaded bytes stay within documented policy",
+        "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Manifest claims a package digest that does not match actual packaged bytes.",
+          "kind": "contract-counterfactual",
+          "treatment": "Manifest package.content_sha256 is reproducible from the packaged files."
+        },
+        "execution": {
+          "check": "package-digest-binding",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_package_content_sha256_matches_actual": true,
+          "manifest_package_files_match_actual": true
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-package-digest-binding",
+        "metrics": [
+          "package_digest_drift_count"
+        ],
+        "title": "Package digest binding: manifest package.content_sha256 equals actual bytes",
+        "track": "distribution-qualification"
+      }
+    ],
+    "id": "suite.distribution-qualification-plan-v0",
     "qualification_gate": {
-      "candidate_minimum_executed_cases": 9,
+      "candidate_minimum_executed_cases": 11,
       "candidate_required_case_ids": [
         "dq-plan-boundary-preservation-identity",
         "dq-plan-boundary-preservation-mutation",
@@ -21,292 +580,17 @@
         "dq-plan-context-efficiency-reference-count",
         "dq-plan-context-efficiency-no-oversized-always",
         "dq-plan-activation-discovery-preservation",
-        "dq-plan-activation-discovery-exclusion"
+        "dq-plan-activation-discovery-exclusion",
+        "dq-plan-package-digest-binding"
       ],
       "qualified_required_case_ids": [
         "dq-plan-behavioral-efficacy-vs-baseline",
         "dq-plan-behavioral-efficacy-vs-prior-revision"
       ]
     },
-    "cases": [
-      {
-        "id": "dq-plan-activation-discovery-preservation",
-        "title": "Activation (structural discovery preservation): every canonical use_when statement is rendered verbatim into the generated SKILL.md",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "activation",
-        "active": true,
-        "execution": {
-          "mode": "distribution-structural",
-          "status": "executable",
-          "check": "structural-discovery-preservation"
-        },
-        "fixture": {
-          "distribution_path": "distribution/agent-skills/plan",
-          "request_phrase": "objective is too broad to execute safely as a single task"
-        },
-        "comparison": {
-          "kind": "contract-counterfactual",
-          "control": "Generated SKILL.md without derived discovery statements.",
-          "treatment": "Generated SKILL.md with every canonical use_when statement rendered verbatim.",
-          "ablation": null
-        },
-        "expected": {
-          "should_invoke": true,
-          "canonical_use_when_missing": []
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["canonical_use_when_rendered_count", "canonical_use_when_missing"]
-      },
-      {
-        "id": "dq-plan-activation-discovery-exclusion",
-        "title": "Activation (structural discovery exclusion): every canonical do_not_use_when statement is rendered verbatim into the generated SKILL.md",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "activation",
-        "active": true,
-        "execution": {
-          "mode": "distribution-structural",
-          "status": "executable",
-          "check": "structural-discovery-exclusion"
-        },
-        "fixture": {
-          "distribution_path": "distribution/agent-skills/plan",
-          "request_phrase": "brainstorm a feature idea"
-        },
-        "comparison": {
-          "kind": "contract-counterfactual",
-          "control": "Generated SKILL.md without the canonical exclusion list rendered.",
-          "treatment": "Generated SKILL.md with every canonical do_not_use_when statement rendered verbatim.",
-          "ablation": null
-        },
-        "expected": {
-          "should_invoke": false,
-          "request_in_do_not_use_when": true,
-          "canonical_do_not_use_when_missing": []
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["canonical_do_not_use_when_rendered_count", "canonical_do_not_use_when_missing"]
-      },
-      {
-        "id": "dq-plan-activation-collision-with-spec",
-        "title": "Activation: collision detection with neighboring capability (designed-not-run)",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "activation",
-        "active": false,
-        "execution": {
-          "mode": "distribution-collision",
-          "status": "designed-not-run"
-        },
-        "fixture": {"kind": "model-harness-task", "description": "A request that plausibly activates both Plan and Spec."},
-        "comparison": {"kind": "control-treatment", "control": "Skill without explicit collision handling.", "treatment": "Skill with collision surfaced to the model.", "ablation": null},
-        "expected": {"treatment_behaviors": ["collision surfaced without silent selection"], "prohibited": ["silently activating one capability over another"]},
-        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent"]},
-        "metrics": ["collision_resolution_rate"]
-      },
-      {
-        "id": "dq-plan-behavioral-efficacy-vs-baseline",
-        "title": "Behavioral efficacy: compiled skill vs no-skill baseline (designed-not-run)",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "behavioral_efficacy",
-        "active": false,
-        "execution": {
-          "mode": "distribution-behavioral",
-          "status": "designed-not-run"
-        },
-        "fixture": {"kind": "model-harness-task", "description": "Same model/harness on a broad objective with no skill, then with the Plan skill."},
-        "comparison": {"kind": "control-treatment", "control": "Same model/harness without the compiled skill.", "treatment": "Same model/harness with the compiled skill.", "ablation": null},
-        "expected": {"treatment_behaviors": ["produces a phased plan with acceptance gates", "exposes dependencies before sequencing work"], "prohibited": ["producing an undifferentiated task dump"]},
-        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent", "no_remote_credentials"]},
-        "metrics": ["task_success_rate", "false_assumption_count", "tokens", "execution_time"]
-      },
-      {
-        "id": "dq-plan-behavioral-efficacy-vs-prior-revision",
-        "title": "Behavioral efficacy: current adapter revision vs prior (designed-not-run)",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "behavioral_efficacy",
-        "active": false,
-        "execution": {
-          "mode": "distribution-behavioral",
-          "status": "designed-not-run"
-        },
-        "fixture": {"kind": "model-harness-task", "description": "Run the same planning task with adapter version N-1 then N; record observed outcome deltas."},
-        "comparison": {"kind": "multi-arm", "control": "Previous adapter revision (N-1).", "treatment": "Current adapter revision (N).", "ablation": null},
-        "expected": {"treatment_behaviors": ["non-regression on established planning behaviors", "improvement on declared slice if applicable"], "prohibited": ["silent authority widening"]},
-        "case_health": {"required_checks": ["starting_state_reproducible", "acceptance_observable", "solution_not_leaked", "verifier_independent", "no_remote_credentials"]},
-        "metrics": ["non_regression_rate", "behavior_delta"]
-      },
-      {
-        "id": "dq-plan-boundary-preservation-identity",
-        "title": "Boundary preservation: capability identity and source digest survive compilation",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "manifest-capability-identity"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Manifest whose capability.id or source digest differs from canonical.", "treatment": "Manifest whose capability.id, version, source digest, and primary_asset_id all equal canonical.", "ablation": null},
-        "expected": {
-          "manifest_capability_id_matches_canonical": true,
-          "manifest_capability_version_matches_canonical": true,
-          "manifest_source_capability_sha_matches_canonical": true,
-          "manifest_primary_asset_id_matches_canonical": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["identity_drift_count"]
-      },
-      {
-        "id": "dq-plan-boundary-preservation-mutation",
-        "title": "Boundary preservation: mutation class survives compilation without silent write authority",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "manifest-mutation"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Mutation class weakened by adapter.", "treatment": "Mutation class preserved exactly; read-only capability carries no write authority.", "ablation": null},
-        "expected": {
-          "manifest_mutation_class_matches_canonical": true,
-          "manifest_mutation_reversible_matches_canonical": true,
-          "read_only_no_silent_write_authority": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["mutation_class_drift_count"]
-      },
-      {
-        "id": "dq-plan-boundary-preservation-authority",
-        "title": "Boundary preservation: authority required/optional/forbidden survive compilation without widening or relaxation",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "manifest-authority"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Adapter silently widens authority or removes a forbidden token.", "treatment": "Adapter preserves required/optional/forbidden sets exactly with no widening and no relaxation.", "ablation": null},
-        "expected": {
-          "manifest_authority_required_matches_canonical": true,
-          "manifest_authority_optional_matches_canonical": true,
-          "manifest_authority_forbidden_matches_canonical": true,
-          "no_added_authority": true,
-          "no_relaxed_forbidden": true,
-          "no_target_authority_widening": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["authority_drift_count"]
-      },
-      {
-        "id": "dq-plan-boundary-preservation-execution",
-        "title": "Boundary preservation: execution preferred/allowed/prohibited survive compilation without widening",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "manifest-execution"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Adapter adds an execution surface not in canonical or drops a prohibited surface.", "treatment": "Adapter preserves preferred/allowed/prohibited sets exactly.", "ablation": null},
-        "expected": {
-          "manifest_execution_preferred_subset_of_allowed": true,
-          "manifest_execution_allowed_disjoint_from_prohibited": true,
-          "manifest_execution_preferred_matches_canonical": true,
-          "manifest_execution_allowed_matches_canonical": true,
-          "manifest_execution_prohibited_matches_canonical": true,
-          "no_target_execution_widening": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["execution_drift_count"]
-      },
-      {
-        "id": "dq-plan-boundary-preservation-invocation",
-        "title": "Boundary preservation: invocation boundary is recorded in manifest and refuses human-invocation for agent-skills",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "manifest-invocation"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Adapter silently flattens human invocation into agent invocation or drops the metadata field.", "treatment": "Manifest records canonical invocation; SKILL.md frontmatter exposes the metadata; compiler refuses human-invocation exports for agent-skills.", "ablation": null},
-        "expected": {
-          "manifest_invocation_matches_canonical": true,
-          "manifest_arsenal_invocation_metadata_present": true,
-          "human_invocation_refused_by_target": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["invocation_drift_count"]
-      },
-      {
-        "id": "dq-plan-context-efficiency-entrypoint-size",
-        "title": "Context efficiency: SKILL.md body remains bounded despite the bundled 2817-line reference",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "context_efficiency",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "skill-body-size"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Generated body inlines the full reference (2817 lines).", "treatment": "Generated body references on-demand files; stays bounded.", "ablation": null},
-        "expected": {"skill_md_body_bytes_max": 8192, "skill_md_body_lines_max": 250, "skill_md_body_bytes_within_policy": true, "skill_md_body_lines_within_policy": true},
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["skill_md_body_bytes", "skill_md_body_lines"]
-      },
-      {
-        "id": "dq-plan-context-efficiency-reference-count",
-        "title": "Context efficiency: package bundles exactly the declared resources",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "context_efficiency",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "bundle-reference-count"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Adapter bundles duplicate or shadow resources or omits declared ones.", "treatment": "Adapter bundles exactly the declared resources; no undeclared packaged files.", "ablation": null},
-        "expected": {
-          "bundle_contains_references_dir": true,
-          "bundle_contains_arsenal_manifest": true,
-          "bundle_files_unique": true,
-          "every_declared_resource_packaged": true,
-          "no_undeclared_packaged_files": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["bundle_file_count", "missing_from_package", "undeclared_in_package"]
-      },
-      {
-        "id": "dq-plan-context-efficiency-no-oversized-always",
-        "title": "Context efficiency: actual packaged always-loaded bytes stay within documented policy",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "context_efficiency",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "always-loaded-size-policy"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Adapter silently bundles oversized always-loaded content while reporting empty metadata.", "treatment": "Compiler measures actual packaged bytes per resource and aggregate; bench re-measures and rejects drift.", "ablation": null},
-        "expected": {
-          "no_always_loaded_resource_exceeds_soft_limit": true,
-          "documented_soft_limit_bytes": 32768,
-          "every_always_loaded_resource_within_limit": true,
-          "aggregate_always_loaded_within_limit": true,
-          "metadata_matches_actual_packaged_bytes": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["always_loaded_total_bytes", "always_loaded_per_resource_bytes"]
-      },
-      {
-        "id": "dq-plan-package-digest-binding",
-        "title": "Package digest binding: manifest package.content_sha256 equals actual bytes",
-        "track": "distribution-qualification",
-        "capability_id": "capability.plan",
-        "axis": "boundary_preservation",
-        "active": true,
-        "execution": {"mode": "distribution-structural", "status": "executable", "check": "package-digest-binding"},
-        "fixture": {"distribution_path": "distribution/agent-skills/plan"},
-        "comparison": {"kind": "contract-counterfactual", "control": "Manifest claims a package digest that does not match actual packaged bytes.", "treatment": "Manifest package.content_sha256 is reproducible from the packaged files.", "ablation": null},
-        "expected": {
-          "manifest_package_content_sha256_matches_actual": true,
-          "manifest_package_files_match_actual": true
-        },
-        "case_health": {"required_checks": ["starting_state_reproducible", "expected_outcome_explicit", "verifier_independent"]},
-        "metrics": ["package_digest_drift_count"]
-      }
-    ]
+    "qualification_track": "four-axis",
+    "target": "agent-skills",
+    "title": "Distribution Qualification: agent-skills adapter for Plan",
+    "track": "distribution-qualification"
   }
 }
