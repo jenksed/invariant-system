@@ -3,7 +3,6 @@
   "project": {
     "org": "jenksed",
     "repo": "project-arsenal",
-    "schema_host": "project-arsenal.dev",
     "doctrine_upstream": "jenksed/project-arsenal",
     "doctrine_path": "engineering/doctrine/ENGINEERING_DOCTRINE.md"
   },

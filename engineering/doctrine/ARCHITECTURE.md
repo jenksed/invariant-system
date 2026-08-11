@@ -68,8 +68,6 @@ edited freely per deployment.
 Owned by `arsenal.project.json`:
 
 - `project.org`, `project.repo` — repository identity
-- `project.schema_host` — preferred schema host (informational; the
-  schema-registry.json remains authoritative)
 - `project.doctrine_upstream`, `project.doctrine_path` — provenance
   pointer to the canonical Engineering Doctrine source
 - `distribution.enabled_targets` — which Arsenal-supported targets to
