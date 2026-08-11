@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import shutil
@@ -12,21 +11,36 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+# Canonical Arsenal protocol vocabulary and shared I/O primitives.
+# The compiler used to define its own copies of sha256_bytes,
+# canonical_json, safe_relative_path, and the target registry; the
+# shared modules own those now. The compiler remains responsible for
+# packaging, resource mapping, and manifest generation.
+from arsenal_protocol import (
+    COMPILER_VERSION,
+    DEFAULT_ALWAYS_LOADED_SOFT_LIMIT_BYTES,
+    LOCK_SCHEMA_VERSION,
+    RESOURCE_ROLES,
+)
+from arsenal_io import (
+    canonical_json,
+    safe_relative_path,
+    sha256_bytes,
+)
+from arsenal_targets import load_supported_targets, resolve_enabled_targets
+
 ROOT = Path(__file__).resolve().parents[1]
 PLAN_PATH = ROOT / "arsenal/compiler/export-plan.json"
 LOCK_PATH = ROOT / ".arsenal.lock"
-COMPILER_VERSION = "0.1.0"
-LOCK_SCHEMA_VERSION = "1.0.0"
-SUPPORTED_TARGETS = {"agent-skills"}
-# Invocation requirements that each target adapter must demonstrate it preserves.
-# Targets whose metadata cannot preserve the boundary must fail closed.
-TARGET_INVOCATION_SUPPORT: dict[str, set[str]] = {
-    # Agent Skills frontmatter does not currently expose explicit invocation
-    # semantics; until the target can preserve the boundary, only
-    # invocation != "human" may be exported.
-    "agent-skills": {"agent", "composed"},
-}
-PACKAGE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+
+# Documented policy: always-loaded instructions content must fit within
+# the adapter's body budget. The agent-skills SKILL.md should remain
+# readable without an explicit cap, but we record a soft ceiling so the
+# compiler can warn (not reject) when content exceeds it. Limits are
+# documented policy, not external contract. Per-target overrides can
+# extend arsenal_targets without touching this default.
+INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES = DEFAULT_ALWAYS_LOADED_SOFT_LIMIT_BYTES
+
 # Per-role target subdirectory inside the generated package.
 ROLE_DIR: dict[str, str] = {
     "instructions": "references",
@@ -36,27 +50,8 @@ ROLE_DIR: dict[str, str] = {
     "fixture": "fixtures",
     "asset": "assets",
 }
-# Documented policy: always-loaded instructions content must fit within the
-# adapter's body budget. The agent-skills SKILL.md should remain readable
-# without an explicit cap, but we record a soft ceiling so the compiler can
-# warn (not reject) when content exceeds it. Limits are documented policy,
-# not external contract.
-INSTRUCTIONS_ALWAYS_LOADED_SOFT_LIMIT_BYTES = 32_768
 
-
-def sha256_bytes(data: bytes) -> str:
-    return "sha256:" + hashlib.sha256(data).hexdigest()
-
-
-def canonical_json(data: Any) -> bytes:
-    return (json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
-
-
-def safe_relative_path(raw: str, *, field: str) -> Path:
-    path = Path(raw)
-    if not raw or path.is_absolute() or ".." in path.parts:
-        raise AssertionError(f"{field} must be a safe repository-relative path: {raw!r}")
-    return path
+PACKAGE_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 
 
 def load_json(path: Path) -> Any:
@@ -103,6 +98,7 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
 
     capabilities = load_capabilities(root)
     assets = load_assets(root)
+    supported_targets = load_supported_targets(root)
     seen: set[tuple[str, str]] = set()
     normalized: list[dict[str, Any]] = []
 
@@ -129,12 +125,26 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
 
         if cap_id not in capabilities:
             raise AssertionError(f"unknown capability in export plan: {cap_id}")
-        if target not in SUPPORTED_TARGETS:
+        if target not in supported_targets:
+            # Already rejected above; kept as defense-in-depth for the
+            # rare case where supported_targets is empty.
+            raise AssertionError(
+                f"target {target!r} is not in the Arsenal-supported target registry"
+            )
             raise AssertionError(f"unsupported export target: {target}")
 
         package_name = export["package_name"]
-        if not isinstance(package_name, str) or not PACKAGE_RE.fullmatch(package_name):
-            raise AssertionError(f"invalid package_name: {package_name!r}")
+        # Package-name pattern comes from the target registry, not from
+        # the compiler. Each target may declare its own pattern; the
+        # compiler validates against the registered pattern instead of
+        # carrying its own hardcoded regex.
+        target_spec = supported_targets.get(target, {})
+        package_pattern = target_spec.get("package_name_pattern", "[a-z0-9]+(?:-[a-z0-9]+)*")
+        if not isinstance(package_name, str) or not re.fullmatch(package_pattern, package_name):
+            raise AssertionError(
+                f"package_name {package_name!r} does not match target {target!r} "
+                f"pattern {package_pattern!r}"
+            )
 
         output_rel = safe_relative_path(export["output_path"], field="output_path")
         if output_rel.parts[:2] != ("distribution", "agent-skills"):
@@ -153,15 +163,23 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
 
         # Invocation preservation: target adapters that cannot preserve
         # the capability's required invocation boundary must fail closed.
+        # Source of truth for supported targets is the Arsenal-owned
+        # registry at distribution/compiler/targets.json; consumer
+        # configuration cannot redefine Arsenal's target support policy.
         cap = capabilities[cap_id]["capability"]
         invocation = cap.get("invocation")
-        supported = TARGET_INVOCATION_SUPPORT.get(target)
-        if supported is None:
-            raise AssertionError(f"target {target!r} has no declared invocation support policy")
-        if invocation not in supported:
+        target_spec = supported_targets.get(target)
+        if target_spec is None:
+            raise AssertionError(
+                f"target {target!r} is not in the Arsenal-supported target registry "
+                f"({sorted(supported_targets)}); consumer configuration cannot "
+                f"enable unsupported targets. Add the target to "
+                f"distribution/compiler/targets.json to make it available."
+            )
+        if invocation not in target_spec["invocation_support"]:
             raise AssertionError(
                 f"target {target!r} cannot preserve invocation {invocation!r}; "
-                f"supported invocations: {sorted(supported)}"
+                f"supported invocations: {sorted(target_spec['invocation_support'])}"
             )
 
         # Behavior-neutrality: behavioral discovery must come from canonical data.
@@ -781,7 +799,11 @@ def main(argv: list[str] | None = None) -> int:
         plan_path = (ROOT / plan_path).resolve()
     if args.command == "validate":
         exports = validate_plan_data(load_json(plan_path), ROOT)
-        print(f"Arsenal compiler contract: PASS ({len(exports)} exports; targets={','.join(sorted(SUPPORTED_TARGETS))})")
+        supported_targets = load_supported_targets(ROOT)
+        print(
+            f"Arsenal compiler contract: PASS ({len(exports)} exports; "
+            f"targets={','.join(sorted(supported_targets))})"
+        )
     elif args.command == "build":
         write_build(ROOT, plan_path)
     elif args.command == "verify":

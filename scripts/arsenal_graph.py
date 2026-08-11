@@ -3,21 +3,28 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import sys
 from pathlib import Path
 from typing import Any
 
+# Canonical Arsenal protocol vocabulary and shared I/O primitives.
+from arsenal_protocol import (
+    DANGEROUS_AUTHORITY,
+    EVALUATION_STATES,
+    LIFECYCLE_STATES,
+)
+from arsenal_io import load_json, safe_relative_path, sha256_bytes
+
 ROOT = Path(__file__).resolve().parents[1]
 GRAPH_PATH = ROOT / "arsenal/graph/graph.json"
 LOCK_PATH = ROOT / ".arsenal.lock"
 
-LIFECYCLE_ORDER = {"draft": 0, "testing": 1, "stable": 2}
-EVALUATION_ORDER = {"unassessed": 0, "planned": 1, "candidate": 2, "qualified": 3}
+LIFECYCLE_ORDER = {state: i for i, state in enumerate(sorted(LIFECYCLE_STATES))}
+EVALUATION_ORDER = {state: i for i, state in enumerate(sorted(EVALUATION_STATES))}
 SEMVER_RE = re.compile(r"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$")
-DANGEROUS_PROFILE_GRANTS = {"secrets.read", "cloud.remote", "production.mutate", "network.write"}
+DANGEROUS_PROFILE_GRANTS = DANGEROUS_AUTHORITY
 EXIT_CODES = {
     "READY": 0,
     "CAPABILITY_GAP": 3,
@@ -25,21 +32,6 @@ EXIT_CODES = {
     "QUALIFICATION_GAP": 5,
     "UNKNOWN": 6,
 }
-
-
-def load_json(path: Path) -> Any:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def sha256_bytes(data: bytes) -> str:
-    return "sha256:" + hashlib.sha256(data).hexdigest()
-
-
-def safe_relative_path(raw: str, *, field: str) -> Path:
-    path = Path(raw)
-    if not raw or path.is_absolute() or ".." in path.parts:
-        raise AssertionError(f"{field} must be repository-relative and traversal-free: {raw!r}")
-    return path
 
 
 def parse_semver(value: str) -> tuple[int, int, int]:

@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import argparse
 import copy
-import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+# Canonical Arsenal protocol vocabulary and shared I/O primitives.
+from arsenal_io import sha256_bytes
 
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "arsenal/observability/redaction-policy.json"
@@ -53,10 +55,6 @@ def read_json(path: Path) -> dict[str, Any]:
 
 def canonical_bytes(value: Any) -> bytes:
     return (json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False) + "\n").encode("utf-8")
-
-
-def sha256_bytes(data: bytes) -> str:
-    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def sha256_file(path: Path) -> str:

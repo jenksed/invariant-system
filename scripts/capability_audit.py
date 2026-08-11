@@ -9,29 +9,29 @@ import re
 import sys
 from pathlib import Path
 
-CAPABILITY_SCHEMA_VERSION = "2.2.0"
-CAPABILITY_SCHEMA_LEGACY = {"2.0.0", "2.1.0"}
-ASSET_SCHEMA_VERSION = "1.0.0"
+# Canonical Arsenal protocol vocabulary. The capability_audit script
+# is the canonical enforcer of these vocabularies; values flow from
+# arsenal_protocol so the schema, audit, and Capability Contract
+# documentation cannot drift from one another.
+from arsenal_protocol import (
+    AUTHORITY,
+    ASSET_SCHEMA_VERSION,
+    CAPABILITY_SCHEMA_LEGACY,
+    CAPABILITY_SCHEMA_VERSION,
+    EVALUATION_STATES,
+    INVOCATIONS,
+    LIFECYCLE_STATES,
+    MUTATION_CLASSES,
+    SUBSTRATES,
+    WRITE_AUTHORITY,
+)
 
-AUTHORITY = {
-    "filesystem.read", "filesystem.write", "shell.execute",
-    "network.read", "network.write", "git.read", "git.write",
-    "tracker.read", "tracker.write", "secrets.read", "cloud.local",
-    "cloud.remote", "production.mutate", "human.confirmation",
-}
-WRITE_AUTHORITY = {
-    "filesystem.write", "network.write", "git.write", "tracker.write",
-    "cloud.local", "cloud.remote", "production.mutate",
-}
-SUBSTRATES = {
-    "reasoning-only", "repository-read", "local-process", "local-container",
-    "local-emulator", "local-cluster", "remote-sandbox",
-    "shared-nonproduction", "staging", "production", "user-mediated",
-}
-MUTATION_CLASSES = {"read-only", "workspace-write", "external-write", "high-consequence"}
-LIFECYCLES = {"draft", "testing", "stable", "deprecated"}
-INVOCATIONS = {"human", "agent", "composed"}
-EVALUATION_STATES = {"unassessed", "planned", "candidate", "qualified"}
+# Local aliases preserve the existing call sites in the rest of the
+# script body without churn.
+CAPABILITY_SCHEMA_VERSION = CAPABILITY_SCHEMA_VERSION
+CAPABILITY_SCHEMA_LEGACY = CAPABILITY_SCHEMA_LEGACY
+ASSET_SCHEMA_VERSION = ASSET_SCHEMA_VERSION
+LIFECYCLES = LIFECYCLE_STATES
 EVIDENCE_KINDS = {
     "report", "artifact", "command", "test", "diff", "receipt",
     "decision-record", "runtime-observation", "verdict",

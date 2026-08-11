@@ -13,38 +13,36 @@ import sys
 import tempfile
 from pathlib import Path
 
+# Canonical Arsenal protocol vocabulary and shared I/O primitives.
+from arsenal_protocol import (
+    AUTHORITY,
+    CASE_HEALTH_CHECKS,
+    COMPARISONS,
+    DISTRIBUTION_AXES,
+    DISTRIBUTION_EXECUTION_MODES,
+    DISTRIBUTION_QUALIFICATION_STATES,
+    EXECUTION_MODES,
+    EXECUTION_STATUS,
+    INVOCATIONS,
+    SUITE_SCHEMA_VERSION,
+)
+from arsenal_io import sha256_bytes
+
 ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = ROOT / "evaluation" / "cases"
 ROUTER = ROOT / "engineering/development_packs/floci/providers/scripts/route-local-cloud-capability.py"
 CAP_DIR = ROOT / "arsenal" / "capabilities"
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = SUITE_SCHEMA_VERSION
 LOCAL_SUITE_ASSET = "evaluation.arsenal-bench-local-cloud-v0"
 SOFT_LIMIT_BYTES = 32_768
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
-
-def sha256_bytes(data: bytes) -> str:
-    return "sha256:" + hashlib.sha256(data).hexdigest()
-
-HEALTH_CHECKS = {
-    "starting_state_reproducible",
-    "failure_reachable",
-    "success_reachable",
-    "acceptance_observable",
-    "expected_outcome_explicit",
-    "solution_not_leaked",
-    "verifier_independent",
-    "no_remote_credentials",
-}
-COMPARISONS = {"control-treatment", "ablation", "multi-arm", "contract-counterfactual"}
-EXECUTION_MODES = {"agent-control-treatment", "local-cloud-router", "local-cloud-runtime"}
-DISTRIBUTION_EXECUTION_MODES = {
-    "distribution-structural",
-    "distribution-collision",
-    "distribution-behavioral",
-}
-EXECUTION_STATUS = {"designed-not-run", "executable"}
-QUALIFICATION_STATES = {"unassessed", "candidate", "qualified"}
+HEALTH_CHECKS = CASE_HEALTH_CHECKS
+COMPARISONS = COMPARISONS
+EXECUTION_MODES = EXECUTION_MODES
+DISTRIBUTION_EXECUTION_MODES = DISTRIBUTION_EXECUTION_MODES
+EXECUTION_STATUS = EXECUTION_STATUS
+QUALIFICATION_STATES = DISTRIBUTION_QUALIFICATION_STATES
 
 
 class BenchError(Exception):
