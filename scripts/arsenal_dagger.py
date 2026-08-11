@@ -10,6 +10,9 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+# Shared I/O primitives.
+from arsenal_io import load_json
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_WORLD = ROOT / "engineering/development_packs/dagger/worlds/tdd-python-container.json"
 CAPABILITIES_DIR = ROOT / "arsenal/capabilities"
@@ -19,10 +22,6 @@ SUBSTRATE_SELECTOR = ROOT / "scripts/arsenal_substrate.py"
 
 class ContractError(RuntimeError):
     pass
-
-
-def load_json(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def safe_repo_path(value: str) -> Path:
