@@ -29,7 +29,7 @@
   "binding": {
     "capability_sha256": "sha256:8aa8861b046e8dc1c2836242740f74004f1983fbde53440fa3bf2305ea6f95d4",
     "distribution_path": "distribution/agent-skills/plan",
-    "manifest_sha256": "sha256:cd547e563b34711782c24b77051b6e2c1c1a01a6e0dc4098fa5d17bc4be0ec3f",
+    "manifest_sha256": "sha256:ae399f681d7b56d24bd3e36b58f7880ed33101b6abb3874fbbbff637f3768e2c",
     "package_content_sha256": "sha256:67c02f4f344c2d10fe36c044300291c65e9ce61c0474b859e3234f81629cb692"
   },
   "candidate_ready": true,
@@ -142,6 +142,12 @@
     "Receipt is bound to the capability, distribution, and adapter-version digests in 'binding'; any change to those values invalidates this evidence."
   ],
   "qualification_id": "qualification.capability.plan.agent-skills.1.0.0",
+  "qualification_identity": {
+    "adapter_version": "1.0.0",
+    "capability_id": "capability.plan",
+    "suite_id": "suite.distribution-qualification-plan-v0",
+    "target": "agent-skills"
+  },
   "qualified_ready": false,
   "schema_version": "1.0.0",
   "status": "candidate",

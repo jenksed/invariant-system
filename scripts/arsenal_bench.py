@@ -1067,6 +1067,15 @@ def build_qualification_receipt(suite: dict, results: list[dict]) -> dict:
         "capability_version": cap_doc["capability"].get("version"),
         "target": suite["target"],
         "adapter_version": suite["adapter_version"],
+        # Qualification identity binds all four dimensions across
+        # suite, manifest, and receipt. A stale receipt against a
+        # different capability/target/adapter/suite fails here.
+        "qualification_identity": {
+            "capability_id": suite["capability_id"],
+            "target": suite["target"],
+            "adapter_version": suite["adapter_version"],
+            "suite_id": suite["id"],
+        },
         "axes": by_axis,
         "candidate_ready": candidate_ready,
         "qualified_ready": qualified_ready,

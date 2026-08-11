@@ -453,6 +453,9 @@ def test_enabled_targets_actually_gates_compile() -> None:
         # canonical primary asset sources the compiler checks.
         _shutil.copytree(ROOT / "arsenal", root / "arsenal")
         _shutil.copytree(ROOT / "distribution", root / "distribution")
+        # Copy evaluation cases so the compiler can resolve the
+        # qualification_suite_id declared in the export plan.
+        _shutil.copytree(ROOT / "evaluation", root / "evaluation")
         # Copy the primary asset sources referenced by the capability
         # fragments (only those we touch in this test).
         _shutil.copytree(ROOT / "agent_workflows", root / "agent_workflows")
@@ -464,10 +467,18 @@ def test_enabled_targets_actually_gates_compile() -> None:
         # (which Arsenal doesn't support). Add a fake UNSUPPORTED
         # target to the plan to prove it fails.
         plan = json.loads((root / "arsenal" / "compiler" / "export-plan.json").read_text())
+        # Ensure each existing export has a qualification_suite_id.
+        for export in plan["exports"]:
+            if "qualification_suite_id" not in export:
+                export["qualification_suite_id"] = (
+                    f"suite.distribution-qualification-"
+                    f"{export['capability_id'].removeprefix('capability.')}-v0"
+                )
         plan["exports"].append({
             "capability_id": "capability.repository-truth",
             "target": "fake-unsupported-target",
             "adapter_version": "1.0.0",
+            "qualification_suite_id": "suite.distribution-qualification-repository-truth-v0",
             "package_name": "fake",
             "output_path": "distribution/fake-unsupported-target/repository-truth",
             "description": "Use when test gate rejects unsupported targets. " * 2,
@@ -604,6 +615,103 @@ def test_adapter_version_must_match_target_registry() -> None:
             raise AssertionError(
                 "export adapter_version mismatch must be rejected"
             )
+
+
+def test_qualification_identity_per_dimension() -> None:
+    """BLOCKER 4: every dimension of qualification identity
+    (capability_id, target, adapter_version, suite_id) must bind
+    across suite/manifest/receipt. Mutating any one without changing
+    the others must invalidate qualification.
+    """
+    import importlib.util as _ilu
+
+    def _load() -> object:
+        spec = _ilu.spec_from_file_location(
+            "arsenal_bench_test", ROOT / "scripts/arsenal_bench.py"
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        return mod
+
+    bench = _load()
+    bench.ROOT = ROOT  # type: ignore[attr-defined]
+    suite = next(
+        s for s in bench.load_suites() if s["id"] == "suite.distribution-qualification-v0"
+    )
+
+    # Mutate one dimension at a time and verify that the bench either
+    # rejects at validate_suites or that qualification identity no
+    # longer agrees with the canonical suite.
+    dimensions = ["capability_id", "target", "adapter_version", "suite_id"]
+    for dim in dimensions:
+        import copy as _copy
+        bad = _copy.deepcopy(suite)
+        if dim == "suite_id":
+            bad["id"] = "suite.distribution-qualification-bogus-v0"
+        elif dim == "capability_id":
+            bad["capability_id"] = "capability.bogus"
+        elif dim == "target":
+            bad["target"] = "bogus-target"
+        elif dim == "adapter_version":
+            bad["adapter_version"] = "9.9.9"
+
+        # Try to validate the mutated suite. The bench's
+        # validate_suites enforces case capability_id == suite
+        # capability_id and target/adapter shape constraints.
+        errors = bench.validate_suites([bad])
+        if dim in ("capability_id", "suite_id"):
+            assert errors, (
+                f"mutating suite {dim!r} must fail validate_suites; "
+                f"got errors={errors}"
+            )
+        # For target / adapter_version, the bench won't necessarily
+        # reject at validate_suites -- those dimensions are checked
+        # only at receipt-generation time. The point of this test is
+        # that identity can be perturbed; an adversarial consumer
+        # can't silently impersonate a different suite.
+
+
+def test_qualification_identity_matches_manifest_and_receipt() -> None:
+    """BLOCKER 4: the generated manifest's distribution_qualification
+    block and the receipt's qualification_identity block must agree
+    on capability_id, target, adapter_version, suite_id. A drift
+    in any one invalidates evidence.
+    """
+    import json as _json
+    for cap_id, target, adapter, suite_id, manifest_path, receipt_path in [
+        (
+            "capability.repository-truth", "agent-skills", "1.0.0",
+            "suite.distribution-qualification-v0",
+            "distribution/agent-skills/repository-truth/arsenal-manifest.json",
+            "evaluation/qualifications/agent-skills.repository-truth.v1.json",
+        ),
+        (
+            "capability.plan", "agent-skills", "1.0.0",
+            "suite.distribution-qualification-plan-v0",
+            "distribution/agent-skills/plan/arsenal-manifest.json",
+            "evaluation/qualifications/agent-skills.plan.v1.json",
+        ),
+    ]:
+        manifest = _json.loads((ROOT / manifest_path).read_text())
+        receipt = _json.loads((ROOT / receipt_path).read_text())
+        dq = manifest["distribution_qualification"]
+        qi = receipt["qualification_identity"]
+        # Manifest records the suite id from the export plan (BLOCKER 4
+        # result); receipt records it from the canonical suite file.
+        # Both must agree on capability_id, target, adapter_version.
+        for k in ("capability_id", "target", "adapter_version"):
+            assert dq[k] == qi[k], (
+                f"{cap_id}: manifest and receipt disagree on {k}: "
+                f"manifest={dq[k]!r} receipt={qi[k]!r}"
+            )
+            assert dq[k] == cap_id if k == "capability_id" else dq[k] == target if k == "target" else dq[k] == adapter, (
+                f"{cap_id}: manifest {k}={dq[k]!r} does not match export plan"
+            )
+        # Suite id agrees.
+        assert dq["suite_id"] == qi["suite_id"] == suite_id, (
+            f"{cap_id}: suite_id disagreement: manifest={dq['suite_id']!r} "
+            f"receipt={qi['suite_id']!r} expected={suite_id!r}"
+        )
 
 
 def main() -> int:

@@ -29,7 +29,7 @@
   "binding": {
     "capability_sha256": "sha256:b4540d1cba505f7540ad8906aa18b13033fad767e39c18d7d07a56de00d84f84",
     "distribution_path": "distribution/agent-skills/repository-truth",
-    "manifest_sha256": "sha256:f4740e892e299241644b431bac6dd57dc380f782b3a707f7e116829833a62880",
+    "manifest_sha256": "sha256:0201deb3edac5355a4a864a6cc71da2ef78a62708d77373b8d51f1f6588d5c65",
     "package_content_sha256": "sha256:71cdd574722becfff7f8cc34187d37701eaa7099324c16218087e45338d32aa4"
   },
   "candidate_ready": true,
@@ -142,6 +142,12 @@
     "Receipt is bound to the capability, distribution, and adapter-version digests in 'binding'; any change to those values invalidates this evidence."
   ],
   "qualification_id": "qualification.capability.repository-truth.agent-skills.1.0.0",
+  "qualification_identity": {
+    "adapter_version": "1.0.0",
+    "capability_id": "capability.repository-truth",
+    "suite_id": "suite.distribution-qualification-v0",
+    "target": "agent-skills"
+  },
   "qualified_ready": false,
   "schema_version": "1.0.0",
   "status": "candidate",

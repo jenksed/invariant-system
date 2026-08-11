@@ -111,6 +111,7 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
             "output_path",
             "description",
             "compatibility",
+            "qualification_suite_id",
         }
         missing = sorted(required - set(export))
         if missing:
@@ -159,6 +160,40 @@ def validate_plan_data(plan: dict[str, Any], root: Path) -> list[dict[str, Any]]
                 f"target {target!r}; the target registry at "
                 f"distribution/compiler/targets.json is the authoritative "
                 f"source of adapter version per target"
+            )
+
+        # Qualification suite ID is owned by the benchmark suite file
+        # (Bench owns qualification truth, not the compiler). The
+        # compiler must load the suite and assert that its declared
+        # capability_id, target, and adapter_version agree with the
+        # export. Without this assertion the compiler would invent
+        # an identifier that disagrees with the actual suite.
+        suite_id = export["qualification_suite_id"]
+        suite = _load_qualification_suite(root, suite_id)
+        if suite is None:
+            raise AssertionError(
+                f"qualification_suite_id {suite_id!r} declared in export plan "
+                f"does not correspond to any suite under evaluation/cases/; "
+                f"Bench owns suite identity"
+            )
+        if suite.get("capability_id") != cap_id:
+            raise AssertionError(
+                f"export capability_id {cap_id!r} does not match qualification "
+                f"suite {suite_id!r} capability_id {suite.get('capability_id')!r}; "
+                f"qualification identity must agree across all four dimensions"
+            )
+        if suite.get("target") != target:
+            raise AssertionError(
+                f"export target {target!r} does not match qualification suite "
+                f"{suite_id!r} target {suite.get('target')!r}; qualification "
+                f"identity must agree across all four dimensions"
+            )
+        if suite.get("adapter_version") != export["adapter_version"]:
+            raise AssertionError(
+                f"export adapter_version {export['adapter_version']!r} does not "
+                f"match qualification suite {suite_id!r} adapter_version "
+                f"{suite.get('adapter_version')!r}; qualification identity must "
+                f"agree across all four dimensions"
             )
 
         package_name = export["package_name"]
@@ -573,14 +608,18 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
         },
         # Adapter qualification is a separate evidence claim from capability
         # lifecycle. The compiler owns this stub (status=unassessed) and
-        # records only the identifier of the suite that should be used to
-        # evaluate it. Truth lives in the receipt produced by
+        # records the suite id declared in the export plan. The export
+        # plan's suite id was validated against the canonical suite file
+        # in evaluation/cases/ during validate_plan_data, so this matches
+        # actual qualification truth rather than an invented identifier.
+        # Truth (status, evidence) lives in the receipt produced by
         # scripts/arsenal_bench.py qualify.
         "distribution_qualification": {
             "status": "unassessed",
+            "capability_id": cap["id"],
             "target": export["target"],
             "adapter_version": export["adapter_version"],
-            "suite_id": derive_default_suite_id(cap["id"]),
+            "suite_id": export["qualification_suite_id"],
             "evidence_paths": [],
         },
         "package": {
@@ -596,11 +635,33 @@ def build_agent_skill(export: dict[str, Any], root: Path) -> tuple[dict[str, byt
     return generated, manifest
 
 
+def _load_qualification_suite(root: Path, suite_id: str) -> dict | None:
+    """Load a benchmark suite by id from evaluation/cases/.
+
+    Returns the suite dict or None if no suite file declares the id.
+    Used by the compiler to validate that the export's
+    qualification_suite_id corresponds to a real benchmark suite whose
+    capability/target/adapter agree with the export. The compiler
+    does NOT invent an identifier from the capability name; the suite
+    file is the canonical authority.
+    """
+    for path in sorted((root / "evaluation" / "cases").glob("*.json")):
+        try:
+            doc = load_json(path)
+        except (OSError, json.JSONDecodeError):
+            continue
+        suite = doc.get("suite") if isinstance(doc, dict) else None
+        if isinstance(suite, dict) and suite.get("id") == suite_id:
+            return suite
+    return None
+
+
 def derive_default_suite_id(capability_id: str) -> str:
     """Deterministic mapping from capability_id to default qualification suite.
 
-    The compiler only records the suite identifier it expects the bench to
-    evaluate against; actual qualification truth is owned by receipts.
+    Used only as a hint for new exports. The authoritative suite
+    identity lives in evaluation/cases/*.json and is asserted at
+    compile time, not invented here.
     """
     return f"suite.distribution-qualification-{capability_id.removeprefix('capability.')}-v0"
 
