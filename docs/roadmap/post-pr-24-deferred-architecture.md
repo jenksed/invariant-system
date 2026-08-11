@@ -258,48 +258,70 @@ classifications from repository evidence (not from prior
 assumption). They are recorded here so that future slices do not
 have to re-litigate them.
 
-* `arsenal/capability.schema.json`,
-  `arsenal/lock.schema.json`, all evaluation/observability/knowledge/
-  trust schemas, `scripts/arsenal_protocol.py`, and the
-  governance source-model schema are `arsenal-protocol` +
-  `normative` + `authored`.
-* `arsenal/schema-registry.json`, `distribution/compiler/targets.json`,
-  and `arsenal/compiler/export-plan.json` are
-  `arsenal-distribution` + `normative` + `authored`.
-* `arsenal/capabilities/*.json` are `consumer-deployed` +
-  `normative` + `authored` (a bounded family; the source model
-  addresses the family, per-capability detail lives in the
-  fragment).
-* `arsenal/registry.json` + `arsenal/registry.d/*.json` are
-  `consumer-deployed` + `normative` + `authored` (merged view of
-  asset identity).
-* `arsenal.project.json` is `consumer-deployed` + `normative` +
-  `authored`; it never absorbs current branch / current PR /
-  current qualification.
-* `.arsenal.lock` is `consumer-deployed` + `normative` +
-  `generated` — the canonical counter-example to the
-  `generated == derived` shortcut. Its lifecycle/evaluation state
-  is authoritative.
-* `distribution/agent-skills/<pkg>/{SKILL.md, references/, arsenal-manifest.json}`
-  are `arsenal-distribution` + `derived` + `generated`; byte-equal
-  on rebuild.
-* `evaluation/qualifications/*.json` is `consumer-deployed` +
-  `historical` + `generated` — the canonical counter-example
-  showing that a generated artifact is not disposable if its value
-  is evidence of a past execution. The receipt must not be edited
-  to match present state.
-* `arsenal/knowledge/fixtures/kft-0-kiln.json` is
-  `consumer-deployed` + `historical` + `generated`.
-* `docs/field-trials/KFT-0-kiln.md` is `consumer-deployed` +
-  `historical` + `authored`.
+* `scripts/arsenal_protocol.py`,
+  `scripts/arsenal_governance.py`, every protocol
+  schema under `arsenal/`, `evaluation/`, `arsenal/observability/`,
+  `arsenal/knowledge/`, and `arsenal/trust/`, and the
+  `arsenal/source-model.schema.json` are `arsenal-protocol` +
+  `normative` + `authored`. These define what valid Arsenal data
+  IS, not which concrete instances Project Arsenal ships.
+* `arsenal/distribution.compiler.targets` (supported targets and
+  adapter versions), `arsenal/distribution.compiler.export-plan`,
+  `arsenal/distribution.schema-registry` (canonical schema $id
+  URLs), the generated `distribution/agent-skills/<pkg>/{SKILL.md,
+  references/, arsenal-manifest.json}` family, and the Project
+  Arsenal-owned qualification evidence under
+  `evaluation/qualifications/*.json` are `arsenal-distribution`.
+  A consumer may select a subset (`enabled_targets`) but does
+  not redefine the supported targets, the schema $id registry,
+  the export plan, or Project Arsenal's own distribution
+  packages.
+* `arsenal/capabilities/*.json` is `arsenal-distribution` +
+  `normative` + `authored`. These are canonical Project Arsenal
+  capability fragments; a consumer project installs/uses them
+  but does not redefine them. A fork or vendor must publish its
+  own fragment family and its own source-model.
+* `arsenal/registry.json` and the
+  `arsenal/registry.d/*.json` family are `arsenal-distribution` +
+  `normative` + `authored`. Per `arsenal/ASSET_CONTRACT.md` both
+  the base and the `.d` fragments are independently authored;
+  the merged view is the canonical read.
+* `arsenal/distribution.compiler.export-plan` owns the
+  capability→target mapping. The fragment owns the canonical
+  capability lifecycle/evaluation; the lockfile owns the
+  *pinned* lifecycle/evaluation. These are different facts, not
+  duplicate normative owners.
+* `evaluation/cases/{core-engineering,local-cloud,distribution-qualification*}.json`
+  are `arsenal-distribution` + `normative` + `authored`. The
+  evaluation schemas (`*.schema.json`) are protocol; the
+  concrete suite instances are Project Arsenal distribution
+  content.
+* `arsenal/knowledge/fixtures/kft-0-kiln.json` and
+  `docs/field-trials/KFT-0-kiln.md` are `arsenal-distribution` +
+  `historical`. The SUBJECT of the field trial is Kiln, but the
+  OWNER is Project Arsenal: Project Arsenal decides whether the
+  fixture/report is published, updated, or rewritten.
+* `docs/roadmap/post-pr-24-deferred-architecture.md` and
+  `docs/roadmap/capability-system.md` are `arsenal-distribution` +
+  `narrative` + `authored`. A consumer does not redefine Project
+  Arsenal's canonical roadmaps by configuring its installation.
 * `engineering/doctrine/ARCHITECTURE.md` is `arsenal-protocol` +
   `normative` + `authored` (it sets authoritative ownership/state
   boundaries; treat it as canonical architecture, not as a
   free-form explainer).
-* `docs/roadmap/post-pr-24-deferred-architecture.md` and
-  `docs/roadmap/capability-system.md` are `consumer-deployed` +
-  `narrative` + `authored`; readers must not treat them as
-  protocol authority.
+* `arsenal/source-model.json` is `arsenal-distribution` +
+  `normative` + `authored`. The schema
+  `arsenal/source-model.schema.json` is `arsenal-protocol`. The
+  instance is Project Arsenal's own classification index.
+* `arsenal.project.json` is `consumer-deployed` + `normative` +
+  `authored`. It is the only consumer-authored artifact in this
+  repository. It never absorbs current branch / current PR /
+  current qualification.
+* `.arsenal.lock` is `consumer-deployed` + `normative` +
+  `generated`. It is the canonical `generated + normative`
+  counter-example to a `generated == derived` shortcut. It owns
+  PINNED facts (`lockfile.pinned-capability-*`), not duplicate
+  copies of canonical capability facts.
 
 The source-model also exposes an "impossible in this repository"
 property: a generated artifact may be `generated + normative`
@@ -321,6 +343,29 @@ encoding it.
 * `materialization` is recorded per-artifact where it is
   meaningful rather than declared as a mandatory third axis. The
   slice does not assume a future axis is needed.
+* An initial draft of the source model classified
+  `arsenal/capabilities/*.json` and the asset registry as
+  `consumer-deployed`. The reconciliation pass moved both to
+  `arsenal-distribution` because they are canonical Project
+  Arsenal content, not per-installation state.
+* An initial draft of the source model classified qualification
+  receipts, KFT-0 evidence, and Project Arsenal roadmaps as
+  `consumer-deployed`. The reconciliation pass moved all three to
+  `arsenal-distribution` because ownership answers "who is
+  permitted to define/revise?", not "what is the subject?" or
+  "who consumes?".
+* The source-model schema and the source-model instance are
+  intentionally distinct: the schema is `arsenal-protocol` and
+  the instance is `arsenal-distribution`. The schema defines
+  the structure of a valid source-model; the instance is
+  Project Arsenal's own classification of its own content. A
+  fork/vendor publishes its own instance.
+* The lockfile's lifecycle/evaluation values were initially
+  treated as a duplicate of the canonical lifecycle. The
+  reconciliation pass split them into distinct facts
+  (`capability.current-lifecycle` vs
+  `lockfile.pinned-capability-lifecycle`) so the lockfile is a
+  consumer-accepted pin, not a duplicate normative owner.
 
 ## Items carried forward
 

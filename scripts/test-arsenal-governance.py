@@ -61,21 +61,59 @@ def test_source_model_loads_against_canonical_schema() -> None:
 
 
 def test_lockfile_is_generated_normative() -> None:
-    """The competence lockfile is a canonical generated-but-normative counter-example."""
+    """The competence lockfile is a canonical generated-but-normative
+    counter-example: produced by the compiler, but owned and accepted
+    by the consumer installation.
+    """
     lock = next(a for a in _model()["artifacts"] if a["id"] == "arsenal.competence-lockfile")
     assert lock["state_role"] == "normative"
     assert lock["materialization"] == "generated"
     assert lock["ownership"] == "consumer-deployed"
+    # The lockfile owns PINNED facts, not canonical capability facts.
+    # Its fact IDs are prefixed lockfile.pinned-* so they cannot collide
+    # with capability.current-* owned by the fragment.
+    forbidden = [f for f in lock["owns_facts"] if not f.startswith("lockfile.")]
+    assert not forbidden, (
+        f"lockfile must not own non-pinned facts: {forbidden}"
+    )
+
+
+def test_capability_lifecycle_owner_is_fragment_not_lockfile() -> None:
+    """The current capability lifecycle is owned by the canonical
+    capability fragment. The lockfile owns a PIN of the lifecycle at
+    compile time. These are distinct facts and must have distinct
+    owners; otherwise the lockfile would be a duplicate normative
+    owner of the current lifecycle.
+    """
+    artifacts_by_id = {a["id"]: a for a in _model()["artifacts"]}
+    fragment = artifacts_by_id["arsenal.capability-fragments"]
+    lockfile = artifacts_by_id["arsenal.competence-lockfile"]
+    fact_by_id = {f["id"]: f for f in _model()["facts"]}
+    assert fact_by_id["capability.current-lifecycle"]["owner_artifact"] == "arsenal.capability-fragments"
+    assert fact_by_id["lockfile.pinned-capability-lifecycle"]["owner_artifact"] == "arsenal.competence-lockfile"
+    # Both fragments (the family artifact) and the lockfile are present.
+    assert "capability.current-lifecycle" in fragment["owns_facts"]
+    assert "lockfile.pinned-capability-lifecycle" in lockfile["owns_facts"]
+    assert "lockfile.pinned-capability-lifecycle" not in fragment["owns_facts"]
+    assert "capability.current-lifecycle" not in lockfile["owns_facts"]
 
 
 def test_qualification_receipt_is_generated_historical() -> None:
-    """A qualification receipt is a canonical generated-but-historical counter-example."""
+    """A qualification receipt is a canonical generated-but-historical
+    counter-example: it is Project Arsenal's own qualification
+    evidence for its own distributed packages.
+    """
     receipts = next(
         a for a in _model()["artifacts"]
         if a["id"] == "arsenal.bench.distribution-qualification-receipt"
     )
     assert receipts["state_role"] == "historical"
     assert receipts["materialization"] == "generated"
+    assert receipts["ownership"] == "arsenal-distribution"
+    # The receipt owns its own historical subject-binding; it does
+    # NOT redefine the canonical capability identity.
+    bad = [f for f in receipts["owns_facts"] if f in {"capability.identity", "capability.current-lifecycle"}]
+    assert not bad, f"receipt must not own canonical capability facts: {bad}"
 
 
 def test_skill_package_is_generated_derived() -> None:
@@ -84,13 +122,17 @@ def test_skill_package_is_generated_derived() -> None:
     )
     assert pkg["state_role"] == "derived"
     assert pkg["materialization"] == "generated"
+    assert pkg["ownership"] == "arsenal-distribution"
 
 
 def test_canonical_artifact_classifications() -> None:
-    """Sanity check the key load-bearing artifacts we expect to be registered."""
+    """Sanity check the key load-bearing artifacts we expect to be
+    registered.
+    """
     ids = {a["id"] for a in _model()["artifacts"]}
     expected = {
         "arsenal.protocol",
+        "arsenal.governance-vocabulary",
         "arsenal.capability-fragment-schema",
         "arsenal.competence-lock-schema",
         "arsenal.distribution.compiler.targets",
@@ -100,7 +142,9 @@ def test_canonical_artifact_classifications() -> None:
         "arsenal.project",
         "arsenal.competence-lockfile",
         "arsenal.distribution.skill",
+        "arsenal.bench.case",
         "arsenal.bench.distribution-qualification",
+        "arsenal.bench.local-cloud-cases",
         "arsenal.bench.distribution-qualification-receipt",
         "arsenal.knowledge.snapshot-fixture-kft-0",
         "arsenal.field-trial.kft-0-report",
@@ -111,6 +155,107 @@ def test_canonical_artifact_classifications() -> None:
     }
     missing = expected - ids
     assert not missing, f"expected artifacts not classified: {sorted(missing)}"
+
+
+def test_canonical_capability_fragments_are_distribution_not_consumer() -> None:
+    """Canonical Project Arsenal capability fragments are
+    arsenal-distribution, not consumer-deployed. A consumer may
+    install/use them but does not redefine them.
+    """
+    fragments = next(
+        a for a in _model()["artifacts"] if a["id"] == "arsenal.capability-fragments"
+    )
+    assert fragments["ownership"] == "arsenal-distribution", (
+        "capability fragments are canonical Project Arsenal content; "
+        "consumers do not redefine them"
+    )
+    assert fragments["state_role"] == "normative"
+
+
+def test_concrete_evaluation_suites_are_distribution_not_protocol() -> None:
+    """The evaluation schemas are protocol; the concrete suite
+    instances are arsenal-distribution.
+    """
+    schemas = next(
+        a for a in _model()["artifacts"] if a["id"] == "arsenal.evaluation-case-schema"
+    )
+    cases = next(
+        a for a in _model()["artifacts"] if a["id"] == "arsenal.bench.case"
+    )
+    dq = next(
+        a for a in _model()["artifacts"]
+        if a["id"] == "arsenal.bench.distribution-qualification"
+    )
+    assert schemas["ownership"] == "arsenal-protocol"
+    assert cases["ownership"] == "arsenal-distribution"
+    assert dq["ownership"] == "arsenal-distribution"
+
+
+def test_source_model_schema_and_instance_have_distinct_ownership() -> None:
+    """The source-model schema is protocol (defines what a valid
+    source-model IS). The source-model instance is distribution
+    (Project Arsenal's own classification index).
+    """
+    schema = next(
+        a for a in _model()["artifacts"]
+        if a["id"] == "arsenal.governance-source-model-schema"
+    )
+    instance = next(
+        a for a in _model()["artifacts"]
+        if a["id"] == "arsenal.governance-source-model"
+    )
+    assert schema["ownership"] == "arsenal-protocol"
+    assert instance["ownership"] == "arsenal-distribution"
+    # The instance owns facts scoped to this Project Arsenal distribution.
+    instance_facts = set(instance["owns_facts"])
+    assert "governance.artifact-classification.project-arsenal" in instance_facts
+    assert "governance.source-assignment.project-arsenal" in instance_facts
+
+
+def test_kft0_evidence_is_distribution_even_though_subject_is_external() -> None:
+    """Field-trial evidence about Kiln is owned by Project Arsenal,
+    not by the consumer whose repository was the trial subject.
+    Ownership is about who may define/revise, not about who the
+    subject is.
+    """
+    fixture = next(
+        a for a in _model()["artifacts"]
+        if a["id"] == "arsenal.knowledge.snapshot-fixture-kft-0"
+    )
+    report = next(
+        a for a in _model()["artifacts"] if a["id"] == "arsenal.field-trial.kft-0-report"
+    )
+    assert fixture["ownership"] == "arsenal-distribution"
+    assert fixture["state_role"] == "historical"
+    assert report["ownership"] == "arsenal-distribution"
+    assert report["state_role"] == "historical"
+
+
+def test_roadmaps_are_distribution_narrative() -> None:
+    """Project Arsenal's program roadmaps are arsenal-distribution
+    narrative. A consumer does not redefine Project Arsenal's roadmap
+    by configuring its installation.
+    """
+    for aid in ("arsenal.roadmap.post-pr-24", "arsenal.roadmap.capability-system"):
+        art = next(a for a in _model()["artifacts"] if a["id"] == aid)
+        assert art["ownership"] == "arsenal-distribution"
+        assert art["state_role"] == "narrative"
+
+
+def test_consumer_deployed_is_narrow() -> None:
+    """Only arsenal.project.json and the competence lockfile are
+    consumer-deployed in this distribution. Adding a third would
+    require a deliberate justification; the test catches accidental
+    widening.
+    """
+    consumer_assets = [
+        a for a in _model()["artifacts"] if a["ownership"] == "consumer-deployed"
+    ]
+    consumer_ids = sorted(a["id"] for a in consumer_assets)
+    assert consumer_ids == ["arsenal.competence-lockfile", "arsenal.project"], (
+        f"unexpected consumer-deployed artifacts: {consumer_ids}; "
+        f"widening the consumer-deployed layer requires explicit justification"
+    )
 
 
 def test_each_fact_has_exactly_one_normative_owner() -> None:
@@ -127,16 +272,30 @@ def test_each_fact_has_exactly_one_normative_owner() -> None:
 
 def test_consumer_config_does_not_appear_in_arsenal_project() -> None:
     """The model must classify arsenal.project.json as a single
-    normative configuration artifact; it must NOT itself be derived or
-    historical, and it must NOT be the normative owner of any
+    normative configuration artifact; it must NOT itself be derived
+    or historical, and it must NOT be the normative owner of any
     governance fact.
     """
     proj = next(a for a in _model()["artifacts"] if a["id"] == "arsenal.project")
     assert proj["state_role"] == "normative"
     assert proj["ownership"] == "consumer-deployed"
-    # It owns project.* facts only; no governance fact.
     bad = [f for f in proj["owns_facts"] if f.startswith("governance.")]
     assert not bad, f"arsenal.project must not own governance facts; got {bad}"
+
+
+def test_canonical_capability_identity_owner_is_fragment() -> None:
+    """Canonical capability identity is owned by the fragment family,
+    not by a historical receipt.
+    """
+    fact_by_id = {f["id"]: f for f in _model()["facts"]}
+    assert fact_by_id["capability.identity"]["owner_artifact"] == "arsenal.capability-fragments"
+    receipt_facts = next(
+        a for a in _model()["artifacts"]
+        if a["id"] == "arsenal.bench.distribution-qualification-receipt"
+    )["owns_facts"]
+    assert "capability.identity" not in receipt_facts, (
+        "receipt must bind to capability identity, not redefine it"
+    )
 
 
 def test_source_model_does_not_duplicate_domain_values() -> None:
