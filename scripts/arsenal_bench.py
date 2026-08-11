@@ -599,7 +599,7 @@ def _load_capability_for_manifest(manifest: dict) -> dict:
     return read_json(cap_path)["capability"]
 
 
-def _check_structural_discovery_preservation(case: dict, manifest: dict, skill_text: str) -> dict:
+def _check_structural_discovery_preservation(case: dict, manifest: dict, skill_text: str, _suite = None) -> dict:
     """Structural discovery preservation: every canonical use_when statement
     is rendered verbatim into the generated SKILL.md body.
 
@@ -626,7 +626,7 @@ def _check_structural_discovery_preservation(case: dict, manifest: dict, skill_t
     }
 
 
-def _check_structural_discovery_excludes(case: dict, manifest: dict, skill_text: str) -> dict:
+def _check_structural_discovery_excludes(case: dict, manifest: dict, skill_text: str, _suite = None) -> dict:
     """Structural preservation of the do_not_use_when list.
 
     Every canonical exclusion must be rendered verbatim into the body so a
@@ -653,7 +653,7 @@ def _check_structural_discovery_excludes(case: dict, manifest: dict, skill_text:
     }
 
 
-def _check_manifest_capability_identity(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_manifest_capability_identity(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     cap = _load_capability_for_manifest(manifest)
     cap_path = ROOT / manifest["source"]["capability_path"]
     actual_sha = sha256_bytes(cap_path.read_bytes())
@@ -665,7 +665,7 @@ def _check_manifest_capability_identity(case: dict, manifest: dict, _skill_text:
     }
 
 
-def _check_manifest_mutation(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_manifest_mutation(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     cap = _load_capability_for_manifest(manifest)
     cap_mutation = cap["mutation"]
     man_mutation = manifest["mutation"]
@@ -695,7 +695,7 @@ def _check_manifest_mutation(case: dict, manifest: dict, _skill_text: str) -> di
     }
 
 
-def _check_manifest_authority(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_manifest_authority(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     cap = _load_capability_for_manifest(manifest)
     cap_required = set(cap["authority"]["required"])
     cap_optional = set(cap["authority"]["optional"])
@@ -720,7 +720,7 @@ def _check_manifest_authority(case: dict, manifest: dict, _skill_text: str) -> d
     }
 
 
-def _check_manifest_execution(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_manifest_execution(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     cap = _load_capability_for_manifest(manifest)
     cap_pref = set(cap["execution"]["preferred"])
     cap_allowed = set(cap["execution"]["allowed"])
@@ -738,7 +738,7 @@ def _check_manifest_execution(case: dict, manifest: dict, _skill_text: str) -> d
     }
 
 
-def _check_manifest_invocation(case: dict, manifest: dict, skill_text: str) -> dict:
+def _check_manifest_invocation(case: dict, manifest: dict, skill_text: str, _suite = None) -> dict:
     cap = _load_capability_for_manifest(manifest)
     canonical_invocation = cap["invocation"]
     manifest_invocation = manifest.get("invocation", "<missing>")
@@ -763,7 +763,7 @@ def _check_manifest_invocation(case: dict, manifest: dict, skill_text: str) -> d
     }
 
 
-def _check_skill_body_size(case: dict, _manifest: dict, skill_text: str) -> dict:
+def _check_skill_body_size(case: dict, _manifest: dict, skill_text: str, _suite = None) -> dict:
     max_bytes = case["expected"]["skill_md_body_bytes_max"]
     max_lines = case["expected"]["skill_md_body_lines_max"]
     return {
@@ -774,7 +774,7 @@ def _check_skill_body_size(case: dict, _manifest: dict, skill_text: str) -> dict
     }
 
 
-def _check_bundle_structure(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_bundle_structure(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     dist_path = ROOT / case["fixture"]["distribution_path"]
     files = [p.relative_to(dist_path).as_posix() for p in sorted(dist_path.rglob("*")) if p.is_file()]
     # Every declared resource must appear packaged exactly once.
@@ -794,7 +794,7 @@ def _check_bundle_structure(case: dict, manifest: dict, _skill_text: str) -> dic
     }
 
 
-def _check_always_loaded_size(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_always_loaded_size(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     """Measure actual packaged always-loaded bytes.
 
     The compiler records per-resource and total always-loaded bytes in
@@ -854,7 +854,7 @@ def _check_always_loaded_size(case: dict, manifest: dict, _skill_text: str) -> d
     }
 
 
-def _check_package_digest(case: dict, manifest: dict, _skill_text: str) -> dict:
+def _check_package_digest(case: dict, manifest: dict, _skill_text: str, _suite = None) -> dict:
     """Measure the actual package content_sha256 and compare to manifest."""
     dist_path = ROOT / case["fixture"]["distribution_path"]
     files = {}
@@ -876,7 +876,32 @@ def _check_package_digest(case: dict, manifest: dict, _skill_text: str) -> dict:
     }
 
 
-DISTRIBUTION_STRUCTURAL_CHECKS = {
+DISTRIBUTION_STRUCTURAL_CHECKS = {}
+
+
+def _check_manifest_suite_alignment(case: dict, manifest: dict, _skill_text: str, suite: dict | None) -> dict:
+    """The manifest's claimed capability must agree with the suite that
+    qualified it. A receipt that claims capability.plan but whose
+    manifest carries capability.repository-truth is a forged or
+    misbound qualification and must FAIL.
+    """
+    suite_capability_id = (suite or {}).get("capability_id")
+    manifest_capability_id = manifest.get("capability", {}).get("id")
+    return {
+        "suite_capability_id": suite_capability_id,
+        "manifest_capability_id": manifest_capability_id,
+        "manifest_matches_suite_capability_id": (
+            suite_capability_id is not None
+            and manifest_capability_id == suite_capability_id
+        ),
+        "no_cross_capability_reuse": (
+            suite_capability_id is not None
+            and manifest_capability_id == suite_capability_id
+        ),
+    }
+
+
+DISTRIBUTION_STRUCTURAL_CHECKS.update({
     "structural-discovery-preservation": _check_structural_discovery_preservation,
     "structural-discovery-exclusion": _check_structural_discovery_excludes,
     "manifest-capability-identity": _check_manifest_capability_identity,
@@ -888,10 +913,11 @@ DISTRIBUTION_STRUCTURAL_CHECKS = {
     "bundle-reference-count": _check_bundle_structure,
     "always-loaded-size-policy": _check_always_loaded_size,
     "package-digest-binding": _check_package_digest,
-}
+    "manifest-suite-alignment": _check_manifest_suite_alignment,
+})
 
 
-def run_distribution_structural(case: dict) -> dict:
+def run_distribution_structural(case: dict, suite: dict) -> dict:
     dist_rel = case.get("fixture", {}).get("distribution_path")
     if not dist_rel:
         raise BenchError(f"{case['id']}: distribution-structural case requires distribution_path")
@@ -903,7 +929,9 @@ def run_distribution_structural(case: dict) -> dict:
     check_name = case.get("execution", {}).get("check")
     if not check_name or check_name not in DISTRIBUTION_STRUCTURAL_CHECKS:
         raise BenchError(f"{case['id']}: unknown distribution-structural check {check_name!r}")
-    observed = DISTRIBUTION_STRUCTURAL_CHECKS[check_name](case, manifest, skill_text)
+    observed = DISTRIBUTION_STRUCTURAL_CHECKS[check_name](case, manifest, skill_text, suite)
+    if not isinstance(observed, dict):
+        observed = {}
     # Compare observation to expected keys.
     expected = case.get("expected", {})
     mismatches: list[str] = []
@@ -934,7 +962,7 @@ def run_distribution_suite(suite: dict) -> dict:
             continue
         mode = case.get("execution", {}).get("mode")
         if mode == "distribution-structural":
-            results.append(run_distribution_structural(case))
+            results.append(run_distribution_structural(case, suite))
         else:
             # collision / behavioral: designed-not-run for now
             raise BenchError(

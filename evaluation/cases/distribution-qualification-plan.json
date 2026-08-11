@@ -565,11 +565,49 @@
         ],
         "title": "Package digest binding: manifest package.content_sha256 equals actual bytes",
         "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.plan",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Manifest whose capability.id differs from the qualifying suite (cross-capability reuse).",
+          "kind": "contract-counterfactual",
+          "treatment": "Manifest whose capability.id equals the qualifying suite capability_id; a receipt claiming capability.plan with a Repository Truth manifest is rejected."
+        },
+        "execution": {
+          "check": "manifest-suite-alignment",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_capability_id": "capability.plan",
+          "manifest_matches_suite_capability_id": true,
+          "no_cross_capability_reuse": true,
+          "suite_capability_id": "capability.plan"
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/plan"
+        },
+        "id": "dq-plan-manifest-suite-alignment",
+        "metrics": [
+          "manifest_suite_capability_mismatch_count"
+        ],
+        "title": "Manifest suite alignment: manifest.capability.id equals suite.capability_id for capability.plan",
+        "track": "distribution-qualification"
       }
     ],
     "id": "suite.distribution-qualification-plan-v0",
     "qualification_gate": {
-      "candidate_minimum_executed_cases": 11,
+      "candidate_minimum_executed_cases": 12,
       "candidate_required_case_ids": [
         "dq-plan-boundary-preservation-identity",
         "dq-plan-boundary-preservation-mutation",
@@ -581,7 +619,8 @@
         "dq-plan-context-efficiency-no-oversized-always",
         "dq-plan-activation-discovery-preservation",
         "dq-plan-activation-discovery-exclusion",
-        "dq-plan-package-digest-binding"
+        "dq-plan-package-digest-binding",
+        "dq-plan-manifest-suite-alignment"
       ],
       "qualified_required_case_ids": [
         "dq-plan-behavioral-efficacy-vs-baseline",

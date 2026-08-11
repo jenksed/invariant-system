@@ -565,11 +565,49 @@
         ],
         "title": "Package digest binding: manifest package.content_sha256 equals actual bytes",
         "track": "distribution-qualification"
+      },
+      {
+        "active": true,
+        "axis": "boundary_preservation",
+        "capability_id": "capability.repository-truth",
+        "case_health": {
+          "required_checks": [
+            "starting_state_reproducible",
+            "expected_outcome_explicit",
+            "verifier_independent"
+          ]
+        },
+        "comparison": {
+          "ablation": null,
+          "control": "Manifest whose capability.id differs from the qualifying suite (cross-capability reuse).",
+          "kind": "contract-counterfactual",
+          "treatment": "Manifest whose capability.id equals the qualifying suite capability_id; a receipt claiming capability.plan with a Repository Truth manifest is rejected."
+        },
+        "execution": {
+          "check": "manifest-suite-alignment",
+          "mode": "distribution-structural",
+          "status": "executable"
+        },
+        "expected": {
+          "manifest_capability_id": "capability.repository-truth",
+          "manifest_matches_suite_capability_id": true,
+          "no_cross_capability_reuse": true,
+          "suite_capability_id": "capability.repository-truth"
+        },
+        "fixture": {
+          "distribution_path": "distribution/agent-skills/repository-truth"
+        },
+        "id": "dq-manifest-suite-alignment",
+        "metrics": [
+          "manifest_suite_capability_mismatch_count"
+        ],
+        "title": "Manifest suite alignment: manifest.capability.id equals suite.capability_id for capability.repository-truth",
+        "track": "distribution-qualification"
       }
     ],
     "id": "suite.distribution-qualification-v0",
     "qualification_gate": {
-      "candidate_minimum_executed_cases": 11,
+      "candidate_minimum_executed_cases": 12,
       "candidate_required_case_ids": [
         "dq-boundary-preservation-identity",
         "dq-boundary-preservation-mutation",
@@ -581,7 +619,8 @@
         "dq-context-efficiency-no-oversized-always",
         "dq-activation-discovery-preservation",
         "dq-activation-discovery-exclusion",
-        "dq-package-digest-binding"
+        "dq-package-digest-binding",
+        "dq-manifest-suite-alignment"
       ],
       "qualified_required_case_ids": [
         "dq-behavioral-efficacy-vs-baseline",

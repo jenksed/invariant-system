@@ -14,10 +14,10 @@
       "total": 2
     },
     "boundary_preservation": {
-      "executed": 6,
+      "executed": 7,
       "failed": 0,
-      "passed": 6,
-      "total": 6
+      "passed": 7,
+      "total": 7
     },
     "context_efficiency": {
       "executed": 3,
@@ -119,15 +119,21 @@
       "case_id": "dq-package-digest-binding",
       "execution": "executed",
       "status": "PASS"
+    },
+    {
+      "axis": "boundary_preservation",
+      "case_id": "dq-manifest-suite-alignment",
+      "execution": "executed",
+      "status": "PASS"
     }
   ],
   "claim_scope": "Structural evidence over manifest and bundled distribution content only. Behavioral efficacy evidence remains designed-not-run in v0 and is required for qualified status. Activation claims refer to canonical discovery preservation in the generated SKILL.md body, not to model activation behavior. Adapter qualification is a separate evidence claim from capability lifecycle and does not promote canonical capability state.",
   "counts": {
     "designed_not_run": 3,
-    "executed": 11,
+    "executed": 12,
     "failed": 0,
-    "passed": 11,
-    "total": 14
+    "passed": 12,
+    "total": 15
   },
   "limitations": [
     "Designed-not-run cases provide no execution evidence and cannot contribute to qualification.",

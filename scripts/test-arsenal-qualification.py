@@ -273,15 +273,14 @@ def main() -> int:
     # Mutation 21: required candidate case marked designed-not-run.
     # The qualification_gate validator must reject this at validate_suites.
     def mut_required_case_designed_not_run(_dist: Path):
-        # We do not mutate the package here; we mutate the suite gate
-        # temporarily, then attempt qualify, which calls validate_suites.
         suite_path = None
         for p in (ROOT / "evaluation" / "cases").glob("*.json"):
             suite_doc = json.loads(p.read_text())
             if suite_doc.get("suite", {}).get("id") == suite_id:
                 suite_path = p
                 break
-        suite_doc = json.loads(suite_path.read_text())
+        original_text = suite_path.read_text()
+        suite_doc = json.loads(original_text)
         cases = suite_doc["suite"]["cases"]
         target = "dq-boundary-preservation-mutation"
         for c in cases:
@@ -290,24 +289,27 @@ def main() -> int:
                 c["execution"]["status"] = "designed-not-run"
                 break
         suite_path.write_text(json.dumps(suite_doc, indent=2, sort_keys=True) + "\n")
-        with tempfile.TemporaryDirectory() as tmp:
-            receipt_path = Path(tmp) / "receipt.json"
-            argv = ["qualify", "--suite", suite_id, "--receipt", str(receipt_path)]
-            original_argv = sys.argv
-            original_stderr = sys.stderr
-            sys.argv = ["arsenal_bench"] + argv
-            sys.stderr = StringIO()
-            try:
-                rc = bench.main()
-                err_output = sys.stderr.getvalue()
-            finally:
-                sys.argv = original_argv
-                sys.stderr = original_stderr
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                receipt_path = Path(tmp) / "receipt.json"
+                argv = ["qualify", "--suite", suite_id, "--receipt", str(receipt_path)]
+                original_argv = sys.argv
+                original_stderr = sys.stderr
+                sys.argv = ["arsenal_bench"] + argv
+                sys.stderr = StringIO()
+                try:
+                    rc = bench.main()
+                    err_output = sys.stderr.getvalue()
+                finally:
+                    sys.argv = original_argv
+                    sys.stderr = original_stderr
             if rc == 0:
                 raise AssertionError(
                     "required candidate case marked designed-not-run: "
                     f"qualify returned 0 instead of failing at validate_suites; stderr: {err_output!r}"
                 )
+        finally:
+            suite_path.write_text(original_text)
     mut_required_case_designed_not_run(None)
 
     # Mutation 22: required candidate case fails. Force the structural
@@ -334,55 +336,79 @@ def main() -> int:
             if suite_doc.get("suite", {}).get("id") == suite_id:
                 suite_path = p
                 break
-        suite_doc = json.loads(suite_path.read_text())
+        original_text = suite_path.read_text()
+        suite_doc = json.loads(original_text)
         gate = suite_doc["suite"]["qualification_gate"]
         gate["candidate_required_case_ids"].append("dq-does-not-exist")
         suite_path.write_text(json.dumps(suite_doc, indent=2, sort_keys=True) + "\n")
-        with tempfile.TemporaryDirectory() as tmp:
-            receipt_path = Path(tmp) / "receipt.json"
-            argv = ["qualify", "--suite", suite_id, "--receipt", str(receipt_path)]
-            original_argv = sys.argv
-            original_stderr = sys.stderr
-            sys.argv = ["arsenal_bench"] + argv
-            sys.stderr = StringIO()
-            try:
-                rc = bench.main()
-                err_output = sys.stderr.getvalue()
-            finally:
-                sys.argv = original_argv
-                sys.stderr = original_stderr
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                receipt_path = Path(tmp) / "receipt.json"
+                argv = ["qualify", "--suite", suite_id, "--receipt", str(receipt_path)]
+                original_argv = sys.argv
+                original_stderr = sys.stderr
+                sys.argv = ["arsenal_bench"] + argv
+                sys.stderr = StringIO()
+                try:
+                    rc = bench.main()
+                    err_output = sys.stderr.getvalue()
+                finally:
+                    sys.argv = original_argv
+                    sys.stderr = original_stderr
             if rc == 0:
                 raise AssertionError(
                     f"required case omitted: qualify returned 0; stderr: {err_output!r}"
                 )
+        finally:
+            suite_path.write_text(original_text)
     mut_required_case_omitted(None)
 
     # Mutation 24 / 25 / 26: cross-capability / cross-suite reuse.
-    # Run the Plan suite against the Repository Truth distribution and
-    # vice versa; both must fail at validate_suites because case
-    # capability_id no longer matches suite capability_id.
+    # Point the Plan suite at the Repository Truth distribution. The
+    # bench loads the canonical capability from the manifest's
+    # source.capability_path; that resolves to capability.repository-truth
+    # while the suite declares capability.plan. The structural checks
+    # (authority, mutation, identity) will all FAIL because the
+    # canonical capability differs from what the suite expects, so
+    # candidate_ready must drop to False.
     def mut_cross_capability_reuse():
-        with tempfile.TemporaryDirectory() as tmp:
-            receipt_path = Path(tmp) / "receipt.json"
-            argv = [
-                "qualify",
-                "--suite", "suite.distribution-qualification-plan-v0",
-                "--receipt", str(receipt_path),
-            ]
-            original_argv = sys.argv
-            original_stderr = sys.stderr
-            sys.argv = ["arsenal_bench"] + argv
-            sys.stderr = StringIO()
+        tmp_root = ROOT / ".tmp-ars-qual-adversary"
+        if tmp_root.exists():
+            shutil.rmtree(tmp_root)
+        tmp_root.mkdir()
+        try:
+            rt_dist = _copy_distribution_to("distribution/agent-skills/repository-truth", tmp_root)
+            plan_suite_id = "suite.distribution-qualification-plan-v0"
+            saved = _swap_suite_distribution(plan_suite_id, rt_dist)
             try:
-                rc = bench.main()
-                err_output = sys.stderr.getvalue()
+                with tempfile.TemporaryDirectory() as tmp:
+                    receipt_path = Path(tmp) / "receipt.json"
+                    argv = [
+                        "qualify",
+                        "--suite", plan_suite_id,
+                        "--receipt", str(receipt_path),
+                    ]
+                    original_argv = sys.argv
+                    original_stderr = sys.stderr
+                    sys.argv = ["arsenal_bench"] + argv
+                    sys.stderr = StringIO()
+                    try:
+                        rc = bench.main()
+                    finally:
+                        sys.argv = original_argv
+                        sys.stderr = original_stderr
+                    if receipt_path.is_file():
+                        receipt = json.loads(receipt_path.read_text())
+                        if receipt["status"] == "candidate":
+                            raise AssertionError(
+                                "cross-capability reuse: Plan suite qualified against "
+                                "Repository Truth distribution; receipt claims candidate. "
+                                f"binding={receipt['binding']}"
+                            )
             finally:
-                sys.argv = original_argv
-                sys.stderr = original_stderr
-            if rc == 0:
-                raise AssertionError(
-                    f"Plan suite against RT distribution: qualify returned 0; stderr: {err_output!r}"
-                )
+                _restore_suite_distribution(plan_suite_id, saved)
+        finally:
+            shutil.rmtree(tmp_root, ignore_errors=True)
     mut_cross_capability_reuse()
 
     print("ARS-07 qualification adversarial suite: PASS")
