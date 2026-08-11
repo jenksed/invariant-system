@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -222,6 +224,218 @@ def test_targets_rejects_unknown_invocation_support() -> None:
         raise AssertionError("load_supported_targets should reject unknown invocation")
     finally:
         path.unlink()
+
+
+def test_version_coherence_across_surfaces() -> None:
+    """The capability schema $id, registry version, schema's
+    schema_version const, CAPABILITY_SCHEMA_VERSION constant, and
+    CAPABILITY_CONTRACT.md must all agree on 2.2.0.
+
+    If any surface drifts, the contract is silently incoherent.
+    """
+    import re as _re
+    # 1. Protocol constant.
+    assert arsenal_protocol.CAPABILITY_SCHEMA_VERSION == "2.2.0"
+
+    # 2. Schema file.
+    schema = json.loads((ROOT / "arsenal/capability.schema.json").read_text())
+    assert schema["$id"] == "https://project-arsenal.dev/schema/capability-fragment-2.2.0.json"
+    assert schema["properties"]["schema_version"]["const"] == "2.2.0"
+
+    # 3. Schema registry.
+    registry = json.loads((ROOT / "arsenal/schema-registry.json").read_text())
+    assert registry["schemas"]["capability-fragment"]["version"] == "2.2.0"
+    # The schema_id_for() derivation must equal the schema file's $id.
+    from arsenal_schema_registry import schema_id_for
+    assert schema_id_for(ROOT, "capability-fragment") == schema["$id"]
+
+    # 4. CAPABILITY_CONTRACT.md declares the same version.
+    contract = (ROOT / "arsenal/CAPABILITY_CONTRACT.md").read_text()
+    m = _re.search(r"^Schema-Version:\s*(\S+)\s*$", contract, _re.MULTILINE)
+    assert m, "CAPABILITY_CONTRACT.md must declare Schema-Version"
+    assert m.group(1) == "2.2.0"
+
+    # 5. Every current capability fragment must declare 2.2.0.
+    for path in sorted((ROOT / "arsenal/capabilities").glob("*.json")):
+        doc = json.loads(path.read_text())
+        assert doc.get("schema_version") == "2.2.0", (
+            f"{path.relative_to(ROOT)} claims schema_version "
+            f"{doc.get('schema_version')!r} but the canonical schema is 2.2.0"
+        )
+
+
+def test_legacy_21_fragment_accepted_when_no_2_2_fields() -> None:
+    """Backward compat: a fragment declaring 2.1.0 with NO 2.2-only
+    fields (no `resources`) must still pass the audit. This proves
+    legacy acceptance is real, not permissive ambiguity.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "capability_audit_legacy_test", ROOT / "scripts/capability_audit.py"
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+
+        # Build a synthetic asset registry that includes the legacy fixture.
+        legacy_asset_id = "software.legacy-fixture"
+        sandbox_registry = {
+            "schema_version": mod.ASSET_SCHEMA_VERSION,
+            "assets": [{
+                "id": legacy_asset_id,
+                "path": "arsenal/capabilities/legacy-fixture.json",
+                "category": "software_engineering",
+                "kind": "prompt",
+                "status": "unverified",
+                "purpose": "Legacy fixture asset for version compatibility tests.",
+            }],
+        }
+        asset_ids = {a["id"] for a in sandbox_registry["assets"]}
+        # Augment with all real asset ids so other checks pass.
+        real_ids, _real_errors = mod.load_asset_ids(ROOT)
+        asset_ids |= real_ids
+
+        legacy = {
+            "schema_version": "2.1.0",
+            "capability": {
+                "id": "capability.legacy-fixture",
+                "version": "0.1.0",
+                "display_name": "Legacy Fixture",
+                "aliases": [],
+                "purpose": "Backward-compat fixture representing pre-2.2 capability shape.",
+                "lifecycle": "draft",
+                "invocation": "agent",
+                "discovery": {
+                    "use_when": [
+                        {"text": "Legacy fixture used to verify 2.1 acceptance.",
+                         "kind": "positive"}
+                    ],
+                },
+                "inputs": [
+                    {"name": "input_a", "required": True,
+                     "description": "Legacy fixture input."},
+                ],
+                "outputs": [
+                    {"name": "output_a", "description": "Legacy fixture output."},
+                ],
+                "preconditions": [
+                    {"id": "precondition_a", "description": "Legacy precondition."}
+                ],
+                "context": {"required": ["task.intent"], "preferred": []},
+                "implementation": {
+                    "primary_asset": legacy_asset_id,
+                    "asset_ids": [legacy_asset_id],
+                    # Intentionally NO `resources` -- this is pre-2.2 shape.
+                },
+                "authority": {
+                    "required": ["filesystem.read"],
+                    "optional": [],
+                    "forbidden": [],
+                },
+                "mutation": {"class": "read-only", "reversible": True},
+                "execution": {
+                    "preferred": ["repository-read"],
+                    "allowed": ["repository-read"],
+                    "prohibited": ["remote-sandbox", "staging", "production"],
+                },
+                "verification": {
+                    "requirements": [
+                        {"id": "v_basic",
+                         "description": "Legacy verification requirement.",
+                         "evidence_kind": "verdict"}
+                    ],
+                    "receipt_required": False,
+                },
+                "evidence_outputs": [
+                    {"name": "evidence_a", "description": "Legacy evidence output."}
+                ],
+                "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+                "provenance": {"asset_ids": [legacy_asset_id]},
+                "compatibility": {"supersedes": [], "notes": ""},
+            },
+        }
+        errors: list[str] = []
+        mod.validate_capability(legacy["capability"], asset_ids, errors,
+                                schema_version="2.1.0")
+        assert not errors, (
+            f"legacy 2.1.0 fragment with no 2.2-only fields must pass; got: {errors}"
+        )
+
+
+def test_legacy_21_fragment_with_2_2_resources_must_fail() -> None:
+    """A 2.1.0 fragment declaring `resources` (a 2.2-only field)
+    must be rejected. This proves the contract refuses to silently
+    extend legacy shapes with current-only semantics.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        import importlib.util as _ilu
+        spec = _ilu.spec_from_file_location(
+            "capability_audit_impersonator_test",
+            ROOT / "scripts/capability_audit.py",
+        )
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        real_ids, _real_errors = mod.load_asset_ids(ROOT)
+        asset_ids = real_ids | {"software.impersonator"}
+
+        doc = {
+            "schema_version": "2.1.0",
+            "capability": {
+                "id": "capability.impersonator",
+                "version": "0.1.0",
+                "display_name": "Impersonator",
+                "aliases": [],
+                "purpose": "Claims legacy version while using current-only Resources.",
+                "lifecycle": "draft",
+                "invocation": "agent",
+                "discovery": {
+                    "use_when": [
+                        {"text": "Impersonator fixture.", "kind": "positive"}
+                    ],
+                },
+                "inputs": [{"name": "i", "required": True, "description": "x"}],
+                "outputs": [{"name": "o", "description": "y"}],
+                "preconditions": [{"id": "p", "description": "x"}],
+                "context": {"required": ["task.intent"], "preferred": []},
+                "implementation": {
+                    "primary_asset": "software.impersonator",
+                    "asset_ids": ["software.impersonator"],
+                    "resources": [
+                        {"asset_id": "software.impersonator",
+                         "role": "reference",
+                         "load": "on-demand"}
+                    ],
+                },
+                "authority": {"required": ["filesystem.read"],
+                               "optional": [], "forbidden": []},
+                "mutation": {"class": "read-only", "reversible": True},
+                "execution": {"preferred": ["repository-read"],
+                               "allowed": ["repository-read"],
+                               "prohibited": ["remote-sandbox", "staging", "production"]},
+                "verification": {
+                    "requirements": [
+                        {"id": "v", "description": "v", "evidence_kind": "verdict"}
+                    ],
+                    "receipt_required": False,
+                },
+                "evidence_outputs": [{"name": "e", "description": "e"}],
+                "evaluation": {"status": "unassessed", "suite_asset_ids": []},
+                "provenance": {"asset_ids": ["software.impersonator"]},
+                "compatibility": {"supersedes": [], "notes": ""},
+            },
+        }
+        errors: list[str] = []
+        mod.validate_capability(doc["capability"], asset_ids, errors,
+                                schema_version="2.1.0")
+        assert errors, (
+            f"2.1.0 fragment with `resources` must be rejected as an "
+            f"impersonator; audit accepted it without comment. errors={errors}"
+        )
+        joined = "\n".join(errors)
+        # The error must name the actual issue, not be silent.
+        assert "resources" in joined or "legacy" in joined or "current" in joined, (
+            f"rejection error must name the impersonation; got: {joined!r}"
+        )
 
 
 def main() -> int:

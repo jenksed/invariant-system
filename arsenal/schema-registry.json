@@ -1,50 +1,50 @@
 {
-  "schema_version": "1.0.0",
   "host": "project-arsenal.dev",
+  "schema_version": "1.0.0",
   "schemas": {
     "capability-fragment": {
-      "version": "2.0.0",
-      "path": "arsenal/capability.schema.json"
-    },
-    "competence-lock": {
-      "version": "1.0.0",
-      "path": "arsenal/lock.schema.json"
-    },
-    "evaluation-case": {
-      "version": "1.0.0",
-      "path": "evaluation/evaluation-case.schema.json"
+      "path": "arsenal/capability.schema.json",
+      "version": "2.2.0"
     },
     "case-health-receipt": {
-      "version": "1.0.0",
-      "path": "evaluation/case-health-receipt.schema.json"
+      "path": "evaluation/case-health-receipt.schema.json",
+      "version": "1.0.0"
+    },
+    "competence-lock": {
+      "path": "arsenal/lock.schema.json",
+      "version": "1.0.0"
+    },
+    "evaluation-case": {
+      "path": "evaluation/evaluation-case.schema.json",
+      "version": "1.0.0"
     },
     "evaluation-receipt": {
-      "version": "1.0.0",
-      "path": "evaluation/evaluation-receipt.schema.json"
+      "path": "evaluation/evaluation-receipt.schema.json",
+      "version": "1.0.0"
     },
     "flight-record": {
-      "version": "1.0.0",
-      "path": "arsenal/observability/flight-record.schema.json"
+      "path": "arsenal/observability/flight-record.schema.json",
+      "version": "1.0.0"
     },
     "knowledge-snapshot": {
-      "version": "1.0.0",
-      "path": "arsenal/knowledge/snapshot.schema.json"
-    },
-    "trust-policy": {
-      "version": "1.0.0",
-      "path": "arsenal/trust/policy.schema.json"
-    },
-    "trust-review": {
-      "version": "1.0.0",
-      "path": "arsenal/trust/review.schema.json"
-    },
-    "trust-decision": {
-      "version": "1.0.0",
-      "path": "arsenal/trust/decision.schema.json"
+      "path": "arsenal/knowledge/snapshot.schema.json",
+      "version": "1.0.0"
     },
     "trust-candidate": {
-      "version": "1.0.0",
-      "path": "arsenal/trust/candidate.schema.json"
+      "path": "arsenal/trust/candidate.schema.json",
+      "version": "1.0.0"
+    },
+    "trust-decision": {
+      "path": "arsenal/trust/decision.schema.json",
+      "version": "1.0.0"
+    },
+    "trust-policy": {
+      "path": "arsenal/trust/policy.schema.json",
+      "version": "1.0.0"
+    },
+    "trust-review": {
+      "path": "arsenal/trust/review.schema.json",
+      "version": "1.0.0"
     }
   }
 }

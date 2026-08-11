@@ -95,7 +95,7 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
     if not directory.is_absolute():
         directory = root / directory
     errors: list[str] = []
-    fragments: list[tuple[Path, dict]] = []
+    fragments: list[tuple[Path, str, dict]] = []
     files = sorted(directory.glob("*.json"))
     if not files:
         return [], [f"{directory}: no capability JSON fragments found"]
@@ -115,7 +115,7 @@ def load_capability_fragments(root: Path, capability_dir: Path | None = None):
         if not isinstance(capability, dict):
             errors.append(f"{path}: capability must be an object")
             continue
-        fragments.append((path, capability))
+        fragments.append((path, doc.get("schema_version"), capability))
     return fragments, errors
 
 
@@ -134,7 +134,8 @@ def _unique_named(cap_id: str, field: str, items, key: str, errors: list[str]):
         seen.add(value)
 
 
-def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> None:
+def validate_capability(cap: dict, asset_ids: set[str], errors: list[str],
+                        *, schema_version: str | None = None) -> None:
     cap_id = cap.get("id", "<missing-id>")
     missing = CAPABILITY_FIELDS - set(cap)
     extra = set(cap) - CAPABILITY_FIELDS
@@ -231,7 +232,20 @@ def validate_capability(cap: dict, asset_ids: set[str], errors: list[str]) -> No
 
         # Resource strategy: optional. When present, every entry must be
         # well-formed and the role/load combination must be valid.
+        # NOTE: The `resources` field was introduced in Capability
+        # Contract 2.2.0. Legacy 2.0.0 / 2.1.0 fragments may not
+        # declare `resources` and must continue to validate. A fragment
+        # claiming an older schema version while declaring `resources`
+        # is an impersonator: it describes current-only semantics with
+        # a legacy version stamp. Reject explicitly so version
+        # semantics remain enforceable.
         resources = implementation.get("resources")
+        if resources is not None and schema_version in CAPABILITY_SCHEMA_LEGACY:
+            errors.append(
+                f"{cap_id}: implementation.resources is a Capability Contract 2.2.0 field "
+                f"but the fragment declares schema_version={schema_version!r}; "
+                f"legacy fragments must omit 2.2-only fields"
+            )
         if resources is not None:
             if not isinstance(resources, list):
                 errors.append(f"{cap_id}: implementation.resources must be an array")
@@ -398,12 +412,13 @@ def validate_repository(root: Path, capability_dir: Path | None = None):
     capabilities: list[dict] = []
     ids: set[str] = set()
     public_names: dict[str, str] = {}
-    for path, cap in fragments:
+    for path, schema_version, cap in fragments:
         cap_id = cap.get("id", f"<{path.name}>")
         if cap_id in ids:
             errors.append(f"{cap_id}: duplicate capability id")
         ids.add(cap_id)
-        validate_capability(cap, asset_ids, errors)
+        validate_capability(cap, asset_ids, errors,
+                            schema_version=schema_version)
         capabilities.append(cap)
         for public in [cap.get("display_name"), *(cap.get("aliases") or [])]:
             if not isinstance(public, str):
