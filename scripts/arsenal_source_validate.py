@@ -15,20 +15,28 @@ Validation surface:
   copy of domain values); the artifact's state_role tells us whether
   the fact is normative, derived, historical, or narrative;
 * every owner_artifact resolves to a declared artifact id;
-* every pattern-style artifact points to files or directories that
-  actually exist (loader and validator agree);
+* every artifact's ``owns_facts`` cross-references match the
+  ``facts[]`` list bidirectionally (no dangling IDs in either
+  direction; the model answers "who owns this fact?" with one
+  semantic answer regardless of which API asks);
+* every path-style and pattern-style artifact points to a file or
+  directory family that actually exists and stays under the
+  repository root (the shared ``arsenal_io.safe_repo_path`` primitive
+  is used so loader and validator cannot disagree);
 * the model itself is structurally consistent with its JSON schema
-  (closed-shape is enforced by the loader; the validator complements
-  the loader's structural checks with semantic invariants).
+  (closed-shape, required fields, types, identifiers, and
+  ``uniqueItems`` are enforced by the loader; the validator
+  complements the loader's structural checks with semantic
+  invariants).
 
-Closed-shape enforcement for unknown keys lives in
-``arsenal_source_model.load_source_model``. The validator here does
-NOT re-check structural shape -- it would be redundant.
+Closed-shape and required-field enforcement live in
+``arsenal_source_model.load_source_model``. The validator here
+focuses on semantic checks that depend on the model's content
+rather than its raw shape.
 """
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -38,22 +46,6 @@ import arsenal_schema_registry
 import arsenal_source_model
 
 ROOT = Path(__file__).resolve().parents[1]
-
-
-def _resolve_artifact_path(art: dict, root: Path) -> Path | None:
-    if "path" in art:
-        return root / art["path"]
-    if "path_pattern" in art:
-        # The first segment of a bounded pattern is a directory
-        # relative to the root. Anything else fails closed.
-        pat = art["path_pattern"]
-        if pat.startswith("/") or pat.startswith("./") or pat.startswith("../"):
-            return None
-        if ".." in pat.split("/"):
-            return None
-        candidate = root / pat.split("/", 1)[0]
-        return candidate if candidate.is_dir() else None
-    return None
 
 
 def _check_vocabulary(errors: list[str], model: dict) -> None:
@@ -82,14 +74,30 @@ def _check_vocabulary(errors: list[str], model: dict) -> None:
 
 
 def _check_fact_owners(errors: list[str], model: dict) -> None:
+    """Cross-check ``fact.owner_artifact`` against ``artifact.owns_facts``.
+
+    The semantic invariant is: every fact has exactly one owning
+    artifact, AND that owning artifact must list the fact in its
+    ``owns_facts`` array. The validator enforces both directions:
+
+    * forward: for every fact, ``fact.id`` appears in the owner's
+      ``owns_facts``;
+    * backward: for every entry in any artifact's ``owns_facts``,
+      that fact id exists in ``facts[]`` and points back to the
+      same artifact.
+
+    Without this, the source model can answer "who owns this fact?"
+    differently depending on which API is asked.
+    """
     artifact_ids = {a["id"] for a in model["artifacts"]}
-    fact_owner: dict[str, str] = {}
-    seen_fact_ids: set[str] = set()
+    artifacts_by_id = {a["id"]: a for a in model["artifacts"]}
+    fact_ids: set[str] = set()
     for fact in model["facts"]:
         fid = fact["id"]
-        if fid in seen_fact_ids:
+        if fid in fact_ids:
             errors.append(f"duplicate fact id: {fid}")
-        seen_fact_ids.add(fid)
+            continue
+        fact_ids.add(fid)
         owner = fact["owner_artifact"]
         if owner not in artifact_ids:
             errors.append(
@@ -97,58 +105,82 @@ def _check_fact_owners(errors: list[str], model: dict) -> None:
                 f"artifact id"
             )
             continue
-        if fid in fact_owner and fact_owner[fid] != owner:
+        # Forward coherence: owner.owns_facts must include this fact.
+        owns_list = artifacts_by_id[owner].get("owns_facts", [])
+        if fid not in owns_list:
             errors.append(
-                f"fact {fid!r}: has more than one owner "
-                f"({fact_owner[fid]!r}, {owner!r}); the state_role of the "
-                f"owning artifact determines whether each owner's fact is "
-                f"normative, derived, historical, or narrative"
+                f"fact {fid!r}: owner_artifact {owner!r} does not list "
+                f"this fact in owns_facts; the source model has exactly "
+                f"one owning artifact per fact and the two views must agree"
             )
-        elif fid not in fact_owner:
-            fact_owner[fid] = owner
+
+    # Backward coherence: every entry in any artifact's owns_facts
+    # must correspond to a real fact pointing back to the same
+    # artifact.
+    fact_owner_by_id: dict[str, str] = {
+        f["id"]: f["owner_artifact"] for f in model["facts"]
+    }
+    for art in model["artifacts"]:
+        for fid in art.get("owns_facts", []):
+            owner = fact_owner_by_id.get(fid)
+            if owner is None:
+                errors.append(
+                    f"artifact {art['id']!r}: owns_facts references unknown "
+                    f"fact id {fid!r}"
+                )
+                continue
+            if owner != art["id"]:
+                errors.append(
+                    f"artifact {art['id']!r}: owns_facts references fact "
+                    f"{fid!r} whose owner_artifact is {owner!r}; the source "
+                    f"model has exactly one owning artifact per fact and the "
+                    f"two views must agree"
+                )
 
 
 def _check_paths(errors: list[str], model: dict, root: Path) -> None:
     for art in model["artifacts"]:
+        aid = art["id"]
         if "path" in art:
-            p = root / art["path"]
-            if not p.is_file():
+            try:
+                resolved = arsenal_io.safe_repo_path(
+                    root, art["path"], field=f"artifact {aid!r} path"
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+                continue
+            if not resolved.is_file():
                 errors.append(
-                    f"artifact {art['id']!r}: declared path does not exist: {art['path']}"
+                    f"artifact {aid!r}: declared path does not exist: {art['path']}"
                 )
             continue
         pat = art["path_pattern"]
-        # Repository-relative only. No traversal. Must be a real family.
-        if pat.startswith("/") or pat.startswith("./") or pat.startswith("../"):
+        # Use the shared primitive on the head segment so the path
+        # family cannot escape the repository root.
+        try:
+            head_resolved = arsenal_io.safe_repo_path(
+                root, pat.split("/", 1)[0], field=f"artifact {aid!r} path_pattern head"
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+            continue
+        if not head_resolved.is_dir():
             errors.append(
-                f"artifact {art['id']!r}: path_pattern must be repository-relative: {pat!r}"
+                f"artifact {aid!r}: pattern base directory missing: {pat.split('/', 1)[0]}"
             )
             continue
-        if ".." in pat.split("/"):
-            errors.append(
-                f"artifact {art['id']!r}: path_pattern must not contain traversal: {pat!r}"
-            )
-            continue
-        # Walk the head segment as a directory under the root.
-        head = pat.split("/", 1)[0]
-        base = root / head
-        if not base.is_dir():
-            errors.append(
-                f"artifact {art['id']!r}: pattern base directory missing: {head}"
-            )
-            continue
-        # Use a bounded glob under the base. Refuse recursive descent
-        # (``**``) to keep the surface explicit.
+        # Refuse recursive descent (``**``) to keep the surface
+        # explicit.
         if "**" in pat:
             errors.append(
-                f"artifact {art['id']!r}: recursive '**' patterns are not allowed: {pat!r}"
+                f"artifact {aid!r}: recursive '**' patterns are not allowed: {pat!r}"
             )
             continue
         tail = pat.split("/", 1)[1] if "/" in pat else "*"
-        matches = sorted(base.glob(tail))
+        matches = sorted(head_resolved.glob(tail))
         if not matches:
             errors.append(
-                f"artifact {art['id']!r}: pattern {pat!r} matches no files"
+                f"artifact {aid!r}: pattern {pat!r} matches no files"
             )
 
 
@@ -159,6 +191,45 @@ def _check_schema_registry(errors: list[str], model: dict, root: Path) -> None:
         )
     except Exception as exc:
         errors.append(f"source-model schema not registered: {exc}")
+
+
+# Mapping from error substring to the documented exit-code token.
+# Errors not covered by a specific substring fall back to UNKNOWN.
+_EXIT_CODE_RULES: tuple[tuple[str, str], ...] = (
+    ("missing source model", "MISSING_MODEL"),
+    ("source-model load error", "SCHEMA_VIOLATION"),
+    ("unknown key", "SCHEMA_VIOLATION"),
+    ("unknown top-level key", "SCHEMA_VIOLATION"),
+    ("missing required field", "SCHEMA_VIOLATION"),
+    ("must be a string", "SCHEMA_VIOLATION"),
+    ("must be a list", "SCHEMA_VIOLATION"),
+    ("does not match pattern", "SCHEMA_VIOLATION"),
+    ("shorter than the", "SCHEMA_VIOLATION"),
+    ("must declare exactly one of", "SCHEMA_VIOLATION"),
+    ("duplicate fact ids", "SCHEMA_VIOLATION"),
+    ("duplicate artifact id", "DUPLICATE_IDENTITY"),
+    ("duplicate fact id", "DUPLICATE_IDENTITY"),
+    ("unknown ownership layer", "ROLE_VIOLATION"),
+    ("unknown state role", "ROLE_VIOLATION"),
+    ("unknown materialization", "ROLE_VIOLATION"),
+    ("not a registered artifact id", "INVALID_REFERENCE"),
+    ("does not list this fact in owns_facts", "CONFLICTING_OWNER"),
+    ("references unknown fact id", "CONFLICTING_OWNER"),
+    ("whose owner_artifact is", "CONFLICTING_OWNER"),
+    ("resolves outside the repository root", "SCHEMA_VIOLATION"),
+    ("traversal", "SCHEMA_VIOLATION"),
+    ("repository-relative", "SCHEMA_VIOLATION"),
+    ("recursive '**'", "SCHEMA_VIOLATION"),
+    ("must not traverse", "SCHEMA_VIOLATION"),
+    ("must not contain '.' segments", "SCHEMA_VIOLATION"),
+)
+
+
+def _classify_error(message: str) -> str:
+    for needle, code in _EXIT_CODE_RULES:
+        if needle in message:
+            return code
+    return "UNKNOWN"
 
 
 def validate_source_model(root: Path = ROOT) -> list[str]:
@@ -183,6 +254,22 @@ def main() -> int:
     if errors:
         for err in errors:
             print(f"ERROR: {err}", file=sys.stderr)
+        # Pick the most-specific exit code based on the highest
+        # classification across the reported errors. Schema-level
+        # violations are the most specific; otherwise the first
+        # match wins.
+        priority = [
+            "MISSING_MODEL",
+            "SCHEMA_VIOLATION",
+            "DUPLICATE_IDENTITY",
+            "INVALID_REFERENCE",
+            "ROLE_VIOLATION",
+            "CONFLICTING_OWNER",
+        ]
+        codes = {_classify_error(e) for e in errors}
+        for code in priority:
+            if code in codes:
+                return arsenal_governance.EXIT_CODE[code]
         return arsenal_governance.EXIT_CODE["UNKNOWN"]
     artifact_count = len(arsenal_source_model.load_source_model(ROOT)["artifacts"])
     fact_count = len(arsenal_source_model.load_source_model(ROOT)["facts"])

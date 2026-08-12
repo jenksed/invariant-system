@@ -143,7 +143,7 @@
       "state_role": "normative",
       "materialization": "authored",
       "owns_facts": ["asset.identity"],
-      "notes": "Canonical base asset registry. The merged view (arsenal.registry + arsenal.registry.d) is the canonical read; both the base and the extensions are independently authored Project Arsenal distribution content."
+      "notes": "Canonical base asset registry. The merged view (arsenal.registry + arsenal.registry.d) is the canonical read; both the base and the extensions are independently authored Project Arsenal distribution content. COMPOSITE-SOURCE NOTE: asset.identity's physical sources are arsenal/registry.json AND arsenal/registry.d/*.json; the current source model declares arsenal.registry as the single owner and lists arsenal.registry.d separately with no owns_facts. Composite-source modeling is a deferred-design prerequisite for the Project Intelligence tracer; see docs/roadmap/post-pr-24-deferred-architecture.md."
     },
     {
       "id": "arsenal.registry.d",
@@ -152,7 +152,7 @@
       "state_role": "normative",
       "materialization": "authored",
       "owns_facts": [],
-      "notes": "Co-authoritative extension fragments loaded in filename order. Per arsenal/ASSET_CONTRACT.md, both the base and the .d fragments are independently authored. The merged view is the canonical read; each fragment owns its own asset entries."
+      "notes": "Co-authoritative extension fragments loaded in filename order. Per arsenal/ASSET_CONTRACT.md, both the base and the .d fragments are independently authored. The merged view is the canonical read; each fragment owns its own asset entries. COMPOSITE-SOURCE NOTE: see arsenal.registry; composite-source modeling is deferred until the source model can express multiple physical sources per fact."
     },
     {
       "id": "arsenal.bench.case",

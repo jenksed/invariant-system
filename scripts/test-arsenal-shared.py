@@ -855,6 +855,86 @@ def test_compiler_verify_emits_pass_output() -> None:
     assert "exports" in out, f"missing 'exports' summary in verify stdout: {out!r}"
 
 
+def test_safe_repo_path_accepts_simple_relative() -> None:
+    """The shared repository-path primitive accepts a normal relative
+    path and resolves it under the given root.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "sub").mkdir()
+        out = arsenal_io.safe_repo_path(root, "sub/file.txt", field="path")
+        assert out.is_absolute()
+        assert out == (root / "sub" / "file.txt").resolve()
+        assert out.is_relative_to(root.resolve())
+
+
+def test_safe_repo_path_accepts_deeply_nested_relative() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "a" / "b" / "c").mkdir(parents=True)
+        out = arsenal_io.safe_repo_path(root, "a/b/c/d.json", field="path")
+        assert out == (root / "a" / "b" / "c" / "d.json").resolve()
+
+
+def test_safe_repo_path_rejects_absolute() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for bad in ("/etc/passwd", "/tmp/example"):
+            try:
+                arsenal_io.safe_repo_path(root, bad, field="path")
+            except ValueError:
+                continue
+            raise AssertionError(f"safe_repo_path must reject absolute path {bad!r}")
+
+
+def test_safe_repo_path_rejects_traversal() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for bad in ("../outside", "foo/../../outside", "../../etc/passwd"):
+            try:
+                arsenal_io.safe_repo_path(root, bad, field="path")
+            except ValueError:
+                continue
+            raise AssertionError(f"safe_repo_path must reject traversal {bad!r}")
+
+
+def test_safe_repo_path_rejects_dot_slash_prefix() -> None:
+    """``./relative`` is intentionally rejected. Authors should write
+    ``subdir/file`` rather than ``./subdir/file``.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        for bad in ("./relative", "./foo/bar"):
+            try:
+                arsenal_io.safe_repo_path(root, bad, field="path")
+            except ValueError:
+                continue
+            raise AssertionError(f"safe_repo_path must reject leading-./ {bad!r}")
+
+
+def test_safe_repo_path_rejects_dot_segment() -> None:
+    """A ``.`` segment anywhere in the path is rejected (kept simple
+    to avoid normalization ambiguity).
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        try:
+            arsenal_io.safe_repo_path(root, "foo/./bar", field="path")
+        except ValueError:
+            return
+        raise AssertionError("safe_repo_path must reject '.' segment")
+
+
+def test_safe_repo_path_rejects_empty() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        try:
+            arsenal_io.safe_repo_path(root, "", field="path")
+        except ValueError:
+            return
+        raise AssertionError("safe_repo_path must reject empty path")
+
+
 def main() -> int:
     tests = [v for k, v in globals().items() if k.startswith("test_")]
     failures = 0

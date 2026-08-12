@@ -377,6 +377,32 @@ Decision Records + commit roles, governance projection, lifecycle
 separation artifact, stop-condition taxonomy, consistency lint,
 generated review summary.
 
+### Composite-source modeling (added in GC01 repair)
+
+`asset.identity` is currently owned by `arsenal.registry` whose
+declared path is `arsenal/registry.json`. Per
+`arsenal/ASSET_CONTRACT.md`, the canonical asset registry is the
+merged view of `arsenal/registry.json` and
+`arsenal/registry.d/*.json`; both the base and the extension
+fragments are independently authored.
+
+The current source model declares `arsenal.registry` as the
+single owner and lists `arsenal.registry.d` as a separate artifact
+with no `owns_facts`. This is a deferred composite-source design
+gap, not a correctness bug for the existing slice: the loader
+and validator do not lose track of either file. A future slice
+must decide whether to:
+
+* extend the schema to declare multiple physical sources per
+  fact (logical owner + physical source members), or
+* collapse the merged view into a single composite artifact id
+  and treat the registry family as one artifact.
+
+Until that decision is made, the Project Intelligence tracer
+must NOT trace `asset.identity` -- the source model cannot yet
+express its true provenance honestly, and silently tracing the
+base file alone would be a hidden coupling.
+
 The source model itself is intentionally narrow in this slice:
 coverage of the load-bearing artifacts above is in. A future slice
 should consider whether the source model should additionally index

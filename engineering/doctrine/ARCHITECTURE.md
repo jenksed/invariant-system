@@ -229,9 +229,9 @@ These are guaranteed by the architecture, not by tests alone:
    normative for classification and source assignment, but it does
    not duplicate domain values. The validator in
    `scripts/arsenal_source_validate.py` fails closed on unknown
-   roles, duplicate identities, missing owners, two normative
-   owners for one fact, and value-shaped keys inside the source
-   model.
+   roles, duplicate identities, missing owners, conflicting owners
+   for one fact, schema-required fields that are absent, invalid
+   identifiers, and unsafe path bindings.
 
 ## Ownership and state role
 

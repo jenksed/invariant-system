@@ -347,17 +347,21 @@ def test_canonical_capability_identity_owner_is_fragment() -> None:
 
 
 def test_source_model_does_not_duplicate_domain_values() -> None:
-    """Anti-duplication test.
+    """Anti-duplication characterization.
 
     The source model must NOT carry any of the domain values it
     references; it stores only classification and locator metadata.
+    The closed-shape enforcement in ``load_source_model`` rejects any
+    key not in ``ALLOWED_ARTIFACT_KEYS`` (so a value-shaped key like
+    ``lifecycle`` would fail to load). This test is the redundant
+    load-time invariant: every artifact key is in the allowed set.
     """
-    bad = arsenal_source_model.FORBIDDEN_ARTIFACT_VALUE_KEYS
     for art in _model()["artifacts"]:
-        leaked = sorted(set(art) & bad)
+        leaked = sorted(set(art) - arsenal_source_model.ALLOWED_ARTIFACT_KEYS)
         assert not leaked, (
-            f"artifact {art['id']!r} leaks domain value(s) {leaked}; "
-            f"the source model must point at the source rather than copy its value"
+            f"artifact {art['id']!r} carries key(s) {leaked} outside "
+            f"ALLOWED_ARTIFACT_KEYS; the source model is an index and "
+            f"must not carry domain values"
         )
 
 
@@ -729,6 +733,476 @@ def test_canonical_drift_guard() -> None:
     assert a == b
     # And the validator's exit code for an unmodified tree is zero.
     assert arsenal_source_validate.validate_source_model(ROOT) == []
+
+
+# --- Schema/runtime coherence (F1) ---
+#
+# The GC01 schema declares more structural rules than the loader
+# historically enforced: required fields, types, identifier
+# patterns, and ``owns_facts`` uniqueness. These mutations prove
+# every schema-required constraint now fails closed through the
+# runtime validation path.
+
+
+def test_missing_required_artifact_ownership_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["artifacts"][0]["ownership"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "ownership" in err and "required" in err
+
+
+def test_missing_required_artifact_state_role_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["artifacts"][0]["state_role"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "state_role" in err and "required" in err
+
+
+def test_missing_required_artifact_owns_facts_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["artifacts"][0]["owns_facts"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "owns_facts" in err and "required" in err
+
+
+def test_missing_required_artifact_id_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["artifacts"][0]["id"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "id" in err
+
+
+def test_missing_required_fact_id_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["facts"][0]["id"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "id" in err
+
+
+def test_missing_required_fact_owner_artifact_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["facts"][0]["owner_artifact"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "owner_artifact" in err and "required" in err
+
+
+def test_wrong_type_ownership_list_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["ownership"] = []
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "ownership" in err and "must be a string" in err
+
+
+def test_wrong_type_state_role_object_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["state_role"] = {}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "state_role" in err and "must be a string" in err
+
+
+def test_wrong_type_owns_facts_string_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["owns_facts"] = "capability.identity"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "owns_facts" in err and "must be a list" in err
+
+
+def test_wrong_type_id_integer_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = 123
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "id must be a string" in err
+
+
+def test_wrong_type_artifacts_object_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"] = {}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "artifacts must be a list" in err
+
+
+def test_wrong_type_facts_object_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"] = {}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "facts must be a list" in err
+
+
+def test_wrong_type_materialization_integer_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["materialization"] = 7
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "materialization" in err and "must be a string" in err
+
+
+def test_invalid_id_uppercase_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = "Arsenal.Protocol"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not match pattern" in err
+
+
+def test_invalid_id_too_short_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = "ab"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "shorter than the" in err
+
+
+def test_invalid_id_leading_digit_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = "1protocol"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not match pattern" in err
+
+
+def test_invalid_id_whitespace_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = "arsenal protocol"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not match pattern" in err
+
+
+def test_invalid_id_path_like_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["id"] = "arsenal/protocol"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not match pattern" in err
+
+
+def test_invalid_owner_artifact_id_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["owner_artifact"] = "ARSENAL.PROTOCOL"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not match pattern" in err
+
+
+def test_owns_facts_duplicate_ids_rejected() -> None:
+    """Schema declares ``owns_facts`` as ``uniqueItems: true``; the
+    loader enforces the same rule.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        owns = data["artifacts"][0]["owns_facts"]
+        data["artifacts"][0]["owns_facts"] = owns + [owns[0]]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "duplicate fact ids" in err
+
+
+def test_valid_nested_repository_relative_path_accepted() -> None:
+    """A valid deeply-nested path is accepted. Avoids accidentally
+    over-restricting legitimate paths.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        # Pick an artifact that uses a plain path and replace with a
+        # deeply nested valid path that exists in this repo.
+        for art in data["artifacts"]:
+            if "path" in art and "path_pattern" not in art:
+                art["path"] = "arsenal/knowledge/fixtures/kft-0-kiln.json"
+                break
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc == 0, f"nested valid path must validate: {err}"
+
+
+# --- Ownership drift (F2) ---
+#
+# The serialized source model has two representations of ownership:
+# ``artifact.owns_facts[]`` and ``fact.owner_artifact``. They MUST
+# agree. These mutations exercise every direction of the drift.
+
+
+def test_ownership_drift_fact_omitted_from_owner_rejected() -> None:
+    """``fact.owner_artifact`` names A, but A.owns_facts does not
+    list the fact. Rejected.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        fid = data["facts"][0]["id"]
+        aid = data["facts"][0]["owner_artifact"]
+        for art in data["artifacts"]:
+            if art["id"] == aid:
+                art["owns_facts"] = [f for f in art["owns_facts"] if f != fid]
+                break
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "does not list this fact in owns_facts" in err
+
+
+def test_ownership_drift_artifact_lists_but_fact_points_elsewhere_rejected() -> None:
+    """Artifact A lists fact X in owns_facts, but fact X's
+    owner_artifact points to B. Rejected.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        fid = data["facts"][0]["id"]
+        original_owner = data["facts"][0]["owner_artifact"]
+        # Pick a different artifact to become the new owner.
+        new_owner = next(
+            a["id"] for a in data["artifacts"] if a["id"] != original_owner
+        )
+        data["facts"][0]["owner_artifact"] = new_owner
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "whose owner_artifact is" in err or "does not list this fact in owns_facts" in err
+
+
+def test_ownership_drift_artifact_lists_nonexistent_fact_rejected() -> None:
+    """Artifact A lists a fact id that does not exist in ``facts[]``.
+    Rejected.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["owns_facts"].append("does.not.exist")
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "references unknown fact id" in err
+
+
+def test_ownership_drift_two_artifacts_list_same_fact_rejected() -> None:
+    """A fact has a single owner_artifact, but two artifacts both
+    list it in owns_facts. The loader already rejects duplicate
+    fact ids when the facts collide on ``id``; the relevant drift
+    here is that two artifacts each point to the SAME fact id and
+    only one of them is the canonical owner. Either the second
+    listing is removed by the second cross-check or the duplicate
+    fact id check fires.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        fid = data["facts"][0]["id"]
+        # Add the fact id to a SECOND artifact's owns_facts so two
+        # artifacts both claim it.
+        others = [
+            a for a in data["artifacts"]
+            if fid not in a.get("owns_facts", [])
+            and a["id"] != data["facts"][0]["owner_artifact"]
+        ]
+        assert others, "test setup requires a second artifact"
+        others[0]["owns_facts"].append(fid)
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert (
+        "whose owner_artifact is" in err
+        or "does not list this fact in owns_facts" in err
+        or "references unknown fact id" in err
+    )
+
+
+# --- Path boundary (F3) ---
+#
+# Plain ``path`` values must receive the same repository-boundary
+# protection as ``path_pattern``. Before this slice, only the
+# pattern form had explicit traversal/absolute guards; the plain
+# path relied on `Path` silently discarding the preceding root.
+
+
+def test_path_absolute_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = "/tmp/example"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "must be a safe repository-relative path" in err
+
+
+def test_path_traversal_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = "../outside"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "must be a safe repository-relative path" in err
+
+
+def test_path_traversal_chain_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = "foo/../../outside"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "must be a safe repository-relative path" in err
+
+
+def test_path_dot_slash_prefix_rejected() -> None:
+    """``./relative`` is intentionally rejected (documented as
+    unnecessary ambiguity).
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = "./relative"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "must be a safe repository-relative path" in err
+
+
+def test_path_dot_segment_rejected() -> None:
+    """``foo/./bar`` is normalized away by ``Path`` but is rejected
+    as unnecessary ambiguity.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = "foo/./bar"
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "must be a safe repository-relative path" in err
+
+
+def test_path_lockfile_dotfile_accepted() -> None:
+    """The competence lockfile is a legitimate top-level dotfile
+    (``.arsenal.lock``) and must be accepted.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        for art in data["artifacts"]:
+            if art["id"] == "arsenal.competence-lockfile":
+                art["path"] = ".arsenal.lock"
+                break
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc == 0, f"dotfile lockfile path must validate: {err}"
+
+
+# --- Schema/runtime coherence (F1) --- additional coherence checks
+# that connect the loader's required-fields list to the schema's
+# declared `required` arrays so future drift is caught at one site.
+
+
+def test_loader_required_fields_match_schema_required() -> None:
+    """The loader's ``REQUIRED_*_FIELDS`` mirrors the schema's
+    ``required`` arrays. If the schema is amended, the loader must
+    be amended in the same commit; this test catches drift.
+    """
+    model = arsenal_source_model.load_source_model(ROOT)
+    schema = model["schema_document"]
+    schema_artifact_required = set(schema["$defs"]["artifact"]["required"])
+    schema_fact_required = set(schema["$defs"]["fact"]["required"])
+    loader_artifact_required = set(arsenal_source_model.REQUIRED_ARTIFACT_FIELDS)
+    loader_fact_required = set(arsenal_source_model.REQUIRED_FACT_FIELDS)
+    assert schema_artifact_required == loader_artifact_required, (
+        f"schema artifact required {schema_artifact_required} != "
+        f"loader REQUIRED_ARTIFACT_FIELDS {loader_artifact_required}"
+    )
+    assert schema_fact_required == loader_fact_required, (
+        f"schema fact required {schema_fact_required} != "
+        f"loader REQUIRED_FACT_FIELDS {loader_fact_required}"
+    )
+
+
+def test_loader_id_pattern_matches_schema_pattern() -> None:
+    """The loader's ``ID_PATTERN`` mirrors the schema's id pattern.
+    A drift here means the loader and schema disagree about what a
+    valid identifier is.
+    """
+    model = arsenal_source_model.load_source_model(ROOT)
+    schema = model["schema_document"]
+    schema_pattern = schema["$defs"]["artifact"]["properties"]["id"]["pattern"]
+    schema_min = schema["$defs"]["artifact"]["properties"]["id"]["minLength"]
+    assert schema_pattern == arsenal_source_model.ID_PATTERN
+    assert schema_min == arsenal_source_model.ID_MIN_LENGTH
+
+
+def test_exit_code_for_schema_violation_is_two() -> None:
+    """The validator wires meaningful error classes to the advertised
+    exit codes (no longer collapses every failure to ``UNKNOWN``).
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        del data["artifacts"][0]["ownership"]
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    # Run the CLI directly to capture its exit code.
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as tmp:
+        sandbox = Path(tmp) / "sandbox"
+        sandbox.mkdir()
+        for sub in ("arsenal", "scripts", "distribution", "evaluation",
+                    "docs", "engineering"):
+            src = ROOT / sub
+            if src.is_dir():
+                shutil.copytree(src, sandbox / sub)
+        for top in ("arsenal.project.json", ".arsenal.lock"):
+            src = ROOT / top
+            if src.is_file():
+                shutil.copy2(src, sandbox / top)
+        mutate(sandbox)
+        result = subprocess.run(
+            ["python3", "scripts/arsenal_source_validate.py"],
+            cwd=sandbox, capture_output=True, text=True,
+        )
+    assert result.returncode == arsenal_governance.EXIT_CODE["SCHEMA_VIOLATION"], (
+        f"missing required field must exit SCHEMA_VIOLATION (2); "
+        f"got rc={result.returncode}; stderr={result.stderr!r}"
+    )
 
 
 def main() -> int:
