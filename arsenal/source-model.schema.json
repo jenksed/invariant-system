@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/governance-source-model-1.0.0.json",
+  "title": "Project Arsenal Governance Source Model",
+  "description": "Machine-readable index of where governance facts are owned and what state role each carrying artifact plays. This schema constrains the source model itself; it does NOT carry domain values such as supported targets, schema versions, adapter versions, suite IDs, or capability lifecycle/evaluation state. The `notes` field on each artifact is non-authoritative explanatory metadata and MUST NOT be consulted for domain truth. See scripts/arsenal_governance.py for the closed vocabularies referenced here.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "artifacts", "facts"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "facts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fact"}
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ownership", "state_role", "owns_facts"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$",
+          "minLength": 3,
+          "description": "Stable identifier for this artifact inside the source model. Used as the owner key for facts."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Repository-relative path to the artifact. Glob patterns are not allowed at the artifact level; use path_pattern to address a family of files or directories."
+        },
+        "path_pattern": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional bounded glob pattern (e.g. 'arsenal/capabilities/*.json' or 'distribution/agent-skills/*'). Repository-relative, no traversal. Used to address a family of artifacts that all share ownership and state role; the pattern may match files or directories."
+        },
+        "ownership": {
+          "type": "string",
+          "description": "Closed ownership layer. The validator rejects any value not in the canonical vocabulary."
+        },
+        "state_role": {
+          "type": "string",
+          "description": "Closed state role. The validator rejects any value not in the canonical vocabulary."
+        },
+        "materialization": {
+          "type": "string",
+          "description": "Optional materialization mode. The validator rejects any value not in the canonical vocabulary."
+        },
+        "owns_facts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/idRef"},
+          "uniqueItems": true,
+          "description": "Fact IDs whose owner is this artifact. The artifact's state_role tells what kind of representation those facts are (normative/derived/historical/narrative). Empty array allowed only for narrative or derived artifacts that do not own any fact."
+        },
+        "notes": {
+          "type": "string",
+          "description": "NON-AUTHORITATIVE explanatory metadata. Free-form human-readable comment. Validators, projections, and governance queries MUST NOT consult this field for domain truth. It exists purely for documentation and must not become the only machine-relevant source of mutable current state."
+        }
+      },
+      "oneOf": [
+        {"required": ["path"]},
+        {"required": ["path_pattern"]}
+      ]
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "owner_artifact"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9.-]*$",
+          "minLength": 3
+        },
+        "owner_artifact": {
+          "$ref": "#/$defs/idRef",
+          "description": "The single artifact that owns this fact. Validation rejects a fact with more than one owner."
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Free-form locator inside the owner (e.g. 'lifecycle', 'targets', 'evaluation'). The validator may grep this string against the artifact body; it never carries the value itself."
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "idRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.-]*$",
+      "minLength": 3
+    }
+  }
+}

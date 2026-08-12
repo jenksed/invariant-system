@@ -18,8 +18,11 @@ import re
 from pathlib import Path
 from typing import Any
 
-# Matches a non-empty relative path with no traversal segments.
-_SAFE_RELATIVE_RE = re.compile(r"^[^./][^/]*(?:/[^/]+)*$")
+# Matches a non-empty relative path with no traversal or
+# current-directory-only segments. Leading ``.`` is allowed only as
+# the start of a real filename (e.g. ``.arsenal.lock``); bare
+# ``.``, ``..``, ``./`` and ``../`` are rejected.
+_SAFE_RELATIVE_RE = re.compile(r"^[^/]+(?:/[^/]+)*$")
 
 
 def sha256_bytes(data: bytes) -> str:
@@ -65,12 +68,53 @@ def write_json(path: Path, data: Any) -> None:
 def safe_relative_path(raw: str, *, field: str) -> Path:
     """Validate and return a safe repository-relative path string.
 
-    Rejects absolute paths, paths that contain ".." traversal segments,
-    and empty strings. Used by every script that reads a path from a
-    registry, manifest, or suite definition.
+    Rejects absolute paths, paths that contain ``..`` traversal or
+    bare ``.`` segments, empty strings, and paths whose overall shape
+    contains any segment that is ``""``, ``.``, or ``..``. Leading
+    ``.`` is allowed only as the start of a real filename (e.g.
+    ``.arsenal.lock``); bare ``.``, ``..``, ``./`` and ``../`` are
+    all rejected.
     """
-    if not raw or ".." in Path(raw).parts or Path(raw).is_absolute():
+    if not raw or Path(raw).is_absolute():
         raise ValueError(f"{field} must be a safe repository-relative path: {raw!r}")
     if not _SAFE_RELATIVE_RE.match(raw):
         raise ValueError(f"{field} must be a safe repository-relative path: {raw!r}")
+    if any(seg in ("", ".", "..") for seg in raw.split("/")):
+        raise ValueError(f"{field} must be a safe repository-relative path: {raw!r}")
     return Path(raw)
+
+
+def safe_repo_path(root: Path, raw: str, *, field: str) -> Path:
+    """Validate ``raw`` against ``root`` and return a resolved Path.
+
+    This is the canonical repository-path safety primitive. The source
+    model loader and validator both call it so they cannot disagree on
+    what counts as a safe repository-relative path.
+
+    Rejects:
+
+    * empty strings;
+    * absolute paths (POSIX leading ``/`` and Windows drive letters);
+    * any traversal segment (``..``);
+    * a leading ``./`` prefix -- documented as rejected to keep path
+      semantics explicit. Authors should write ``subdir/file`` rather
+      than ``./subdir/file``;
+    * any ``.`` segment (e.g. ``foo/./bar``);
+    * a leading ``../`` prefix;
+    * a resolved path that escapes ``root`` after symlink
+      normalization (defense in depth even though traversal segments
+      are already rejected above).
+
+    Returns the absolute resolved Path when the input is safe.
+    """
+    # Reuse the existing string-level repository-path validator so
+    # the canonical rules live in exactly one place. That validator
+    # already rejects empty strings, absolute paths, traversal
+    # segments, bare ``.`` segments, and a leading ``./``.
+    safe_relative_path(raw, field=field)
+    # Defense in depth: ensure the resolved path stays under root.
+    resolved_root = root.resolve()
+    resolved = (resolved_root / raw).resolve()
+    if not resolved.is_relative_to(resolved_root):
+        raise ValueError(f"{field} resolves outside the repository root: {raw!r}")
+    return resolved
