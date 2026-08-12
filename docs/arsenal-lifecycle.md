@@ -21,6 +21,13 @@ need to learn a second state machine.
 
 ## Canonical lifecycle states
 
+The lifecycle table describes **capability state**, not Qualified Method Record
+status. A capability is the contract / productized surface; its lifecycle and
+evaluation are owned by the canonical capability fragment
+(`arsenal/capabilities/*.json`) and the qualification receipts under
+`evaluation/qualifications/`. The two protocol values are projections of one
+epistemic trajectory.
+
 | Epistemic stage    | Existing lifecycle | Existing evaluation.status | Meaning                                                          |
 |--------------------|--------------------|----------------------------|------------------------------------------------------------------|
 | Idea               | `draft`            | `unassessed`               | Concept exists; no claim yet; no evidence.                       |
@@ -32,6 +39,40 @@ need to learn a second state machine.
 The terminal state `deprecated` remains a non-epistemic terminal that any prior
 stage may transition into. It is excluded from the epistemic chain because it
 encodes retirement rather than evidence strength.
+
+## QMR status and capability state are independent projections
+
+A Qualified Method Record carries its own `status` field
+(`experimental` or `qualified`). That status is **method maturity** — the
+evidence Arsenal has gathered for a method in a declared context. It is NOT
+the capability's lifecycle value, and it is NOT the capability's evaluation
+status. The two projections are distinct:
+
+| Projection | What it describes | Where it lives | Owner |
+|------------|-------------------|----------------|-------|
+| **QMR status** (`experimental` / `qualified`) | Method maturity for a declared context; bound to evidence in `evaluation.evidence_refs`, observed cases, observed strengths, observed failures. | The method record itself: `evaluation/method-records/*.yaml` | The method record (`arsenal.method-records` in the source model). |
+| **Capability lifecycle** (`draft` / `testing` / `stable` / `deprecated`) | The epistemic state of the capability contract/productized surface. | `arsenal/capabilities/<id>.json` → `capability.lifecycle` | `arsenal.capability-fragments` in the source model. |
+| **Capability evaluation.status** (`unassessed` / `planned` / `candidate` / `qualified`) | The evaluation state of the capability, recorded against the qualification suite gate. | `arsenal/capabilities/<id>.json` → `capability.evaluation.status` and the qualification receipts under `evaluation/qualifications/` | `arsenal.capability-fragments` plus the bench-emitted qualification receipts. |
+
+Implications the record-keeping must preserve:
+
+1. A method may be `experimental` while its underlying capability is still
+   `draft` / `unassessed` (no qualification work has begun).
+2. A method may be `qualified` for one context while its capability is still
+   `testing` / `candidate` overall (the method-level gate is satisfied but the
+   broader capability promotion criteria are not).
+3. A `qualified` method does NOT automatically promote its capability. Capability
+   promotion remains a separate decision with its own evidence boundary; the
+   capability fragment is the canonical owner of `capability.lifecycle` and
+   `capability.evaluation.status`.
+4. The QMR is evidence, never authority. It binds to the capability via
+   provenance (`procedure_ref`, `arsenal_commit`, `record_digest`,
+   `evidence_refs`) but does not redefine the canonical values.
+5. The protocol enum `LIFECYCLE_STATES` and `EVALUATION_STATES` are owned by
+   `scripts/arsenal_protocol.py`. Arsenal-distribution content does not
+   introduce a parallel state machine; the QMR `status` enum
+   (`experimental` / `qualified`) is the closed vocabulary for method
+   maturity and is separate from the capability protocol enums.
 
 ## Why this design does not create parallel authority
 

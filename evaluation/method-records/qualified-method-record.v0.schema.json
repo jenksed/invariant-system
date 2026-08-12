@@ -139,8 +139,8 @@
         },
         "record_digest": {
           "type": "string",
-          "pattern": "^sha256:[A-Fa-f0-9]{64}$",
-          "description": "SHA-256 digest of the record itself (with the digest field set to its placeholder)."
+          "pattern": "^(sha256:[A-Fa-f0-9]{64}|sha256:fixture-only)$",
+          "description": "SHA-256 digest of the record itself (with the digest field set to its placeholder). The fixture placeholder sha256:fixture-only is permitted only when the record is explicitly marked fixture=true; all other records must carry a real 64-hex SHA-256."
         }
       }
     }
@@ -208,7 +208,8 @@
           "procedure_ref": {"pattern": "^sha256:fixture-only$"},
           "provenance": {
             "properties": {
-              "arsenal_commit": {"type": ["string", "null"]}
+              "arsenal_commit": {"type": ["string", "null"]},
+              "record_digest": {"pattern": "^sha256:fixture-only$"}
             }
           }
         }

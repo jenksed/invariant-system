@@ -25,7 +25,8 @@ Validation surface:
 
 Records marked ``fixture: true`` are loaded for completeness but their
 ``procedure_ref``, ``arsenal_commit``, and ``record_digest`` are allowed
-to be placeholders; they are NOT subject to the
+to be placeholders (``sha256:fixture-only`` for the digest fields and
+``null`` for ``arsenal_commit``); they are NOT subject to the
 ``qualified_for.contexts``/``exclusions`` checks.
 
 The script exits non-zero on the first failure class it observes. Each

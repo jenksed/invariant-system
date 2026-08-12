@@ -21,7 +21,7 @@ to the Project Arsenal surface that enforces it.
 | `evaluation.confidence`| `bounded`, `limited`, `unqualified-fixture`, `qualified-for-declared-context`. `qualified` records must use the last. | Schema enum + allOf const.                                                                             |
 | `evaluation.qualification_gap` | Optional explicit gap statement.                       | Schema min-length; used by the canonical record to enumerate the qualification gap honestly.           |
 | `provenance.arsenal_commit` | The Arsenal commit SHA the record was authored against. `null` is permitted for fixture and experimental records. | Schema type union; `qualified` records carry a real SHA (validator does not yet enforce this explicitly — fixture/experimental paths are documented but `qualified` is unreachable today). |
-| `provenance.record_digest`  | SHA-256 of the record itself, computed via the documented canonicalization. | `_compute_record_digest` (SHA-256 over JSON with sort_keys + canonical separators, replacing the digest field with the 64-zero placeholder). |
+| `provenance.record_digest`  | SHA-256 of the record itself, computed via the documented canonicalization. `sha256:fixture-only` is permitted only when the record is explicitly a fixture. | Schema regex `^(sha256:[A-Fa-f0-9]{64}|sha256:fixture-only)$` plus the fixture-scoped allOf branch that constrains fixtures to `sha256:fixture-only`. `_compute_record_digest` (SHA-256 over JSON with sort_keys + canonical separators, replacing the digest field with the 64-zero placeholder) runs only for non-fixture records. |
 | Runtime authority tokens (`filesystem.write`, `network.write`, `git.write`, `production.mutate`, `cloud.remote`) | The record cannot grant filesystem, network, Git, or production authority. | Substring check in `validate_record` rejects the presence of any of these tokens in the record body.   |
 
 ## Canonicalization rule for `provenance.record_digest`
@@ -64,3 +64,28 @@ ARS-01 does not consume any qualification receipt; no qualification
 receipt exists for `capability.recon` today. The qualified method
 record is therefore classified `experimental` and the qualification gap
 is documented explicitly.
+
+## QMR status vs capability lifecycle / evaluation status
+
+The QMR `status` field (`experimental` / `qualified`) is a closed
+vocabulary for **method maturity** — what Arsenal has observed about a
+method in a declared context. It is distinct from the capability's
+`lifecycle` and `evaluation.status` values, which are owned by
+`arsenal/capabilities/<id>.json` (canonical capability fragment) and
+by the qualification receipts under `evaluation/qualifications/`. The
+two projections are independent:
+
+- A method may be `experimental` while its capability is `draft` /
+  `unassessed`.
+- A method may be `qualified` for a declared context while its
+  capability remains `testing` / `candidate` overall.
+- A `qualified` method does NOT promote its capability. Capability
+  promotion remains a separate decision with its own evidence.
+
+The QMR is evidence, not authority. The record binds to the capability
+via provenance digests and `evidence_refs`; it does not redefine
+`capability.lifecycle` or `capability.evaluation.status`. See
+`docs/arsenal-lifecycle.md` for the canonical narrative and
+`arsenal/source-model.json` facts (`method-record.qualification-status`
+vs `capability.current-lifecycle` / `capability.current-evaluation`)
+for the source-of-truth attribution.

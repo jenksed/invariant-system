@@ -324,6 +324,64 @@ def test_status_field_must_be_in_enum() -> None:
     print("PASS negative case: status not in enum rejected")
 
 
+def test_upstream_fixture_loads_unchanged() -> None:
+    """The upstream engineering-system fixture at
+    ``engineering-system/fixtures/qualified-method-record.v0.yaml`` must be
+    loadable by the Arsenal validator without modification. This is the
+    compatibility test: Arsenal's reproduction of the v0 contract MUST accept
+    the official fixture semantics so consumers do not silently fork the
+    contract.
+    """
+    upstream = (
+        Path("/Users/jenksed/Developer/engineering-system-workspace/engineering-system")
+        / "fixtures"
+        / "qualified-method-record.v0.yaml"
+    )
+    if not upstream.is_file():
+        # The compatibility target is a sibling repo (engineering-system).
+        # If that workspace is not present in this checkout, skip — the
+        # compatibility test is opt-in by workspace layout.
+        print("SKIP compatibility case: upstream fixture not present")
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        dst = Path(tmp) / "method-records"
+        dst.mkdir()
+        shutil.copy2(SCHEMA_PATH, dst / SCHEMA_PATH.name)
+        shutil.copy2(upstream, dst / "qualified-method-record.v0.yaml")
+        rc, err = _run_validator(dst)
+    assert rc == 0, (
+        f"upstream fixture failed Arsenal validation: rc={rc}, err={err!r}"
+    )
+    print("PASS compatibility case: upstream fixture loads unchanged")
+
+
+def test_non_fixture_record_rejects_placeholder_digest() -> None:
+    """A non-fixture record that uses ``record_digest: sha256:fixture-only``
+    is rejected by the schema. Stricter rules for real records are preserved:
+    only fixtures may carry the placeholder digest.
+    """
+    import yaml
+    with tempfile.TemporaryDirectory() as tmp:
+        dst = _copy_records_to(Path(tmp))
+        path = dst / "repository-recon.architecture-anchor.v0.yaml"
+        record = yaml.safe_load(path.read_text())
+        record["provenance"]["record_digest"] = "sha256:fixture-only"
+        path.write_text(yaml.safe_dump(record, sort_keys=True, allow_unicode=True))
+        rc, err = _run_validator(dst)
+    # Either the schema (fixture-only not permitted for non-fixture) or the
+    # digest check rejects it; both are part of the documented invariants.
+    assert rc in (
+        arm.EXIT_CODE["SCHEMA_VIOLATION"],
+        arm.EXIT_CODE["INVALID_DIGEST"],
+    ), f"expected SCHEMA_VIOLATION/INVALID_DIGEST, got rc={rc}; err={err!r}"
+    assert (
+        "record_digest" in err
+        or "fixture-only" in err
+        or "pattern" in err.lower()
+    )
+    print("PASS negative case: non-fixture record rejects placeholder digest")
+
+
 def _canonical_digest(record: dict) -> str:
     """Helper: compute the canonical digest for a record."""
     import hashlib, json
@@ -348,6 +406,8 @@ def main() -> int:
     test_determinism_two_runs_agree()
     test_provenance_canonical_record_digest_matches()
     test_status_field_must_be_in_enum()
+    test_upstream_fixture_loads_unchanged()
+    test_non_fixture_record_rejects_placeholder_digest()
     print("method-record suite: PASS")
     return 0
 
