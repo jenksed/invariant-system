@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/qualified-method-record-v0.json",
+  "title": "Project Arsenal Qualified Method Record v0 (re-declared)",
+  "description": "Closed-shape validation of Project Arsenal's reproduction of the engineering-system qualified-method-record/v0 contract. The schema enforces the documented minimum record (status, qualified_for, inputs, outputs, procedure_ref, evaluation, provenance) and the documented invariants (qualification is context-bound; failures and exclusions are first-class). It does NOT redefine the contract; consumers that need the engineering-system contract should resolve the original schema id there. This schema only validates records Project Arsenal emits.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "method_id",
+    "method_version",
+    "status",
+    "qualified_for",
+    "inputs",
+    "outputs",
+    "procedure_ref",
+    "evaluation",
+    "provenance"
+  ],
+  "properties": {
+    "schema": {
+      "const": "engineering-system/qualified-method-record/v0",
+      "description": "Schema identity must match the accepted engineering-system contract."
+    },
+    "fixture": {
+      "const": true,
+      "description": "When true, the record is a fixture and carries no qualification claim. Records without fixture=true must satisfy the non-fixture invariants."
+    },
+    "method_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9.\\-/]+$",
+      "minLength": 5,
+      "description": "Stable identifier of the method being qualified. Project Arsenal uses the prefix repository-recon/ for Repository Recon methods and adds a method-name suffix."
+    },
+    "method_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9.-]+)?$",
+      "description": "Semantic version of the method."
+    },
+    "status": {
+      "enum": ["experimental", "qualified"],
+      "description": "Method maturity. experimental = observed but not gate-qualified; qualified = gate satisfied for the declared context only."
+    },
+    "qualified_for": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome", "contexts", "exclusions"],
+      "properties": {
+        "outcome": {
+          "type": "string",
+          "minLength": 3,
+          "description": "The user-visible outcome the method is bound to (e.g. understand-a-repository)."
+        },
+        "contexts": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 3},
+          "description": "The contexts in which the qualification claim holds."
+        },
+        "exclusions": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 3},
+          "description": "Explicit contexts or conditions the record does NOT cover. Negative knowledge is first-class."
+        }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 0,
+      "items": {"type": "string", "minLength": 1},
+      "description": "Named inputs the method consumes."
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"type": "string", "minLength": 1},
+      "description": "Named outputs the method produces."
+    },
+    "procedure_ref": {
+      "type": "string",
+      "pattern": "^(sha256:[A-Fa-f0-9]{64}|sha256:fixture-only)$",
+      "description": "Provenance digest of the procedure. fixture-only is permitted only when the record is explicitly a fixture; all other records must carry a real SHA-256."
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_refs",
+        "models",
+        "repositories",
+        "observed_strengths",
+        "observed_failures",
+        "confidence"
+      ],
+      "properties": {
+        "evidence_refs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Provenance references (sha256, file paths, etc.) to the evidence base."
+        },
+        "models": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Model identifiers whose observed behavior contributed to the evidence base."
+        },
+        "repositories": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Repository identifiers the evidence base was observed on."
+        },
+        "observed_strengths": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Concrete observed strengths. Each entry must be a positive observation, not a category."
+        },
+        "observed_failures": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "description": "Concrete observed failures or qualifications gaps. Required for experimental records."
+        },
+        "confidence": {
+          "enum": ["unqualified-fixture", "bounded", "limited", "qualified-for-declared-context"],
+          "description": "Confidence level. bounded and limited are permitted for experimental records; qualified-for-declared-context requires status=qualified."
+        },
+        "qualification_gap": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional explicit gap statement when the evidence is not yet sufficient for qualification."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["arsenal_commit", "record_digest"],
+      "properties": {
+        "arsenal_commit": {
+          "type": ["string", "null"],
+          "description": "The Arsenal commit SHA the record was authored against. Null is permitted for fixture and experimental records authored before the commit is final; qualified records must carry a real commit SHA."
+        },
+        "record_digest": {
+          "type": "string",
+          "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+          "description": "SHA-256 digest of the record itself (with the digest field set to its placeholder)."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "experimental records must declare observed_failures and a non-positive confidence",
+      "if": {
+        "properties": {"status": {"const": "experimental"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "evaluation": {
+            "required": ["observed_failures"],
+            "properties": {
+              "observed_failures": {"minItems": 1},
+              "confidence": {"enum": ["unqualified-fixture", "bounded", "limited"]}
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "experimental records may carry a null arsenal_commit because the record is authored before promotion; qualified records must carry a real commit SHA",
+      "if": {
+        "properties": {"status": {"const": "experimental"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "provenance": {
+            "properties": {
+              "arsenal_commit": {"type": ["string", "null"]}
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "qualified records must declare confidence=qualified-for-declared-context",
+      "if": {
+        "properties": {"status": {"const": "qualified"}},
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "evaluation": {
+            "required": ["observed_failures"],
+            "properties": {
+              "confidence": {"const": "qualified-for-declared-context"}
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "fixtures must declare fixture=true and may carry placeholder digests",
+      "if": {
+        "properties": {"fixture": {"const": true}},
+        "required": ["fixture"]
+      },
+      "then": {
+        "properties": {
+          "procedure_ref": {"pattern": "^sha256:fixture-only$"},
+          "provenance": {
+            "properties": {
+              "arsenal_commit": {"type": ["string", "null"]}
+            }
+          }
+        }
+      }
+    }
+  ]
+}
