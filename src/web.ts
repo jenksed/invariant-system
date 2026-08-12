@@ -18,6 +18,7 @@ import {
   snapshotRepo
 } from './index';
 import { runRepositoryRecon } from './packs/repository-recon/run';
+import { loadAndValidateQmr } from './core/qmr';
 
 export interface WebOptions {
   port: number;
@@ -105,11 +106,19 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           return;
         }
         const cap = await resolveCapability(packRoot);
+        let qmr;
+        try {
+          qmr = await loadAndValidateQmr({ capability: cap, repoRoot: repository });
+        } catch (e) {
+          jsonResponse(res, 422, { error: (e as Error).message, simulated: true });
+          return;
+        }
         const recon = await runRepositoryRecon(repository);
         const snap = await snapshotRepo(repository);
         const envelope = compileWorkEnvelope({
           goal,
           capability: cap,
+          qmr,
           projectState: {
             repository,
             baseCommit: snap.input.headCommit,

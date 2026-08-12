@@ -44,7 +44,10 @@ export function buildResultView(result: RunResultEnvelopeV0): ResultView {
   const summary =
     `Run ${result.run_id} for Work ${result.work_id} reported status '${result.status}'. ` +
     `Authority requested=${result.authority.requested.length}, granted=${result.authority.granted.length}, ` +
-    `denied=${result.authority.denied.length}. ` +
+    `denied=${result.authority.denied.length} (all simulated). ` +
+    `Proof obligations satisfied=${result.proof_obligations.satisfied.length}, ` +
+    `unsatisfied=${result.proof_obligations.unsatisfied.length}, ` +
+    `invalidated=${result.proof_obligations.invalidated.length} (all simulated). ` +
     `Evidence items=${result.evidence.length} (all simulated). ` +
     `Acceptance readiness: ${result.acceptance_readiness.ready ? 'ready' : 'NOT ready'}.`;
 

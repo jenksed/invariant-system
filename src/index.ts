@@ -47,6 +47,14 @@ export type { PackManifest, CatalogEntry, InstallResult } from './core/pack';
 export { loadQmrFixture, loadSkillDescriptor } from './core/skill';
 export type { SkillDescriptor } from './core/skill';
 
+export {
+  loadAndValidateQmr,
+  checkQmrCapabilityCompatibility,
+  isMethodStatusSufficient
+} from './core/qmr';
+export type { LoadAndValidateQmrArgs } from './core/qmr';
+export { QmrError, QmrMissingError, QmrMalformedError, QmrIncompatibilityError } from './core/qmr';
+
 export type {
   WorkEnvelopeV0,
   RunResultEnvelopeV0,

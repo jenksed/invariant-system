@@ -14,7 +14,8 @@ import {
   invokeFakeKiln,
   buildResultView,
   removePack,
-  rollbackPack
+  rollbackPack,
+  loadAndValidateQmr
 } from '../../src/index';
 
 describe('power-user flow', () => {
@@ -59,10 +60,12 @@ describe('power-user flow', () => {
 
     // run
     const goal = findGoalById('understand-a-repository')!;
+    const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: fixtureDir });
     const snap = await snapshotRepo(repoRoot);
     const envelope = compileWorkEnvelope({
       goal,
       capability: cap,
+      qmr,
       projectState: {
         repository: repoRoot,
         baseCommit: snap.input.headCommit,

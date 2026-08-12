@@ -1,13 +1,20 @@
 /**
- * Goal -> Work Envelope v0 compiler.
+ * Goal + Capability + loaded QMR -> Work Envelope v0 compiler.
  *
- * Pure function: given a goal, a resolved capability, and a project state,
- * produce a Work Envelope v0. Validates the produced envelope with zod.
+ * Pure function: given a goal, a resolved capability, a project state, and
+ * a QMR that has already been loaded and validated against the capability,
+ * produce a Work Envelope v0. The QMR is REQUIRED because the envelope's
+ * `method_provenance` must derive from the actually-loaded QMR, not from
+ * the capability's contract metadata. The Work Envelope contract says
+ * Arsenal is optional provenance, but if a QMR is in scope it must be
+ * cited truthfully.
+ *
+ * Validates the produced envelope with zod.
  */
 import { randomUUID } from 'node:crypto';
 import type { Goal } from './goal';
 import type { ResolvedCapability } from './capability-registry';
-import type { WorkEnvelopeV0 } from './schemas';
+import type { QualifiedMethodRecordV0, WorkEnvelopeV0 } from './schemas';
 import { WorkEnvelopeV0Schema } from './schemas';
 
 export interface ProjectState {
@@ -19,13 +26,15 @@ export interface ProjectState {
 export function compileWorkEnvelope(args: {
   goal: Goal;
   capability: ResolvedCapability;
+  qmr: QualifiedMethodRecordV0;
   projectState: ProjectState;
   createdAt: string;
   workId?: string;
 }): WorkEnvelopeV0 {
   const workId = args.workId ?? randomUUID();
   const methodProvenance = [
-    `${args.capability.skill.id}@${args.capability.contract.compatibility.min_method_status}`
+    `${args.qmr.method_id}@${args.qmr.method_version}`,
+    `digest:${args.qmr.provenance.record_digest}`
   ];
 
   const envelope: WorkEnvelopeV0 = {

@@ -9,7 +9,7 @@ import {
   snapshotRepo,
   invokeFakeKiln,
   buildResultView,
-  loadQmrFixture
+  loadAndValidateQmr
 } from '../../src/index';
 
 describe('fixture substitution', () => {
@@ -33,12 +33,13 @@ describe('fixture substitution', () => {
     async function runOnce(qmrPath: string) {
       const cap = await resolveCapability(path.join(packsDir, 'repository-recon'));
       cap.skill.qmrFixturePath = qmrPath;
-      const qmr = await loadQmrFixture(qmrPath, fixtureDir);
+      const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: fixtureDir });
       expect(qmr.qualified_for.outcome).toBe('understand-a-repository');
       const snap = await snapshotRepo(repoRoot);
       const envelope = compileWorkEnvelope({
         goal,
         capability: cap,
+        qmr,
         projectState: {
           repository: repoRoot,
           baseCommit: snap.input.headCommit,
@@ -51,6 +52,7 @@ describe('fixture substitution', () => {
       return {
         contractVersion: cap.contract.contract_version,
         envelopeContractVersion: envelope.capability.contract_version,
+        envelopeProvenance: envelope.capability.method_provenance,
         view
       };
     }
@@ -58,9 +60,13 @@ describe('fixture substitution', () => {
     const a = await runOnce(path.join(fixtureDir, 'qualified-method-record.v0.yaml'));
     const b = await runOnce(path.join(fixtureDir, 'qualified-method-record.v0.alt.yaml'));
 
+    // Capability contract is identical across A/B.
     expect(a.contractVersion).toBe(b.contractVersion);
     expect(a.envelopeContractVersion).toBe(b.envelopeContractVersion);
     expect(a.view.simulated).toBe(true);
     expect(b.view.simulated).toBe(true);
+    // Work Envelope method provenance differs across A/B because the QMR
+    // method_id and digest differ.
+    expect(a.envelopeProvenance).not.toEqual(b.envelopeProvenance);
   });
 });

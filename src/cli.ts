@@ -38,6 +38,7 @@ import {
   loadSkillDescriptor
 } from './index';
 import { runRepositoryRecon } from './packs/repository-recon/run';
+import { loadAndValidateQmr } from './core/qmr';
 import { validateAllFixtures, compileAgainstGoalCatalog } from './core/contract-validation';
 
 const PACKS_DIR = path.resolve(__dirname, 'packs');
@@ -159,14 +160,26 @@ program
         cap.skill.qmrFixturePath = opts.qmrFixture;
       }
 
-      // Step 1: run the deterministic local procedure (read-only).
+      // Step 1: load and validate the QMR the Capability is supposed to
+      // back. Missing, malformed, or incompatible QMR fails closed.
+      let qmr;
+      try {
+        qmr = await loadAndValidateQmr({ capability: cap, repoRoot: opts.repository });
+      } catch (e) {
+        console.error(`loadout run: ${(e as Error).message}`);
+        process.exit(1);
+      }
+
+      // Step 2: run the deterministic local procedure (read-only).
       const recon = await runRepositoryRecon(opts.repository);
-      // Step 2: snapshot the workspace.
+      // Step 3: snapshot the workspace.
       const snap = await snapshotRepo(opts.repository);
-      // Step 3: compile the Work Envelope.
+      // Step 4: compile the Work Envelope. method_provenance derives from
+      // the loaded QMR, not from the Capability's contract metadata.
       const envelope = compileWorkEnvelope({
         goal,
         capability: cap,
+        qmr,
         projectState: {
           repository: opts.repository,
           baseCommit: snap.input.headCommit,
@@ -174,17 +187,18 @@ program
         },
         createdAt: new Date().toISOString()
       });
-      // Step 4: invoke the SIMULATED Kiln boundary.
+      // Step 5: invoke the SIMULATED Kiln boundary. Defaults to deny-all
+      // authority and unsatisfy-all proof obligations.
       const result = invokeFakeKiln(envelope);
-      // Step 5: build the Result view.
+      // Step 6: build the Result view.
       const view = buildResultView(result);
-      // Step 6: print.
+      // Step 7: print.
       console.log(formatResultViewText(view));
       console.log('');
       console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
       for (const n of recon.notes) console.log(`  ${n}`);
 
-      // Step 7: persist the run record.
+      // Step 8: persist the run record.
       const wsPaths = await ensureWorkspace(opts.repository);
       const recordPath = path.join(wsPaths.runs, `${result.run_id}.json`);
       await fs.writeFile(

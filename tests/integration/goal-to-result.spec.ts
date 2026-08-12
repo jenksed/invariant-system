@@ -9,7 +9,8 @@ import {
   compileWorkEnvelope,
   snapshotRepo,
   invokeFakeKiln,
-  buildResultView
+  buildResultView,
+  loadAndValidateQmr
 } from '../../src/index';
 
 describe('goal-to-result pipeline', () => {
@@ -37,10 +38,15 @@ describe('goal-to-result pipeline', () => {
     const cap = await resolveCapability(
       path.join(repoRoot, '.loadout', 'packs', 'repository-recon')
     );
+    // The QMR fixture is a Loadout-bundled v0 fixture. Resolve it against
+    // the Loadout installation, not the target repo.
+    const loadoutRoot = path.join(__dirname, '..', '..');
+    const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: loadoutRoot });
     const snap = await snapshotRepo(repoRoot);
     const envelope = compileWorkEnvelope({
       goal,
       capability: cap,
+      qmr,
       projectState: {
         repository: repoRoot,
         baseCommit: snap.input.headCommit,

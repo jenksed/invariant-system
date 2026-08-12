@@ -23,7 +23,8 @@ import {
   snapshotRepo,
   invokeFakeKiln,
   buildResultView,
-  listCatalog
+  listCatalog,
+  loadAndValidateQmr
 } from '../index';
 
 export async function validateAllFixtures(fixturesDir: string): Promise<void> {
@@ -62,10 +63,12 @@ export async function compileAgainstGoalCatalog(args: {
     );
     if (!goal) throw new Error(`no goal for capability ${m.capability.id}`);
     const cap = await resolveCapability(path.join(args.packsDir, m.id));
+    const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: args.repoRoot });
     const snap = await snapshotRepo(args.repoRoot);
     const envelope = compileWorkEnvelope({
       goal,
       capability: cap,
+      qmr,
       projectState: {
         repository: args.repoRoot,
         baseCommit: snap.input.headCommit,
