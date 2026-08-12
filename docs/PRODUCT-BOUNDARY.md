@@ -30,4 +30,3 @@ These views are complementary. Loadout and Kiln are sibling products in innovati
 - **Acceptance:** Human or explicitly authorized workflow decision.
 
 Kiln can establish that evidence was obtained and bound to state. It cannot establish that a model genuinely understood the material or that the product is universally correct.
-

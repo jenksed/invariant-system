@@ -48,3 +48,6 @@ Loadout does not own:
 
 Report commit SHA, files, verification, contract versions, user flow demonstrated, simulated versus real behavior, assumptions, unknowns, and excluded follow-ups.
 
+## LOD-01 verification note
+
+The first slice (`agent/lod-01-repository-recon`) adds a single bundled pack, a deterministic fake Kiln boundary, a CLI, and a minimal local web surface. All boundary artifacts are v0 fixtures and every Result view, evidence item, and authority decision is labeled `simulated: true`. The verification surface is `scripts/verify.sh`; see `docs/architecture/LOD-01.md`.
