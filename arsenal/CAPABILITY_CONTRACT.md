@@ -244,6 +244,43 @@ Rules:
 
 This keeps **stable is an evidence claim** true across assets and capabilities.
 
+### ARS-01 epistemic lifecycle
+
+The lifecycle and evaluation values above are the canonical
+Project Arsenal expression of the epistemic chain
+`Idea -> Hypothesis -> Experimental -> Replicated/Evaluated -> Qualified`
+declared in `engineering-system/decisions/0001-product-system.md`.
+The mapping is documented in `docs/arsenal-lifecycle.md` and is
+implemented entirely through the existing protocol vocabularies so
+the lifecycle does not create a parallel state machine.
+
+| Epistemic stage          | Lifecycle  | Evaluation status |
+|--------------------------|------------|-------------------|
+| Idea                     | `draft`    | `unassessed`      |
+| Hypothesis               | `draft`    | `planned`         |
+| Experimental             | `testing`  | `candidate`       |
+| Replicated/Evaluated     | `testing`  | `candidate`       |
+| Qualified                | `stable`   | `qualified`       |
+
+`deprecated` remains a non-epistemic terminal that any prior stage may
+transition into; it does not appear in the epistemic chain because it
+encodes retirement rather than evidence strength.
+
+The capability fragment continues to own the current lifecycle and
+evaluation status (see `arsenal/source-model.json` facts
+`capability.current-lifecycle` and `capability.current-evaluation`).
+A Qualified Method Record is an evidence surface that binds to the
+canonical capability fragment via provenance; it does not promote the
+fragment, change its lifecycle, or grant runtime authority.
+
+See also:
+
+- `docs/arsenal-lifecycle.md` — the canonical lifecycle documentation.
+- `evaluation/method-records/` — Qualified Method Records emitted by
+  Project Arsenal.
+- `evaluation/method-records/contract-map.md` — field-by-field
+  traceability to the engineering-system contract.
+
 ## Provenance and compatibility
 
 `provenance.asset_ids` records registered assets that materially define or justify the capability contract.

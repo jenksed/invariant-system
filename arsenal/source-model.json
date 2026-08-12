@@ -246,6 +246,64 @@
       "notes": "Architecture doctrine is protocol because it sets authoritative ownership/state-role boundaries for the repository. It is canonical architecture text, not a free-form explainer."
     },
     {
+      "id": "arsenal.method-records",
+      "path_pattern": "evaluation/method-records/*.yaml",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": [
+        "method-record.method-evidence",
+        "method-record.method-provenance",
+        "method-record.qualification-status"
+      ],
+      "notes": "Project Arsenal's own Qualified Method Records emitted under the engineering-system/qualified-method-record/v0 contract. Records are evidence surfaces, not authority; each record binds to the canonical capability fragment via provenance and the contract map (evaluation/method-records/contract-map.md). The records own their own historical evidence and provenance; they do NOT redefine capability identity, lifecycle, or evaluation status owned by arsenal.capability-fragments."
+    },
+    {
+      "id": "arsenal.method-records.schema",
+      "path": "evaluation/method-records/qualified-method-record.v0.schema.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-schema"],
+      "notes": "Project Arsenal's reproduction of the engineering-system qualified-method-record/v0 contract as a closed-shape JSON Schema. The schema is normative for records Project Arsenal emits; the upstream contract id (engineering-system/qualified-method-record/v0) is preserved as the required schema identity. Consumers needing the engineering-system canonical schema should resolve the upstream $id."
+    },
+    {
+      "id": "arsenal.method-records.contract-map",
+      "path": "evaluation/method-records/contract-map.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Project Arsenal's narrative traceability between the engineering-system qualified-method-record/v0 contract clauses and the Project Arsenal surface that enforces them. Non-authoritative documentation; the executable enforcement lives in scripts/arsenal_method_record.py and the schema under evaluation/method-records/."
+    },
+    {
+      "id": "arsenal.method-records.validator",
+      "path": "scripts/arsenal_method_record.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-validator"],
+      "notes": "Deterministic CLI that validates Project Arsenal Qualified Method Records against the canonical schema, the contract invariants, the canonical digest rule, and the contract's no-runtime-authority invariant. Exits with documented non-zero codes on every documented failure class."
+    },
+    {
+      "id": "arsenal.method-records.tests",
+      "path": "scripts/test-method-record.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-tests"],
+      "notes": "Positive, negative, transition, determinism, and provenance tests for the method-record validator. Each test mutates one property of the canonical record in an isolated temporary directory."
+    },
+    {
+      "id": "arsenal.epistemic-lifecycle",
+      "path": "docs/arsenal-lifecycle.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Canonical documentation for Project Arsenal's epistemic lifecycle (Idea -> Hypothesis -> Experimental -> Replicated/Evaluated -> Qualified) and its mapping onto the existing LIFECYCLE_STATES and EVALUATION_STATES protocol vocabularies. Narrative artifact; the lifecycle itself is owned by arsenal.protocol and arsenal.capability-fragments."
+    },
+    {
       "id": "arsenal.roadmap.post-pr-24",
       "path": "docs/roadmap/post-pr-24-deferred-architecture.md",
       "ownership": "arsenal-distribution",
@@ -332,6 +390,12 @@
     {"id": "knowledge.snapshot-fixture-kft-0", "owner_artifact": "arsenal.knowledge.snapshot-fixture-kft-0", "locator": "snapshot"},
     {"id": "field-trial.kft-0-report", "owner_artifact": "arsenal.field-trial.kft-0-report", "locator": "report"},
     {"id": "architecture.ownership-layers", "owner_artifact": "arsenal.architecture.doctrine", "locator": "ownership-layers"},
+    {"id": "method-record.method-evidence", "owner_artifact": "arsenal.method-records", "locator": "evaluation.evidence_refs and evaluation.observed_strengths and evaluation.observed_failures"},
+    {"id": "method-record.method-provenance", "owner_artifact": "arsenal.method-records", "locator": "provenance.arsenal_commit and provenance.record_digest and procedure_ref"},
+    {"id": "method-record.qualification-status", "owner_artifact": "arsenal.method-records", "locator": "status and qualified_for.contexts and qualified_for.exclusions"},
+    {"id": "protocol.method-record-schema", "owner_artifact": "arsenal.method-records.schema", "locator": "schema"},
+    {"id": "protocol.method-record-validator", "owner_artifact": "arsenal.method-records.validator", "locator": "scripts/arsenal_method_record.py"},
+    {"id": "protocol.method-record-tests", "owner_artifact": "arsenal.method-records.tests", "locator": "scripts/test-method-record.py"},
     {"id": "governance.artifact-classification.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "artifacts[]"},
     {"id": "governance.source-assignment.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "facts[]"}
   ]

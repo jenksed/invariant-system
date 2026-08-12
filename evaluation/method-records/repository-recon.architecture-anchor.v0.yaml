@@ -1,0 +1,79 @@
+# Project Arsenal Qualified Method Record — Repository Recon / Architecture Anchor (Incremental)
+#
+# Schema identity: engineering-system/qualified-method-record/v0
+# Owner: ARS-01 (epistemic lifecycle)
+# Status: EXPERIMENTAL — qualification is NOT claimed.
+#
+# Why experimental, not qualified:
+#   * No qualification receipt exists in evaluation/qualifications/ for
+#     capability.recon today (no bench evaluation has been executed).
+#   * The canonical capability fragment records lifecycle=draft and
+#     evaluation.status=unassessed.
+#   * The bench cannot run model-behavior cases for v0; qualification
+#     requires evidence that has not been collected.
+#   * Per the lifecycle policy in docs/arsenal-lifecycle.md, the only
+#     honest classification when current evidence cannot justify `qualified`
+#     is `experimental`. Inflating to `qualified` would be a false claim
+#     about behavioral efficacy.
+#
+# Contract reference:
+#   engineering-system/contracts/qualified-method-record.v0.md (read-only)
+#   engineering-system/fixtures/qualified-method-record.v0.yaml (contract fixture)
+schema: engineering-system/qualified-method-record/v0
+method_id: repository-recon/architecture-anchor-incremental
+method_version: 0.1.0
+status: experimental
+qualified_for:
+  outcome: understand-a-repository
+  contexts:
+    - local-git-repository-with-AGENTS.md
+    - local-git-repository-with-arsenal-canonical-contracts
+  exclusions:
+    - repositories-without-version-control
+    - repositories-without-accessible-on-disk-state
+    - behavioral-efficacy-claims-about-model-performance
+    - runtime-authority-or-production-system-mutation
+    - engineering-system-and-loadout-source-repositories-themselves
+inputs:
+  - repository-state-reference
+  - arsenal-capability-fragment-set
+  - canonical-engineering-doctrine-pointer
+  - project-decision-record-set
+outputs:
+  - architecture-anchor-map
+  - epistemic-lifecycle-summary
+  - inventory-of-canonical-ownership
+  - gap-register-with-provenance
+procedure_ref: sha256:aabfb65d67b7130c35982883f14ba34142c3801bf6feb26baef809680c10f08f
+evaluation:
+  evidence_refs:
+    - arsenal/capabilities/recon.json
+    - arsenal/source-model.json
+    - arsenal/source-model.schema.json
+    - arsenal/CAPABILITY_CONTRACT.md
+    - arsenal/capability.schema.json
+    - scripts/capability_audit.py
+    - scripts/test-capability-contract.py
+    - scripts/arsenal_source_validate.py
+    - docs/arsenal-lifecycle.md
+  models:
+    - not-applicable
+  repositories:
+    - jenksed/project-arsenal
+    - jenksed/engineering-system
+  observed_strengths:
+    - identifies-the-canonical-extension-point-of-existing-lifecycle-and-evaluation-states-without-creating-parallel-authority
+    - preserves-the-capability-fragment-as-the-single-owner-of-capability.current-lifecycle-and-capability.current-evaluation
+    - binds-the-method-record-to-the-capability-fragment-via-provenance-without-overwriting-canonical-state
+    - retains-explicit-exclusions-and-qualification-gap-as-first-class-negative-knowledge
+  observed_failures:
+    - no-qualification-receipt-exists-for-capability.recon
+    - canonical-lifecycle-stays-at-draft-and-evaluation.status-stays-at-unassessed
+    - bench-cannot-yet-execute-behavioral-efficacy-cases-for-v0
+    - this-record-cannot-be-promoted-to-qualified-without-additional-execution-evidence
+    - no-evaluation-suite-asset-is-currently-bound-to-capability.recon
+  confidence: bounded
+  qualification_gap: "qualification requires a qualification receipt bound to capability.recon for a declared target and adapter; no such receipt has been emitted by scripts/arsenal_bench.py. Until then this record is experimental and may not be cited as qualified."
+provenance:
+  arsenal_commit: null
+  record_digest: sha256:66e96875ff168d79b66cafc33d8bf23eefabd9e9a33cf95f1e4934ad426aaebb
