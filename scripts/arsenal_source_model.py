@@ -47,6 +47,7 @@ the contract; this module enforces it. The two are kept in lock-step:
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -133,8 +134,6 @@ def _check_id(value: Any, *, location: str) -> str:
     ``minLength: 3``. Anything else (uppercase, leading invalid
     character, whitespace, slash, too short) is rejected.
     """
-    import re
-
     if not isinstance(value, str):
         raise ValueError(
             f"{location}: id must be a string, got {type(value).__name__}"
@@ -333,7 +332,7 @@ def resolve_pattern(artifact: dict, root: Path) -> list[Path]:
     base = root
     if "/" in pattern:
         head, _, tail = pattern.partition("/")
-        if head and head not in {".", ".."}:
+        if head:
             candidate = arsenal_io.safe_repo_path(
                 root, head, field="pattern head"
             )
