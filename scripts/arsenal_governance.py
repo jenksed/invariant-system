@@ -173,12 +173,17 @@ SOURCE_MODEL_SCHEMA_VERSION_CONST = "1.0.0"
 # ``arsenal_protocol.EXIT_CODE`` (a PASS becomes a zero exit). New
 # failure codes are named below so callers do not have to learn a new
 # taxonomy.
+#
+# Note: duplicate artifact/fact ids are detected by the loader as a
+# structural check and exit with ``SCHEMA_VIOLATION`` (rc=2). The
+# taxonomy does not reserve a separate code for duplicates because
+# the loader is the only place duplicates are detected and the
+# validator never reaches its own semantic duplicate checks.
 EXIT_CODE = {
     "PASS": 0,
     "MISSING_MODEL": 8,        # source-model file or schema is absent
     "SCHEMA_VIOLATION": 2,     # model fails its own JSON Schema
     "INVALID_REFERENCE": 3,    # registered artifact/fact does not exist
-    "DUPLICATE_IDENTITY": 4,   # duplicate artifact or fact id
     "ROLE_VIOLATION": 5,       # role/ownership/mat value not in vocab
     "CONFLICTING_OWNER": 6,    # a fact has more than one owner
     "UNKNOWN": 8,

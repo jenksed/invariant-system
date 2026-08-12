@@ -1171,6 +1171,148 @@ def test_loader_id_pattern_matches_schema_pattern() -> None:
     assert schema_min == arsenal_source_model.ID_MIN_LENGTH
 
 
+def test_loader_optional_string_field_sets_cover_schema() -> None:
+    """For every schema-declared optional string field on the
+    artifact or fact, the loader must list that field in either
+    ``ARTIFACT_OPTIONAL_STRING_FIELDS`` or
+    ``FACT_OPTIONAL_STRING_FIELDS``. Adding a new optional string
+    field to the schema without updating the loader's enforcement
+    set is a fail-closed gap; this test catches it.
+    """
+    model = arsenal_source_model.load_source_model(ROOT)
+    schema = model["schema_document"]
+
+    def optional_string_fields(defs_name: str) -> set[str]:
+        out: set[str] = set()
+        for fname, fdef in schema["$defs"][defs_name]["properties"].items():
+            if not isinstance(fdef, dict):
+                continue
+            # ``required`` properties are not optional; skip them.
+            if fname in schema["$defs"][defs_name].get("required", []):
+                continue
+            # ``path`` and ``path_pattern`` are governed by the
+            # path-safety primitive and the oneOf XOR rather than
+            # by the generic optional-string check; their
+            # enforcement is asserted by
+            # ``test_loader_path_like_fields_cover_schema``.
+            if fname in arsenal_source_model.PATH_LIKE_FIELDS:
+                continue
+            if fdef.get("type") == "string":
+                out.add(fname)
+        return out
+
+    schema_artifact_optional_strings = optional_string_fields("artifact")
+    schema_fact_optional_strings = optional_string_fields("fact")
+    loader_artifact_optional = set(
+        arsenal_source_model.ARTIFACT_OPTIONAL_STRING_FIELDS
+    )
+    loader_fact_optional = set(
+        arsenal_source_model.FACT_OPTIONAL_STRING_FIELDS
+    )
+
+    # Every schema-optional string field must be enforced by the
+    # loader. Reverse direction is permissive: the loader may
+    # enforce an optional string field that the schema does not
+    # declare (e.g. reserved future fields), but only as long as
+    # the field stays inside the closed-shape allowlist.
+    missing_artifact = (
+        schema_artifact_optional_strings - loader_artifact_optional
+    )
+    assert not missing_artifact, (
+        f"schema declares optional artifact string field(s) "
+        f"{sorted(missing_artifact)} that the loader does not enforce"
+    )
+    missing_fact = (
+        schema_fact_optional_strings - loader_fact_optional
+    )
+    assert not missing_fact, (
+        f"schema declares optional fact string field(s) "
+        f"{sorted(missing_fact)} that the loader does not enforce"
+    )
+
+
+def test_loader_min_length_overrides_cover_schema() -> None:
+    """For every optional string field the schema declares with a
+    ``minLength`` constraint, the loader must declare a matching
+    override in ``*_OPTIONAL_STRING_MIN_LENGTH``. A schema change
+    that adds a minLength to an optional field without mirroring
+    it in the loader is a silent drift; this test catches it.
+    """
+    model = arsenal_source_model.load_source_model(ROOT)
+    schema = model["schema_document"]
+
+    def collect_min_lengths(defs_name: str) -> dict[str, int]:
+        out: dict[str, int] = {}
+        for fname, fdef in schema["$defs"][defs_name]["properties"].items():
+            if isinstance(fdef, dict) and "minLength" in fdef:
+                out[fname] = fdef["minLength"]
+        return out
+
+    schema_artifact_min = collect_min_lengths("artifact")
+    schema_fact_min = collect_min_lengths("fact")
+    loader_artifact_min = arsenal_source_model.FACT_OPTIONAL_STRING_MIN_LENGTH  # noqa: E501
+    loader_fact_min = arsenal_source_model.FACT_OPTIONAL_STRING_MIN_LENGTH
+
+    # Required fields are handled by ID_PATTERN / ID_MIN_LENGTH
+    # checks elsewhere; this test only covers optional fields.
+    # Path-like fields (``path``, ``path_pattern``) carry a
+    # minLength of 1 in the schema but are enforced by the path
+    # safety primitive (``arsenal_io.safe_repo_path``) which
+    # already rejects empty strings; they are intentionally not
+    # listed in ``*_OPTIONAL_STRING_MIN_LENGTH`` because their
+    # enforcement sits in a different code path with its own
+    # coherence test.
+    for fname, mlen in schema_artifact_min.items():
+        if fname in schema["$defs"]["artifact"].get("required", []):
+            continue
+        if fname in arsenal_source_model.PATH_LIKE_FIELDS:
+            continue
+        assert loader_artifact_min.get(fname) == mlen, (
+            f"schema declares optional artifact field {fname!r} "
+            f"with minLength={mlen}; loader must mirror it"
+        )
+    for fname, mlen in schema_fact_min.items():
+        if fname in schema["$defs"]["fact"].get("required", []):
+            continue
+        if fname in arsenal_source_model.PATH_LIKE_FIELDS:
+            continue
+        assert loader_fact_min.get(fname) == mlen, (
+            f"schema declares optional fact field {fname!r} "
+            f"with minLength={mlen}; loader must mirror it"
+        )
+
+
+def test_loader_path_like_fields_cover_schema() -> None:
+    """The loader's ``PATH_LIKE_FIELDS`` mirrors every string
+    field that the schema attaches a oneOf XOR to on the artifact
+    record. A future schema change that splits a path-like field
+    into a third option would silently bypass the loader's
+    type+XOR check unless this test forces the loader update.
+    """
+    model = arsenal_source_model.load_source_model(ROOT)
+    schema = model["schema_document"]
+    artifact_props = schema["$defs"]["artifact"]["properties"]
+    oneOf = schema["$defs"]["artifact"].get("oneOf", [])
+    path_like_in_schema: set[str] = set()
+    for branch in oneOf:
+        if not isinstance(branch, dict):
+            continue
+        for fname in branch.get("required", []):
+            if (
+                fname in artifact_props
+                and isinstance(artifact_props[fname], dict)
+                and artifact_props[fname].get("type") == "string"
+            ):
+                path_like_in_schema.add(fname)
+    assert path_like_in_schema == set(
+        arsenal_source_model.PATH_LIKE_FIELDS
+    ), (
+        f"schema oneOf path-like fields {sorted(path_like_in_schema)} "
+        f"!= loader PATH_LIKE_FIELDS "
+        f"{sorted(arsenal_source_model.PATH_LIKE_FIELDS)}"
+    )
+
+
 def test_exit_code_for_schema_violation_is_two() -> None:
     """The validator wires meaningful error classes to the advertised
     exit codes (no longer collapses every failure to ``UNKNOWN``).
@@ -1202,6 +1344,180 @@ def test_exit_code_for_schema_violation_is_two() -> None:
     assert result.returncode == arsenal_governance.EXIT_CODE["SCHEMA_VIOLATION"], (
         f"missing required field must exit SCHEMA_VIOLATION (2); "
         f"got rc={result.returncode}; stderr={result.stderr!r}"
+    )
+
+
+# --- Contract-consistency repair (final-pass MEDIUMs) ---
+#
+# These cover the three residual gaps from the independent review:
+# 1) optional metadata field types (locator, notes);
+# 2) wrong-type path/path_pattern must fail with a clean
+#    ValueError rather than a downstream Path() TypeError;
+# 3) duplicate artifact/fact ids must exit SCHEMA_VIOLATION (rc=2)
+#    because the loader is the only place they are detected.
+
+
+def test_optional_locator_list_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["locator"] = []
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "locator" in err and "must be a string" in err
+
+
+def test_optional_locator_empty_string_rejected() -> None:
+    """Schema declares locator as ``minLength: 1``; the loader
+    enforces the same when present.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["locator"] = ""
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "locator" in err and "at least 1 character" in err
+
+
+def test_optional_locator_integer_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["locator"] = 7
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "locator" in err and "must be a string" in err
+
+
+def test_optional_notes_integer_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"][0]["notes"] = 5
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "notes" in err and "must be a string" in err
+
+
+def test_optional_notes_object_rejected() -> None:
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["notes"] = {}
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "notes" in err and "must be a string" in err
+
+
+def test_path_integer_rejected_clean() -> None:
+    """``path = 123`` is rejected with a clean deterministic error
+    rather than the downstream ``Path()`` TypeError.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"][0]["path"] = 123
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "path" in err and "must be a string" in err
+    # The error must NOT be the raw Path() TypeError that the
+    # pre-repair loader propagated.
+    assert "PathLike" not in err
+
+
+def test_path_pattern_object_rejected_clean() -> None:
+    """``path_pattern = {}`` is rejected with a clean deterministic
+    error rather than the downstream ``.split`` AttributeError.
+    """
+    def mutate(sandbox: Path) -> None:
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        for art in data["artifacts"]:
+            if "path_pattern" in art:
+                art["path_pattern"] = {}
+                break
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+    rc, err = _mutate_and_validate(mutate)
+    assert rc != 0
+    assert "path_pattern" in err and "must be a string" in err
+    assert "AttributeError" not in err
+
+
+def test_duplicate_artifact_id_exits_schema_violation() -> None:
+    """Duplicate artifact ids are detected by the loader; the
+    validator must surface that as SCHEMA_VIOLATION (rc=2), not as
+    the previously advertised but unreachable DUPLICATE_IDENTITY (rc=4).
+    """
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as tmp:
+        sandbox = Path(tmp) / "sandbox"
+        sandbox.mkdir()
+        for sub in ("arsenal", "scripts", "distribution", "evaluation",
+                    "docs", "engineering"):
+            src = ROOT / sub
+            if src.is_dir():
+                shutil.copytree(src, sandbox / sub)
+        for top in ("arsenal.project.json", ".arsenal.lock"):
+            src = ROOT / top
+            if src.is_file():
+                shutil.copy2(src, sandbox / top)
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["artifacts"].append(copy.deepcopy(data["artifacts"][0]))
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+        result = subprocess.run(
+            ["python3", "scripts/arsenal_source_validate.py"],
+            cwd=sandbox, capture_output=True, text=True,
+        )
+    assert result.returncode == arsenal_governance.EXIT_CODE["SCHEMA_VIOLATION"], (
+        f"duplicate artifact id must exit SCHEMA_VIOLATION (rc=2); "
+        f"got rc={result.returncode}; stderr={result.stderr!r}"
+    )
+    assert arsenal_governance.EXIT_CODE["SCHEMA_VIOLATION"] != 4, (
+        "SCHEMA_VIOLATION must not collide with the removed "
+        "DUPLICATE_IDENTITY code; taxonomy distinguishes them by name"
+    )
+
+
+def test_duplicate_fact_id_exits_schema_violation() -> None:
+    """Duplicate fact ids are likewise detected by the loader and
+    exit SCHEMA_VIOLATION.
+    """
+    import subprocess
+
+    with tempfile.TemporaryDirectory() as tmp:
+        sandbox = Path(tmp) / "sandbox"
+        sandbox.mkdir()
+        for sub in ("arsenal", "scripts", "distribution", "evaluation",
+                    "docs", "engineering"):
+            src = ROOT / sub
+            if src.is_dir():
+                shutil.copytree(src, sandbox / sub)
+        for top in ("arsenal.project.json", ".arsenal.lock"):
+            src = ROOT / top
+            if src.is_file():
+                shutil.copy2(src, sandbox / top)
+        data = json.loads((sandbox / "arsenal" / "source-model.json").read_text())
+        data["facts"].append(copy.deepcopy(data["facts"][0]))
+        (sandbox / "arsenal" / "source-model.json").write_text(json.dumps(data))
+        result = subprocess.run(
+            ["python3", "scripts/arsenal_source_validate.py"],
+            cwd=sandbox, capture_output=True, text=True,
+        )
+    assert result.returncode == arsenal_governance.EXIT_CODE["SCHEMA_VIOLATION"], (
+        f"duplicate fact id must exit SCHEMA_VIOLATION (rc=2); "
+        f"got rc={result.returncode}; stderr={result.stderr!r}"
+    )
+
+
+def test_duplicate_identity_exit_code_removed_from_taxonomy() -> None:
+    """``DUPLICATE_IDENTITY`` is removed from the exit-code taxonomy
+    because the loader is the only place duplicates are detected and
+    no consumer depends on rc=4 for duplicates.
+    """
+    assert "DUPLICATE_IDENTITY" not in arsenal_governance.EXIT_CODE, (
+        "DUPLICATE_IDENTITY must be removed from the taxonomy; "
+        "duplicates exit SCHEMA_VIOLATION (rc=2) via the loader"
     )
 
 

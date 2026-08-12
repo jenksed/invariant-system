@@ -10,7 +10,6 @@ Validation surface:
 
 * canonical closed vocabularies for ownership, state role, and
   materialization;
-* duplicate artifact and fact identities;
 * exactly one owning artifact per fact (the model is not a second
   copy of domain values); the artifact's state_role tells us whether
   the fact is normative, derived, historical, or narrative;
@@ -24,15 +23,17 @@ Validation surface:
   repository root (the shared ``arsenal_io.safe_repo_path`` primitive
   is used so loader and validator cannot disagree);
 * the model itself is structurally consistent with its JSON schema
-  (closed-shape, required fields, types, identifiers, and
-  ``uniqueItems`` are enforced by the loader; the validator
-  complements the loader's structural checks with semantic
-  invariants).
+  (closed-shape, required fields, types, identifiers, optional
+  string types, ``uniqueItems``, and the path XOR are all enforced
+  by the loader; duplicate artifact/fact ids are likewise a
+  loader-side structural check and report SCHEMA_VIOLATION rc=2).
+  The validator complements the loader's structural checks with
+  semantic invariants that depend on the model's content rather
+  than its raw shape.
 
-Closed-shape and required-field enforcement live in
-``arsenal_source_model.load_source_model``. The validator here
-focuses on semantic checks that depend on the model's content
-rather than its raw shape.
+Closed-shape, required-field, and duplicate-identity enforcement
+live in ``arsenal_source_model.load_source_model``. The validator
+here focuses on semantic checks.
 """
 
 from __future__ import annotations
@@ -49,12 +50,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _check_vocabulary(errors: list[str], model: dict) -> None:
-    seen_artifact_ids: set[str] = set()
+    # Duplicate artifact ids are rejected by the loader as a
+    # structural check (``load_source_model`` records each id and
+    # raises on collision). The validator therefore never sees a
+    # loaded model that contains duplicates, and does not need its
+    # own duplicate check here. Duplicate fact ids are likewise
+    # rejected by the loader; both report SCHEMA_VIOLATION (rc=2).
     for art in model["artifacts"]:
         aid = art["id"]
-        if aid in seen_artifact_ids:
-            errors.append(f"duplicate artifact id: {aid}")
-        seen_artifact_ids.add(aid)
         if art["ownership"] not in arsenal_governance.OWNERSHIP_LAYERS:
             errors.append(
                 f"artifact {aid!r}: unknown ownership layer {art['ownership']!r}; "
@@ -91,13 +94,11 @@ def _check_fact_owners(errors: list[str], model: dict) -> None:
     """
     artifact_ids = {a["id"] for a in model["artifacts"]}
     artifacts_by_id = {a["id"]: a for a in model["artifacts"]}
-    fact_ids: set[str] = set()
+    # Duplicate fact ids are rejected by the loader as a structural
+    # check; the validator never sees a loaded model that contains
+    # duplicates, so no duplicate check is needed here.
     for fact in model["facts"]:
         fid = fact["id"]
-        if fid in fact_ids:
-            errors.append(f"duplicate fact id: {fid}")
-            continue
-        fact_ids.add(fid)
         owner = fact["owner_artifact"]
         if owner not in artifact_ids:
             errors.append(
@@ -195,6 +196,9 @@ def _check_schema_registry(errors: list[str], model: dict, root: Path) -> None:
 
 # Mapping from error substring to the documented exit-code token.
 # Errors not covered by a specific substring fall back to UNKNOWN.
+# Duplicate artifact/fact ids are detected by the loader as part of
+# the structural boundary and are classified as SCHEMA_VIOLATION;
+# the taxonomy reserves no separate code for duplicates.
 _EXIT_CODE_RULES: tuple[tuple[str, str], ...] = (
     ("missing source model", "MISSING_MODEL"),
     ("source-model load error", "SCHEMA_VIOLATION"),
@@ -207,8 +211,8 @@ _EXIT_CODE_RULES: tuple[tuple[str, str], ...] = (
     ("shorter than the", "SCHEMA_VIOLATION"),
     ("must declare exactly one of", "SCHEMA_VIOLATION"),
     ("duplicate fact ids", "SCHEMA_VIOLATION"),
-    ("duplicate artifact id", "DUPLICATE_IDENTITY"),
-    ("duplicate fact id", "DUPLICATE_IDENTITY"),
+    ("duplicate artifact id", "SCHEMA_VIOLATION"),
+    ("duplicate fact id", "SCHEMA_VIOLATION"),
     ("unknown ownership layer", "ROLE_VIOLATION"),
     ("unknown state role", "ROLE_VIOLATION"),
     ("unknown materialization", "ROLE_VIOLATION"),
@@ -261,7 +265,6 @@ def main() -> int:
         priority = [
             "MISSING_MODEL",
             "SCHEMA_VIOLATION",
-            "DUPLICATE_IDENTITY",
             "INVALID_REFERENCE",
             "ROLE_VIOLATION",
             "CONFLICTING_OWNER",

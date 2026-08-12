@@ -99,7 +99,21 @@ REQUIRED_FACT_FIELDS = ("id", "owner_artifact")
 # list/object allowed). ``materialization`` is optional and may be
 # absent; the remaining string fields are required.
 ARTIFACT_REQUIRED_STRING_FIELDS = ("ownership", "state_role")
-ARTIFACT_OPTIONAL_STRING_FIELDS = ("materialization",)
+ARTIFACT_OPTIONAL_STRING_FIELDS = ("materialization", "notes")
+
+# Optional fact-side string fields. The schema declares ``locator``
+# and ``notes`` as ``type: string`` (``locator`` with
+# ``minLength: 1``); the loader enforces the same when present so a
+# non-string value does not slip past the structural boundary.
+FACT_OPTIONAL_STRING_FIELDS = ("locator", "notes")
+FACT_OPTIONAL_STRING_MIN_LENGTH = {"locator": 1}
+
+# Fields whose declared JSON type is a string, when present.
+# ``path`` and ``path_pattern`` are mutually exclusive; the loader
+# enforces both the XOR and the string type at the structural
+# boundary so a wrong-type value (e.g. ``123``) is rejected with a
+# clean ValueError rather than a downstream ``Path()`` TypeError.
+PATH_LIKE_FIELDS = ("path", "path_pattern")
 
 
 def source_model_path(root: Path) -> Path:
@@ -157,6 +171,32 @@ def _check_required_string_field(
         raise ValueError(
             f"{location}: required field {field!r} must be a string; "
             f"got {type(value).__name__} {value!r}"
+        )
+
+
+def _check_optional_string_field(
+    obj: dict, *, field: str, location: str,
+    min_length: int | None = None,
+) -> None:
+    """Enforce schema-declared optional string field type.
+
+    When a key is present, it must be a string. For fields that the
+    schema declares with ``minLength``, an empty string is rejected
+    the same way.
+    """
+    if field not in obj:
+        return
+    value = obj[field]
+    if not isinstance(value, str):
+        raise ValueError(
+            f"{location}: optional field {field!r} must be a string when "
+            f"present; got {type(value).__name__} {value!r}"
+        )
+    if min_length is not None and len(value) < min_length:
+        raise ValueError(
+            f"{location}: optional field {field!r} must be at least "
+            f"{min_length} character(s) when present; got length "
+            f"{len(value)} ({value!r})"
         )
 
 
@@ -243,6 +283,11 @@ def load_source_model(root: Path) -> dict:
                 f"{location}: optional field 'materialization' must be a string "
                 f"when present; got {type(art['materialization']).__name__}"
             )
+        # Optional ``notes`` must be a string when present; no
+        # minLength declared in the schema.
+        _check_optional_string_field(
+            art, field="notes", location=location
+        )
         # owns_facts must be a list with unique items.
         owns = art["owns_facts"]
         if not isinstance(owns, list):
@@ -253,13 +298,24 @@ def load_source_model(root: Path) -> dict:
             raise ValueError(
                 f"{location}: 'owns_facts' must not contain duplicate fact ids"
             )
-        # path vs path_pattern XOR.
+        # path vs path_pattern XOR. The loader enforces the XOR and
+        # the string type at the structural boundary so a wrong-type
+        # value (e.g. 123) is rejected here rather than via a
+        # downstream ``Path()`` TypeError.
         if not (("path" in art) ^ ("path_pattern" in art)):
             raise ValueError(
                 f"{location} ({aid!r}): must declare exactly one of 'path' "
                 f"or 'path_pattern' (XOR); both present is rejected, "
                 f"neither present is rejected"
             )
+        # Reject non-string ``path`` / ``path_pattern`` at the
+        # structural boundary with a clean deterministic error.
+        for field in PATH_LIKE_FIELDS:
+            if field in art and not isinstance(art[field], str):
+                raise ValueError(
+                    f"{location} ({aid!r}): field {field!r} must be a "
+                    f"string when present; got {type(art[field]).__name__}"
+                )
         # Repository-relative path safety for plain ``path``.
         if "path" in art:
             arsenal_io.safe_repo_path(root, art["path"], field=f"artifact {aid!r} path")
@@ -301,6 +357,15 @@ def load_source_model(root: Path) -> dict:
             fact["owner_artifact"],
             location=f"{location} owner_artifact",
         )
+        # Optional fact-side string fields must be strings when
+        # present (and ``locator`` has minLength: 1 per the schema).
+        for field in FACT_OPTIONAL_STRING_FIELDS:
+            _check_optional_string_field(
+                fact,
+                field=field,
+                location=location,
+                min_length=FACT_OPTIONAL_STRING_MIN_LENGTH.get(field),
+            )
 
     # Sort for deterministic output and stable equality assertions.
     artifacts_sorted = sorted(artifacts, key=lambda a: a["id"])
