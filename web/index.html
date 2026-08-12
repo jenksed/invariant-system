@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Loadout (SIMULATED)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Loadout</h1>
+      <p class="badge">SIMULATED run</p>
+      <p class="lede">Human-facing capability environment &mdash; LOD-01 vertical slice.</p>
+    </header>
+    <main>
+      <section class="card">
+        <h2>Pick a Goal</h2>
+        <p>One Goal is available in this slice:</p>
+        <ul id="goals"></ul>
+      </section>
+      <section class="card">
+        <h2>Repository</h2>
+        <p>Use this repository (auto-filled from the server):</p>
+        <input id="repo" type="text" size="80" />
+      </section>
+      <section class="card">
+        <h2>Run</h2>
+        <button id="run-btn">Run &ldquo;Understand this repository&rdquo;</button>
+        <p class="small">This calls the SIMULATED Kiln boundary. Results are clearly labeled.</p>
+      </section>
+      <section class="card" id="result-card" hidden>
+        <h2>Result</h2>
+        <pre id="result"></pre>
+      </section>
+      <section class="card" id="recon-card" hidden>
+        <h2>Local recon notes (input, not a Kiln record)</h2>
+        <ul id="recon"></ul>
+      </section>
+    </main>
+    <footer>
+      <p>
+        Loadout &middot; LOD-01 &middot; all runs simulated &middot; see
+        <code>docs/architecture/LOD-01.md</code>
+      </p>
+    </footer>
+    <script src="/app.js"></script>
+  </body>
+</html>

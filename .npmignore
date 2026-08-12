@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+.loadout/
+*.log
+.DS_Store
+tests/
+.github/
+scripts/
+docs/
+fixtures/
+tsconfig.json
+.eslintrc.cjs
+.prettierrc.json
+vitest.config.ts
