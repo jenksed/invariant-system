@@ -295,6 +295,36 @@
       "notes": "Positive, negative, transition, determinism, and provenance tests for the method-record validator. Each test mutates one property of the canonical record in an isolated temporary directory."
     },
     {
+      "id": "arsenal.method-evaluation.cases",
+      "path_pattern": "evaluation/method-cases/",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": [
+        "method-evaluation.case-fixtures",
+        "method-evaluation.corpus-manifest"
+      ],
+      "notes": "Bounded, deterministic local-repository evaluation corpus for the Repository Recon method. Each case is a self-contained fixture directory with repo/ and expected.json. The corpus is owned by Project Arsenal distribution; consumers do not redefine its method_id or capability_id. The corpus owns its own case fixtures and corpus manifest; it does NOT redefine capability state owned by arsenal.capability-fragments."
+    },
+    {
+      "id": "arsenal.method-evaluation.evaluator",
+      "path": "scripts/arsenal_evaluate.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-evaluator"],
+      "notes": "Deterministic CLI that evaluates the canonical Repository Recon method against the bounded corpus and emits an evaluation artifact with method identity, version, contexts, per-case successes/misses/unsupported_claims/unknowns/failures, evidence references, qualification gap, and an explicit epistemic conclusion. Exits with documented non-zero codes on every documented failure class. Never promotes capability lifecycle or evaluation status; auto-promotion flags in the artifact are always false."
+    },
+    {
+      "id": "arsenal.method-evaluation.tests",
+      "path": "scripts/test-arsenal-evaluate.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-tests"],
+      "notes": "Positive, determinism, negative, honesty, authority, and provenance tests for the method-evaluation CLI. Each test runs the CLI in an isolated temporary directory and asserts the documented behavior. Tests refuse composite scores, runtime authority tokens, and remote credentials."
+    },
+    {
       "id": "arsenal.epistemic-lifecycle",
       "path": "docs/arsenal-lifecycle.md",
       "ownership": "arsenal-distribution",
@@ -396,6 +426,10 @@
     {"id": "protocol.method-record-schema", "owner_artifact": "arsenal.method-records.schema", "locator": "schema"},
     {"id": "protocol.method-record-validator", "owner_artifact": "arsenal.method-records.validator", "locator": "scripts/arsenal_method_record.py"},
     {"id": "protocol.method-record-tests", "owner_artifact": "arsenal.method-records.tests", "locator": "scripts/test-method-record.py"},
+    {"id": "method-evaluation.case-fixtures", "owner_artifact": "arsenal.method-evaluation.cases", "locator": "evaluation/method-cases/<case_id>/repo and expected.json"},
+    {"id": "method-evaluation.corpus-manifest", "owner_artifact": "arsenal.method-evaluation.cases", "locator": "evaluation/method-cases/corpus.manifest.json"},
+    {"id": "protocol.method-evaluation-evaluator", "owner_artifact": "arsenal.method-evaluation.evaluator", "locator": "scripts/arsenal_evaluate.py"},
+    {"id": "protocol.method-evaluation-tests", "owner_artifact": "arsenal.method-evaluation.tests", "locator": "scripts/test-arsenal-evaluate.py"},
     {"id": "governance.artifact-classification.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "artifacts[]"},
     {"id": "governance.source-assignment.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "facts[]"}
   ]

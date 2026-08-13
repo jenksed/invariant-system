@@ -89,3 +89,18 @@ via provenance digests and `evidence_refs`; it does not redefine
 `arsenal/source-model.json` facts (`method-record.qualification-status`
 vs `capability.current-lifecycle` / `capability.current-evaluation`)
 for the source-of-truth attribution.
+
+## Method-evaluation binding (ARS-04)
+
+ARS-04 (`scripts/arsenal_evaluate.py`) evaluates the canonical
+Repository Recon method against a bounded local-repository corpus
+and emits an evaluation artifact. The artifact binds to the
+canonical QMR through the `method.method_record_digest` field and
+emits a `run_digest` that mirrors the QMR's
+`provenance.record_digest` canonicalization rule. A revised QMR
+emitted by ARS-04 is always `status: experimental`; ARS-04 does
+not promote the method or its underlying capability. The QMR
+remains evidence; capability lifecycle and evaluation status are
+still owned by the canonical capability fragment and the
+qualification receipts. See `docs/arsenal-method-evaluation.md`
+for the canonical narrative.
