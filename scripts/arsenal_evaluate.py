@@ -218,6 +218,130 @@ def _load_corpus(path: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Method run procedure.
+# ---------------------------------------------------------------------------
+#
+# The Repository Recon method's procedure is, per its canonical QMR,
+# a static, deterministic, read-only inspector of on-disk state. The
+# procedure does NOT consult any expected.json, it does NOT consult
+# the corpus manifest, and it does NOT consult the evaluator. It
+# produces a list of findings (kind, subject, evidence_path, actual)
+# that the evaluator then compares against the expected assertions.
+#
+# The procedure is intentionally a separate function so:
+#   * tests can stub it (replacing its output) to prove the
+#     evaluator's behavior is output-driven;
+#   * the procedure's output is the sole ground truth consulted by
+#     the evaluator -- the fixture state is never re-inspected
+#     during assertion evaluation;
+#   * the procedure can be exercised independently of the corpus
+#     loading and artifact assembly logic.
+
+# Canonical anchors scanned by the procedure. Each anchor is a
+# (evidence_path, subject, kind) triple. ``kind`` is the canonical
+# classification of the anchor (informational; the assertion's
+# kind drives the comparison logic). The procedure emits one
+# finding per anchor whose ``actual`` is ``path.exists()``; the
+# evaluator decides whether a presence or absence assertion
+# matches that observation.
+PRESENCE_ANCHORS: tuple[tuple[str, str], ...] = (
+    ("AGENTS.md", "AGENTS.md"),
+    ("README.md", "README.md"),
+    ("src/main.py", "src/"),
+    ("engineering/doctrine/CORE.md", "engineering/doctrine/CORE.md"),
+    ("arsenal/capabilities/recon.json", "arsenal/capabilities/recon.json"),
+    ("evaluation/method-records/example.yaml", "evaluation/method-records/example.yaml"),
+    ("scripts/recon_method.py", "scripts/recon_method.py"),
+)
+
+# Anchors the procedure classifies as absence-typed. These are
+# canonical ownership layers; the procedure still emits a finding
+# for each, with ``actual = path.exists()``, so either a presence
+# or an absence assertion can match the same anchor.
+ABSENCE_ANCHORS: tuple[tuple[str, str], ...] = (
+    ("engineering/", "engineering/doctrine"),
+    ("arsenal/capabilities/", "arsenal/capabilities"),
+    ("evaluation/method-records/", "evaluation/method-records"),
+)
+
+CAPABILITY_IDENTITY_PATH = "arsenal/capabilities/recon.json"
+
+
+def _run_recon_procedure(repo_path: Path) -> list[dict]:
+    """Invoke the Repository Recon method's procedure on ``repo_path``.
+
+    The procedure is deterministic and read-only. It returns a list
+    of findings, each shaped as:
+
+        {
+            "kind":    "presence" | "absence" | "capability_identity",
+            "subject": <canonical subject string>,
+            "evidence": <repo-relative path string>,
+            "actual":  <bool for presence/absence, dict for
+                         capability_identity, None when unreadable>,
+        }
+
+    The procedure never inspects any expected.json, corpus manifest,
+    or evaluator-internal state. For non-capability anchors,
+    ``actual`` is the raw ``path.exists()`` observation so the same
+    finding can satisfy either a presence or an absence assertion.
+    For the capability fragment anchor, two findings are emitted:
+    one presence observation (``actual = path.exists()``) and one
+    capability_identity observation (``actual = parsed dict or
+    None``). Findings are emitted in a stable order: presence
+    anchors first (in declaration order), then absence anchors
+    (in declaration order), then the capability identity anchor.
+    """
+    findings: list[dict] = []
+    for evidence_rel, subject in PRESENCE_ANCHORS:
+        if evidence_rel == CAPABILITY_IDENTITY_PATH:
+            continue
+        findings.append({
+            "kind": "presence",
+            "subject": subject,
+            "evidence": evidence_rel,
+            "actual": (repo_path / evidence_rel).exists(),
+        })
+    for evidence_rel, subject in ABSENCE_ANCHORS:
+        findings.append({
+            "kind": "absence",
+            "subject": subject,
+            "evidence": evidence_rel,
+            "actual": (repo_path / evidence_rel).exists(),
+        })
+    target = repo_path / CAPABILITY_IDENTITY_PATH
+    # Presence observation for the capability fragment.
+    findings.append({
+        "kind": "presence",
+        "subject": "arsenal/capabilities/recon.json",
+        "evidence": CAPABILITY_IDENTITY_PATH,
+        "actual": target.exists(),
+    })
+    # Capability identity observation (richer actual value).
+    actual_cap: dict | None = None
+    if target.exists():
+        try:
+            with target.open("r", encoding="utf-8") as fh:
+                cap_doc = json.load(fh)
+            cap = cap_doc.get("capability") if isinstance(cap_doc, dict) else None
+            if isinstance(cap, dict):
+                actual_cap = {
+                    "id": cap.get("id"),
+                    "lifecycle": cap.get("lifecycle"),
+                    "evaluation_status": (cap.get("evaluation") or {}).get("status"),
+                }
+        except (OSError, json.JSONDecodeError):
+            actual_cap = None
+    findings.append({
+        "kind": "capability_identity",
+        "subject": "arsenal/capabilities/recon.json",
+        "evidence": CAPABILITY_IDENTITY_PATH,
+        "actual": actual_cap,
+    })
+    return findings
+
+
+# ---------------------------------------------------------------------------
 # Case loading and assertion evaluation.
 # ---------------------------------------------------------------------------
 
@@ -255,13 +379,23 @@ def _load_case(case: dict) -> dict:
     }
 
 
-def _evaluate_assertion(assertion: dict, repo_path: Path) -> dict:
-    """Evaluate one expected assertion against ``repo_path``.
+def _evaluate_assertion(assertion: dict, procedure_outputs: list[dict]) -> dict:
+    """Evaluate one expected assertion against the procedure's outputs.
 
-    Returns a single observation dict with concrete evidence and a
-    stable ``outcome`` field. The recon method (per its canonical
-    QMR) is a static, deterministic, read-only inspector of on-disk
-    state. There is no LLM call and no model behavior under test.
+    The procedure's outputs are the SOLE ground truth consulted. The
+    fixture state is never re-inspected by this function. If the
+    procedure did not produce a finding for the assertion's
+    ``evidence_path``, the outcome is ``FAILURE`` with a message
+    naming the missing anchor -- which proves the evaluation is
+    output-driven, not fixture-presence-driven.
+
+    For ``presence`` and ``absence`` assertions, the procedure
+    emits a single ``actual = path.exists()`` finding per anchor
+    and the assertion's ``kind`` decides whether presence or
+    absence is the success condition. For ``capability_identity``
+    assertions the procedure emits a separate finding carrying the
+    parsed capability fields; matching is by ``evidence_path`` and
+    ``kind == capability_identity``.
     """
     kind = assertion.get("kind")
     subject = assertion.get("subject", "<missing>")
@@ -277,10 +411,22 @@ def _evaluate_assertion(assertion: dict, repo_path: Path) -> dict:
             "evidence": None,
             "message": "assertion missing evidence_path",
         }
-    target = (repo_path / evidence_rel).resolve()
-    repo_resolved = repo_path.resolve()
-    safe = target.is_relative_to(repo_resolved)
-    if not safe:
+
+    if kind in ("presence", "absence"):
+        matches = [f for f in procedure_outputs if f.get("evidence") == evidence_rel]
+    elif kind == "capability_identity":
+        matches = [
+            f for f in procedure_outputs
+            if f.get("evidence") == evidence_rel
+            and f.get("kind") == "capability_identity"
+        ]
+    else:
+        matches = []
+
+    if not matches:
+        # The procedure never produced a finding the evaluator can
+        # match against. The evaluation is honestly reported as a
+        # FAILURE -- not a silent pass.
         return {
             "id": assertion.get("id"),
             "kind": kind,
@@ -288,46 +434,36 @@ def _evaluate_assertion(assertion: dict, repo_path: Path) -> dict:
             "outcome": "FAILURE",
             "expected": assertion.get("expected"),
             "actual": None,
-            "evidence": None,
-            "message": f"evidence_path escapes repo: {evidence_rel!r}",
+            "evidence": evidence_rel,
+            "message": (
+                f"procedure did not produce a finding for evidence_path "
+                f"{evidence_rel!r} with kind={kind!r}"
+            ),
         }
-    exists = target.exists()
-    actual = exists
+
+    finding = matches[0]
+    actual = finding.get("actual")
 
     if kind == "presence":
-        outcome = "SUCCESS" if exists is True else "MISS"
+        outcome = "SUCCESS" if actual is True else "MISS"
     elif kind == "absence":
-        outcome = "SUCCESS" if exists is False else "MISS"
+        outcome = "SUCCESS" if actual is False else "MISS"
     elif kind == "capability_identity":
-        if not exists:
-            outcome = "MISS"
+        if not isinstance(actual, dict):
+            outcome = "FAILURE"
+            actual = None
         else:
-            try:
-                with target.open("r", encoding="utf-8") as fh:
-                    cap_doc = json.load(fh)
-            except (OSError, json.JSONDecodeError):
-                cap_doc = None
-            cap = cap_doc.get("capability") if isinstance(cap_doc, dict) else None
-            if not isinstance(cap, dict):
-                outcome = "FAILURE"
-                actual = None
-            else:
-                actual = {
-                    "id": cap.get("id"),
-                    "lifecycle": cap.get("lifecycle"),
-                    "evaluation_status": (cap.get("evaluation") or {}).get("status"),
-                }
-                expected = {
-                    "id": assertion.get("expected_id"),
-                    "lifecycle": assertion.get("expected_lifecycle"),
-                    "evaluation_status": assertion.get("expected_evaluation_status"),
-                }
-                ok = all(
-                    actual.get(k) == v
-                    for k, v in expected.items()
-                    if v is not None
-                )
-                outcome = "SUCCESS" if ok else "MISS"
+            expected = {
+                "id": assertion.get("expected_id"),
+                "lifecycle": assertion.get("expected_lifecycle"),
+                "evaluation_status": assertion.get("expected_evaluation_status"),
+            }
+            ok = all(
+                actual.get(k) == v
+                for k, v in expected.items()
+                if v is not None
+            )
+            outcome = "SUCCESS" if ok else "MISS"
     else:
         outcome = "FAILURE"
         actual = None
@@ -344,17 +480,22 @@ def _evaluate_assertion(assertion: dict, repo_path: Path) -> dict:
 
 
 def _evaluate_case(case: dict) -> dict:
-    """Run every expected assertion for one case and aggregate results.
+    """Run the procedure and compare its outputs against expected assertions.
+
+    The procedure is invoked ONCE per case. Its findings are the
+    sole ground truth the evaluator compares against; the fixture
+    state is not re-inspected during assertion evaluation.
 
     The aggregate categorizes assertions into:
 
-    * ``successes``        -- the on-disk state matches the expectation.
-    * ``misses``           -- the on-disk state does NOT match the
-                              expectation (presence/absence/id
-                              assertion failed).
-    * ``failures``         -- the assertion could not be evaluated
-                              safely (path traversal, missing
-                              evidence_path, unknown kind).
+    * ``successes``        -- the procedure's output matches the
+                              expected value.
+    * ``misses``           -- the procedure produced a finding whose
+                              actual value does NOT match the
+                              expected value.
+    * ``failures``         -- the procedure did not produce a
+                              matching finding at all (the
+                              evaluation is honestly output-driven).
     * ``unknowns``         -- context-specific gaps the case
                               intentionally documents (e.g. the
                               absence of AGENTS.md in an incomplete
@@ -362,8 +503,8 @@ def _evaluate_case(case: dict) -> dict:
                               negative knowledge, not as bugs.
     * ``unsupported_claims`` -- claims the case authorises the
                               evaluator to observe as NOT supported
-                              by the on-disk state. Surfacing them
-                              keeps the method honest.
+                              by the procedure's output. Surfacing
+                              them keeps the method honest.
     """
     expected = case["expected"]
     expected_assertions = expected.get("expected_assertions") or []
@@ -371,9 +512,11 @@ def _evaluate_case(case: dict) -> dict:
     expected_unknowns |= set(expected.get("unknowns_allowed") or [])
     unsupported_allowed = set(expected.get("unsupported_claims_allowed") or [])
 
+    procedure_outputs = _run_recon_procedure(case["repo_path"])
+
     observations: list[dict] = []
     for assertion in expected_assertions:
-        observations.append(_evaluate_assertion(assertion, case["repo_path"]))
+        observations.append(_evaluate_assertion(assertion, procedure_outputs))
 
     successes = [o["id"] for o in observations if o["outcome"] == "SUCCESS"]
     misses = [o["id"] for o in observations if o["outcome"] == "MISS"]
@@ -390,6 +533,7 @@ def _evaluate_case(case: dict) -> dict:
         "repo_path": _rel(case["repo_path"]),
         "expected_context": expected.get("context_kind"),
         "expected_epistemic_conclusion": expected.get("expected_epistemic_conclusion"),
+        "procedure_output_count": len(procedure_outputs),
         "observation_count": len(observations),
         "successes": successes,
         "misses": misses,

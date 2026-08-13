@@ -388,6 +388,202 @@ def test_no_runtime_authority_or_remote_credentials() -> None:
         print("PASS authority: artifact declares no runtime authority or remote credentials")
 
 
+def test_stubbed_procedure_misses_change_evaluation() -> None:
+    """The evaluation MUST change when the procedure's output changes.
+
+    This proves the evaluator is output-driven: replacing the
+    procedure's actual finding for a canonical anchor with a wrong
+    value must cause the evaluator to report a MISS for the
+    matching expected assertion, instead of a SUCCESS.
+    """
+    # Run the canonical corpus once to capture the real procedure's
+    # outputs and the real outcomes for the straightforward case.
+    real_outputs = ae._run_recon_procedure(
+        ROOT / "evaluation" / "method-cases" / "repo-straightforward" / "repo"
+    )
+    real_ag = next(
+        f for f in real_outputs
+        if f.get("kind") == "presence" and f.get("evidence") == "AGENTS.md"
+    )
+    assert real_ag["actual"] is True, "fixture sanity: AGENTS.md should be present"
+
+    # Build the corrupted outputs: the procedure claims AGENTS.md is
+    # missing, while everything else matches the real output.
+    corrupted = [dict(f) for f in real_outputs]
+    for f in corrupted:
+        if f.get("kind") == "presence" and f.get("evidence") == "AGENTS.md":
+            f["actual"] = False
+
+    # The matching assertion in repo-straightforward expects AGENTS.md
+    # to be present. With the corrupted outputs the procedure
+    # contradicts that expectation.
+    straight = {
+        "case_id": "recon.straightforward.small-clean",
+        "context_kind": "local-git-repository-with-AGENTS.md",
+        "expected": {
+            "case_id": "recon.straightforward.small-clean",
+            "context_kind": "local-git-repository-with-AGENTS.md",
+            "expected_assertions": [
+                {
+                    "id": "agents_md_present",
+                    "kind": "presence",
+                    "subject": "AGENTS.md",
+                    "expected": True,
+                    "evidence_path": "AGENTS.md",
+                },
+            ],
+            "expected_epistemic_conclusion": "experimental",
+        },
+        "repo_path": ROOT / "evaluation" / "method-cases" / "repo-straightforward" / "repo",
+    }
+
+    # Real procedure -> SUCCESS.
+    real_obs = ae._evaluate_assertion(straight["expected"]["expected_assertions"][0], real_outputs)
+    assert real_obs["outcome"] == "SUCCESS", (
+        f"real procedure should produce SUCCESS for AGENTS.md present, "
+        f"got {real_obs['outcome']!r}"
+    )
+
+    # Stubbed procedure -> MISS, not a silent SUCCESS.
+    corrupted_obs = ae._evaluate_assertion(
+        straight["expected"]["expected_assertions"][0], corrupted
+    )
+    assert corrupted_obs["outcome"] == "MISS", (
+        f"stubbed procedure (AGENTS.md absent) should produce MISS for "
+        f"an assertion that expects AGENTS.md to be present; got "
+        f"{corrupted_obs['outcome']!r}"
+    )
+    print("PASS output-driven: stubbed procedure producing a wrong finding causes a MISS")
+
+
+def test_assertion_without_procedure_finding_is_failure() -> None:
+    """An assertion whose evidence_path the procedure never produced
+    MUST be reported as a FAILURE, not a SUCCESS.
+
+    This is the load-bearing proof that the evaluation is
+    output-driven: the evaluator does NOT match expected facts that
+    the method did not produce.
+    """
+    # Procedure with only one finding (AGENTS.md present).
+    procedure_outputs = [
+        {
+            "kind": "presence",
+            "subject": "AGENTS.md",
+            "evidence": "AGENTS.md",
+            "actual": True,
+        }
+    ]
+
+    # Assertion expects a capability identity that the procedure
+    # never produced.
+    fake_assertion = {
+        "id": "capability_id_recon",
+        "kind": "capability_identity",
+        "subject": "arsenal/capabilities/recon.json",
+        "expected_id": "capability.recon",
+        "expected_lifecycle": "draft",
+        "expected_evaluation_status": "unassessed",
+        "evidence_path": "arsenal/capabilities/recon.json",
+    }
+
+    obs = ae._evaluate_assertion(fake_assertion, procedure_outputs)
+    assert obs["outcome"] == "FAILURE", (
+        f"assertion without a matching procedure finding MUST be FAILURE; "
+        f"got {obs['outcome']!r}"
+    )
+    assert "did not produce a finding" in obs.get("message", ""), (
+        f"FAILURE message should name the missing anchor: {obs!r}"
+    )
+
+    # A presence assertion for an evidence_path the procedure never
+    # inspected must also FAILURE, not silently pass.
+    fake_presence = {
+        "id": "phantom_anchor",
+        "kind": "presence",
+        "subject": "phantom/anchor.md",
+        "expected": True,
+        "evidence_path": "phantom/anchor.md",
+    }
+    obs2 = ae._evaluate_assertion(fake_presence, procedure_outputs)
+    assert obs2["outcome"] == "FAILURE", (
+        f"phantom-anchor presence MUST be FAILURE; got {obs2['outcome']!r}"
+    )
+    assert "did not produce a finding" in obs2.get("message", ""), (
+        f"FAILURE message should name the missing anchor: {obs2!r}"
+    )
+    print("PASS output-driven: assertions without a matching procedure finding are FAILURE")
+
+
+def test_procedure_actually_invoked_per_case() -> None:
+    """The case-level aggregator MUST invoke the procedure (not just
+    inspect the fixture state) when evaluating assertions.
+
+    We monkey-patch the procedure to count invocations and to flip
+    a single canonical anchor's actual value. A canonical run then
+    produces a per-case ``procedure_output_count`` greater than
+    zero and produces a MISS for the flipped anchor.
+    """
+    # Monkey-patch the procedure: flip AGENTS.md to absent and
+    # record how many times it was called.
+    original = ae._run_recon_procedure
+    calls: list[Path] = []
+
+    def stub(repo_path: Path) -> list[dict]:
+        calls.append(repo_path)
+        outputs = original(repo_path)
+        flipped = []
+        for f in outputs:
+            if f.get("kind") == "presence" and f.get("evidence") == "AGENTS.md":
+                flipped.append({**f, "actual": False})
+            else:
+                flipped.append(f)
+        return flipped
+
+    saved = ae._run_recon_procedure
+    ae._run_recon_procedure = stub
+    artifact_text: str | None = None
+    try:
+        with tempfile.TemporaryDirectory(prefix="ars-04-invoke-") as td:
+            tmp = Path(td)
+            out = tmp / "eval.json"
+            rc, _, stderr = _run(
+                [
+                    "repository-recon",
+                    "--corpus", str(CORPUS_PATH.relative_to(ROOT)),
+                    "--out", str(out),
+                ]
+            )
+            assert rc == 0, f"run failed: {stderr!r}"
+            artifact_text = out.read_text(encoding="utf-8")
+    finally:
+        ae._run_recon_procedure = saved
+
+    # The procedure must have been invoked at least once per case.
+    assert len(calls) >= 3, (
+        f"procedure should be invoked once per case (3 cases), got {len(calls)}"
+    )
+
+    # The artifact must carry the per-case procedure output count
+    # and at least one MISS for the flipped AGENTS.md anchor.
+    assert artifact_text is not None, "artifact text was not captured"
+    artifact = json.loads(artifact_text)
+    for case_result in artifact["case_results"]:
+        assert case_result.get("procedure_output_count", 0) > 0, (
+            f"case {case_result.get('case_id')!r} should report a positive "
+            f"procedure_output_count; got {case_result.get('procedure_output_count')!r}"
+        )
+    flipped_misses = [
+        case for case in artifact["case_results"]
+        if "agents_md_present" in case.get("misses", [])
+        or "agents_md_absent" in case.get("misses", [])
+    ]
+    assert flipped_misses, (
+        "stubbed procedure flipping AGENTS.md to absent must produce at "
+        "least one MISS in the artifact"
+    )
+    print("PASS output-driven: procedure is invoked per case and its outputs drive the evaluation")
+
+
 def main() -> int:
     test_canonical_run_emits_valid_artifact()
     test_run_digest_is_deterministic()
@@ -400,6 +596,9 @@ def main() -> int:
     test_revised_qmr_is_refused_for_non_canonical_method()
     test_metric_set_is_honest_no_composite_score()
     test_no_runtime_authority_or_remote_credentials()
+    test_stubbed_procedure_misses_change_evaluation()
+    test_assertion_without_procedure_finding_is_failure()
+    test_procedure_actually_invoked_per_case()
     print("arsenal evaluate suite: PASS")
     return 0
 
