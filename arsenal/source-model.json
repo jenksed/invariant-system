@@ -334,7 +334,7 @@
         "protocol.method-evaluation-adapter-contract",
         "protocol.method-evaluation-adapter-findings-shape"
       ],
-      "notes": "The adapter seam through which the method evaluator can be configured to invoke an external Repository Recon procedure (e.g. a future Loadout productized procedure). The default adapter wraps the internal fixture procedure; the shell-loadout-recon adapter reads pre-emitted findings from a JSON file. Adapter contracts: no Arsenal source import of Loadout, no Arsenal runtime dependency on Loadout, the adapter identity is recorded in the artifact's provenance.adapter block, and a broken candidate produces strictly worse evaluation evidence (no silent fallback)."
+      "notes": "The adapter seam through which the method evaluator can be configured to invoke an external Repository Recon procedure. Three adapters: internal-fixture-procedure (the canonical default, wraps scripts/arsenal_evaluate._run_recon_procedure), shell-loadout-recon (Phase 1 placeholder, reads pre-emitted findings from a JSON file), and loadout-runtime (Phase 2, shells out to the Loadout W3 checkpoint's runRepositoryRecon via Node.js). Adapter contracts: no Arsenal source import of Loadout, no Arsenal runtime dependency on Loadout, the adapter identity is recorded in the artifact's provenance.adapter block, and a broken candidate produces strictly worse evaluation evidence (no silent fallback)."
     },
     {
       "id": "arsenal.method-evaluation.adapter-tests",
@@ -343,7 +343,7 @@
       "state_role": "normative",
       "materialization": "authored",
       "owns_facts": ["protocol.method-evaluation-adapter-tests"],
-      "notes": "Positive, negative, regression, determinism, and provenance tests for the adapter surface. Proves the evaluator can be configured to use an external adapter, a broken candidate produces strictly more misses than the canonical internal run, the shell adapter refuses silent fallback to the internal procedure, and the corpus-level end-to-end evaluation pattern is wired up for Phase 2."
+      "notes": "Positive, negative, regression, determinism, provenance, translation, and no-silent-fallback tests for the adapter surface. Proves the evaluator can be configured to use any of the three adapters, a broken candidate produces strictly more misses than the canonical internal run, the shell and loadout-runtime adapters refuse silent fallback to the internal procedure, the corpus-level end-to-end evaluation pattern is wired up, and the Loadout-to-Arsenal findings translation is honest (1:1 with the ReconResultV1 shape)."
     },
     {
       "id": "arsenal.epistemic-lifecycle",

@@ -267,20 +267,30 @@ ABSENCE_ANCHORS: tuple[tuple[str, str], ...] = (
 
 CAPABILITY_IDENTITY_PATH = "arsenal/capabilities/recon.json"
 
-# Adapter surface (ARS-W3 Phase 1). The evaluator can be configured
-# to invoke an external procedure via an adapter; the default is the
+# Adapter surface (ARS-W3). The evaluator can be configured to
+# invoke an external procedure via an adapter; the default is the
 # internal fixture procedure. The closed vocabulary here mirrors the
 # adapter names defined under ``evaluation/adapters/``.
 ADAPTER_INTERNAL = "internal-fixture-procedure"
 ADAPTER_SHELL_LOADOUT = "shell-loadout-recon"
-ALLOWED_ADAPTERS = frozenset({ADAPTER_INTERNAL, ADAPTER_SHELL_LOADOUT})
+ADAPTER_LOADOUT_RUNTIME = "loadout-runtime"
+ALLOWED_ADAPTERS = frozenset(
+    {ADAPTER_INTERNAL, ADAPTER_SHELL_LOADOUT, ADAPTER_LOADOUT_RUNTIME}
+)
 
 
-def _resolve_adapter(adapter_name: str, *, adapter_input: str | None):
+def _resolve_adapter(
+    adapter_name: str,
+    *,
+    adapter_input: str | None,
+    loadout_root: str | None = None,
+):
     """Resolve an adapter by name. Returns the adapter instance.
 
     The internal adapter takes no input. The shell adapter requires
-    ``adapter_input`` (a path to a findings JSON file).
+    ``adapter_input`` (a path to a findings JSON file). The Loadout
+    runtime adapter requires ``loadout_root`` (a path to the Loadout
+    installation directory).
     """
     if adapter_name not in ALLOWED_ADAPTERS:
         raise ValueError(
@@ -310,6 +320,15 @@ def _resolve_adapter(adapter_name: str, *, adapter_input: str | None):
             ShellLoadoutReconAdapter,
         )
         return ShellLoadoutReconAdapter(Path(adapter_input))
+    if adapter_name == ADAPTER_LOADOUT_RUNTIME:
+        if not loadout_root:
+            raise ValueError(
+                f"adapter {adapter_name!r} requires --loadout-root PATH"
+            )
+        from evaluation.adapters.loadout_runtime_adapter import (  # type: ignore
+            LoadoutRuntimeAdapter,
+        )
+        return LoadoutRuntimeAdapter(Path(loadout_root))
     raise ValueError(f"unhandled adapter {adapter_name!r}")
 
 
@@ -787,20 +806,69 @@ def _assemble_artifact(
             "A revised QMR is emitted as evidence (status: experimental) but "
             "is not authoritative; authority over capability state remains "
             "with the canonical capability fragment.",
-            "ARS-W3 Phase 1 introduced an adapter surface (internal-fixture-procedure "
-            "and shell-loadout-recon) so the evaluator can be configured to invoke an "
-            "external Repository Recon procedure. The v0 qualified-method-record "
+            "ARS-W3 Phase 2 added the loadout-runtime adapter so the evaluator "
+            "can invoke the Loadout W3 Repository Recon v1 procedure "
+            "(d95927fbb675902d0fba992684b101ff60ff5a52). The v0 qualified-method-record "
             "contract has no adapter concept; the canonical QMR's procedure_ref "
             "is a single SHA-256 and cannot simultaneously bind to multiple "
             "adapters. Promoting the QMR to qualified therefore requires a "
             "contract evolution that introduces an adapter concept (adapter "
-            "identity, adapter_version, adapter_input_provenance); this is the "
-            "W3 Phase 1 graduation gap and is documented in "
-            "docs/arsenal-method-evaluation.md.",
+            "identity, adapter_version, adapter_input_provenance) and a "
+            "productized-vs-fixture status qualifier; this is the W3 Phase 2 "
+            "graduation gap and is documented in docs/arsenal-method-evaluation.md.",
+            "When the canonical Arsenal corpus is run through the loadout-runtime "
+            "adapter, the metrics show assertions_failed > 0 for paths Loadout does "
+            "not catalog (e.g. arsenal/capabilities/recon.json, "
+            "engineering/doctrine/CORE.md, scripts/recon_method.py). This is the "
+            "honest output-driven signal that Loadout's catalogue differs from "
+            "Arsenal's; the corpus is Arsenal-canonical and not a fair test for "
+            "the Loadout productized target until a Loadout-canonical corpus exists.",
         ],
     }
     payload["run_digest"] = _compute_run_digest(payload)
     return payload
+
+
+def _build_adapter_block(adapter, args) -> dict:
+    """Build the ``provenance.adapter`` block for the artifact.
+
+    The block records the adapter identity (name), the input path
+    (when applicable), the module path (when applicable), and the
+    Loadout installation root (when applicable). Every field is
+    stable across runs so the run_digest remains deterministic.
+    """
+    block: dict = {
+        "name": adapter.name,
+        "input": None,
+        "module": None,
+        "loadout_root": None,
+    }
+    if adapter.name == ADAPTER_INTERNAL:
+        block["module"] = (
+            "evaluation.adapters.internal_fixture_adapter:"
+            "InternalFixtureProcedureAdapter"
+        )
+    elif adapter.name == ADAPTER_SHELL_LOADOUT:
+        block["input"] = (
+            _rel(Path(args.adapter_input).resolve())
+            if args.adapter_input
+            else None
+        )
+        block["module"] = (
+            "evaluation.adapters.shell_loadout_adapter:"
+            "ShellLoadoutReconAdapter"
+        )
+    elif adapter.name == ADAPTER_LOADOUT_RUNTIME:
+        block["loadout_root"] = (
+            _rel(Path(args.loadout_root).resolve())
+            if args.loadout_root
+            else None
+        )
+        block["module"] = (
+            "evaluation.adapters.loadout_runtime_adapter:"
+            "LoadoutRuntimeAdapter"
+        )
+    return block
 
 
 def _emit_revised_qmr(artifact: dict, out_path: Path) -> str:
@@ -1006,7 +1074,11 @@ def cmd_repository_recon(args) -> int:
     # broken adapter fails loudly (case loading is the next step
     # and would mask the adapter error).
     try:
-        adapter = _resolve_adapter(args.adapter, adapter_input=args.adapter_input)
+        adapter = _resolve_adapter(
+            args.adapter,
+            adapter_input=args.adapter_input,
+            loadout_root=args.loadout_root,
+        )
     except (ValueError, FileNotFoundError, OSError) as exc:
         print(f"ERROR adapter: {exc}", file=sys.stderr)
         return EXIT_CODE["UNKNOWN"]
@@ -1050,21 +1122,7 @@ def cmd_repository_recon(args) -> int:
 
     import os
     arsenal_commit = os.environ.get("GITHUB_SHA") or None
-    adapter_block = {
-        "name": adapter.name,
-        "input": (
-            _rel(Path(args.adapter_input).resolve())
-            if adapter.name == ADAPTER_SHELL_LOADOUT and args.adapter_input
-            else None
-        ),
-        "module": (
-            "evaluation.adapters.internal_fixture_adapter:"
-            "InternalFixtureProcedureAdapter"
-            if adapter.name == ADAPTER_INTERNAL
-            else "evaluation.adapters.shell_loadout_adapter:"
-            "ShellLoadoutReconAdapter"
-        ),
-    }
+    adapter_block = _build_adapter_block(adapter, args)
     artifact = _assemble_artifact(
         method, corpus, case_results, arsenal_commit, adapter=adapter_block
     )
@@ -1208,6 +1266,15 @@ def parser() -> argparse.ArgumentParser:
             "Path to the adapter input (findings JSON for "
             "shell-loadout-recon). Required when --adapter is "
             "shell-loadout-recon; ignored otherwise."
+        ),
+    )
+    rr.add_argument(
+        "--loadout-root",
+        default=None,
+        help=(
+            "Path to the Loadout installation root (the directory "
+            "containing dist/packs/repository-recon/run.js). Required "
+            "when --adapter is loadout-runtime; ignored otherwise."
         ),
     )
     rr.set_defaults(func=cmd_repository_recon)

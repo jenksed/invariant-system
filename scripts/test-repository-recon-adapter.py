@@ -600,6 +600,245 @@ def test_adapter_does_not_break_revised_qmr_emission() -> None:
         )
 
 
+def _loadout_root_for_tests() -> Path | None:
+    """Resolve the Loadout installation root for the adapter tests.
+
+    The tests are no-ops (return None) when the W3 Loadout checkpoint
+    is not present on disk. The runtime adapter test then skips
+    itself rather than failing. CI runs against the exact checkpoint
+    the Wave 3 maintainer supplies.
+    """
+    candidates = [
+        Path(os.environ.get("ARSENAL_W3_LOADOUT_ROOT", "")),
+        ROOT.parent / "loadout",
+        Path("/Users/jenksed/Developer/engineering-system-workspace/loadout"),
+    ]
+    for c in candidates:
+        if c and c.is_dir() and (c / "dist" / "packs" / "repository-recon" / "run.js").is_file():
+            return c
+    return None
+
+
+def test_loadout_runtime_adapter_translates_common_paths() -> None:
+    """When the W3 Loadout checkpoint is present, the loadout-runtime
+    adapter must successfully translate the procedure's output into
+    Arsenal findings for the canonical corpus, and the artifact must
+    record the adapter identity with the Loadout installation root.
+
+    Skipped when the checkpoint is not present (the test surface is
+    environment-conditional so the suite stays green in CI without
+    the Loadout source tree).
+    """
+    loadout_root = _loadout_root_for_tests()
+    if loadout_root is None:
+        print(
+            "SKIP loadout-runtime translates: Loadout W3 checkpoint not on disk"
+        )
+        return
+    with tempfile.TemporaryDirectory(prefix="ars-w3-loadout-rt-") as td:
+        tmp = Path(td)
+        out = tmp / "eval.json"
+        rc, _, stderr = _run(
+            [
+                "repository-recon",
+                "--corpus", str(CORPUS_PATH.relative_to(ROOT)),
+                "--out", str(out),
+                "--adapter", ae.ADAPTER_LOADOUT_RUNTIME,
+                "--loadout-root", str(loadout_root),
+            ]
+        )
+        assert rc == 0, f"loadout-runtime run failed: rc={rc}, stderr={stderr!r}"
+        artifact = json.loads(out.read_text(encoding="utf-8"))
+        adapter = artifact["provenance"]["adapter"]
+        assert adapter["name"] == ae.ADAPTER_LOADOUT_RUNTIME
+        assert adapter["loadout_root"], (
+            "loadout-runtime adapter must record the loadout_root in provenance"
+        )
+        # The artifact must validate against the canonical validator.
+        rc, _, _ = _run(["validate", "--artifact", str(out)])
+        assert rc == 0, "loadout-runtime artifact failed validation"
+        # The straightforward case must succeed on the AGENTS.md and
+        # README.md presence assertions; these are paths Loadout's
+        # catalog covers. Arsenal-specific paths produce FAILURE
+        # outcomes, which is the honest output-driven signal.
+        straight = next(
+            cr for cr in artifact["case_results"]
+            if cr["case_id"] == "recon.straightforward.small-clean"
+        )
+        success_ids = set(straight["successes"])
+        assert "agents_md_present" in success_ids, (
+            f"Loadout runtime adapter must succeed on AGENTS.md presence; "
+            f"got successes={success_ids!r}"
+        )
+        assert "readme_present" in success_ids, (
+            f"Loadout runtime adapter must succeed on README.md presence; "
+            f"got successes={success_ids!r}"
+        )
+        print(
+            "PASS loadout-runtime translates: Loadout W3 checkpoint produces "
+            "expected common-path coverage; Arsenal-specific paths surface "
+            "honestly as FAILURE"
+        )
+
+
+def test_loadout_runtime_adapter_without_loadout_root_is_rejected() -> None:
+    """Selecting the loadout-runtime adapter without --loadout-root
+    is rejected (the evaluator refuses to invent an installation)."""
+    with tempfile.TemporaryDirectory(prefix="ars-w3-loadout-noinput-") as td:
+        tmp = Path(td)
+        out = tmp / "eval.json"
+        rc, _, stderr = _run(
+            [
+                "repository-recon",
+                "--corpus", str(CORPUS_PATH.relative_to(ROOT)),
+                "--out", str(out),
+                "--adapter", ae.ADAPTER_LOADOUT_RUNTIME,
+            ]
+        )
+        assert rc != 0, "loadout-runtime without --loadout-root must be rejected"
+        assert "loadout-root" in stderr.lower(), (
+            f"loadout-runtime without root must surface requirement in stderr; "
+            f"got {stderr!r}"
+        )
+        print(
+            "PASS loadout-runtime requires-root: loadout-runtime without "
+            "--loadout-root is refused"
+        )
+
+
+def test_loadout_runtime_adapter_with_missing_root_fails_loudly() -> None:
+    """A loadout-runtime adapter pointed at a missing Loadout
+    installation refuses to emit a partial artifact and surfaces the
+    failure in stderr."""
+    with tempfile.TemporaryDirectory(prefix="ars-w3-loadout-badroot-") as td:
+        tmp = Path(td)
+        out = tmp / "eval.json"
+        rc, _, stderr = _run(
+            [
+                "repository-recon",
+                "--corpus", str(CORPUS_PATH.relative_to(ROOT)),
+                "--out", str(out),
+                "--adapter", ae.ADAPTER_LOADOUT_RUNTIME,
+                "--loadout-root", str(tmp / "no-such-loadout"),
+            ]
+        )
+        assert rc != 0, "loadout-runtime with bad root must NOT silently succeed"
+        assert "loadout-runtime" in stderr.lower() or "cannot locate" in stderr.lower(), (
+            f"loadout-runtime with bad root must surface the failure in stderr; "
+            f"got {stderr!r}"
+        )
+        assert not out.exists(), (
+            "loadout-runtime with a bad root must NOT emit a partial artifact"
+        )
+        print(
+            "PASS loadout-runtime missing-root: bad --loadout-root fails loudly "
+            "and emits no partial artifact"
+        )
+
+
+def test_translate_recon_to_findings_known_anchors_and_unknowns() -> None:
+    """The translation helper emits presence findings (actual=True)
+    for every detected anchor and presence findings (actual=False)
+    for every canonical path implied by an ``architecture_anchor:KIND``
+    unknown. The translation is pure and reviewable."""
+    from evaluation.adapters.loadout_runtime_adapter import (  # type: ignore
+        _translate_recon_to_findings,
+    )
+    recon = {
+        "schema": "loadout/repository-recon/v1",
+        "architecture_anchors": [
+            {
+                "kind": "governance",
+                "path": "AGENTS.md",
+                "observation": "x",
+                "evidence": "x",
+            },
+            {
+                "kind": "readme",
+                "path": "README.md",
+                "observation": "y",
+                "evidence": "y",
+            },
+            {
+                "kind": "source_root",
+                "path": "src/",
+                "observation": "z",
+                "evidence": "z",
+            },
+        ],
+        "unknowns": [
+            {"subject": "architecture_anchor:ci_workflow", "reason": "r"},
+            {"subject": "architecture_anchor:test_root", "reason": "r"},
+            {"subject": "architecture_ownership", "reason": "r"},
+        ],
+    }
+    findings = _translate_recon_to_findings(recon)
+    # Three presence-True findings (the detected anchors).
+    presence_true = [f for f in findings if f["actual"] is True]
+    assert len(presence_true) == 3, (
+        f"expected 3 presence-True findings, got {len(presence_true)}: "
+        f"{presence_true!r}"
+    )
+    # The unknowns of the form architecture_anchor:KIND emit presence-False
+    # findings for every canonical path of that KIND that was not detected.
+    presence_false = [f for f in findings if f["actual"] is False]
+    evidence_set = {f["evidence"] for f in presence_false}
+    # ci_workflow canonical paths include .github/workflows, .travis.yml, ...
+    assert ".github/workflows" in evidence_set, (
+        f"expected ci_workflow canonical path '.github/workflows' in absence "
+        f"findings, got {sorted(evidence_set)}"
+    )
+    assert ".travis.yml" in evidence_set, (
+        f"expected ci_workflow canonical path '.travis.yml' in absence "
+        f"findings, got {sorted(evidence_set)}"
+    )
+    # test_root canonical paths include tests/, test/, spec/, __tests__/.
+    assert "tests/" in evidence_set
+    # Architecture-ownership unknown (not of the anchor:KIND form) must NOT
+    # produce findings.
+    assert all(
+        f["subject"] != "architecture_ownership" for f in findings
+    ), "non-anchor-KIND unknown must not produce findings"
+    print(
+        "PASS translate recon-to-findings: pure translation emits 1:1 anchor "
+        "and anchor-KIND-unknown findings, ignores architecture_ownership"
+    )
+
+
+def test_loadout_runtime_adapter_does_not_silently_fall_back() -> None:
+    """When the loadout-runtime adapter's subprocess fails (non-zero
+    exit), the adapter raises a RuntimeError that the evaluator
+    surfaces as UNKNOWN. There is no silent fallback to the internal
+    fixture procedure."""
+    from unittest import mock
+    from evaluation.adapters.loadout_runtime_adapter import (  # type: ignore
+        LoadoutRuntimeAdapter,
+    )
+    fake = mock.MagicMock()
+    fake.returncode = 7
+    fake.stderr = "boom"
+    fake.stdout = ""
+    adapter = LoadoutRuntimeAdapter(Path("/tmp/nonexistent"))
+    with mock.patch.object(
+        adapter, "_resolve_procedure_path", return_value=Path("/tmp/fake.js")
+    ), mock.patch("subprocess.run", return_value=fake):
+        try:
+            adapter.run(Path("/tmp/whatever"))
+        except RuntimeError as exc:
+            assert "loadout-runtime" in str(exc).lower(), (
+                f"adapter failure must name the adapter: {exc!r}"
+            )
+            assert "boom" in str(exc), (
+                f"adapter failure must surface stderr: {exc!r}"
+            )
+            print(
+                "PASS loadout-runtime no-silent-fallback: subprocess failure "
+                "raises a loud RuntimeError naming the adapter and stderr"
+            )
+            return
+    raise AssertionError("adapter swallowed the subprocess failure")
+
+
 def main() -> int:
     test_default_adapter_is_internal()
     test_explicit_internal_adapter_matches_default()
@@ -613,6 +852,11 @@ def main() -> int:
     test_corpus_level_end_to_end_with_shell_adapter()
     test_artifact_adapter_block_is_recorded_for_every_run()
     test_adapter_does_not_break_revised_qmr_emission()
+    test_loadout_runtime_adapter_translates_common_paths()
+    test_loadout_runtime_adapter_without_loadout_root_is_rejected()
+    test_loadout_runtime_adapter_with_missing_root_fails_loudly()
+    test_translate_recon_to_findings_known_anchors_and_unknowns()
+    test_loadout_runtime_adapter_does_not_silently_fall_back()
     print("arsenal adapter suite: PASS")
     return 0
 

@@ -64,27 +64,29 @@ It checks the schema, the closed epistemic-conclusion vocabulary,
 the closed qualification-gap label set, the auto-promotion flags
 (which must all be `false`), and the deterministic run digest.
 
-## Adapter surface (ARS-W3 Phase 1)
+## Adapter surface (ARS-W3)
 
 The evaluator can be configured to invoke an external procedure
 through the adapter package at `evaluation/adapters/`. The
 default is the internal fixture procedure
-(`internal-fixture-procedure`); the Wave 3 Phase 1 placeholder
-for the eventual Loadout productized procedure is
-`shell-loadout-recon`, which reads pre-emitted findings from a
-JSON file.
+(`internal-fixture-procedure`); Phase 1 added the
+`shell-loadout-recon` placeholder; Phase 2 added the
+`loadout-runtime` adapter that shells out to the Loadout W3
+checkpoint's `runRepositoryRecon` procedure.
 
 | Adapter name                  | Module                                                                  | Phase | Description |
 |-------------------------------|-------------------------------------------------------------------------|-------|-------------|
 | `internal-fixture-procedure`  | `evaluation.adapters.internal_fixture_adapter`                          | v0    | The canonical internal procedure. Default. |
-| `shell-loadout-recon`         | `evaluation.adapters.shell_loadout_adapter`                             | W3-P1 | Reads findings from a JSON file. Phase 1 placeholder for the eventual Loadout ``loadout run --plan <plan>`` invocation. |
+| `shell-loadout-recon`         | `evaluation.adapters.shell_loadout_adapter`                             | W3-P1 | Reads pre-emitted findings from a JSON file. Used for fixture-only test surfaces. |
+| `loadout-runtime`             | `evaluation.adapters.loadout_runtime_adapter`                           | W3-P2 | Shells out to the Loadout W3 checkpoint (`runRepositoryRecon`). Read-only; no target mutation; no Arsenal source import of Loadout. |
 
 Adapter contract (Wave 3 frozen invariants):
 
-1. An adapter MUST NOT import Loadout source code.
-2. An adapter MUST NOT depend on Loadout runtime (no shell-out to
-   Loadout until Phase 2 when Loadout's interface is concrete and
-   stable).
+1. An adapter MUST NOT import Loadout source code (no Python
+   `import` of any Loadout module).
+2. An adapter MUST NOT depend on Loadout runtime (no bundling of
+   Loadout source; Phase 2 may shell out to a Node.js procedure
+   the operator points the adapter at).
 3. An adapter MUST be deterministic and read-only with respect to
    the target repository (no writes to the repo, no network, no
    remote credentials).
@@ -101,9 +103,10 @@ The artifact records the adapter identity under
 {
   "provenance": {
     "adapter": {
-      "name": "internal-fixture-procedure",
+      "name": "loadout-runtime",
       "input": null,
-      "module": "evaluation.adapters.internal_fixture_adapter:InternalFixtureProcedureAdapter"
+      "module": "evaluation.adapters.loadout_runtime_adapter:LoadoutRuntimeAdapter",
+      "loadout_root": "/path/to/loadout-installation"
     }
   }
 }
@@ -112,6 +115,53 @@ The artifact records the adapter identity under
 The `provenance.adapter` block is mandatory on every artifact,
 so every emitted artifact is self-describing about which procedure
 produced the findings.
+
+## Loadout runtime adapter (ARS-W3 Phase 2)
+
+The `loadout-runtime` adapter invokes the Loadout Repository
+Recon v1 procedure (`runRepositoryRecon`) at the exact checkpoint
+supplied by the Loadout Wave 3 maintainer (currently
+`d95927fbb675902d0fba992684b101ff60ff5a52`). The adapter:
+
+1. Resolves the procedure at
+   `<loadout-root>/dist/packs/repository-recon/run.js` (built) or
+   `<loadout-root>/src/packs/repository-recon/run.ts` (source
+   fallback).
+2. Writes a small ESM bootstrap to a private temp file and runs
+   it through `node`. The bootstrap dynamically imports the
+   procedure by absolute path and prints the result as JSON on
+   stdout. The bootstrap is removed in a finally block.
+3. Captures the `ReconResultV1` JSON, rejects it if the schema is
+   not `loadout/repository-recon/v1`, and translates the result
+   1:1 into Arsenal findings.
+4. Emits a presence finding (`actual=True`) for every detected
+   architecture anchor.
+5. Emits presence findings (`actual=False`) for every canonical
+   path implied by an `architecture_anchor:KIND` unknown (the
+   canonical catalogues are mirrored verbatim from the Loadout
+   source so the translation is transparent and reviewable).
+6. Does NOT supplement Loadout outputs with internal-procedure
+   checks. Arsenal-specific paths that Loadout does not catalog
+   produce FAILURE outcomes in the evaluation -- which is the
+   honest output-driven signal that Loadout's catalogue differs
+   from Arsenal's.
+
+CLI:
+
+```bash
+python3 scripts/arsenal_evaluate.py repository-recon \
+    --adapter loadout-runtime \
+    --loadout-root /path/to/loadout \
+    --corpus evaluation/method-cases/corpus.manifest.json \
+    --out .arsenal-eval/repository-recon-evaluation.loadout.v0.json
+```
+
+The `loadout-runtime` adapter is environment-conditional in the
+test suite: when the W3 Loadout checkpoint is not on disk the
+test skips itself rather than failing the suite. CI runs against
+the exact checkpoint the Wave 3 maintainer supplies (the
+environment variable `ARSENAL_W3_LOADOUT_ROOT` overrides the
+default lookup).
 
 ## Corpus (v0)
 
@@ -234,10 +284,10 @@ The adapter surface is exercised by
   shell adapter, the resulting artifact validates, and the
   run_digest is stable across two invocations.
 
-## Graduation gap (ARS-W3 Phase 1)
+## Graduation gap (ARS-W3 Phase 2)
 
-ARS-W3 Phase 1 introduces the adapter surface so the evaluator
-can invoke an external Repository Recon procedure. The Phase 1
+ARS-W3 Phase 2 evaluates the productized Loadout Repository Recon
+v1 target through the `loadout-runtime` adapter. The Phase 2
 graduation gap enumerates what is still required before the
 canonical QMR can be promoted from `experimental` to `qualified`
 against the productized (Loadout) target:
@@ -251,26 +301,39 @@ against the productized (Loadout) target:
    truthfully describe qualification against a specific adapter
    binding rather than a single canonical procedure.
 
-2. **No runtime adapter for Loadout.** Phase 1 only ships a
-   `shell-loadout-recon` adapter that reads pre-emitted findings
-   from a JSON file. Phase 2 must add a runtime adapter (e.g.
-   `LoadoutRuntimeAdapter`) that invokes the Loadout
-   `loadout run --plan <plan>` CLI through a stable, documented
-   interface. Phase 1 deliberately stops short of this because
-   Loadout's interface is not yet concrete.
+2. **Catalog mismatch between the existing corpus and Loadout.**
+   The existing Arsenal corpus expects Arsenal-canonical paths
+   (`engineering/doctrine/CORE.md`, `arsenal/capabilities/recon.json`,
+   `scripts/recon_method.py`, etc.) that Loadout's
+   `runRepositoryRecon` does not catalog. When evaluated
+   through the `loadout-runtime` adapter, the corpus produces
+   FAILURE outcomes for those paths. This is the honest
+   output-driven signal that Loadout's catalogue differs from
+   Arsenal's. A QMR that truthfully described qualification
+   against the Loadout target would need to bind to a corpus
+   composed of paths Loadout actually catalogs.
 
-3. **No actual evaluation against the Loadout Phase 1 checkpoint.**
-   The Loadout Repository Recon v1 checkpoint SHA is supplied
-   separately. Phase 1 does not yet invoke the procedure; it
-   only prepares the adapter infrastructure.
+3. **Single `procedure_ref` cannot bind to multiple adapters.**
+   The canonical QMR's `procedure_ref` is a single SHA-256 of
+   the canonical fixture procedure. The productized Loadout
+   target has a different procedure interface digest. A QMR
+   cannot truthfully carry both bindings; a contract evolution
+   is required.
 
-4. **No behavioral efficacy evidence.** The canonical QMR
+4. **No productized-vs-fixture status qualifier.** The QMR
+   `status` vocabulary is `experimental | qualified`. Neither
+   value distinguishes "qualified against an Arsenal fixture"
+   from "qualified against the productized Loadout target".
+   The contract needs a binding qualifier so a QMR can honestly
+   declare which adapter it is qualified against.
+
+5. **No behavioral efficacy evidence.** The canonical QMR
    `observed_failures` already declares
    `no-behavioral-efficacy-evidence-in-v0`. Behavioral efficacy
    requires a controlled model/harness run, which is out of
    scope for ARS-W3.
 
-5. **No qualification receipt bound to a target and adapter.**
+6. **No qualification receipt bound to a target and adapter.**
    The QMR `evaluation.qualification_gap` already declares
    `no-qualification-receipt-bound-to-capability`. Promotion to
    `qualified` requires a qualification receipt bound to
@@ -278,6 +341,36 @@ against the productized (Loadout) target:
    `scripts/arsenal_bench.py` has not yet emitted for
    `capability.recon` against the Loadout adapter.
 
-The ARS-W3 closeout therefore reports `READY` for the adapter
-infrastructure and `BLOCKED` for the QMR promotion until items
-1–3 are resolved. The canonical QMR remains `experimental`.
+The ARS-W3 closeout therefore reports `READY` for the Phase 2
+adapter infrastructure (the `loadout-runtime` adapter
+successfully invokes the W3 checkpoint, the artifact validates,
+the run_digest is deterministic, and a broken candidate
+produces strictly worse evaluation evidence) and `BLOCKED` for
+the QMR promotion until items 1–4 are resolved. The canonical
+QMR remains `experimental`.
+
+### Phase 2 evaluation evidence (illustrative)
+
+When the canonical corpus is run through the `loadout-runtime`
+adapter (with Loadout's `runRepositoryRecon` from checkpoint
+`d95927fbb675902d0fba992684b101ff60ff5a52`), the metrics are:
+
+| Metric                       | Internal-fixture | loadout-runtime |
+|------------------------------|------------------|-----------------|
+| cases_total                  | 3                | 3               |
+| assertions_evaluated         | 16               | 16              |
+| assertions_supported         | 16               | 5               |
+| assertions_missed            | 0                | 0               |
+| assertions_failed            | 0                | 11              |
+
+Loadout's procedure produces SUCCESS outcomes for the
+common-path assertions (`AGENTS.md` presence, `README.md`
+presence, `AGENTS.md` absence in the ambiguous case). The 11
+FAILURE outcomes are all Arsenal-canonical paths Loadout does
+not catalog (`engineering/doctrine/CORE.md`,
+`arsenal/capabilities/recon.json`, `evaluation/method-records/...`,
+`scripts/recon_method.py`, etc.). This is the documented catalog
+mismatch in graduation gap item 2.
+
+The artifact is stored at
+`.arsenal-eval/repository-recon-evaluation.loadout.v0.json`.
