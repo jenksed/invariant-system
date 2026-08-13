@@ -112,7 +112,9 @@ export async function compileAgainstGoalCatalog(args: {
       throw new Error('Plan.plan_id does not match its content; refusing.');
     }
     if (plan.execution_boundary.boundary !== 'simulated') {
-      throw new Error('Plan.execution_boundary is not SIMULATED; refusing.');
+      throw new Error(
+        `Plan.execution_boundary is '${plan.execution_boundary.boundary}', not 'simulated'; refusing.`
+      );
     }
   }
 }

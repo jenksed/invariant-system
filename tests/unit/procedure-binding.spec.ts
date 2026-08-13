@@ -324,9 +324,11 @@ describe('procedure registry (L2)', () => {
       packRoot,
       loadoutRoot: LOADOUT_ROOT,
       repoRoot
-    })) as { repository: string; headCommit: string; notes: string[] };
+    })) as { repository: string; summary: string; schema: string };
     expect(result.repository).toBe(repoRoot);
-    expect(Array.isArray(result.notes)).toBe(true);
+    expect(result.schema).toBe('loadout/repository-recon/v1');
+    expect(typeof result.summary).toBe('string');
+    expect(result.summary.length).toBeGreaterThan(0);
   });
 
   it('extractExportedSymbols finds exported functions, consts, classes, interfaces, types', () => {

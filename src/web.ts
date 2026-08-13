@@ -27,7 +27,12 @@ import {
   verifyPlanFreshness,
   verifyPlanProcedureBinding,
   invokeProcedure,
-  computeProcedureInterfaceDigest
+  computeProcedureInterfaceDigest,
+  submitWorkEnvelopeToKiln,
+  KilnUnavailableError,
+  KilnMalformedResponseError,
+  KilnFakeLabelError,
+  KilnSupervisionError
 } from './index';
 import { loadAndValidateQmr } from './core/qmr';
 import {
@@ -106,9 +111,11 @@ export async function startWeb(opts: WebOptions): Promise<void> {
         const body = (await readJsonBody(req)) as {
           goal?: string;
           repository?: string;
+          execution?: 'kiln' | 'simulate';
         };
         const goalTitle = body.goal ?? 'Understand this repository';
         const repository = body.repository ?? opts.defaultRepository;
+        const executionBoundary = body.execution === 'kiln' ? 'kiln' : 'simulated';
         const goal = findGoalByTitle(goalTitle);
         if (!goal) {
           jsonResponse(res, 400, { error: `unknown goal: ${goalTitle}` });
@@ -157,7 +164,8 @@ export async function startWeb(opts: WebOptions): Promise<void> {
             workspaceStateDigest: snap.digest
           },
           createdAt: envelope.created_at,
-          packRoot
+          packRoot,
+          executionBoundary
         });
         const planPath = defaultPlanPath(repository, plan);
         await writePlan({ plan, outPath: planPath });
@@ -165,7 +173,11 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           plan,
           planText: formatPlanText(plan),
           planPath,
-          simulated: true
+          executionBoundary,
+          // The Plan is real and content-addressable regardless of
+          // boundary; only the result is labeled simulated when the
+          // user explicitly chose the simulated boundary.
+          simulated: executionBoundary === 'simulated'
         });
         return;
       }
@@ -173,9 +185,11 @@ export async function startWeb(opts: WebOptions): Promise<void> {
         const body = (await readJsonBody(req)) as {
           planPath?: string;
           repository?: string;
+          execution?: 'kiln' | 'simulate';
         };
         const planPath = body.planPath;
         const repository = body.repository ?? opts.defaultRepository;
+        const requestedExecution = body.execution;
         if (!planPath) {
           jsonResponse(res, 400, { error: 'planPath is required' });
           return;
@@ -243,30 +257,82 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           }
           return;
         }
-        let recon: { notes: string[]; [k: string]: unknown };
+        let recon: { summary: string; [k: string]: unknown } | null = null;
+        let procedureInvocationCount = 0;
+        // Honor the Plan's recorded execution boundary; the user can
+        // request a mismatch via the `execution` field, but the
+        // mismatch MUST match (otherwise we refuse).
+        const planBoundary = plan.execution_boundary.boundary;
+        if (requestedExecution === 'kiln' && planBoundary !== 'kiln') {
+          jsonResponse(res, 422, {
+            error: `requested execution='kiln' but Plan's recorded boundary is '${planBoundary}'`,
+            simulated: true
+          });
+          return;
+        }
+        if (requestedExecution === 'simulate' && planBoundary !== 'simulated') {
+          jsonResponse(res, 422, {
+            error: `requested execution='simulate' but Plan's recorded boundary is '${planBoundary}'`,
+            simulated: true
+          });
+          return;
+        }
+        const effectiveMode: 'kiln' | 'simulate' = planBoundary === 'kiln' ? 'kiln' : 'simulate';
+        let result;
+        let kilnRawJson: string | null = null;
         try {
-          recon = (await invokeProcedure({
-            procedureEntry: cap.skill.procedureEntry,
-            packRoot,
-            loadoutRoot: LOADOUT_ROOT,
-            repoRoot: repository
-          })) as { notes: string[] };
+          if (effectiveMode === 'kiln') {
+            const driverResult = await submitWorkEnvelopeToKiln(plan.work_envelope);
+            result = driverResult.envelope;
+            kilnRawJson = driverResult.rawJson;
+            if (driverResult.procedureShouldRun) {
+              procedureInvocationCount += 1;
+              recon = (await invokeProcedure({
+                procedureEntry: cap.skill.procedureEntry,
+                packRoot,
+                loadoutRoot: LOADOUT_ROOT,
+                repoRoot: repository
+              })) as { summary: string };
+            }
+          } else {
+            result = invokeFakeKiln(plan.work_envelope);
+            procedureInvocationCount += 1;
+            recon = (await invokeProcedure({
+              procedureEntry: cap.skill.procedureEntry,
+              packRoot,
+              loadoutRoot: LOADOUT_ROOT,
+              repoRoot: repository
+            })) as { summary: string };
+          }
         } catch (e) {
-          if (e instanceof ProcedureResolutionError) {
+          if (
+            e instanceof KilnUnavailableError ||
+            e instanceof KilnMalformedResponseError ||
+            e instanceof KilnFakeLabelError ||
+            e instanceof KilnSupervisionError
+          ) {
+            jsonResponse(res, 502, { error: e.message, simulated: false });
+          } else if (e instanceof ProcedureResolutionError) {
             jsonResponse(res, 422, { error: e.message, simulated: true });
           } else {
             jsonResponse(res, 500, { error: (e as Error).message });
           }
           return;
         }
-        const result = invokeFakeKiln(plan.work_envelope);
         const view = buildResultView(result);
         jsonResponse(res, 200, {
           plan_id: plan.plan_id,
           work_envelope_digest: plan.work_envelope_digest,
           view,
-          reconNotes: recon.notes,
-          simulated: true
+          reconSummary: recon?.summary,
+          ...(recon ? { recon } : {}),
+          executionBoundary: effectiveMode,
+          procedureInvocationCount,
+          ...(kilnRawJson ? { kilnRawJson } : {}),
+          // The result is labeled simulated only when the user
+          // explicitly chose the simulated boundary; a real Kiln run
+          // result is NEVER labeled simulated.
+          simulated: effectiveMode === 'simulate'
         });
         return;
       }
@@ -274,9 +340,11 @@ export async function startWeb(opts: WebOptions): Promise<void> {
         const body = (await readJsonBody(req)) as {
           goal?: string;
           repository?: string;
+          execution?: 'kiln' | 'simulate';
         };
         const goalTitle = body.goal ?? 'Understand this repository';
         const repository = body.repository ?? opts.defaultRepository;
+        const effectiveMode: 'kiln' | 'simulate' = body.execution === 'kiln' ? 'kiln' : 'simulate';
         const goal = findGoalByTitle(goalTitle);
         if (!goal) {
           jsonResponse(res, 400, { error: `unknown goal: ${goalTitle}` });
@@ -300,22 +368,6 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           jsonResponse(res, 422, { error: (e as Error).message, simulated: true });
           return;
         }
-        let recon: { notes: string[]; [k: string]: unknown };
-        try {
-          recon = (await invokeProcedure({
-            procedureEntry: cap.skill.procedureEntry,
-            packRoot,
-            loadoutRoot: LOADOUT_ROOT,
-            repoRoot: repository
-          })) as { notes: string[] };
-        } catch (e) {
-          if (e instanceof ProcedureResolutionError) {
-            jsonResponse(res, 422, { error: e.message, simulated: true });
-          } else {
-            jsonResponse(res, 500, { error: (e as Error).message });
-          }
-          return;
-        }
         const snap = await snapshotRepo(repository);
         const envelope = compileWorkEnvelope({
           goal,
@@ -328,9 +380,59 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           },
           createdAt: new Date().toISOString()
         });
-        const result = invokeFakeKiln(envelope);
+        let result;
+        let recon: { summary: string; [k: string]: unknown } | null = null;
+        let procedureInvocationCount = 0;
+        let kilnRawJson: string | null = null;
+        try {
+          if (effectiveMode === 'kiln') {
+            const driverResult = await submitWorkEnvelopeToKiln(envelope);
+            result = driverResult.envelope;
+            kilnRawJson = driverResult.rawJson;
+            if (driverResult.procedureShouldRun) {
+              procedureInvocationCount += 1;
+              recon = (await invokeProcedure({
+                procedureEntry: cap.skill.procedureEntry,
+                packRoot,
+                loadoutRoot: LOADOUT_ROOT,
+                repoRoot: repository
+              })) as { summary: string };
+            }
+          } else {
+            result = invokeFakeKiln(envelope);
+            procedureInvocationCount += 1;
+            recon = (await invokeProcedure({
+              procedureEntry: cap.skill.procedureEntry,
+              packRoot,
+              loadoutRoot: LOADOUT_ROOT,
+              repoRoot: repository
+            })) as { summary: string };
+          }
+        } catch (e) {
+          if (
+            e instanceof KilnUnavailableError ||
+            e instanceof KilnMalformedResponseError ||
+            e instanceof KilnFakeLabelError ||
+            e instanceof KilnSupervisionError
+          ) {
+            jsonResponse(res, 502, { error: e.message, simulated: false });
+          } else if (e instanceof ProcedureResolutionError) {
+            jsonResponse(res, 422, { error: e.message, simulated: true });
+          } else {
+            jsonResponse(res, 500, { error: (e as Error).message });
+          }
+          return;
+        }
         const view = buildResultView(result);
-        jsonResponse(res, 200, { view, reconNotes: recon.notes, simulated: true });
+        jsonResponse(res, 200, {
+          view,
+          reconSummary: recon?.summary,
+          ...(recon ? { recon } : {}),
+          executionBoundary: effectiveMode,
+          procedureInvocationCount,
+          ...(kilnRawJson ? { kilnRawJson } : {}),
+          simulated: effectiveMode === 'simulate'
+        });
         return;
       }
       res.writeHead(404);

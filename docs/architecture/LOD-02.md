@@ -5,6 +5,16 @@
 **Scope:** Plan/Explain feature for `Understand this repository`
 **Date:** 2026-08-12
 
+## Wave 3 Phase 1 update (2026-08-13)
+
+The Repository Recon procedure has been advanced from a flat summary to a
+deterministic structured v1. The new shape is Loadout-owned
+(`loadout/repository-recon/v1`) and is embedded in the Plan as a
+content-addressable block.
+
+See `docs/architecture/LOD-03-recon-v1.md` for the detailed structure,
+determinism rules, and LOD-RR acceptance mapping.
+
 ## Objective (re-stated)
 
 Add a `loadout plan` subcommand that produces a content-addressable, real

@@ -142,7 +142,7 @@ describe('Loadout Plan v0 (L1)', () => {
 
     // EXECUTION BOUNDARY: unmistakably simulated
     expect(plan.execution_boundary.boundary).toBe('simulated');
-    expect(plan.execution_boundary.reason).toBe('no-real-kiln');
+    expect(plan.execution_boundary.reason).toBe('user-selected-simulated');
     expect(plan.execution_boundary.details).toMatch(/simulated/i);
   });
 

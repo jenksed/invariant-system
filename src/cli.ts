@@ -46,7 +46,12 @@ import {
   computeProcedureInterfaceDigest,
   writePlan,
   defaultPlanPath,
-  formatPlanText
+  formatPlanText,
+  submitWorkEnvelopeToKiln,
+  KilnUnavailableError,
+  KilnMalformedResponseError,
+  KilnFakeLabelError,
+  KilnSupervisionError
 } from './index';
 import { loadAndValidateQmr } from './core/qmr';
 import { validateAllFixtures, compileAgainstGoalCatalog } from './core/contract-validation';
@@ -56,7 +61,8 @@ import {
   PlanStaleError,
   PlanProcedureBindingError
 } from './core/plan';
-import { ProcedureResolutionError } from './core/procedure-registry';
+// ProcedureResolutionError is no longer referenced in this file; the
+// run command rethrows any error from invokeProcedure as a plain Error.
 
 const PACKS_DIR = path.resolve(__dirname, 'packs');
 // Loadout installation root: the directory containing the dist/ folder.
@@ -145,9 +151,13 @@ program
 program
   .command('run')
   .description(
-    'Run the selected Goal/Capability end-to-end through the SIMULATED boundary. ' +
-      'Either --goal or --plan must be supplied. --plan uses the pre-compiled ' +
-      'Work Envelope from `loadout plan`; nothing is silently recomputed.'
+    'Run the selected Goal/Capability end-to-end. Either --goal or --plan must be ' +
+      'supplied. --plan uses the pre-compiled Work Envelope from `loadout plan`; nothing ' +
+      'is silently recomputed. Use --execution kiln to run through the real Kiln ' +
+      'supervision boundary (canonical run-result envelope); use --simulate to run ' +
+      'through the in-process fake Kiln boundary (every result is labeled ' +
+      "`simulated: true`). The Plan's recorded execution_boundary must match the " +
+      'selected flag or the run fails closed.'
   )
   .option('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
   .option('--plan <path>', 'Path to a Plan v0 file produced by `loadout plan`')
@@ -159,6 +169,43 @@ program
     ''
   )
   .option('-o, --out <path>', 'write the run record (JSON) here', '')
+  .option(
+    '--execution <mode>',
+    'execution boundary: kiln (real Kiln driver) or simulate (fake Kiln boundary). ' +
+      "Default for --plan: the Plan's recorded execution_boundary. Default for --goal: simulate.",
+    ''
+  )
+  .option(
+    '--simulate',
+    'shorthand for --execution simulate (fake Kiln boundary). Default for --goal runs.',
+    false
+  )
+  .option(
+    '--kiln-binary <path>',
+    'Kiln CLI executable (default: mix). Used only with --execution kiln.',
+    ''
+  )
+  .option(
+    '--kiln-home <path>',
+    'KILN_HOME directory passed to the Kiln CLI (optional). Used only with --execution kiln.',
+    ''
+  )
+  .option(
+    '--actor-id <id>',
+    'Actor identifier passed to the Kiln CLI (default: loadout). Used only with --execution kiln.',
+    ''
+  )
+  .addHelpText(
+    'after',
+    '\nExecution modes:\n' +
+      '  --execution kiln    submit the Work Envelope to the real Kiln supervision\n' +
+      '                      boundary via `mix kiln supervise`. Requires Kiln to be\n' +
+      '                      installed. If Kiln is missing or unavailable, the run\n' +
+      '                      FAILS CLOSED; there is no silent fallback to fake Kiln.\n' +
+      '  --simulate          run through the in-process fake Kiln boundary. Every\n' +
+      '                      result, authority decision, effect, and evidence item\n' +
+      '                      is labeled `simulated: true`.\n'
+  )
   .action(
     async (opts: {
       goal?: string;
@@ -167,11 +214,41 @@ program
       pack: string;
       qmrFixture: string;
       out: string;
+      execution: string;
+      kilnBinary: string;
+      kilnHome: string;
+      actorId: string;
+      simulate?: boolean;
     }) => {
       // --plan and --goal are mutually exclusive. Exactly one must be present.
       if (Boolean(opts.plan) === Boolean(opts.goal)) {
         console.error('loadout run: provide exactly one of --goal "<title>" or --plan <path>.');
         process.exit(2);
+      }
+
+      // Resolve the execution mode. --execution and --simulate are
+      // mutually exclusive; only one may be set.
+      const requestedExecution = opts.execution;
+      let mode: 'kiln' | 'simulate' | null = null;
+      if (opts.simulate && requestedExecution) {
+        console.error(
+          `loadout run: --simulate is shorthand for --execution simulate and cannot be combined with --execution ${requestedExecution}.`
+        );
+        process.exit(2);
+      }
+      if (opts.simulate) {
+        mode = 'simulate';
+      }
+      if (requestedExecution) {
+        if (requestedExecution === 'kiln') mode = 'kiln';
+        else if (requestedExecution === 'simulate' || requestedExecution === 'simulated')
+          mode = 'simulate';
+        else {
+          console.error(
+            `loadout run: --execution must be 'kiln' or 'simulate' (got '${requestedExecution}').`
+          );
+          process.exit(2);
+        }
       }
 
       // ----- PLAN path: load the plan, verify integrity + freshness, -----
@@ -249,33 +326,38 @@ program
           process.exit(1);
         }
 
+        // Honor the Plan's recorded execution boundary. If the user
+        // explicitly selected a mode, it MUST match the Plan's recorded
+        // boundary; otherwise the Plan's choice wins.
+        const planBoundary = plan.execution_boundary.boundary;
+        if (mode === 'kiln' && planBoundary !== 'kiln') {
+          console.error(
+            `loadout run: --execution kiln was requested but the Plan's recorded ` +
+              `execution_boundary is '${planBoundary}'. Plans are immutable; either re-run ` +
+              `'loadout plan --execution kiln' to produce a kiln-bound Plan, or omit --execution ` +
+              `and let the Plan's choice apply.`
+          );
+          process.exit(1);
+        }
+        if (mode === 'simulate' && planBoundary !== 'simulated') {
+          console.error(
+            `loadout run: --simulate was requested but the Plan's recorded ` +
+              `execution_boundary is '${planBoundary}'. Plans are immutable; either re-run ` +
+              `'loadout plan' (without --execution kiln) to produce a simulated-bound Plan, or ` +
+              `honor the Plan's kiln boundary with --execution kiln.`
+          );
+          process.exit(1);
+        }
+        // Map the recorded boundary ('simulated' | 'kiln') to the
+        // CLI flag value ('simulate' | 'kiln'). 'simulated' in the
+        // Plan is the user-facing term for the in-process fake Kiln
+        // boundary; the CLI flag name is 'simulate' for brevity.
+        const effectiveMode: 'kiln' | 'simulate' = planBoundary === 'kiln' ? 'kiln' : 'simulate';
+
         // The Plan's embedded Work Envelope is submitted verbatim. We do
         // NOT re-resolve the Capability, re-load the QMR, or recompile.
         const envelope = plan.work_envelope;
-        // Step: invoke the procedure via the registry. This is the
-        // SOLE path that calls the Skill procedure; it is not a
-        // hardcoded import. The Plan's procedure_binding tells us which
-        // procedure entry to invoke; the registry resolves it to the
-        // actual function.
-        let recon: { notes: string[]; [k: string]: unknown };
-        try {
-          recon = (await invokeProcedure({
-            procedureEntry: cap.skill.procedureEntry,
-            packRoot,
-            loadoutRoot: LOADOUT_ROOT,
-            repoRoot: opts.repository
-          })) as { notes: string[] };
-        } catch (e) {
-          if (e instanceof ProcedureResolutionError) {
-            console.error(`loadout run: ${e.message}`);
-          } else {
-            console.error(`loadout run: procedure invocation failed: ${(e as Error).message}`);
-          }
-          process.exit(1);
-        }
-        // Step: invoke the SIMULATED Kiln boundary with the Plan's envelope.
-        const result = invokeFakeKiln(envelope);
-        const view = buildResultView(result);
+
         console.log(
           `=== Loaded plan: ${plan.plan_id} (work_envelope_digest=${plan.work_envelope_digest}) ===`
         );
@@ -285,11 +367,84 @@ program
         console.log(
           `=== Procedure binding verified: qmr_procedure_ref=${plan.procedure_binding.qmr_procedure_ref} ===`
         );
+        console.log(`=== Execution boundary: ${effectiveMode.toUpperCase()} ===`);
         console.log('');
+
+        // ----- DRIVE KILN OR FAKE KILN -----
+        // Procedure is invoked ONLY when the boundary says so:
+        //   - kiln boundary: only when Kiln grants authority
+        //   - simulated boundary: always (the fake boundary never
+        //     denies authority in the simulated path, so the
+        //     procedure is the producer-side observation Loadout
+        //     reports as INPUT).
+        // The sentinel test asserts the kiln-deny path keeps
+        // procedureInvocationCount at 0.
+        let result: import('./index').RunResultEnvelopeV0;
+        let kilnRawJson: string | null = null;
+        let recon: { summary: string; [k: string]: unknown } | null = null;
+        let procedureInvocationCount = 0;
+        if (effectiveMode === 'kiln') {
+          let kilnResult;
+          try {
+            kilnResult = await submitWorkEnvelopeToKiln(envelope, {
+              ...(opts.kilnBinary ? { kilnBinary: opts.kilnBinary } : {}),
+              ...(opts.kilnHome ? { kilnHome: opts.kilnHome } : {}),
+              ...(opts.actorId ? { actorId: opts.actorId } : {})
+            });
+          } catch (e) {
+            if (
+              e instanceof KilnUnavailableError ||
+              e instanceof KilnMalformedResponseError ||
+              e instanceof KilnFakeLabelError ||
+              e instanceof KilnSupervisionError
+            ) {
+              console.error(`loadout run: ${e.message}`);
+            } else {
+              console.error(`loadout run: Kiln supervision failed: ${(e as Error).message}`);
+            }
+            process.exit(1);
+          }
+          result = kilnResult.envelope;
+          kilnRawJson = kilnResult.rawJson;
+          // 12-step protocol step 9: execute the procedure ONLY IF
+          // Kiln granted authority. Sentinel test asserts this.
+          if (kilnResult.procedureShouldRun) {
+            procedureInvocationCount += 1;
+            recon = (await invokeProcedure({
+              procedureEntry: cap.skill.procedureEntry,
+              packRoot,
+              loadoutRoot: LOADOUT_ROOT,
+              repoRoot: opts.repository
+            })) as { summary: string };
+          }
+        } else {
+          // Simulated path: invoke the fake boundary, then the
+          // procedure (the procedure's observation is what the fake
+          // boundary would conceptually observe).
+          result = invokeFakeKiln(envelope);
+          procedureInvocationCount += 1;
+          recon = (await invokeProcedure({
+            procedureEntry: cap.skill.procedureEntry,
+            packRoot,
+            loadoutRoot: LOADOUT_ROOT,
+            repoRoot: opts.repository
+          })) as { summary: string };
+        }
+
+        const view = buildResultView(result);
+
         console.log(formatResultViewText(view));
         console.log('');
-        console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
-        for (const n of recon.notes) console.log(`  ${n}`);
+        if (effectiveMode === 'kiln') {
+          console.log('(canonical Run Result Envelope from real Kiln)');
+          console.log(`procedure invoked: ${procedureInvocationCount === 1 ? 'yes' : 'no'}`);
+          console.log(`authority granted: ${result.authority.granted.join(', ') || '(none)'}`);
+        } else {
+          console.log(
+            'Local procedure summary (input to the fake Kiln boundary, not a Kiln record):'
+          );
+          if (recon) console.log(`  ${recon.summary}`);
+        }
 
         // Persist run record (same shape as ad-hoc run path).
         const wsPaths = await ensureWorkspace(opts.repository);
@@ -299,10 +454,13 @@ program
           JSON.stringify(
             {
               sourcePlan: { plan_id: plan.plan_id, plan_path: opts.plan },
+              executionBoundary: effectiveMode,
+              procedureInvocationCount,
               workEnvelope: envelope,
               runResult: result,
               view,
-              recon
+              ...(recon ? { recon } : {}),
+              ...(kilnRawJson ? { kilnRawJson } : {})
             },
             null,
             2
@@ -313,7 +471,14 @@ program
           await fs.writeFile(
             opts.out,
             JSON.stringify(
-              { plan_id: plan.plan_id, envelope, result, view, sourcePlanPath: opts.plan },
+              {
+                plan_id: plan.plan_id,
+                envelope,
+                result,
+                view,
+                executionBoundary: effectiveMode,
+                sourcePlanPath: opts.plan
+              },
               null,
               2
             )
@@ -359,30 +524,13 @@ program
         process.exit(1);
       }
 
-      // Step 2: run the deterministic local procedure (read-only) via
-      // the registry keyed by the Skill's procedureEntry. This is the
-      // same invocation path that `run --plan` uses; the only
-      // difference is whether the binding came from a Plan or from a
-      // live capability resolution.
-      let recon: { notes: string[]; [k: string]: unknown };
-      try {
-        recon = (await invokeProcedure({
-          procedureEntry: cap.skill.procedureEntry,
-          packRoot,
-          loadoutRoot: LOADOUT_ROOT,
-          repoRoot: opts.repository
-        })) as { notes: string[] };
-      } catch (e) {
-        if (e instanceof ProcedureResolutionError) {
-          console.error(`loadout run: ${e.message}`);
-        } else {
-          console.error(`loadout run: procedure invocation failed: ${(e as Error).message}`);
-        }
-        process.exit(1);
-      }
-      // Step 3: snapshot the workspace.
+      // Ad-hoc path: default to simulate. The user can request --execution
+      // kiln explicitly.
+      const effectiveMode: 'kiln' | 'simulate' = mode ?? 'simulate';
+
+      // Step 2: snapshot the workspace.
       const snap = await snapshotRepo(opts.repository);
-      // Step 4: compile the Work Envelope. method_provenance derives from
+      // Step 3: compile the Work Envelope. method_provenance derives from
       // the loaded QMR, not from the Capability's contract metadata.
       const envelope = compileWorkEnvelope({
         goal,
@@ -395,27 +543,96 @@ program
         },
         createdAt: new Date().toISOString()
       });
-      // Step 5: invoke the SIMULATED Kiln boundary. Defaults to deny-all
-      // authority and unsatisfy-all proof obligations.
-      const result = invokeFakeKiln(envelope);
+
+      // ----- DRIVE KILN OR FAKE KILN -----
+      let result: import('./index').RunResultEnvelopeV0;
+      let recon: { summary: string; [k: string]: unknown } | null = null;
+      let kilnRawJson: string | null = null;
+      let procedureInvocationCount = 0;
+      if (effectiveMode === 'kiln') {
+        let kilnResult;
+        try {
+          kilnResult = await submitWorkEnvelopeToKiln(envelope, {
+            ...(opts.kilnBinary ? { kilnBinary: opts.kilnBinary } : {}),
+            ...(opts.kilnHome ? { kilnHome: opts.kilnHome } : {}),
+            ...(opts.actorId ? { actorId: opts.actorId } : {})
+          });
+        } catch (e) {
+          if (
+            e instanceof KilnUnavailableError ||
+            e instanceof KilnMalformedResponseError ||
+            e instanceof KilnFakeLabelError ||
+            e instanceof KilnSupervisionError
+          ) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(`loadout run: Kiln supervision failed: ${(e as Error).message}`);
+          }
+          process.exit(1);
+        }
+        result = kilnResult.envelope;
+        kilnRawJson = kilnResult.rawJson;
+        if (kilnResult.procedureShouldRun) {
+          procedureInvocationCount += 1;
+          recon = (await invokeProcedure({
+            procedureEntry: cap.skill.procedureEntry,
+            packRoot,
+            loadoutRoot: LOADOUT_ROOT,
+            repoRoot: opts.repository
+          })) as { summary: string };
+        }
+      } else {
+        // Simulated path.
+        result = invokeFakeKiln(envelope);
+        procedureInvocationCount += 1;
+        recon = (await invokeProcedure({
+          procedureEntry: cap.skill.procedureEntry,
+          packRoot,
+          loadoutRoot: LOADOUT_ROOT,
+          repoRoot: opts.repository
+        })) as { summary: string };
+      }
       // Step 6: build the Result view.
       const view = buildResultView(result);
       // Step 7: print.
       console.log(formatResultViewText(view));
       console.log('');
-      console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
-      for (const n of recon.notes) console.log(`  ${n}`);
+      if (effectiveMode === 'kiln') {
+        console.log('(canonical Run Result Envelope from real Kiln)');
+        console.log(`procedure invoked: ${procedureInvocationCount === 1 ? 'yes' : 'no'}`);
+        console.log(`authority granted: ${result.authority.granted.join(', ') || '(none)'}`);
+      } else {
+        console.log(
+          'Local procedure summary (input to the fake Kiln boundary, not a Kiln record):'
+        );
+        if (recon) console.log(`  ${recon.summary}`);
+      }
 
       // Step 8: persist the run record.
       const wsPaths = await ensureWorkspace(opts.repository);
       const recordPath = path.join(wsPaths.runs, `${result.run_id}.json`);
       await fs.writeFile(
         recordPath,
-        JSON.stringify({ workEnvelope: envelope, runResult: result, view, recon }, null, 2)
+        JSON.stringify(
+          {
+            executionBoundary: effectiveMode,
+            procedureInvocationCount,
+            workEnvelope: envelope,
+            runResult: result,
+            view,
+            ...(recon ? { recon } : {}),
+            ...(kilnRawJson ? { kilnRawJson } : {})
+          },
+          null,
+          2
+        )
       );
       console.log(`run record written: ${recordPath}`);
       if (opts.out) {
-        await fs.writeFile(opts.out, JSON.stringify({ envelope, result, view }, null, 2));
+        await fs.writeFile(
+          opts.out,
+          JSON.stringify({ envelope, result, view, executionBoundary: effectiveMode }, null, 2)
+        );
         console.log(`run summary written: ${opts.out}`);
       }
     }
@@ -427,7 +644,8 @@ program
     'Produce a Loadout Plan v0 (EXPLAIN). The plan is a real, content-addressable ' +
       'artifact that records exactly what execution will ask Kiln for, including ' +
       'the compiled Work Envelope, the QMR provenance, and the compatibility proof. ' +
-      'Pass it to `loadout run --plan <path>` to execute without recomputation.'
+      'Pass it to `loadout run --plan <path>` to execute without recomputation. ' +
+      'Use --execution kiln to bind the Plan to the real Kiln driver; default is simulate.'
   )
   .requiredOption('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
   .option('-r, --repository <path>', 'target repository path', DEFAULT_REPO)
@@ -438,6 +656,16 @@ program
     'explicit plan output path; default is .loadout/plans/<plan_id>.json',
     ''
   )
+  .option(
+    '--execution <mode>',
+    'execution boundary: kiln (real Kiln driver) or simulate (fake Kiln boundary). Default: simulate.',
+    'simulate'
+  )
+  .option(
+    '--simulate',
+    'shorthand for --execution simulate (default). Provided for symmetry with `loadout run`.',
+    false
+  )
   .action(
     async (opts: {
       goal: string;
@@ -445,6 +673,8 @@ program
       pack: string;
       qmrFixture: string;
       out: string;
+      execution: string;
+      simulate?: boolean;
     }) => {
       const goal = findGoalByTitle(opts.goal);
       if (!goal) {
@@ -501,6 +731,34 @@ program
         createdAt: new Date().toISOString()
       });
 
+      // Resolve the execution boundary for the Plan. The Plan's
+      // execution_boundary field records the user's choice; the
+      // matching run flag MUST be passed at run time or the run fails
+      // closed.
+      let executionBoundary: 'simulated' | 'kiln';
+      if (opts.simulate && opts.execution !== 'simulate' && opts.execution !== 'simulated') {
+        if (opts.execution && opts.execution !== '') {
+          console.error(
+            `loadout plan: --simulate cannot be combined with --execution ${opts.execution}.`
+          );
+          process.exit(2);
+        }
+        executionBoundary = 'simulated';
+      } else if (opts.execution === 'kiln') {
+        executionBoundary = 'kiln';
+      } else if (
+        opts.execution === 'simulate' ||
+        opts.execution === 'simulated' ||
+        opts.execution === ''
+      ) {
+        executionBoundary = 'simulated';
+      } else {
+        console.error(
+          `loadout plan: --execution must be 'kiln' or 'simulate' (got '${opts.execution}').`
+        );
+        process.exit(2);
+      }
+
       // Step 5: build the Plan. Pass packRoot so the procedure
       // binding (QMR procedure_ref + Skill procedureEntry + procedure
       // module interface digest) is computed and recorded in the Plan.
@@ -516,7 +774,8 @@ program
           workspaceStateDigest: snap.digest
         },
         createdAt: envelope.created_at,
-        packRoot
+        packRoot,
+        executionBoundary
       });
 
       // Step 6: print the plan to the terminal.
@@ -531,9 +790,15 @@ program
       console.log(`plan_id:    ${plan.plan_id}`);
       console.log(`work_envelope_digest: ${plan.work_envelope_digest}`);
       console.log('');
-      console.log(
-        `Next: 'loadout run --plan ${outPath}' to execute this exact plan without recomputation.`
-      );
+      if (executionBoundary === 'kiln') {
+        console.log(
+          `Next: 'loadout run --plan ${outPath} --execution kiln' to execute against real Kiln.`
+        );
+      } else {
+        console.log(
+          `Next: 'loadout run --plan ${outPath} --simulate' (or omit --execution; default matches this Plan) to execute against the simulated boundary.`
+        );
+      }
     }
   );
 

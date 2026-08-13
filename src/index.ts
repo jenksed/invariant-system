@@ -19,6 +19,16 @@ export type { CapabilityContract } from './core/capability-contract';
 export { invokeFakeKiln } from './core/fake-kiln-boundary';
 export type { FakeKilnOptions } from './core/fake-kiln-boundary';
 
+export {
+  submitWorkEnvelopeToKiln,
+  KilnError,
+  KilnUnavailableError,
+  KilnMalformedResponseError,
+  KilnFakeLabelError,
+  KilnSupervisionError
+} from './core/kiln-driver';
+export type { KilnDriverOptions, KilnDriverResult } from './core/kiln-driver';
+
 export { buildResultView, formatResultViewText } from './core/result-view';
 export type { ResultView } from './core/result-view';
 
@@ -102,5 +112,24 @@ export type {
   LoadoutPlanV0,
   PlanCompatibilityV0,
   PlanMethodProvenanceV0,
-  PlanProcedureBindingV0
+  PlanProcedureBindingV0,
+  ReconResultV1,
+  ArchitectureAnchorV1,
+  ObservedConstraintV1,
+  UnknownV1,
+  RepositoryStateObservationV1
 } from './core/schemas';
+export { ReconResultV1Schema } from './core/schemas';
+
+/**
+ * Programmatic entry point to the bundled repository-recon procedure.
+ * Re-exported here so consumers can invoke it without importing the pack
+ * module directly (which lives under src/packs/...).
+ */
+export { runRepositoryRecon } from './packs/repository-recon/run';
+export type {
+  ArchitectureAnchor,
+  ObservedConstraint,
+  Unknown as ReconUnknown,
+  RepositoryStateObservation
+} from './packs/repository-recon/run';

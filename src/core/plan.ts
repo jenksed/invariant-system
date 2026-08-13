@@ -41,6 +41,8 @@ import type { PackManifest } from './pack';
 import type { QualifiedMethodRecordV0, WorkEnvelopeV0, LoadoutPlanV0 } from './schemas';
 import { LoadoutPlanV0Schema } from './schemas';
 import { computeProcedureInterfaceDigest } from './procedure-registry';
+import { runRepositoryRecon } from '../packs/repository-recon/run';
+import type { ReconResultV1 } from './schemas';
 
 export class PlanError extends Error {
   constructor(message: string) {
@@ -110,6 +112,27 @@ export interface CompileLoadoutPlanArgs {
    * sites that need the digest should pass the Pack root.
    */
   packRoot?: string;
+  /**
+   * The Repository Recon v1 result. The Plan embeds this so the EXPLAIN
+   * view can show the user what recon WOULD produce at plan time. If
+   * omitted, the Plan compiler will run the recon procedure itself
+   * against `projectState.repository`. Callers that have already run
+   * recon (e.g. for caching) may pass the result through.
+   */
+  repositoryRecon?: ReconResultV1;
+  /**
+   * The execution boundary the user selected when planning.
+   *   - 'simulated' (default): the Plan will be executed through the
+   *     in-process fake Kiln boundary (`src/core/fake-kiln-boundary.ts`).
+   *     Every result is labeled `simulated: true`. The Plan's
+   *     `execution_boundary.boundary` field carries this choice.
+   *   - 'kiln': the Plan will be executed through the real Kiln
+   *     supervision boundary (`src/core/kiln-driver.ts`). The user MUST
+   *     pass `--execution kiln` to `loadout run --plan` to honor this
+   *     binding; passing only `--simulate` (or no flag) for a Plan
+   *     bound to `kiln` will FAIL CLOSED at run time.
+   */
+  executionBoundary?: 'simulated' | 'kiln';
 }
 
 /**
@@ -180,7 +203,17 @@ export function computeWorkEnvelopeDigest(envelope: WorkEnvelopeV0): string {
  * the run path will refuse silently to execute.
  */
 export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlanV0> {
-  const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt } = args;
+  const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt, executionBoundary } =
+    args;
+  const boundary: 'simulated' | 'kiln' = executionBoundary ?? 'simulated';
+
+  // Compute the Repository Recon v1 result. The Plan embeds this so the
+  // EXPLAIN view can show the user what recon WOULD produce. If a
+  // caller pre-computed recon (e.g. for caching) it can pass the result
+  // through; otherwise we run the procedure now. The procedure is
+  // deterministic and read-only for fixed repository state.
+  const repositoryRecon: ReconResultV1 =
+    args.repositoryRecon ?? (await runRepositoryRecon(args.projectState.repository));
 
   // The compatibility proof is derived from the inputs; it is a
   // record of WHY the QMR satisfies the Capability, computed here
@@ -269,20 +302,35 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
       base_commit: projectState.baseCommit,
       workspace_state_digest: projectState.workspaceStateDigest
     },
-    execution_boundary: {
-      boundary: 'simulated',
-      reason: 'no-real-kiln',
-      details:
-        'Loadout does not grant runtime authority. Execution will go through src/core/fake-kiln-boundary.ts, ' +
-        'an in-process simulator. Every result, authority decision, effect, and evidence item is labeled ' +
-        'simulated: true. The fake boundary defaults to deny-all authority and unsatisfy-all proof ' +
-        'obligations unless explicit simulated decisions are provided.'
-    },
+    execution_boundary:
+      boundary === 'kiln'
+        ? {
+            boundary: 'kiln',
+            reason: 'user-selected-kiln',
+            details:
+              'The user selected the real Kiln driver. `loadout run --plan <path> --execution kiln` will ' +
+              'submit the embedded Work Envelope to `mix kiln supervise` and return the canonical ' +
+              'engineering-system/run-result-envelope/v0. The procedure MUST NOT execute unless Kiln ' +
+              'grants authority. Results carry no `simulated` label.'
+          }
+        : {
+            boundary: 'simulated',
+            reason: 'user-selected-simulated',
+            details:
+              'The user selected the simulated boundary. Execution will go through src/core/fake-kiln-boundary.ts, ' +
+              'an in-process simulator. Every result, authority decision, effect, and evidence item is labeled ' +
+              'simulated: true. The fake boundary defaults to deny-all authority and unsatisfy-all proof ' +
+              'obligations unless explicit simulated decisions are provided. To execute against real Kiln, ' +
+              're-run `loadout plan --execution kiln` and pass `--execution kiln` to `loadout run --plan`.'
+          },
+    repository_recon: repositoryRecon,
     notes: [
       'Plan is a real artifact; its plan_id and work_envelope_digest are sha256 content addresses.',
       'procedure_binding records the QMR/Skill/procedure binding; tamper with it and the plan_id digest breaks.',
       '`loadout run --plan <path>` will use the embedded Work Envelope without recomputation.',
-      'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.'
+      `This Plan is bound to execution_boundary='${boundary}'. The user must honor that boundary at run time: --execution kiln for a kiln-bound plan; --simulate for a simulated-bound plan. A mismatch fails closed.`,
+      'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.',
+      'The Plan embeds a Repository Recon v1 result computed at plan time. It is part of the content-addressable plan body; any change to the recon result changes the plan_id.'
     ]
   };
 
@@ -478,8 +526,9 @@ export function defaultPlanPath(repoRoot: string, plan: LoadoutPlanV0): string {
 
 /**
  * Human-readable rendering of a Plan. Always leads with the
- * EXECUTION BOUNDARY: SIMULATED line so users cannot mistake a
- * Loadout Plan for a real Kiln execution request.
+ * EXECUTION BOUNDARY line so users cannot mistake a Loadout Plan for
+ * a run it is not. The boundary label (SIMULATED or KILN) is always
+ * the first thing the user sees.
  */
 export function formatPlanText(plan: LoadoutPlanV0): string {
   const lines: string[] = [];
@@ -488,7 +537,11 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push('      content-addressable artifact. `loadout run --plan <path>` will');
   lines.push('      use the embedded Work Envelope without recomputation.');
   lines.push('');
-  lines.push('EXECUTION BOUNDARY: SIMULATED');
+  if (plan.execution_boundary.boundary === 'kiln') {
+    lines.push('EXECUTION BOUNDARY: KILN (real Kiln driver)');
+  } else {
+    lines.push('EXECUTION BOUNDARY: SIMULATED');
+  }
   lines.push(`  ${plan.execution_boundary.details}`);
   lines.push('');
   lines.push('--- Identity ---');
@@ -581,6 +634,37 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push(`  repository:              ${plan.project_state.repository}`);
   lines.push(`  base_commit:             ${plan.project_state.base_commit}`);
   lines.push(`  workspace_state_digest:  ${plan.project_state.workspace_state_digest}`);
+  lines.push('');
+  lines.push('--- Repository Recon (structured v1, computed at plan time) ---');
+  const recon = plan.repository_recon;
+  lines.push(`  schema:                  ${recon.schema}`);
+  lines.push(`  repository:              ${recon.repository}`);
+  lines.push('  repository_state:');
+  lines.push(`    is_git_repository:      ${recon.repository_state.is_git_repository}`);
+  lines.push(`    head_commit:            ${recon.repository_state.head_commit}`);
+  lines.push(`    head_ref:               ${recon.repository_state.head_ref ?? '(detached)'}`);
+  lines.push(
+    `    tracked_files:          ${recon.repository_state.tracked_files ?? '(unavailable)'}  source=${recon.repository_state.tracked_files_source}`
+  );
+  lines.push(`    filesystem_walk_files:  ${recon.repository_state.filesystem_walk_files}`);
+  lines.push(`  architecture_anchors:    ${recon.architecture_anchors.length}`);
+  for (const a of recon.architecture_anchors) {
+    lines.push(`    - [${a.kind}] ${a.path}`);
+    lines.push(`        observation: ${a.observation}`);
+    lines.push(`        evidence:    ${a.evidence}`);
+  }
+  lines.push(`  constraints:             ${recon.constraints.length}`);
+  for (const c of recon.constraints) {
+    lines.push(`    - [${c.kind}] source=${c.source}`);
+    lines.push(`        observation: ${c.observation}`);
+    lines.push(`        evidence:    ${c.evidence}`);
+  }
+  lines.push(`  unknowns:                ${recon.unknowns.length}`);
+  for (const u of recon.unknowns) {
+    lines.push(`    - subject=${u.subject}`);
+    lines.push(`        reason:   ${u.reason}`);
+  }
+  lines.push(`  summary: ${recon.summary}`);
   lines.push('');
   lines.push('--- Notes ---');
   for (const n of plan.notes) lines.push(`  - ${n}`);
