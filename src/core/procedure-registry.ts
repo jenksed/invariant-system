@@ -32,14 +32,36 @@ import path from 'node:path';
 export type ProcedureFunction = (repoRoot: string) => Promise<unknown>;
 
 /**
- * Resolved procedure: the absolute path to the procedure module file
- * and the exported function name to invoke. This is what the registry
+ * Resolved procedure: the source path (logical identifier) and the
+ * runtime path (the actual executable module) of the procedure, plus
+ * the exported function name to invoke. This is what the registry
  * returns; the Plan's `procedure_binding` records both the raw
- * `procedureEntry` (path) and the interface digest.
+ * `procedureEntry` (source path) and the interface digest.
+ *
+ * Two paths are kept distinct because the source path is the
+ * semantic identity (anchored to the Skill's `procedureEntry` and used
+ * for the interface digest), while the runtime path is the executable
+ * artifact (the compiled `.js` in `dist/` for production, the source
+ * `.ts` in `src/` for dev/test). The runtime tries the compiled path
+ * first and falls back to the source path so the same registry works
+ * in both the built production CLI and the source dev environment.
  */
 export interface ResolvedProcedure {
-  /** Absolute path to the procedure module file. */
-  absolutePath: string;
+  /**
+   * Source path: the path the Skill descriptor's `procedureEntry`
+   * resolves to. This is the canonical, semantically stable identifier
+   * for the procedure module (the QMR's `procedure_ref` is meant to
+   * certify this). Relative to the Loadout installation root.
+   */
+  sourcePath: string;
+  /**
+   * Runtime path: the actual executable module that gets imported.
+   * In production this is the compiled `.js` in `dist/packs/.../`;
+   * `invokeProcedure` falls back to `sourcePath` if the runtime path
+   * is not available (e.g., dev/test without a prior build). Relative
+   * to the Loadout installation root.
+   */
+  runtimePath: string;
   /** The exported function name to invoke. */
   exportName: string;
 }
@@ -59,13 +81,23 @@ export class ProcedureResolutionError extends Error {
  * resolved path is the FULL PATH from the Loadout installation root to
  * the procedure module.
  *
+ * Each entry has two paths:
+ *   - `sourcePath`: the canonical logical identifier (the source `.ts`
+ *     file the Skill's `procedureEntry` points to). This is what the
+ *     registry matches against the Skill, and what the procedure
+ *     interface digest is computed from.
+ *   - `runtimePath`: the actual executable module the CLI imports. In
+ *     production this is the compiled `.js` in `dist/packs/.../` so
+ *     the built CLI does not depend on a TypeScript loader at runtime.
+ *
  * Adding a new Pack requires adding an entry here. The QMR's
  * `procedure_ref` is the content-addressable anchor; the registry is
  * the runtime mapping that the Plan binds to.
  */
 const BUNDLED_PROCEDURES: ReadonlyArray<ResolvedProcedure> = [
   {
-    absolutePath: 'src/packs/repository-recon/run.ts',
+    sourcePath: 'src/packs/repository-recon/run.ts',
+    runtimePath: 'dist/packs/repository-recon/run.js',
     exportName: 'runRepositoryRecon'
   }
 ];
@@ -88,14 +120,14 @@ export function resolveProcedure(args: {
   const resolved = path.isAbsolute(procedureEntry)
     ? procedureEntry
     : path.resolve(packRoot, procedureEntry);
-  const normalized = resolved.replace(/\.ts$/, '');
+  const normalized = stripExt(resolved);
   for (const entry of BUNDLED_PROCEDURES) {
-    // The registered absolutePath is relative to the Loadout root. We
+    // The registered sourcePath is relative to the Loadout root. We
     // resolve it against the Loadout root here. To make this work
     // without passing loadoutRoot everywhere, we look up entries by
     // their basename + directory, which is unique enough for the
     // bundled set.
-    const normalizedRegistered = entry.absolutePath.replace(/\.ts$/, '');
+    const normalizedRegistered = stripExt(entry.sourcePath);
     if (normalized.endsWith(normalizedRegistered.split('/').slice(-2).join('/'))) {
       return entry;
     }
@@ -119,9 +151,9 @@ export function resolveProcedureByEntry(
   const resolved = path.isAbsolute(procedureEntry)
     ? procedureEntry
     : path.resolve(loadoutRoot, procedureEntry);
-  const normalized = resolved.replace(/\.ts$/, '');
+  const normalized = stripExt(resolved);
   for (const entry of BUNDLED_PROCEDURES) {
-    const entryResolved = path.resolve(loadoutRoot, entry.absolutePath).replace(/\.ts$/, '');
+    const entryResolved = stripExt(path.resolve(loadoutRoot, entry.sourcePath));
     if (entryResolved === normalized) {
       return entry;
     }
@@ -130,6 +162,16 @@ export function resolveProcedureByEntry(
     `procedure entry '${procedureEntry}' is not registered in the simulated procedure registry; ` +
       `if you added a new pack, register its procedure in src/core/procedure-registry.ts.`
   );
+}
+
+/**
+ * Strip the source/runtime extension (`.ts` or `.js`) from a path so
+ * matching against the registry entry is extension-agnostic. The
+ * Skill descriptor's `procedureEntry` is the source `.ts`; the
+ * runtime path is the compiled `.js`; both refer to the same module.
+ */
+function stripExt(p: string): string {
+  return p.replace(/\.(ts|js)$/, '');
 }
 
 /**
@@ -212,7 +254,13 @@ export function extractExportedSymbols(source: string): Set<string> {
  * Skill procedure. It is NOT a hardcoded call to a specific module.
  *
  * The procedure is loaded via a dynamic import keyed by the entry's
- * resolved path; the registry is the only fixed import surface.
+ * runtime path; the registry is the only fixed import surface. The
+ * runtime path (the compiled `.js` in `dist/packs/.../`) is preferred
+ * because the built CLI has no TypeScript loader; the source path
+ * (the `.ts` in `src/packs/.../`) is the fallback for dev/test
+ * environments where the registry is loaded by `tsx` and `dist/` may
+ * not be present. Both paths are scoped to the Loadout installation
+ * root; neither depends on absolute machine-specific paths.
  */
 export async function invokeProcedure(args: {
   procedureEntry: string;
@@ -222,15 +270,24 @@ export async function invokeProcedure(args: {
 }): Promise<unknown> {
   const { procedureEntry, packRoot, loadoutRoot, repoRoot } = args;
   const entry = resolveProcedure({ procedureEntry, packRoot });
-  // The absolutePath in the registry is relative to the Loadout root.
-  const resolvedModule = path.resolve(loadoutRoot, entry.absolutePath);
-  // We use a dynamic import so that the registry is the only fixed
-  // import surface; the actual procedure module is loaded by path.
-  const mod = (await import(resolvedModule)) as Record<string, ProcedureFunction>;
+  // The runtimePath and sourcePath in the registry are relative to the
+  // Loadout root. Try the compiled runtime path first (production);
+  // fall back to the source path (dev/test, or any environment where
+  // the build has not been run).
+  const runtimeResolved = path.resolve(loadoutRoot, entry.runtimePath);
+  const sourceResolved = path.resolve(loadoutRoot, entry.sourcePath);
+  let mod: Record<string, ProcedureFunction>;
+  try {
+    mod = (await import(runtimeResolved)) as Record<string, ProcedureFunction>;
+  } catch {
+    // Fall back to the source path. This keeps dev/test paths alive
+    // without a forced build step before every test run.
+    mod = (await import(sourceResolved)) as Record<string, ProcedureFunction>;
+  }
   const fn = mod[entry.exportName];
   if (typeof fn !== 'function') {
     throw new ProcedureResolutionError(
-      `procedure module ${resolvedModule} does not export a function named '${entry.exportName}'`
+      `procedure module ${runtimeResolved} (or ${sourceResolved}) does not export a function named '${entry.exportName}'`
     );
   }
   return fn(repoRoot);
