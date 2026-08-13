@@ -19,6 +19,16 @@ export type { CapabilityContract } from './core/capability-contract';
 export { invokeFakeKiln } from './core/fake-kiln-boundary';
 export type { FakeKilnOptions } from './core/fake-kiln-boundary';
 
+export {
+  submitWorkEnvelopeToKiln,
+  KilnError,
+  KilnUnavailableError,
+  KilnMalformedResponseError,
+  KilnFakeLabelError,
+  KilnSupervisionError
+} from './core/kiln-driver';
+export type { KilnDriverOptions, KilnDriverResult } from './core/kiln-driver';
+
 export { buildResultView, formatResultViewText } from './core/result-view';
 export type { ResultView } from './core/result-view';
 
