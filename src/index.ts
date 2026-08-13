@@ -55,10 +55,52 @@ export {
 export type { LoadAndValidateQmrArgs } from './core/qmr';
 export { QmrError, QmrMissingError, QmrMalformedError, QmrIncompatibilityError } from './core/qmr';
 
+export {
+  compileLoadoutPlan,
+  loadPlan,
+  verifyPlanIntegrity,
+  verifyPlanFreshness,
+  verifyPlanProcedureBinding,
+  writePlan,
+  defaultPlanPath,
+  formatPlanText,
+  computePlanId,
+  computeWorkEnvelopeDigest,
+  canonicalize
+} from './core/plan';
+export type {
+  CompileLoadoutPlanArgs,
+  VerifyPlanIntegrityResult,
+  VerifyPlanFreshnessResult,
+  WritePlanArgs
+} from './core/plan';
+export {
+  PlanError,
+  PlanMalformedError,
+  PlanIntegrityError,
+  PlanStaleError,
+  PlanProcedureBindingError
+} from './core/plan';
+
+export {
+  resolveProcedure,
+  resolveProcedureByEntry,
+  computeProcedureInterfaceDigest,
+  computeProcedureInterfaceDigestForPath,
+  invokeProcedure,
+  extractExportedSymbols,
+  ProcedureResolutionError
+} from './core/procedure-registry';
+export type { ResolvedProcedure, ProcedureFunction } from './core/procedure-registry';
+
 export type {
   WorkEnvelopeV0,
   RunResultEnvelopeV0,
   QualifiedMethodRecordV0,
   CapabilityContractV0,
-  SimulatedFlag
+  SimulatedFlag,
+  LoadoutPlanV0,
+  PlanCompatibilityV0,
+  PlanMethodProvenanceV0,
+  PlanProcedureBindingV0
 } from './core/schemas';

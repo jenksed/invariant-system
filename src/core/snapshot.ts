@@ -35,6 +35,12 @@ export async function readHeadCommit(repoRoot: string): Promise<string> {
 export async function listTrackedFiles(repoRoot: string): Promise<string[]> {
   // We do not shell out to git to keep this deterministic across hosts and
   // to make it obvious this is a simulated snapshot, not git plumbing.
+  //
+  // The .loadout/ directory is Loadout's internal workspace (packs, plans,
+  // run history, snapshots, catalog). It is NOT part of the user's
+  // project state. Excluding it ensures the workspace_state_digest
+  // remains stable across Loadout-internal operations (writing a plan
+  // file, recording a run, etc.) and is bound only to the user's repo.
   const out: string[] = [];
   async function walk(dir: string): Promise<void> {
     let entries;
@@ -44,7 +50,12 @@ export async function listTrackedFiles(repoRoot: string): Promise<string[]> {
       return;
     }
     for (const entry of entries) {
-      if (entry.name === '.git' || entry.name === 'node_modules' || entry.name === 'dist') {
+      if (
+        entry.name === '.git' ||
+        entry.name === '.loadout' ||
+        entry.name === 'node_modules' ||
+        entry.name === 'dist'
+      ) {
         continue;
       }
       const full = path.join(dir, entry.name);
