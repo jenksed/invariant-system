@@ -48,9 +48,11 @@ async function makeRepo(): Promise<string> {
 async function buildPlan(repoRoot: string) {
   // Install FIRST so the snapshot we capture below is the same as the
   // snapshot a subsequent `loadout run --plan` would see.
-  await installPack(repoRoot, path.join(PACKS_DIR, 'repository-recon'));
+  const packSourcePath = path.join(PACKS_DIR, 'repository-recon');
+  await installPack(repoRoot, packSourcePath);
   const goal = findGoalById('understand-a-repository')!;
-  const cap = await resolveCapability(path.join(repoRoot, '.loadout', 'packs', 'repository-recon'));
+  const packRoot = path.join(repoRoot, '.loadout', 'packs', 'repository-recon');
+  const cap = await resolveCapability(packRoot);
   const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
   const snap = await snapshotRepo(repoRoot);
   const envelope = compileWorkEnvelope({
@@ -64,10 +66,8 @@ async function buildPlan(repoRoot: string) {
     },
     createdAt: '2026-08-12T00:00:00Z'
   });
-  const packManifest = await readPackManifest(
-    path.join(repoRoot, '.loadout', 'packs', 'repository-recon')
-  );
-  const plan = compileLoadoutPlan({
+  const packManifest = await readPackManifest(packRoot);
+  const plan = await compileLoadoutPlan({
     goal,
     capability: cap,
     pack: packManifest,
@@ -78,7 +78,8 @@ async function buildPlan(repoRoot: string) {
       baseCommit: snap.input.headCommit,
       workspaceStateDigest: snap.digest
     },
-    createdAt: envelope.created_at
+    createdAt: envelope.created_at,
+    packRoot: packSourcePath
   });
   return { goal, cap, qmr, envelope, plan };
 }

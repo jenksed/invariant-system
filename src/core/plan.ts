@@ -40,6 +40,7 @@ import type { ResolvedCapability } from './capability-registry';
 import type { PackManifest } from './pack';
 import type { QualifiedMethodRecordV0, WorkEnvelopeV0, LoadoutPlanV0 } from './schemas';
 import { LoadoutPlanV0Schema } from './schemas';
+import { computeProcedureInterfaceDigest } from './procedure-registry';
 
 export class PlanError extends Error {
   constructor(message: string) {
@@ -101,6 +102,14 @@ export interface CompileLoadoutPlanArgs {
     workspaceStateDigest: string;
   };
   createdAt: string;
+  /**
+   * Absolute path to the Pack root (the directory where skill.json
+   * lives). Used to resolve the Skill's `procedureEntry` so we can
+   * compute the procedure interface digest. If omitted, the procedure
+   * digest is computed from the `procedureEntry` path as-is; call
+   * sites that need the digest should pass the Pack root.
+   */
+  packRoot?: string;
 }
 
 /**
@@ -161,8 +170,16 @@ export function computeWorkEnvelopeDigest(envelope: WorkEnvelopeV0): string {
  *
  * The compatibility block in the Plan describes the proof that was
  * already established, not a new check.
+ *
+ * The procedure_binding block records the mechanical link between the
+ * QMR's `procedure_ref`, the Skill's `procedureEntry`, and the
+ * procedure module's interface digest. This is the binding that makes
+ * Plan-time and Run-time refer to the same procedure: tampering with
+ * any of these fields without changing the others will change the
+ * Plan's digest (because the binding is part of the plan body), and
+ * the run path will refuse silently to execute.
  */
-export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): LoadoutPlanV0 {
+export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlanV0> {
   const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt } = args;
 
   // The compatibility proof is derived from the inputs; it is a
@@ -175,6 +192,19 @@ export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): LoadoutPlanV0 
     qmr.status,
     capability.contract.compatibility.min_method_status
   );
+
+  // Compute the procedure binding: the QMR's content-addressable
+  // procedure_ref, the Skill's runtime procedureEntry, and the
+  // procedure module's interface digest. The digest is computed
+  // here so the binding is part of the content-addressed plan
+  // body; tampering with the procedure module's interface will
+  // change the digest and break the plan_id.
+  const procedureInterfaceDigest = args.packRoot
+    ? await computeProcedureInterfaceDigest({
+        procedureEntry: capability.skill.procedureEntry,
+        packRoot: args.packRoot
+      })
+    : computeProcedureInterfaceDigestSync(capability.skill.procedureEntry);
 
   const plan: LoadoutPlanV0 = {
     schema: 'loadout/plan/v0',
@@ -208,6 +238,11 @@ export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): LoadoutPlanV0 
       confidence: qmr.evaluation.confidence,
       record_digest: qmr.provenance.record_digest,
       arsenal_commit: qmr.provenance.arsenal_commit
+    },
+    procedure_binding: {
+      qmr_procedure_ref: qmr.procedure_ref,
+      skill_procedure_entry: capability.skill.procedureEntry,
+      procedure_interface_digest: procedureInterfaceDigest
     },
     compatibility: {
       min_method_status: capability.contract.compatibility.min_method_status,
@@ -245,6 +280,7 @@ export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): LoadoutPlanV0 
     },
     notes: [
       'Plan is a real artifact; its plan_id and work_envelope_digest are sha256 content addresses.',
+      'procedure_binding records the QMR/Skill/procedure binding; tamper with it and the plan_id digest breaks.',
       '`loadout run --plan <path>` will use the embedded Work Envelope without recomputation.',
       'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.'
     ]
@@ -252,6 +288,20 @@ export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): LoadoutPlanV0 
 
   plan.plan_id = computePlanId(plan);
   return LoadoutPlanV0Schema.parse(plan);
+}
+
+/**
+ * Synchronous digest when loadoutRoot is not provided. Used by tests
+ * that build units in-memory and want to assert about the binding
+ * shape without doing file IO.
+ */
+function computeProcedureInterfaceDigestSync(procedureEntry: string): string {
+  // Without a loadoutRoot we cannot resolve the file; use a placeholder
+  // digest that includes the entry path so the binding is still
+  // distinct per procedureEntry. Tests and call sites that need the
+  // real digest should pass loadoutRoot.
+  const stable = JSON.stringify({ entry: procedureEntry, mode: 'sync-stub' });
+  return 'sha256:' + createHash('sha256').update(stable).digest('hex');
 }
 
 function isStatusSufficient(qmrStatus: string, minStatus: string): boolean {
@@ -340,6 +390,76 @@ export function verifyPlanFreshness(
   };
 }
 
+export class PlanProcedureBindingError extends PlanError {
+  readonly planBinding: { qmr_procedure_ref: string; skill_procedure_entry: string };
+  readonly expected: { qmr_procedure_ref: string; skill_procedure_entry: string };
+  constructor(
+    message: string,
+    planBinding: { qmr_procedure_ref: string; skill_procedure_entry: string },
+    expected: { qmr_procedure_ref: string; skill_procedure_entry: string }
+  ) {
+    super(message);
+    this.name = 'PlanProcedureBindingError';
+    this.planBinding = planBinding;
+    this.expected = expected;
+  }
+}
+
+/**
+ * Verify the Plan's procedure_binding still matches the QMR and Skill
+ * that are currently loaded. This is the integrity check that closes
+ * the gap between the QMR (record of qualification) and the procedure
+ * (the function that actually runs):
+ *   - The QMR's `procedure_ref` must equal the Plan's
+ *     `procedure_binding.qmr_procedure_ref`.
+ *   - The Skill's `procedureEntry` must equal the Plan's
+ *     `procedure_binding.skill_procedure_entry`.
+ *
+ * If either differs, the Plan was either tampered with, the QMR was
+ * swapped, or the Skill descriptor was re-pointed. In all cases, the
+ * user-visible Plan no longer describes the procedure that will run.
+ * Refuse silently to execute.
+ */
+export function verifyPlanProcedureBinding(args: {
+  plan: LoadoutPlanV0;
+  qmr: { procedure_ref: string };
+  skill: { procedureEntry: string };
+  procedureInterfaceDigest: string;
+}): void {
+  const { plan, qmr, skill, procedureInterfaceDigest } = args;
+  const expectedQmrRef = qmr.procedure_ref;
+  const expectedEntry = skill.procedureEntry;
+  const planBinding = plan.procedure_binding;
+  if (planBinding.qmr_procedure_ref !== expectedQmrRef) {
+    throw new PlanProcedureBindingError(
+      `Plan procedure binding mismatch: the loaded QMR's procedure_ref ('${expectedQmrRef}') ` +
+        `does not match the plan's recorded qmr_procedure_ref ('${planBinding.qmr_procedure_ref}'). ` +
+        `The Plan must be regenerated with the current QMR.`,
+      planBinding,
+      { qmr_procedure_ref: expectedQmrRef, skill_procedure_entry: expectedEntry }
+    );
+  }
+  if (planBinding.skill_procedure_entry !== expectedEntry) {
+    throw new PlanProcedureBindingError(
+      `Plan procedure binding mismatch: the Skill's procedureEntry ('${expectedEntry}') ` +
+        `does not match the plan's recorded skill_procedure_entry ('${planBinding.skill_procedure_entry}'). ` +
+        `The Plan must be regenerated with the current Skill descriptor.`,
+      planBinding,
+      { qmr_procedure_ref: expectedQmrRef, skill_procedure_entry: expectedEntry }
+    );
+  }
+  if (planBinding.procedure_interface_digest !== procedureInterfaceDigest) {
+    throw new PlanProcedureBindingError(
+      `Plan procedure binding mismatch: the procedure module's interface digest ` +
+        `('${procedureInterfaceDigest}') no longer matches the digest recorded in the Plan ` +
+        `('${planBinding.procedure_interface_digest}'). The procedure module has been modified ` +
+        `since the plan was created; the Plan must be regenerated.`,
+      planBinding,
+      { qmr_procedure_ref: expectedQmrRef, skill_procedure_entry: expectedEntry }
+    );
+  }
+}
+
 export interface WritePlanArgs {
   plan: LoadoutPlanV0;
   outPath: string;
@@ -397,6 +517,7 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push(`  pack.id:         ${plan.pack.id} @ ${plan.pack.version}`);
   lines.push(`  skill.id:        ${plan.skill.id}`);
   lines.push(`  skill.qmr_path:  ${plan.skill.qmr_fixture_path}`);
+  lines.push(`  skill.procedure: ${plan.procedure_binding.skill_procedure_entry}`);
   lines.push('');
   lines.push('--- Method (QMR provenance) ---');
   lines.push(`  method_id:     ${plan.method.method_id}`);
@@ -405,6 +526,11 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push(`  confidence:    ${plan.method.confidence}`);
   lines.push(`  record_digest: ${plan.method.record_digest}`);
   lines.push(`  arsenal_commit: ${plan.method.arsenal_commit ?? '(none)'}`);
+  lines.push('');
+  lines.push('--- Procedure Binding (QMR <-> Skill <-> procedure module) ---');
+  lines.push(`  qmr_procedure_ref:          ${plan.procedure_binding.qmr_procedure_ref}`);
+  lines.push(`  skill_procedure_entry:      ${plan.procedure_binding.skill_procedure_entry}`);
+  lines.push(`  procedure_interface_digest: ${plan.procedure_binding.procedure_interface_digest}`);
   lines.push('');
   lines.push('--- Compatibility (why this method satisfies the Capability) ---');
   lines.push(

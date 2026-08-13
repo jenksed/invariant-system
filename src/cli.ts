@@ -41,14 +41,22 @@ import {
   loadPlan,
   verifyPlanIntegrity,
   verifyPlanFreshness,
+  verifyPlanProcedureBinding,
+  invokeProcedure,
+  computeProcedureInterfaceDigest,
   writePlan,
   defaultPlanPath,
   formatPlanText
 } from './index';
-import { runRepositoryRecon } from './packs/repository-recon/run';
 import { loadAndValidateQmr } from './core/qmr';
 import { validateAllFixtures, compileAgainstGoalCatalog } from './core/contract-validation';
-import { PlanMalformedError, PlanIntegrityError, PlanStaleError } from './core/plan';
+import {
+  PlanMalformedError,
+  PlanIntegrityError,
+  PlanStaleError,
+  PlanProcedureBindingError
+} from './core/plan';
+import { ProcedureResolutionError } from './core/procedure-registry';
 
 const PACKS_DIR = path.resolve(__dirname, 'packs');
 // Loadout installation root: the directory containing the dist/ folder.
@@ -208,12 +216,63 @@ program
           process.exit(1);
         }
 
+        // Verify the procedure binding: the Plan's recorded QMR
+        // procedure_ref + Skill procedureEntry + procedure interface
+        // digest must match the currently-loaded QMR, Skill, and
+        // procedure module. This is the mechanical check that makes
+        // sure the procedure that runs is the one the Plan describes.
+        const ws = workspacePaths(opts.repository);
+        const packRoot = path.join(ws.packs, plan.pack.id);
+        const cap = await resolveCapability(packRoot);
+        const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
+        const procedureEntryResolved = path.resolve(packRoot, cap.skill.procedureEntry);
+        void procedureEntryResolved; // referenced for clarity; the registry resolves it independently
+        const procedureInterfaceDigest = await computeProcedureInterfaceDigest({
+          procedureEntry: cap.skill.procedureEntry,
+          packRoot
+        });
+        try {
+          verifyPlanProcedureBinding({
+            plan,
+            qmr,
+            skill: cap.skill,
+            procedureInterfaceDigest
+          });
+        } catch (e) {
+          if (e instanceof PlanProcedureBindingError) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(
+              `loadout run: plan procedure binding check failed: ${(e as Error).message}`
+            );
+          }
+          process.exit(1);
+        }
+
         // The Plan's embedded Work Envelope is submitted verbatim. We do
         // NOT re-resolve the Capability, re-load the QMR, or recompile.
         const envelope = plan.work_envelope;
-        // Step: run the deterministic local procedure (read-only) for
-        // context, but it is NOT a substitute for the Kiln record.
-        const recon = await runRepositoryRecon(opts.repository);
+        // Step: invoke the procedure via the registry. This is the
+        // SOLE path that calls the Skill procedure; it is not a
+        // hardcoded import. The Plan's procedure_binding tells us which
+        // procedure entry to invoke; the registry resolves it to the
+        // actual function.
+        let recon: { notes: string[]; [k: string]: unknown };
+        try {
+          recon = (await invokeProcedure({
+            procedureEntry: cap.skill.procedureEntry,
+            packRoot,
+            loadoutRoot: LOADOUT_ROOT,
+            repoRoot: opts.repository
+          })) as { notes: string[] };
+        } catch (e) {
+          if (e instanceof ProcedureResolutionError) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(`loadout run: procedure invocation failed: ${(e as Error).message}`);
+          }
+          process.exit(1);
+        }
         // Step: invoke the SIMULATED Kiln boundary with the Plan's envelope.
         const result = invokeFakeKiln(envelope);
         const view = buildResultView(result);
@@ -222,6 +281,9 @@ program
         );
         console.log(
           `=== Plan is FRESH: project_state matches current snapshot (${currentProjectState.baseCommit}) ===`
+        );
+        console.log(
+          `=== Procedure binding verified: qmr_procedure_ref=${plan.procedure_binding.qmr_procedure_ref} ===`
         );
         console.log('');
         console.log(formatResultViewText(view));
@@ -297,8 +359,27 @@ program
         process.exit(1);
       }
 
-      // Step 2: run the deterministic local procedure (read-only).
-      const recon = await runRepositoryRecon(opts.repository);
+      // Step 2: run the deterministic local procedure (read-only) via
+      // the registry keyed by the Skill's procedureEntry. This is the
+      // same invocation path that `run --plan` uses; the only
+      // difference is whether the binding came from a Plan or from a
+      // live capability resolution.
+      let recon: { notes: string[]; [k: string]: unknown };
+      try {
+        recon = (await invokeProcedure({
+          procedureEntry: cap.skill.procedureEntry,
+          packRoot,
+          loadoutRoot: LOADOUT_ROOT,
+          repoRoot: opts.repository
+        })) as { notes: string[] };
+      } catch (e) {
+        if (e instanceof ProcedureResolutionError) {
+          console.error(`loadout run: ${e.message}`);
+        } else {
+          console.error(`loadout run: procedure invocation failed: ${(e as Error).message}`);
+        }
+        process.exit(1);
+      }
       // Step 3: snapshot the workspace.
       const snap = await snapshotRepo(opts.repository);
       // Step 4: compile the Work Envelope. method_provenance derives from
@@ -420,8 +501,10 @@ program
         createdAt: new Date().toISOString()
       });
 
-      // Step 5: build the Plan.
-      const plan = compileLoadoutPlan({
+      // Step 5: build the Plan. Pass packRoot so the procedure
+      // binding (QMR procedure_ref + Skill procedureEntry + procedure
+      // module interface digest) is computed and recorded in the Plan.
+      const plan = await compileLoadoutPlan({
         goal,
         capability: cap,
         pack: packManifest,
@@ -432,7 +515,8 @@ program
           baseCommit: snap.input.headCommit,
           workspaceStateDigest: snap.digest
         },
-        createdAt: envelope.created_at
+        createdAt: envelope.created_at,
+        packRoot
       });
 
       // Step 6: print the plan to the terminal.

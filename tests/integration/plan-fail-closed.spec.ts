@@ -192,7 +192,7 @@ describe('plan fail-closed behavior', () => {
     const packManifest = await readPackManifest(
       path.join(repoRoot, '.loadout', 'packs', 'repository-recon')
     );
-    const plan = compileLoadoutPlan({
+    const plan = await compileLoadoutPlan({
       goal,
       capability: cap,
       pack: packManifest,
@@ -203,7 +203,8 @@ describe('plan fail-closed behavior', () => {
         baseCommit: snap.input.headCommit,
         workspaceStateDigest: snap.digest
       },
-      createdAt: envelope.created_at
+      createdAt: envelope.created_at,
+      packRoot: path.join(PACKS_DIR, 'repository-recon')
     });
     const planPath = path.join(repoRoot, 'plan.json');
     await writePlan({ plan, outPath: planPath });
@@ -235,7 +236,7 @@ describe('plan fail-closed behavior', () => {
     const packManifest = await readPackManifest(
       path.join(repoRoot, '.loadout', 'packs', 'repository-recon')
     );
-    const plan = compileLoadoutPlan({
+    const plan = await compileLoadoutPlan({
       goal,
       capability: cap,
       pack: packManifest,
@@ -246,7 +247,8 @@ describe('plan fail-closed behavior', () => {
         baseCommit: snap.input.headCommit,
         workspaceStateDigest: snap.digest
       },
-      createdAt: envelope.created_at
+      createdAt: envelope.created_at,
+      packRoot: path.join(PACKS_DIR, 'repository-recon')
     });
     // Mutate repo state
     await fs.writeFile(

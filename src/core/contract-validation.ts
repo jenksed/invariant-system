@@ -91,7 +91,7 @@ export async function compileAgainstGoalCatalog(args: {
     // plan_id is a sha256 content address and its execution_boundary
     // is unmistakably SIMULATED.
     const packManifest = await readPackManifest(path.join(args.packsDir, m.id));
-    const plan = compileLoadoutPlan({
+    const plan = await compileLoadoutPlan({
       goal,
       capability: cap,
       pack: packManifest,
@@ -102,7 +102,8 @@ export async function compileAgainstGoalCatalog(args: {
         baseCommit: snap.input.headCommit,
         workspaceStateDigest: snap.digest
       },
-      createdAt: envelope.created_at
+      createdAt: envelope.created_at,
+      packRoot: path.join(args.packsDir, m.id)
     });
     if (!plan.plan_id.startsWith('sha256:')) {
       throw new Error('Plan.plan_id is not a sha256 content address; refusing.');

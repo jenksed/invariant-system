@@ -200,6 +200,27 @@ export const PlanMethodProvenanceV0Schema = z.object({
 });
 export type PlanMethodProvenanceV0 = z.infer<typeof PlanMethodProvenanceV0Schema>;
 
+/**
+ * Procedure binding: the mechanical anchor that ties the QMR's
+ * `procedure_ref` to the Skill's `procedureEntry` and the procedure
+ * module's interface digest.
+ *
+ * The QMR's `procedure_ref` is the content-addressable anchor that
+ * Arsenal issues when it qualifies a method; the Skill's
+ * `procedureEntry` is the runtime key that the procedure registry
+ * uses to resolve the actual function. Including both in the Plan,
+ * plus a digest of the procedure module's exported interface, makes
+ * the binding verifiable: tampering with either field, or with the
+ * procedure module's interface, will produce a Plan whose
+ * `plan_id` digest no longer matches.
+ */
+export const PlanProcedureBindingV0Schema = z.object({
+  qmr_procedure_ref: z.string(),
+  skill_procedure_entry: z.string(),
+  procedure_interface_digest: z.string()
+});
+export type PlanProcedureBindingV0 = z.infer<typeof PlanProcedureBindingV0Schema>;
+
 export const LoadoutPlanV0Schema = z.object({
   schema: z.literal('loadout/plan/v0'),
   plan_id: z.string(),
@@ -226,6 +247,7 @@ export const LoadoutPlanV0Schema = z.object({
     qmr_fixture_path: z.string()
   }),
   method: PlanMethodProvenanceV0Schema,
+  procedure_binding: PlanProcedureBindingV0Schema,
   compatibility: PlanCompatibilityV0Schema,
   requested_authority: z.array(
     z.object({

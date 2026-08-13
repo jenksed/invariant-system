@@ -44,7 +44,7 @@ async function makeRepo(): Promise<string> {
 }
 
 interface BuiltPlan {
-  plan: ReturnType<typeof compileLoadoutPlan>;
+  plan: Awaited<ReturnType<typeof compileLoadoutPlan>>;
   goal: ReturnType<typeof findGoalById> | undefined;
   cap: Awaited<ReturnType<typeof resolveCapability>>;
   qmr: Awaited<ReturnType<typeof loadAndValidateQmr>>;
@@ -54,9 +54,11 @@ interface BuiltPlan {
 
 async function buildOnePlan(): Promise<BuiltPlan> {
   const repoRoot = await makeRepo();
-  await installPack(repoRoot, path.join(PACKS_DIR, 'repository-recon'));
+  const packSourcePath = path.join(PACKS_DIR, 'repository-recon');
+  await installPack(repoRoot, packSourcePath);
   const goal = findGoalById('understand-a-repository')!;
-  const cap = await resolveCapability(path.join(repoRoot, '.loadout', 'packs', 'repository-recon'));
+  const packRoot = path.join(repoRoot, '.loadout', 'packs', 'repository-recon');
+  const cap = await resolveCapability(packRoot);
   const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
   const snap = await snapshotRepo(repoRoot);
   const envelope = compileWorkEnvelope({
@@ -70,10 +72,8 @@ async function buildOnePlan(): Promise<BuiltPlan> {
     },
     createdAt: '2026-08-12T00:00:00Z'
   });
-  const packManifest = await readPackManifest(
-    path.join(repoRoot, '.loadout', 'packs', 'repository-recon')
-  );
-  const plan = compileLoadoutPlan({
+  const packManifest = await readPackManifest(packRoot);
+  const plan = await compileLoadoutPlan({
     goal,
     capability: cap,
     pack: packManifest,
@@ -84,7 +84,8 @@ async function buildOnePlan(): Promise<BuiltPlan> {
       baseCommit: snap.input.headCommit,
       workspaceStateDigest: snap.digest
     },
-    createdAt: envelope.created_at
+    createdAt: envelope.created_at,
+    packRoot: packSourcePath
   });
   return { plan, goal, cap, qmr, envelope, repoRoot };
 }
@@ -164,7 +165,7 @@ describe('Loadout Plan v0 (L1)', () => {
     // Note: created_at is part of the body but is excluded from the
     // digest, so different timestamps should still produce the same
     // plan_id. We confirm that by passing the same created_at.
-    const a2 = compileLoadoutPlan({
+    const a2 = await compileLoadoutPlan({
       goal: a.goal!,
       capability: a.cap,
       pack: {
@@ -182,7 +183,8 @@ describe('Loadout Plan v0 (L1)', () => {
         baseCommit: a.plan.project_state.base_commit,
         workspaceStateDigest: a.plan.project_state.workspace_state_digest
       },
-      createdAt: a.plan.created_at
+      createdAt: a.plan.created_at,
+      packRoot: path.join(PACKS_DIR, 'repository-recon')
     });
     expect(computePlanId(a2)).toBe(a.plan.plan_id);
   });
@@ -216,7 +218,7 @@ describe('Loadout Plan v0 (L1)', () => {
     const packManifest = await readPackManifest(
       path.join(a.repoRoot, '.loadout', 'packs', 'repository-recon')
     );
-    const planB = compileLoadoutPlan({
+    const planB = await compileLoadoutPlan({
       goal: a.goal!,
       capability: a.cap,
       pack: packManifest,
@@ -227,7 +229,8 @@ describe('Loadout Plan v0 (L1)', () => {
         baseCommit: snap.input.headCommit,
         workspaceStateDigest: snap.digest
       },
-      createdAt: envB.created_at
+      createdAt: envB.created_at,
+      packRoot: path.join(PACKS_DIR, 'repository-recon')
     });
     // Different plan_id
     expect(planB.plan_id).not.toBe(a.plan.plan_id);

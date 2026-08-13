@@ -60,6 +60,7 @@ export {
   loadPlan,
   verifyPlanIntegrity,
   verifyPlanFreshness,
+  verifyPlanProcedureBinding,
   writePlan,
   defaultPlanPath,
   formatPlanText,
@@ -73,7 +74,24 @@ export type {
   VerifyPlanFreshnessResult,
   WritePlanArgs
 } from './core/plan';
-export { PlanError, PlanMalformedError, PlanIntegrityError, PlanStaleError } from './core/plan';
+export {
+  PlanError,
+  PlanMalformedError,
+  PlanIntegrityError,
+  PlanStaleError,
+  PlanProcedureBindingError
+} from './core/plan';
+
+export {
+  resolveProcedure,
+  resolveProcedureByEntry,
+  computeProcedureInterfaceDigest,
+  computeProcedureInterfaceDigestForPath,
+  invokeProcedure,
+  extractExportedSymbols,
+  ProcedureResolutionError
+} from './core/procedure-registry';
+export type { ResolvedProcedure, ProcedureFunction } from './core/procedure-registry';
 
 export type {
   WorkEnvelopeV0,
@@ -83,5 +101,6 @@ export type {
   SimulatedFlag,
   LoadoutPlanV0,
   PlanCompatibilityV0,
-  PlanMethodProvenanceV0
+  PlanMethodProvenanceV0,
+  PlanProcedureBindingV0
 } from './core/schemas';

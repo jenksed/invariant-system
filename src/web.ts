@@ -24,11 +24,19 @@ import {
   formatPlanText,
   loadPlan,
   verifyPlanIntegrity,
-  verifyPlanFreshness
+  verifyPlanFreshness,
+  verifyPlanProcedureBinding,
+  invokeProcedure,
+  computeProcedureInterfaceDigest
 } from './index';
-import { runRepositoryRecon } from './packs/repository-recon/run';
 import { loadAndValidateQmr } from './core/qmr';
-import { PlanMalformedError, PlanIntegrityError, PlanStaleError } from './core/plan';
+import {
+  PlanMalformedError,
+  PlanIntegrityError,
+  PlanStaleError,
+  PlanProcedureBindingError
+} from './core/plan';
+import { ProcedureResolutionError } from './core/procedure-registry';
 
 export interface WebOptions {
   port: number;
@@ -37,6 +45,7 @@ export interface WebOptions {
 }
 
 const WEB_ROOT = path.resolve(__dirname, '..', 'web');
+const LOADOUT_ROOT = path.resolve(__dirname, '..');
 const TYPES = new Map<string, string>([
   ['.html', 'text/html; charset=utf-8'],
   ['.css', 'text/css; charset=utf-8'],
@@ -136,7 +145,7 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           },
           createdAt: new Date().toISOString()
         });
-        const plan = compileLoadoutPlan({
+        const plan = await compileLoadoutPlan({
           goal,
           capability: cap,
           pack: packManifest,
@@ -147,7 +156,8 @@ export async function startWeb(opts: WebOptions): Promise<void> {
             baseCommit: snap.input.headCommit,
             workspaceStateDigest: snap.digest
           },
-          createdAt: envelope.created_at
+          createdAt: envelope.created_at,
+          packRoot
         });
         const planPath = defaultPlanPath(repository, plan);
         await writePlan({ plan, outPath: planPath });
@@ -206,7 +216,49 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           }
           return;
         }
-        const recon = await runRepositoryRecon(repository);
+        // Verify the procedure binding: the Plan's recorded QMR
+        // procedure_ref + Skill procedureEntry + procedure interface
+        // digest must match the currently-loaded QMR, Skill, and
+        // procedure module.
+        const ws = workspacePaths(repository);
+        const packRoot = path.join(ws.packs, plan.pack.id);
+        const cap = await resolveCapability(packRoot);
+        const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
+        const procedureInterfaceDigest = await computeProcedureInterfaceDigest({
+          procedureEntry: cap.skill.procedureEntry,
+          packRoot
+        });
+        try {
+          verifyPlanProcedureBinding({
+            plan,
+            qmr,
+            skill: cap.skill,
+            procedureInterfaceDigest
+          });
+        } catch (e) {
+          if (e instanceof PlanProcedureBindingError) {
+            jsonResponse(res, 422, { error: e.message, simulated: true });
+          } else {
+            jsonResponse(res, 500, { error: (e as Error).message });
+          }
+          return;
+        }
+        let recon: { notes: string[]; [k: string]: unknown };
+        try {
+          recon = (await invokeProcedure({
+            procedureEntry: cap.skill.procedureEntry,
+            packRoot,
+            loadoutRoot: LOADOUT_ROOT,
+            repoRoot: repository
+          })) as { notes: string[] };
+        } catch (e) {
+          if (e instanceof ProcedureResolutionError) {
+            jsonResponse(res, 422, { error: e.message, simulated: true });
+          } else {
+            jsonResponse(res, 500, { error: (e as Error).message });
+          }
+          return;
+        }
         const result = invokeFakeKiln(plan.work_envelope);
         const view = buildResultView(result);
         jsonResponse(res, 200, {
@@ -243,12 +295,27 @@ export async function startWeb(opts: WebOptions): Promise<void> {
         const cap = await resolveCapability(packRoot);
         let qmr;
         try {
-          qmr = await loadAndValidateQmr({ capability: cap, repoRoot: repository });
+          qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
         } catch (e) {
           jsonResponse(res, 422, { error: (e as Error).message, simulated: true });
           return;
         }
-        const recon = await runRepositoryRecon(repository);
+        let recon: { notes: string[]; [k: string]: unknown };
+        try {
+          recon = (await invokeProcedure({
+            procedureEntry: cap.skill.procedureEntry,
+            packRoot,
+            loadoutRoot: LOADOUT_ROOT,
+            repoRoot: repository
+          })) as { notes: string[] };
+        } catch (e) {
+          if (e instanceof ProcedureResolutionError) {
+            jsonResponse(res, 422, { error: e.message, simulated: true });
+          } else {
+            jsonResponse(res, 500, { error: (e as Error).message });
+          }
+          return;
+        }
         const snap = await snapshotRepo(repository);
         const envelope = compileWorkEnvelope({
           goal,
