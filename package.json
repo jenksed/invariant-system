@@ -1,0 +1,23 @@
+{
+  "name": "@temper/temper",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Read-only terminal workbench for real Loadout and Kiln run state.",
+  "bin": {
+    "temper": "dist/src/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/make-bin-executable.mjs",
+    "test": "npm run build && node --test dist/test/*.test.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "ci": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "typescript": "5.4.5"
+  }
+}
