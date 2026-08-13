@@ -24,7 +24,24 @@
         <input id="repo" type="text" size="80" />
       </section>
       <section class="card">
-        <h2>Run</h2>
+        <h2>Plan</h2>
+        <p>
+          Produce a content-addressable Plan first. The Plan explains exactly what execution will
+          ask the (SIMULATED) Kiln boundary to do.
+        </p>
+        <button id="plan-btn">Plan &ldquo;Understand this repository&rdquo;</button>
+        <p class="small">
+          The Plan is a real artifact. Copy its plan_id and use it for the run below.
+        </p>
+      </section>
+      <section class="card" id="plan-card" hidden>
+        <h2>Plan (EXPLAIN)</h2>
+        <p class="small" id="plan-id"></p>
+        <pre id="plan"></pre>
+        <button id="run-plan-btn">Run this plan</button>
+      </section>
+      <section class="card">
+        <h2>Run (ad-hoc)</h2>
         <button id="run-btn">Run &ldquo;Understand this repository&rdquo;</button>
         <p class="small">This calls the SIMULATED Kiln boundary. Results are clearly labeled.</p>
       </section>

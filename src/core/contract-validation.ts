@@ -5,6 +5,9 @@
  * - Compiles a Work Envelope from the Goal catalogue + bundled packs and
  *   validates the produced envelope against the work-envelope fixture
  *   shape (without requiring it to be byte-identical to the fixture).
+ * - Compiles a Loadout Plan v0 from the Goal catalogue + bundled packs
+ *   and verifies its plan_id is a content-addressable sha256 digest and
+ *   its execution_boundary is unmistakably SIMULATED.
  *
  * No network, no mutation. Pure functions over local files.
  */
@@ -24,7 +27,10 @@ import {
   invokeFakeKiln,
   buildResultView,
   listCatalog,
-  loadAndValidateQmr
+  loadAndValidateQmr,
+  compileLoadoutPlan,
+  readPackManifest,
+  computePlanId
 } from '../index';
 
 export async function validateAllFixtures(fixturesDir: string): Promise<void> {
@@ -80,6 +86,32 @@ export async function compileAgainstGoalCatalog(args: {
     const view = buildResultView(result);
     if (!view.simulated) {
       throw new Error('Result view is not labeled simulated; refusing to present it as truthful.');
+    }
+    // The Plan must be a real artifact: compile it, confirm its
+    // plan_id is a sha256 content address and its execution_boundary
+    // is unmistakably SIMULATED.
+    const packManifest = await readPackManifest(path.join(args.packsDir, m.id));
+    const plan = compileLoadoutPlan({
+      goal,
+      capability: cap,
+      pack: packManifest,
+      qmr,
+      workEnvelope: envelope,
+      projectState: {
+        repository: args.repoRoot,
+        baseCommit: snap.input.headCommit,
+        workspaceStateDigest: snap.digest
+      },
+      createdAt: envelope.created_at
+    });
+    if (!plan.plan_id.startsWith('sha256:')) {
+      throw new Error('Plan.plan_id is not a sha256 content address; refusing.');
+    }
+    if (plan.plan_id !== computePlanId(plan)) {
+      throw new Error('Plan.plan_id does not match its content; refusing.');
+    }
+    if (plan.execution_boundary.boundary !== 'simulated') {
+      throw new Error('Plan.execution_boundary is not SIMULATED; refusing.');
     }
   }
 }

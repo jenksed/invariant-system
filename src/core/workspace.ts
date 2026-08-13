@@ -20,6 +20,7 @@ export interface WorkspacePaths {
   catalog: string;
   runs: string;
   snapshots: string;
+  plans: string;
 }
 
 export function workspacePaths(repoRoot: string): WorkspacePaths {
@@ -29,7 +30,8 @@ export function workspacePaths(repoRoot: string): WorkspacePaths {
     packs: path.join(root, 'packs'),
     catalog: path.join(root, 'catalog.json'),
     runs: path.join(root, 'runs'),
-    snapshots: path.join(root, 'snapshots')
+    snapshots: path.join(root, 'snapshots'),
+    plans: path.join(root, 'plans')
   };
 }
 
@@ -38,6 +40,7 @@ export async function ensureWorkspace(repoRoot: string): Promise<WorkspacePaths>
   await fs.mkdir(paths.packs, { recursive: true });
   await fs.mkdir(paths.runs, { recursive: true });
   await fs.mkdir(paths.snapshots, { recursive: true });
+  await fs.mkdir(paths.plans, { recursive: true });
   return paths;
 }
 

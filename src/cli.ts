@@ -2,11 +2,12 @@
 /**
  * Loadout CLI.
  *
- * Subcommands for LOD-01:
+ * Subcommands for LOD-02:
  *   loadout catalog
  *   loadout install <pack-id>
  *   loadout inspect <pack-id>
- *   loadout run --goal "<title>" [--repository <path>] [--pack <pack-id>]
+ *   loadout plan --goal "<title>" [--repository <path>] [--pack <pack-id>] [--out <path>]
+ *   loadout run [--goal "<title>" | --plan <path>] [--repository <path>] [--pack <pack-id>]
  *   loadout remove <pack-id>
  *   loadout rollback <pack-id>
  *   loadout swap <pack-id> --skill <path>
@@ -35,13 +36,25 @@ import {
   workspacePaths,
   ensureWorkspace,
   snapshotRepo,
-  loadSkillDescriptor
+  loadSkillDescriptor,
+  compileLoadoutPlan,
+  loadPlan,
+  verifyPlanIntegrity,
+  verifyPlanFreshness,
+  writePlan,
+  defaultPlanPath,
+  formatPlanText
 } from './index';
 import { runRepositoryRecon } from './packs/repository-recon/run';
 import { loadAndValidateQmr } from './core/qmr';
 import { validateAllFixtures, compileAgainstGoalCatalog } from './core/contract-validation';
+import { PlanMalformedError, PlanIntegrityError, PlanStaleError } from './core/plan';
 
 const PACKS_DIR = path.resolve(__dirname, 'packs');
+// Loadout installation root: the directory containing the dist/ folder.
+// Used to resolve bundled v0 fixtures (e.g. fixtures/qualified-method-record.v0.yaml)
+// whose path is relative to the loadout installation, not the target repo.
+const LOADOUT_ROOT = path.resolve(__dirname, '..');
 const DEFAULT_REPO = process.cwd();
 
 const program = new Command();
@@ -123,33 +136,147 @@ program
 
 program
   .command('run')
-  .description('Run the selected Goal/Capability end-to-end through the SIMULATED boundary.')
-  .requiredOption('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
+  .description(
+    'Run the selected Goal/Capability end-to-end through the SIMULATED boundary. ' +
+      'Either --goal or --plan must be supplied. --plan uses the pre-compiled ' +
+      'Work Envelope from `loadout plan`; nothing is silently recomputed.'
+  )
+  .option('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
+  .option('--plan <path>', 'Path to a Plan v0 file produced by `loadout plan`')
   .option('-r, --repository <path>', 'target repository path', DEFAULT_REPO)
-  .option('-p, --pack <packId>', 'pack id to use', 'repository-recon')
-  .option('--qmr-fixture <path>', 'override the QMR fixture path (power user)', '')
+  .option('-p, --pack <packId>', 'pack id to use (required with --goal)', '')
+  .option(
+    '--qmr-fixture <path>',
+    'override the QMR fixture path (power user; ignored with --plan)',
+    ''
+  )
   .option('-o, --out <path>', 'write the run record (JSON) here', '')
   .action(
     async (opts: {
-      goal: string;
+      goal?: string;
+      plan?: string;
       repository: string;
       pack: string;
       qmrFixture: string;
       out: string;
     }) => {
-      const goal = findGoalByTitle(opts.goal);
+      // --plan and --goal are mutually exclusive. Exactly one must be present.
+      if (Boolean(opts.plan) === Boolean(opts.goal)) {
+        console.error('loadout run: provide exactly one of --goal "<title>" or --plan <path>.');
+        process.exit(2);
+      }
+
+      // ----- PLAN path: load the plan, verify integrity + freshness, -----
+      // ----- then submit the embedded Work Envelope without recompile. -----
+      if (opts.plan) {
+        let plan;
+        try {
+          plan = await loadPlan(opts.plan);
+        } catch (e) {
+          if (e instanceof PlanMalformedError) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(`loadout run: failed to load plan: ${(e as Error).message}`);
+          }
+          process.exit(1);
+        }
+        try {
+          verifyPlanIntegrity(plan);
+        } catch (e) {
+          if (e instanceof PlanIntegrityError) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(`loadout run: plan integrity check failed: ${(e as Error).message}`);
+          }
+          process.exit(1);
+        }
+        // Re-snapshot the repository; refuse to silently re-resolve if
+        // the project state has changed since the plan was created.
+        const currentSnap = await snapshotRepo(opts.repository);
+        const currentProjectState = {
+          baseCommit: currentSnap.input.headCommit,
+          workspaceStateDigest: currentSnap.digest
+        };
+        try {
+          verifyPlanFreshness(plan, currentProjectState);
+        } catch (e) {
+          if (e instanceof PlanStaleError) {
+            console.error(`loadout run: ${e.message}`);
+          } else {
+            console.error(`loadout run: plan freshness check failed: ${(e as Error).message}`);
+          }
+          process.exit(1);
+        }
+
+        // The Plan's embedded Work Envelope is submitted verbatim. We do
+        // NOT re-resolve the Capability, re-load the QMR, or recompile.
+        const envelope = plan.work_envelope;
+        // Step: run the deterministic local procedure (read-only) for
+        // context, but it is NOT a substitute for the Kiln record.
+        const recon = await runRepositoryRecon(opts.repository);
+        // Step: invoke the SIMULATED Kiln boundary with the Plan's envelope.
+        const result = invokeFakeKiln(envelope);
+        const view = buildResultView(result);
+        console.log(
+          `=== Loaded plan: ${plan.plan_id} (work_envelope_digest=${plan.work_envelope_digest}) ===`
+        );
+        console.log(
+          `=== Plan is FRESH: project_state matches current snapshot (${currentProjectState.baseCommit}) ===`
+        );
+        console.log('');
+        console.log(formatResultViewText(view));
+        console.log('');
+        console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
+        for (const n of recon.notes) console.log(`  ${n}`);
+
+        // Persist run record (same shape as ad-hoc run path).
+        const wsPaths = await ensureWorkspace(opts.repository);
+        const recordPath = path.join(wsPaths.runs, `${result.run_id}.json`);
+        await fs.writeFile(
+          recordPath,
+          JSON.stringify(
+            {
+              sourcePlan: { plan_id: plan.plan_id, plan_path: opts.plan },
+              workEnvelope: envelope,
+              runResult: result,
+              view,
+              recon
+            },
+            null,
+            2
+          )
+        );
+        console.log(`run record written: ${recordPath}`);
+        if (opts.out) {
+          await fs.writeFile(
+            opts.out,
+            JSON.stringify(
+              { plan_id: plan.plan_id, envelope, result, view, sourcePlanPath: opts.plan },
+              null,
+              2
+            )
+          );
+          console.log(`run summary written: ${opts.out}`);
+        }
+        return;
+      }
+
+      // ----- AD-HOC path: --goal, resolve and run normally. -----
+      const goalTitle = opts.goal as string;
+      const goal = findGoalByTitle(goalTitle);
       if (!goal) {
-        console.error(`unknown goal: ${opts.goal}`);
+        console.error(`unknown goal: ${goalTitle}`);
         console.error(`known goals: ${GOAL_CATALOGUE.map((g) => g.title).join(', ')}`);
         process.exit(2);
       }
+      const packId = opts.pack || 'repository-recon';
       const ws = workspacePaths(opts.repository);
-      const packRoot = path.join(ws.packs, opts.pack);
+      const packRoot = path.join(ws.packs, packId);
       try {
         await fs.stat(packRoot);
       } catch {
         console.error(
-          `pack ${opts.pack} not installed at ${opts.repository}; run 'loadout install ${opts.pack}' first.`
+          `pack ${packId} not installed at ${opts.repository}; run 'loadout install ${packId}' first.`
         );
         process.exit(2);
       }
@@ -164,7 +291,7 @@ program
       // back. Missing, malformed, or incompatible QMR fails closed.
       let qmr;
       try {
-        qmr = await loadAndValidateQmr({ capability: cap, repoRoot: opts.repository });
+        qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
       } catch (e) {
         console.error(`loadout run: ${(e as Error).message}`);
         process.exit(1);
@@ -210,6 +337,119 @@ program
         await fs.writeFile(opts.out, JSON.stringify({ envelope, result, view }, null, 2));
         console.log(`run summary written: ${opts.out}`);
       }
+    }
+  );
+
+program
+  .command('plan')
+  .description(
+    'Produce a Loadout Plan v0 (EXPLAIN). The plan is a real, content-addressable ' +
+      'artifact that records exactly what execution will ask Kiln for, including ' +
+      'the compiled Work Envelope, the QMR provenance, and the compatibility proof. ' +
+      'Pass it to `loadout run --plan <path>` to execute without recomputation.'
+  )
+  .requiredOption('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
+  .option('-r, --repository <path>', 'target repository path', DEFAULT_REPO)
+  .option('-p, --pack <packId>', 'pack id to use', 'repository-recon')
+  .option('--qmr-fixture <path>', 'override the QMR fixture path (power user)', '')
+  .option(
+    '-o, --out <path>',
+    'explicit plan output path; default is .loadout/plans/<plan_id>.json',
+    ''
+  )
+  .action(
+    async (opts: {
+      goal: string;
+      repository: string;
+      pack: string;
+      qmrFixture: string;
+      out: string;
+    }) => {
+      const goal = findGoalByTitle(opts.goal);
+      if (!goal) {
+        console.error(`unknown goal: ${opts.goal}`);
+        console.error(`known goals: ${GOAL_CATALOGUE.map((g) => g.title).join(', ')}`);
+        process.exit(2);
+      }
+      const ws = workspacePaths(opts.repository);
+      const packRoot = path.join(ws.packs, opts.pack);
+      try {
+        await fs.stat(packRoot);
+      } catch {
+        console.error(
+          `pack ${opts.pack} not installed at ${opts.repository}; run 'loadout install ${opts.pack}' first.`
+        );
+        process.exit(2);
+      }
+
+      const cap = await resolveCapability(packRoot);
+      if (opts.qmrFixture) {
+        // Power-user skill swap: re-bind the skill descriptor in-memory only.
+        cap.skill.qmrFixturePath = opts.qmrFixture;
+      }
+
+      // Step 1: load and validate the QMR. Missing, malformed, or
+      // incompatible QMR fails closed BEFORE we produce a plan.
+      let qmr;
+      try {
+        qmr = await loadAndValidateQmr({ capability: cap, repoRoot: LOADOUT_ROOT });
+      } catch (e) {
+        console.error(`loadout plan: ${(e as Error).message}`);
+        process.exit(1);
+      }
+
+      // Step 2: snapshot the workspace so the Plan's project_state is
+      // bound to observable repository state at plan time.
+      const snap = await snapshotRepo(opts.repository);
+
+      // Step 3: read the pack manifest so the plan records the
+      // pack-level id/version (the binding between capability and
+      // distribution).
+      const packManifest = await readPackManifest(packRoot);
+
+      // Step 4: compile the Work Envelope.
+      const envelope = compileWorkEnvelope({
+        goal,
+        capability: cap,
+        qmr,
+        projectState: {
+          repository: opts.repository,
+          baseCommit: snap.input.headCommit,
+          workspaceStateDigest: snap.digest
+        },
+        createdAt: new Date().toISOString()
+      });
+
+      // Step 5: build the Plan.
+      const plan = compileLoadoutPlan({
+        goal,
+        capability: cap,
+        pack: packManifest,
+        qmr,
+        workEnvelope: envelope,
+        projectState: {
+          repository: opts.repository,
+          baseCommit: snap.input.headCommit,
+          workspaceStateDigest: snap.digest
+        },
+        createdAt: envelope.created_at
+      });
+
+      // Step 6: print the plan to the terminal.
+      console.log(formatPlanText(plan));
+
+      // Step 7: persist the plan to the workspace.
+      await ensureWorkspace(opts.repository);
+      const outPath = opts.out ? path.resolve(opts.out) : defaultPlanPath(opts.repository, plan);
+      await writePlan({ plan, outPath });
+      console.log('');
+      console.log(`plan written: ${outPath}`);
+      console.log(`plan_id:    ${plan.plan_id}`);
+      console.log(`work_envelope_digest: ${plan.work_envelope_digest}`);
+      console.log('');
+      console.log(
+        `Next: 'loadout run --plan ${outPath}' to execute this exact plan without recomputation.`
+      );
     }
   );
 

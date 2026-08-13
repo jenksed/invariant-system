@@ -161,3 +161,97 @@ export const CapabilityContractV0Schema = z.object({
   })
 });
 export type CapabilityContractV0 = z.infer<typeof CapabilityContractV0Schema>;
+
+/* ------------------------- Loadout Plan v0 --------------------------- */
+/**
+ * A Loadout Plan v0 is the user-facing, content-addressable description of
+ * what Loadout intends to ask Kiln to do, BEFORE any execution.
+ *
+ * It is produced by `loadout plan` and consumed by `loadout run --plan`.
+ * A Plan is a real artifact: it carries a deterministic plan_id (sha256
+ * of the canonicalized body) and a work_envelope_digest, both of which
+ * are reproduced identically on a fresh `loadout plan` call against the
+ * same inputs.
+ *
+ * The Plan includes the fully-compiled Work Envelope v0 so that `run
+ * --plan` does not need to recompute, and the same Work Envelope
+ * submitted at plan time is the exact one submitted to the boundary at
+ * run time.
+ */
+
+export const PlanCompatibilityV0Schema = z.object({
+  min_method_status: z.string(),
+  accepted_contexts: z.array(z.string()),
+  outcome: z.string(),
+  qmr_outcome: z.string(),
+  qmr_status: z.string(),
+  status_sufficient: z.boolean(),
+  context_intersections: z.array(z.string())
+});
+export type PlanCompatibilityV0 = z.infer<typeof PlanCompatibilityV0Schema>;
+
+export const PlanMethodProvenanceV0Schema = z.object({
+  method_id: z.string(),
+  method_version: z.string(),
+  status: z.string(),
+  confidence: z.string(),
+  record_digest: z.string(),
+  arsenal_commit: z.string().nullable()
+});
+export type PlanMethodProvenanceV0 = z.infer<typeof PlanMethodProvenanceV0Schema>;
+
+export const LoadoutPlanV0Schema = z.object({
+  schema: z.literal('loadout/plan/v0'),
+  plan_id: z.string(),
+  created_at: z.string(),
+  goal: z.object({
+    id: z.string(),
+    title: z.string(),
+    success_conditions: z.array(z.string())
+  }),
+  capability: z.object({
+    id: z.string(),
+    contract_version: z.string(),
+    contract_schema: z.literal('loadout/capability-contract/v0'),
+    goal_outcome: z.string(),
+    evidence_expectations: z.array(z.string()),
+    failure_shape: z.array(z.string())
+  }),
+  pack: z.object({
+    id: z.string(),
+    version: z.string()
+  }),
+  skill: z.object({
+    id: z.string(),
+    qmr_fixture_path: z.string()
+  }),
+  method: PlanMethodProvenanceV0Schema,
+  compatibility: PlanCompatibilityV0Schema,
+  requested_authority: z.array(
+    z.object({
+      capability: z.string(),
+      scope: z.string()
+    })
+  ),
+  proof_obligations: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      requirement: z.string()
+    })
+  ),
+  work_envelope: WorkEnvelopeV0Schema,
+  work_envelope_digest: z.string(),
+  project_state: z.object({
+    repository: z.string(),
+    base_commit: z.string(),
+    workspace_state_digest: z.string()
+  }),
+  execution_boundary: z.object({
+    boundary: z.literal('simulated'),
+    reason: z.string(),
+    details: z.string()
+  }),
+  notes: z.array(z.string())
+});
+export type LoadoutPlanV0 = z.infer<typeof LoadoutPlanV0Schema>;
