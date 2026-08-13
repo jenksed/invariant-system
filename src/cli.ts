@@ -257,14 +257,14 @@ program
         // hardcoded import. The Plan's procedure_binding tells us which
         // procedure entry to invoke; the registry resolves it to the
         // actual function.
-        let recon: { notes: string[]; [k: string]: unknown };
+        let recon: { summary: string; [k: string]: unknown };
         try {
           recon = (await invokeProcedure({
             procedureEntry: cap.skill.procedureEntry,
             packRoot,
             loadoutRoot: LOADOUT_ROOT,
             repoRoot: opts.repository
-          })) as { notes: string[] };
+          })) as { summary: string };
         } catch (e) {
           if (e instanceof ProcedureResolutionError) {
             console.error(`loadout run: ${e.message}`);
@@ -288,8 +288,10 @@ program
         console.log('');
         console.log(formatResultViewText(view));
         console.log('');
-        console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
-        for (const n of recon.notes) console.log(`  ${n}`);
+        console.log(
+          'Local procedure summary (input to the fake Kiln boundary, not a Kiln record):'
+        );
+        console.log(`  ${recon.summary}`);
 
         // Persist run record (same shape as ad-hoc run path).
         const wsPaths = await ensureWorkspace(opts.repository);
@@ -364,14 +366,14 @@ program
       // same invocation path that `run --plan` uses; the only
       // difference is whether the binding came from a Plan or from a
       // live capability resolution.
-      let recon: { notes: string[]; [k: string]: unknown };
+      let recon: { summary: string; [k: string]: unknown };
       try {
         recon = (await invokeProcedure({
           procedureEntry: cap.skill.procedureEntry,
           packRoot,
           loadoutRoot: LOADOUT_ROOT,
           repoRoot: opts.repository
-        })) as { notes: string[] };
+        })) as { summary: string };
       } catch (e) {
         if (e instanceof ProcedureResolutionError) {
           console.error(`loadout run: ${e.message}`);
@@ -403,8 +405,8 @@ program
       // Step 7: print.
       console.log(formatResultViewText(view));
       console.log('');
-      console.log('Local procedure notes (input to the fake Kiln boundary, not a Kiln record):');
-      for (const n of recon.notes) console.log(`  ${n}`);
+      console.log('Local procedure summary (input to the fake Kiln boundary, not a Kiln record):');
+      console.log(`  ${recon.summary}`);
 
       // Step 8: persist the run record.
       const wsPaths = await ensureWorkspace(opts.repository);

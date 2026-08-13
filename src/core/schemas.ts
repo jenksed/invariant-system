@@ -162,6 +162,74 @@ export const CapabilityContractV0Schema = z.object({
 });
 export type CapabilityContractV0 = z.infer<typeof CapabilityContractV0Schema>;
 
+/* ------------------------ Repository Recon v1 ------------------------ */
+/**
+ * The Repository Recon v1 shape is Loadout-owned (NOT part of the four
+ * engineering-system v0 contracts). It is the structured output of the
+ * bundled `runRepositoryRecon` Skill procedure. It is INPUT to the fake
+ * Kiln boundary, not a Kiln record.
+ */
+export const ArchitectureAnchorV1Schema = z.object({
+  kind: z.enum([
+    'governance',
+    'readme',
+    'manifest',
+    'source_root',
+    'docs_architecture',
+    'test_root',
+    'ci_workflow',
+    'build_config',
+    'project_config'
+  ]),
+  path: z.string(),
+  observation: z.string(),
+  evidence: z.string()
+});
+export type ArchitectureAnchorV1 = z.infer<typeof ArchitectureAnchorV1Schema>;
+
+export const ObservedConstraintV1Schema = z.object({
+  kind: z.enum([
+    'agent_rule',
+    'runtime',
+    'package_manager',
+    'test_command',
+    'mutation_prohibition',
+    'generated_boundary',
+    'ownership'
+  ]),
+  source: z.string(),
+  observation: z.string(),
+  evidence: z.string()
+});
+export type ObservedConstraintV1 = z.infer<typeof ObservedConstraintV1Schema>;
+
+export const UnknownV1Schema = z.object({
+  subject: z.string(),
+  reason: z.string()
+});
+export type UnknownV1 = z.infer<typeof UnknownV1Schema>;
+
+export const RepositoryStateObservationV1Schema = z.object({
+  head_commit: z.string(),
+  head_ref: z.string().nullable(),
+  is_git_repository: z.boolean(),
+  tracked_files: z.number().int().nonnegative().nullable(),
+  tracked_files_source: z.enum(['git', 'unavailable']),
+  filesystem_walk_files: z.number().int().nonnegative()
+});
+export type RepositoryStateObservationV1 = z.infer<typeof RepositoryStateObservationV1Schema>;
+
+export const ReconResultV1Schema = z.object({
+  schema: z.literal('loadout/repository-recon/v1'),
+  repository: z.string(),
+  repository_state: RepositoryStateObservationV1Schema,
+  architecture_anchors: z.array(ArchitectureAnchorV1Schema),
+  constraints: z.array(ObservedConstraintV1Schema),
+  unknowns: z.array(UnknownV1Schema),
+  summary: z.string()
+});
+export type ReconResultV1 = z.infer<typeof ReconResultV1Schema>;
+
 /* ------------------------- Loadout Plan v0 --------------------------- */
 /**
  * A Loadout Plan v0 is the user-facing, content-addressable description of
@@ -274,6 +342,13 @@ export const LoadoutPlanV0Schema = z.object({
     reason: z.string(),
     details: z.string()
   }),
+  /**
+   * The Repository Recon v1 result computed at plan time. Embedded into
+   * the Plan so the EXPLAIN view can show the user what recon WOULD
+   * produce. Part of the content-addressable plan body, so any change
+   * to the recon result changes the plan_id.
+   */
+  repository_recon: ReconResultV1Schema,
   notes: z.array(z.string())
 });
 export type LoadoutPlanV0 = z.infer<typeof LoadoutPlanV0Schema>;

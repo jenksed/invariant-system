@@ -41,6 +41,8 @@ import type { PackManifest } from './pack';
 import type { QualifiedMethodRecordV0, WorkEnvelopeV0, LoadoutPlanV0 } from './schemas';
 import { LoadoutPlanV0Schema } from './schemas';
 import { computeProcedureInterfaceDigest } from './procedure-registry';
+import { runRepositoryRecon } from '../packs/repository-recon/run';
+import type { ReconResultV1 } from './schemas';
 
 export class PlanError extends Error {
   constructor(message: string) {
@@ -110,6 +112,14 @@ export interface CompileLoadoutPlanArgs {
    * sites that need the digest should pass the Pack root.
    */
   packRoot?: string;
+  /**
+   * The Repository Recon v1 result. The Plan embeds this so the EXPLAIN
+   * view can show the user what recon WOULD produce at plan time. If
+   * omitted, the Plan compiler will run the recon procedure itself
+   * against `projectState.repository`. Callers that have already run
+   * recon (e.g. for caching) may pass the result through.
+   */
+  repositoryRecon?: ReconResultV1;
 }
 
 /**
@@ -181,6 +191,14 @@ export function computeWorkEnvelopeDigest(envelope: WorkEnvelopeV0): string {
  */
 export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlanV0> {
   const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt } = args;
+
+  // Compute the Repository Recon v1 result. The Plan embeds this so the
+  // EXPLAIN view can show the user what recon WOULD produce. If a
+  // caller pre-computed recon (e.g. for caching) it can pass the result
+  // through; otherwise we run the procedure now. The procedure is
+  // deterministic and read-only for fixed repository state.
+  const repositoryRecon: ReconResultV1 =
+    args.repositoryRecon ?? (await runRepositoryRecon(args.projectState.repository));
 
   // The compatibility proof is derived from the inputs; it is a
   // record of WHY the QMR satisfies the Capability, computed here
@@ -278,11 +296,13 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
         'simulated: true. The fake boundary defaults to deny-all authority and unsatisfy-all proof ' +
         'obligations unless explicit simulated decisions are provided.'
     },
+    repository_recon: repositoryRecon,
     notes: [
       'Plan is a real artifact; its plan_id and work_envelope_digest are sha256 content addresses.',
       'procedure_binding records the QMR/Skill/procedure binding; tamper with it and the plan_id digest breaks.',
       '`loadout run --plan <path>` will use the embedded Work Envelope without recomputation.',
-      'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.'
+      'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.',
+      'The Plan embeds a Repository Recon v1 result computed at plan time. It is part of the content-addressable plan body; any change to the recon result changes the plan_id.'
     ]
   };
 
@@ -581,6 +601,37 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push(`  repository:              ${plan.project_state.repository}`);
   lines.push(`  base_commit:             ${plan.project_state.base_commit}`);
   lines.push(`  workspace_state_digest:  ${plan.project_state.workspace_state_digest}`);
+  lines.push('');
+  lines.push('--- Repository Recon (structured v1, computed at plan time) ---');
+  const recon = plan.repository_recon;
+  lines.push(`  schema:                  ${recon.schema}`);
+  lines.push(`  repository:              ${recon.repository}`);
+  lines.push('  repository_state:');
+  lines.push(`    is_git_repository:      ${recon.repository_state.is_git_repository}`);
+  lines.push(`    head_commit:            ${recon.repository_state.head_commit}`);
+  lines.push(`    head_ref:               ${recon.repository_state.head_ref ?? '(detached)'}`);
+  lines.push(
+    `    tracked_files:          ${recon.repository_state.tracked_files ?? '(unavailable)'}  source=${recon.repository_state.tracked_files_source}`
+  );
+  lines.push(`    filesystem_walk_files:  ${recon.repository_state.filesystem_walk_files}`);
+  lines.push(`  architecture_anchors:    ${recon.architecture_anchors.length}`);
+  for (const a of recon.architecture_anchors) {
+    lines.push(`    - [${a.kind}] ${a.path}`);
+    lines.push(`        observation: ${a.observation}`);
+    lines.push(`        evidence:    ${a.evidence}`);
+  }
+  lines.push(`  constraints:             ${recon.constraints.length}`);
+  for (const c of recon.constraints) {
+    lines.push(`    - [${c.kind}] source=${c.source}`);
+    lines.push(`        observation: ${c.observation}`);
+    lines.push(`        evidence:    ${c.evidence}`);
+  }
+  lines.push(`  unknowns:                ${recon.unknowns.length}`);
+  for (const u of recon.unknowns) {
+    lines.push(`    - subject=${u.subject}`);
+    lines.push(`        reason:   ${u.reason}`);
+  }
+  lines.push(`  summary: ${recon.summary}`);
   lines.push('');
   lines.push('--- Notes ---');
   for (const n of plan.notes) lines.push(`  - ${n}`);

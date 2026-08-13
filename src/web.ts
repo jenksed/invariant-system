@@ -243,14 +243,14 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           }
           return;
         }
-        let recon: { notes: string[]; [k: string]: unknown };
+        let recon: { summary: string; [k: string]: unknown };
         try {
           recon = (await invokeProcedure({
             procedureEntry: cap.skill.procedureEntry,
             packRoot,
             loadoutRoot: LOADOUT_ROOT,
             repoRoot: repository
-          })) as { notes: string[] };
+          })) as { summary: string };
         } catch (e) {
           if (e instanceof ProcedureResolutionError) {
             jsonResponse(res, 422, { error: e.message, simulated: true });
@@ -265,7 +265,8 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           plan_id: plan.plan_id,
           work_envelope_digest: plan.work_envelope_digest,
           view,
-          reconNotes: recon.notes,
+          reconSummary: recon.summary,
+          recon,
           simulated: true
         });
         return;
@@ -300,14 +301,14 @@ export async function startWeb(opts: WebOptions): Promise<void> {
           jsonResponse(res, 422, { error: (e as Error).message, simulated: true });
           return;
         }
-        let recon: { notes: string[]; [k: string]: unknown };
+        let recon: { summary: string; [k: string]: unknown };
         try {
           recon = (await invokeProcedure({
             procedureEntry: cap.skill.procedureEntry,
             packRoot,
             loadoutRoot: LOADOUT_ROOT,
             repoRoot: repository
-          })) as { notes: string[] };
+          })) as { summary: string };
         } catch (e) {
           if (e instanceof ProcedureResolutionError) {
             jsonResponse(res, 422, { error: e.message, simulated: true });
@@ -330,7 +331,7 @@ export async function startWeb(opts: WebOptions): Promise<void> {
         });
         const result = invokeFakeKiln(envelope);
         const view = buildResultView(result);
-        jsonResponse(res, 200, { view, reconNotes: recon.notes, simulated: true });
+        jsonResponse(res, 200, { view, reconSummary: recon.summary, recon, simulated: true });
         return;
       }
       res.writeHead(404);
