@@ -325,6 +325,27 @@
       "notes": "Positive, determinism, negative, honesty, authority, and provenance tests for the method-evaluation CLI. Each test runs the CLI in an isolated temporary directory and asserts the documented behavior. Tests refuse composite scores, runtime authority tokens, and remote credentials."
     },
     {
+      "id": "arsenal.method-evaluation.adapters",
+      "path_pattern": "evaluation/adapters/*",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "protocol.method-evaluation-adapter-contract",
+        "protocol.method-evaluation-adapter-findings-shape"
+      ],
+      "notes": "The adapter seam through which the method evaluator can be configured to invoke an external Repository Recon procedure (e.g. a future Loadout productized procedure). The default adapter wraps the internal fixture procedure; the shell-loadout-recon adapter reads pre-emitted findings from a JSON file. Adapter contracts: no Arsenal source import of Loadout, no Arsenal runtime dependency on Loadout, the adapter identity is recorded in the artifact's provenance.adapter block, and a broken candidate produces strictly worse evaluation evidence (no silent fallback)."
+    },
+    {
+      "id": "arsenal.method-evaluation.adapter-tests",
+      "path": "scripts/test-repository-recon-adapter.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-adapter-tests"],
+      "notes": "Positive, negative, regression, determinism, and provenance tests for the adapter surface. Proves the evaluator can be configured to use an external adapter, a broken candidate produces strictly more misses than the canonical internal run, the shell adapter refuses silent fallback to the internal procedure, and the corpus-level end-to-end evaluation pattern is wired up for Phase 2."
+    },
+    {
       "id": "arsenal.epistemic-lifecycle",
       "path": "docs/arsenal-lifecycle.md",
       "ownership": "arsenal-distribution",
@@ -430,6 +451,9 @@
     {"id": "method-evaluation.corpus-manifest", "owner_artifact": "arsenal.method-evaluation.cases", "locator": "evaluation/method-cases/corpus.manifest.json"},
     {"id": "protocol.method-evaluation-evaluator", "owner_artifact": "arsenal.method-evaluation.evaluator", "locator": "scripts/arsenal_evaluate.py"},
     {"id": "protocol.method-evaluation-tests", "owner_artifact": "arsenal.method-evaluation.tests", "locator": "scripts/test-arsenal-evaluate.py"},
+    {"id": "protocol.method-evaluation-adapter-contract", "owner_artifact": "arsenal.method-evaluation.adapters", "locator": "evaluation/adapters/repository_recon_adapter.py"},
+    {"id": "protocol.method-evaluation-adapter-findings-shape", "owner_artifact": "arsenal.method-evaluation.adapters", "locator": "evaluation/adapters/repository_recon_adapter.py:ALLOWED_KINDS"},
+    {"id": "protocol.method-evaluation-adapter-tests", "owner_artifact": "arsenal.method-evaluation.adapter-tests", "locator": "scripts/test-repository-recon-adapter.py"},
     {"id": "governance.artifact-classification.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "artifacts[]"},
     {"id": "governance.source-assignment.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "facts[]"}
   ]

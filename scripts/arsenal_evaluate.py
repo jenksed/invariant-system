@@ -74,6 +74,7 @@ except ModuleNotFoundError:  # pragma: no cover
 ROOT = Path(__file__).resolve().parents[1]
 METHOD_RECORDS_DIR = ROOT / "evaluation" / "method-records"
 METHOD_CASES_DIR = ROOT / "evaluation" / "method-cases"
+ADAPTERS_DIR = ROOT / "evaluation" / "adapters"
 DEFAULT_CORPUS = METHOD_CASES_DIR / "corpus.manifest.json"
 DEFAULT_OUT = ROOT / ".arsenal-eval" / "repository-recon-evaluation.v0.json"
 
@@ -265,6 +266,51 @@ ABSENCE_ANCHORS: tuple[tuple[str, str], ...] = (
 )
 
 CAPABILITY_IDENTITY_PATH = "arsenal/capabilities/recon.json"
+
+# Adapter surface (ARS-W3 Phase 1). The evaluator can be configured
+# to invoke an external procedure via an adapter; the default is the
+# internal fixture procedure. The closed vocabulary here mirrors the
+# adapter names defined under ``evaluation/adapters/``.
+ADAPTER_INTERNAL = "internal-fixture-procedure"
+ADAPTER_SHELL_LOADOUT = "shell-loadout-recon"
+ALLOWED_ADAPTERS = frozenset({ADAPTER_INTERNAL, ADAPTER_SHELL_LOADOUT})
+
+
+def _resolve_adapter(adapter_name: str, *, adapter_input: str | None):
+    """Resolve an adapter by name. Returns the adapter instance.
+
+    The internal adapter takes no input. The shell adapter requires
+    ``adapter_input`` (a path to a findings JSON file).
+    """
+    if adapter_name not in ALLOWED_ADAPTERS:
+        raise ValueError(
+            f"unknown adapter {adapter_name!r}; "
+            f"allowed: {sorted(ALLOWED_ADAPTERS)}"
+        )
+    if not ADAPTERS_DIR.is_dir():
+        raise FileNotFoundError(
+            f"adapter package missing: {_rel(ADAPTERS_DIR)}"
+        )
+    # Ensure the adapter package is importable.
+    sys.path.insert(0, str(ROOT))
+    if adapter_name == ADAPTER_INTERNAL:
+        from evaluation.adapters.internal_fixture_adapter import (  # type: ignore
+            InternalFixtureProcedureAdapter,
+        )
+        # Pass the procedure function at construction time so
+        # monkey-patches on the module symbol flow through. The
+        # adapter stores it; ``run`` calls it directly.
+        return InternalFixtureProcedureAdapter(procedure=_run_recon_procedure)
+    if adapter_name == ADAPTER_SHELL_LOADOUT:
+        if not adapter_input:
+            raise ValueError(
+                f"adapter {adapter_name!r} requires --adapter-input PATH"
+            )
+        from evaluation.adapters.shell_loadout_adapter import (  # type: ignore
+            ShellLoadoutReconAdapter,
+        )
+        return ShellLoadoutReconAdapter(Path(adapter_input))
+    raise ValueError(f"unhandled adapter {adapter_name!r}")
 
 
 def _run_recon_procedure(repo_path: Path) -> list[dict]:
@@ -479,12 +525,12 @@ def _evaluate_assertion(assertion: dict, procedure_outputs: list[dict]) -> dict:
     }
 
 
-def _evaluate_case(case: dict) -> dict:
+def _evaluate_case(case: dict, adapter) -> dict:
     """Run the procedure and compare its outputs against expected assertions.
 
-    The procedure is invoked ONCE per case. Its findings are the
-    sole ground truth the evaluator compares against; the fixture
-    state is not re-inspected during assertion evaluation.
+    The procedure is invoked ONCE per case via ``adapter.run``. The
+    findings are the sole ground truth the evaluator compares against;
+    the fixture state is not re-inspected during assertion evaluation.
 
     The aggregate categorizes assertions into:
 
@@ -512,7 +558,7 @@ def _evaluate_case(case: dict) -> dict:
     expected_unknowns |= set(expected.get("unknowns_allowed") or [])
     unsupported_allowed = set(expected.get("unsupported_claims_allowed") or [])
 
-    procedure_outputs = _run_recon_procedure(case["repo_path"])
+    procedure_outputs = adapter.run(case["repo_path"])
 
     observations: list[dict] = []
     for assertion in expected_assertions:
@@ -632,12 +678,20 @@ def _assemble_artifact(
     corpus: dict,
     case_results: list[dict],
     arsenal_commit: str | None,
+    *,
+    adapter: dict | None = None,
 ) -> dict:
     """Assemble the final evaluation artifact.
 
     The artifact is intentionally compact but every field carries a
     meaning. The artifact is the input to the ``validate`` subcommand
     and the binding evidence a future QMR can cite.
+
+    ``adapter`` records the procedure-invocation adapter identity
+    (the wrapper through which the procedure was invoked). The
+    default is the internal fixture procedure; an external adapter
+    (e.g. the shell Loadout Recon placeholder) is recorded when the
+    evaluator is configured with ``--adapter``.
     """
     total_assertions = sum(c["observation_count"] for c in case_results)
     total_success = sum(len(c["successes"]) for c in case_results)
@@ -653,6 +707,16 @@ def _assemble_artifact(
 
     contexts_evaluated = [c["context_kind"] for c in case_results if c.get("context_kind")]
     contexts_declared = method.get("qualified_for", {}).get("contexts", [])
+
+    # Adapter identity is mandatory so the artifact is always
+    # self-describing. The default adapter is the internal fixture
+    # procedure; the evaluator never silently switches.
+    if adapter is None:
+        adapter = {
+            "name": ADAPTER_INTERNAL,
+            "input": None,
+            "module": "scripts.arsenal_evaluate:_run_recon_procedure",
+        }
 
     payload: dict = {
         "schema_version": "1.0.0",
@@ -683,6 +747,7 @@ def _assemble_artifact(
             "model": "not-applicable",
             "harness": "deterministic-python-adapter",
             "remote_credentials_used": False,
+            "adapter": adapter,
         },
         "metrics": {
             "cases_total": len(case_results),
@@ -722,6 +787,16 @@ def _assemble_artifact(
             "A revised QMR is emitted as evidence (status: experimental) but "
             "is not authoritative; authority over capability state remains "
             "with the canonical capability fragment.",
+            "ARS-W3 Phase 1 introduced an adapter surface (internal-fixture-procedure "
+            "and shell-loadout-recon) so the evaluator can be configured to invoke an "
+            "external Repository Recon procedure. The v0 qualified-method-record "
+            "contract has no adapter concept; the canonical QMR's procedure_ref "
+            "is a single SHA-256 and cannot simultaneously bind to multiple "
+            "adapters. Promoting the QMR to qualified therefore requires a "
+            "contract evolution that introduces an adapter concept (adapter "
+            "identity, adapter_version, adapter_input_provenance); this is the "
+            "W3 Phase 1 graduation gap and is documented in "
+            "docs/arsenal-method-evaluation.md.",
         ],
     }
     payload["run_digest"] = _compute_run_digest(payload)
@@ -899,6 +974,14 @@ def cmd_repository_recon(args) -> int:
     ``.arsenal-eval/repository-recon.method-record.v0.yaml``.
 
     All three defaults can be overridden on the command line.
+
+    The ``--adapter`` option configures the procedure-invocation
+    adapter. The default is ``internal-fixture-procedure`` (the
+    canonical procedure in this script). ``shell-loadout-recon``
+    reads findings from a JSON file (``--adapter-input``). The
+    adapter identity is recorded in the artifact's
+    ``provenance.adapter`` block so the artifact is always
+    self-describing about which procedure produced the findings.
     """
     corpus_path = Path(args.corpus) if args.corpus else DEFAULT_CORPUS
     if not corpus_path.is_absolute():
@@ -919,28 +1002,72 @@ def cmd_repository_recon(args) -> int:
         print(f"ERROR invalid QMR: {exc}", file=sys.stderr)
         return EXIT_CODE["METHOD_RECORD_INVALID"]
 
-    case_results: list[dict] = []
+    # Resolve the adapter BEFORE loading cases so a missing or
+    # broken adapter fails loudly (case loading is the next step
+    # and would mask the adapter error).
+    try:
+        adapter = _resolve_adapter(args.adapter, adapter_input=args.adapter_input)
+    except (ValueError, FileNotFoundError, OSError) as exc:
+        print(f"ERROR adapter: {exc}", file=sys.stderr)
+        return EXIT_CODE["UNKNOWN"]
+
+    # For the shell adapter, hand it a case_paths map so the
+    # adapter can resolve per-case findings by canonical path.
+    # Two passes: first load all cases and build the case_paths
+    # map, then iterate to evaluate. This is necessary because
+    # the adapter is constructed before the cases are loaded, and
+    # the shell adapter's case_paths must be populated before the
+    # first evaluation call.
     case_errors: list[str] = []
+    case_paths: dict[str, Path] = {}
+    loaded_cases: list[dict] = []
     for case in corpus["cases"]:
         try:
             loaded = _load_case(case)
         except (FileNotFoundError, ValueError) as exc:
             case_errors.append(f"{case.get('id', '<unknown>')}: {exc}")
             continue
-        case_results.append(_evaluate_case(loaded))
+        case_paths[case["id"]] = loaded["repo_path"]
+        loaded_cases.append(loaded)
 
     if case_errors:
         for err in case_errors:
             print(f"ERROR {err}", file=sys.stderr)
         return EXIT_CODE["CASE_ERROR"]
 
-    if not case_results:
+    if not loaded_cases:
         print("ERROR corpus resolved to zero cases", file=sys.stderr)
         return EXIT_CODE["CASE_ERROR"]
 
+    # If the shell adapter was selected, install the case_paths map
+    # so per-case lookups work. The internal adapter ignores this.
+    if adapter.name == ADAPTER_SHELL_LOADOUT:
+        adapter._case_paths = case_paths  # type: ignore[attr-defined]
+
+    case_results: list[dict] = []
+    for loaded in loaded_cases:
+        case_results.append(_evaluate_case(loaded, adapter))
+
     import os
     arsenal_commit = os.environ.get("GITHUB_SHA") or None
-    artifact = _assemble_artifact(method, corpus, case_results, arsenal_commit)
+    adapter_block = {
+        "name": adapter.name,
+        "input": (
+            _rel(Path(args.adapter_input).resolve())
+            if adapter.name == ADAPTER_SHELL_LOADOUT and args.adapter_input
+            else None
+        ),
+        "module": (
+            "evaluation.adapters.internal_fixture_adapter:"
+            "InternalFixtureProcedureAdapter"
+            if adapter.name == ADAPTER_INTERNAL
+            else "evaluation.adapters.shell_loadout_adapter:"
+            "ShellLoadoutReconAdapter"
+        ),
+    }
+    artifact = _assemble_artifact(
+        method, corpus, case_results, arsenal_commit, adapter=adapter_block
+    )
 
     out_path = Path(args.out) if args.out else DEFAULT_OUT
     if not out_path.is_absolute():
@@ -1061,6 +1188,26 @@ def parser() -> argparse.ArgumentParser:
             "evidence. The revised QMR is always status: experimental; "
             "the evaluator never auto-promotes the method or its "
             "underlying capability."
+        ),
+    )
+    rr.add_argument(
+        "--adapter",
+        default=ADAPTER_INTERNAL,
+        choices=sorted(ALLOWED_ADAPTERS),
+        help=(
+            "Adapter used to invoke the Repository Recon procedure "
+            "(default: %(default)s). The adapter identity is recorded "
+            "in the artifact's provenance.adapter block. The shell "
+            "adapter requires --adapter-input."
+        ),
+    )
+    rr.add_argument(
+        "--adapter-input",
+        default=None,
+        help=(
+            "Path to the adapter input (findings JSON for "
+            "shell-loadout-recon). Required when --adapter is "
+            "shell-loadout-recon; ignored otherwise."
         ),
     )
     rr.set_defaults(func=cmd_repository_recon)
