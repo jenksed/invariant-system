@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "corpus": {
+    "id": "corpus.repository-recon-evaluation-v0",
+    "title": "Repository Recon Method Evaluation v0 corpus",
+    "method_id": "repository-recon/architecture-anchor-incremental",
+    "capability_id": "capability.recon",
+    "owner": "ARS-04",
+    "description": "Deterministic local-repository evaluation corpus for the Repository Recon method. No network access is required. Cases exercise materially different recon conditions: straightforward, explicit architecture/governance, and ambiguous/incomplete.",
+    "cases": [
+      {
+        "id": "recon.straightforward.small-clean",
+        "path": "evaluation/method-cases/repo-straightforward",
+        "context_kind": "local-git-repository-with-AGENTS.md"
+      },
+      {
+        "id": "recon.governed.explicit-architecture",
+        "path": "evaluation/method-cases/repo-governed",
+        "context_kind": "local-git-repository-with-arsenal-canonical-contracts"
+      },
+      {
+        "id": "recon.ambiguous.incomplete-state",
+        "path": "evaluation/method-cases/repo-ambiguous",
+        "context_kind": "incomplete-or-ambiguous-local-repository"
+      }
+    ]
+  }
+}

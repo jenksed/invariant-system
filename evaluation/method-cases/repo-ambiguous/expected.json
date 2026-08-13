@@ -1,0 +1,53 @@
+{
+  "case_id": "recon.ambiguous.incomplete-state",
+  "case_title": "Ambiguous / incomplete repository without AGENTS.md or canonical contracts",
+  "context_kind": "incomplete-or-ambiguous-local-repository",
+  "expected_assertions": [
+    {
+      "id": "agents_md_absent",
+      "kind": "absence",
+      "subject": "AGENTS.md",
+      "expected": true,
+      "evidence_path": "AGENTS.md"
+    },
+    {
+      "id": "readme_present",
+      "kind": "presence",
+      "subject": "README.md",
+      "expected": true,
+      "evidence_path": "README.md"
+    },
+    {
+      "id": "no_canonical_contracts",
+      "kind": "absence",
+      "subject": "engineering/doctrine",
+      "expected": true,
+      "evidence_path": "engineering/"
+    },
+    {
+      "id": "no_capability_fragments",
+      "kind": "absence",
+      "subject": "arsenal/capabilities",
+      "expected": true,
+      "evidence_path": "arsenal/capabilities/"
+    },
+    {
+      "id": "no_existing_qmr",
+      "kind": "absence",
+      "subject": "evaluation/method-records",
+      "expected": true,
+      "evidence_path": "evaluation/method-records/"
+    }
+  ],
+  "unsupported_claims_allowed": [
+    "context-binding-to-canonical-contracts",
+    "qualification-status-derived-from-incomplete-state"
+  ],
+  "unknowns_required": [
+    "absence-of-AGENTS.md-blocks-architecture-anchor",
+    "no-canonical-doctrine-pointer",
+    "no-canonical-capability-fragment",
+    "no-existing-method-record-evidence"
+  ],
+  "expected_epistemic_conclusion": "experimental"
+}
