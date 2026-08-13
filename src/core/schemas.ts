@@ -338,7 +338,14 @@ export const LoadoutPlanV0Schema = z.object({
     workspace_state_digest: z.string()
   }),
   execution_boundary: z.object({
-    boundary: z.literal('simulated'),
+    /**
+     * `simulated` = the Wave 2 fake-Kiln boundary. Output is labeled
+     *     `simulated: true`; no real Kiln enforcement occurred.
+     * `kiln` = the Wave 3 real Kiln driver. Output is the canonical
+     *     engineering-system/run-result-envelope/v0 produced by
+     *     `mix kiln supervise`; `simulated` MUST be absent.
+     */
+    boundary: z.enum(['simulated', 'kiln']),
     reason: z.string(),
     details: z.string()
   }),
