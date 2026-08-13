@@ -1,0 +1,47 @@
+{
+  "case_id": "recon.straightforward.small-clean",
+  "case_title": "Straightforward repository with AGENTS.md and a small src tree",
+  "context_kind": "local-git-repository-with-AGENTS.md",
+  "expected_assertions": [
+    {
+      "id": "agents_md_present",
+      "kind": "presence",
+      "subject": "AGENTS.md",
+      "expected": true,
+      "evidence_path": "AGENTS.md"
+    },
+    {
+      "id": "readme_present",
+      "kind": "presence",
+      "subject": "README.md",
+      "expected": true,
+      "evidence_path": "README.md"
+    },
+    {
+      "id": "src_tree_present",
+      "kind": "presence",
+      "subject": "src/",
+      "expected": true,
+      "evidence_path": "src/main.py"
+    },
+    {
+      "id": "no_canonical_contracts",
+      "kind": "absence",
+      "subject": "engineering/doctrine",
+      "expected": true,
+      "evidence_path": "engineering/"
+    },
+    {
+      "id": "no_capability_fragments",
+      "kind": "absence",
+      "subject": "arsenal/capabilities",
+      "expected": true,
+      "evidence_path": "arsenal/capabilities/"
+    }
+  ],
+  "unsupported_claims_allowed": [],
+  "unknowns_allowed": [
+    "domain-specific-routing"
+  ],
+  "expected_epistemic_conclusion": "experimental"
+}
