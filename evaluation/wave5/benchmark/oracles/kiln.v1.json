@@ -1,0 +1,21 @@
+{
+  "schema": "arsenal/repository-recon-oracle/v1",
+  "repository_id": "kiln",
+  "assertions": [
+    {"id":"KLN-01","expected_claim":"Root governance instructions exist.","evidence_source":["AGENTS.md"],"claim_type":"path_presence","importance":"critical","acceptable_unknown_conditions":[],"expected":{"path":"AGENTS.md"}},
+    {"id":"KLN-02","expected_claim":"The concise Claude entrypoint exists.","evidence_source":["CLAUDE.md"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"CLAUDE.md"}},
+    {"id":"KLN-03","expected_claim":"An Elixir Mix manifest exists.","evidence_source":["mix.exs"],"claim_type":"path_presence","importance":"critical","acceptable_unknown_conditions":[],"expected":{"path":"mix.exs"}},
+    {"id":"KLN-04","expected_claim":"Source is organized under lib/.","evidence_source":["lib/"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"lib/"}},
+    {"id":"KLN-05","expected_claim":"Tests are organized under test/.","evidence_source":["test/"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"test/"}},
+    {"id":"KLN-06","expected_claim":"GitHub Actions CI exists.","evidence_source":[".github/workflows/ci.yml"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":".github/workflows/ci.yml"}},
+    {"id":"KLN-07","expected_claim":"The architecture document exists.","evidence_source":["docs/ARCHITECTURE.md"],"claim_type":"path_presence","importance":"critical","acceptable_unknown_conditions":[],"expected":{"path":"docs/ARCHITECTURE.md"}},
+    {"id":"KLN-08","expected_claim":"Explicit authorization records exist.","evidence_source":["docs/authorizations/"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"docs/authorizations/"}},
+    {"id":"KLN-09","expected_claim":"The project declares its external Arsenal reference as a submodule.","evidence_source":[".gitmodules"],"claim_type":"path_presence","importance":"medium","acceptable_unknown_conditions":[],"expected":{"path":".gitmodules"}},
+    {"id":"KLN-10","expected_claim":"No Node package manifest exists.","evidence_source":["package.json"],"claim_type":"path_absence","importance":"medium","acceptable_unknown_conditions":["repository root is inaccessible"],"expected":{"path":"package.json"}},
+    {"id":"KLN-11","expected_claim":"CLAUDE.md explicitly delegates authority to AGENTS.md.","evidence_source":["CLAUDE.md","AGENTS.md"],"claim_type":"text_reference","importance":"critical","acceptable_unknown_conditions":["CLAUDE.md is unreadable"],"expected":{"source":"CLAUDE.md","target":"AGENTS.md"}},
+    {"id":"KLN-12","expected_claim":"AGENTS.md explicitly references the engineering doctrine.","evidence_source":["AGENTS.md","docs/ENGINEERING-DOCTRINE.md"],"claim_type":"text_reference","importance":"high","acceptable_unknown_conditions":["AGENTS.md is unreadable"],"expected":{"source":"AGENTS.md","target":"docs/ENGINEERING-DOCTRINE.md"}},
+    {"id":"KLN-13","expected_claim":"The Mix project declares app kiln.","evidence_source":["mix.exs"],"claim_type":"text_contains","importance":"high","acceptable_unknown_conditions":["mix.exs is unreadable"],"expected":{"path":"mix.exs","text":"app: :kiln"}},
+    {"id":"KLN-14","expected_claim":"The Mix project declares Elixir ~> 1.20.","evidence_source":["mix.exs"],"claim_type":"text_contains","importance":"high","acceptable_unknown_conditions":["mix.exs is unreadable"],"expected":{"path":"mix.exs","text":"elixir: \"~> 1.20\""}},
+    {"id":"KLN-15","expected_claim":"The dependency lock exists.","evidence_source":["mix.lock"],"claim_type":"path_presence","importance":"medium","acceptable_unknown_conditions":[],"expected":{"path":"mix.lock"}}
+  ]
+}

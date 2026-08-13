@@ -1,0 +1,123 @@
+{
+  "corpus_digest": "sha256:f322c1997b11f04ff2156e6fab035a1e27d4b47c3ddc5a6f479f92fc3173f68c",
+  "implementation_digest": "sha256:53d56a7402624edd1f48f5bd5dfd5a5625d3c6f660e4edc77ee1338378924ea6",
+  "method_id": "repository-recon/governance-graph",
+  "metrics": {
+    "assertions_total": 45,
+    "correct_unknowns": 0,
+    "deterministic": true,
+    "evidence_coverage": 0.2,
+    "execution_cost_ms": 2.31,
+    "false_certainty": 0,
+    "misses": 36,
+    "supported_assertions": 9,
+    "unsupported_claims": 0
+  },
+  "phase": "selection",
+  "result_digest": "sha256:d7aaeebd11b6f0572bb980be1437de4ff8daf68a35992036d57bb4a8259fdd35",
+  "results": [
+    {
+      "assertions_total": 15,
+      "claim_count": 33,
+      "claims_digest": "sha256:ab532b25d778402ff9e86187f9631c9bac5c326bb3e22f856265aa86b24bbe30",
+      "commit": "4dcc1b0fe5c6a198c62b4b130fc9ff7c0e1b15e6",
+      "correct_unknowns": [],
+      "evidence_coverage": 0.2,
+      "false_certainty": 0,
+      "miss_count": 12,
+      "misses": [
+        "ARS-02",
+        "ARS-03",
+        "ARS-04",
+        "ARS-05",
+        "ARS-06",
+        "ARS-07",
+        "ARS-08",
+        "ARS-09",
+        "ARS-10",
+        "ARS-11",
+        "ARS-14",
+        "ARS-15"
+      ],
+      "repository_id": "project-arsenal",
+      "role": "development",
+      "supported_assertions": [
+        "ARS-01",
+        "ARS-12",
+        "ARS-13"
+      ],
+      "supported_count": 3,
+      "unsupported_claim_count": 0,
+      "unsupported_claims": []
+    },
+    {
+      "assertions_total": 15,
+      "claim_count": 6,
+      "claims_digest": "sha256:d4877139c21a8d13f98afcb8e23c4b073fa1e26858a727cf1bdd7a8b7b287dfe",
+      "commit": "161946be59960ff8e8a16726ca1dc585abf714ec",
+      "correct_unknowns": [],
+      "evidence_coverage": 0.13333333333333333,
+      "false_certainty": 0,
+      "miss_count": 13,
+      "misses": [
+        "LOD-02",
+        "LOD-03",
+        "LOD-04",
+        "LOD-05",
+        "LOD-06",
+        "LOD-07",
+        "LOD-08",
+        "LOD-09",
+        "LOD-10",
+        "LOD-11",
+        "LOD-12",
+        "LOD-14",
+        "LOD-15"
+      ],
+      "repository_id": "loadout",
+      "role": "development",
+      "supported_assertions": [
+        "LOD-01",
+        "LOD-13"
+      ],
+      "supported_count": 2,
+      "unsupported_claim_count": 0,
+      "unsupported_claims": []
+    },
+    {
+      "assertions_total": 15,
+      "claim_count": 36,
+      "claims_digest": "sha256:1402e1f555759a694a62db62e0a40ae62a93869fedbd98f858c8d056842b728b",
+      "commit": "bd2c9bcf715c99ef4f126179c1739c3b031039fc",
+      "correct_unknowns": [],
+      "evidence_coverage": 0.26666666666666666,
+      "false_certainty": 0,
+      "miss_count": 11,
+      "misses": [
+        "KLN-03",
+        "KLN-04",
+        "KLN-05",
+        "KLN-06",
+        "KLN-07",
+        "KLN-08",
+        "KLN-09",
+        "KLN-10",
+        "KLN-13",
+        "KLN-14",
+        "KLN-15"
+      ],
+      "repository_id": "kiln",
+      "role": "validation",
+      "supported_assertions": [
+        "KLN-01",
+        "KLN-02",
+        "KLN-11",
+        "KLN-12"
+      ],
+      "supported_count": 4,
+      "unsupported_claim_count": 0,
+      "unsupported_claims": []
+    }
+  ],
+  "schema": "arsenal/repository-recon-benchmark-result/v1"
+}

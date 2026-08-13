@@ -1,0 +1,55 @@
+{
+  "corpus_digest": "sha256:f322c1997b11f04ff2156e6fab035a1e27d4b47c3ddc5a6f479f92fc3173f68c",
+  "implementation_digest": "sha256:d3ced041f66938f48d4aa86ee199f9f607184f21a75824c033174309daa5580e",
+  "method_id": "repository-recon/loadout-runtime-baseline",
+  "metrics": {
+    "assertions_total": 15,
+    "correct_unknowns": 0,
+    "deterministic": true,
+    "evidence_coverage": 0.26666666666666666,
+    "execution_cost_ms": 110.567,
+    "false_certainty": 0,
+    "misses": 11,
+    "supported_assertions": 4,
+    "unsupported_claims": 0
+  },
+  "phase": "holdout",
+  "result_digest": "sha256:bc80e48b44886d465ef83398b160a02891d50cf3448499d7bbab2c710e7d46b5",
+  "results": [
+    {
+      "assertions_total": 15,
+      "claim_count": 8,
+      "claims_digest": "sha256:82c7c1255751e22c2ebfbcabcbc26f3e0d2835566e65ae7a612d787a389576a8",
+      "commit": "57e78b576105dc9c4051f133d0b4697b2e35a8a0",
+      "correct_unknowns": [],
+      "evidence_coverage": 0.26666666666666666,
+      "false_certainty": 0,
+      "miss_count": 11,
+      "misses": [
+        "TMP-03",
+        "TMP-04",
+        "TMP-07",
+        "TMP-08",
+        "TMP-09",
+        "TMP-10",
+        "TMP-11",
+        "TMP-12",
+        "TMP-13",
+        "TMP-14",
+        "TMP-15"
+      ],
+      "repository_id": "temper",
+      "role": "holdout",
+      "supported_assertions": [
+        "TMP-01",
+        "TMP-02",
+        "TMP-05",
+        "TMP-06"
+      ],
+      "supported_count": 4,
+      "unsupported_claim_count": 0,
+      "unsupported_claims": []
+    }
+  ],
+  "schema": "arsenal/repository-recon-benchmark-result/v1"
+}

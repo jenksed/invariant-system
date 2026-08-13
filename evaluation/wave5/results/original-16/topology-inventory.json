@@ -1,0 +1,52 @@
+{
+  "candidate_output_digest": "sha256:be245a00f1d258cda6897fbea6f370d1c20d9794bb4c560566a78f1a3e30a17a",
+  "case_results": [
+    {
+      "case_id": "recon.straightforward.small-clean",
+      "misses": [],
+      "supported": [
+        "agents_md_present",
+        "readme_present",
+        "src_tree_present",
+        "no_canonical_contracts",
+        "no_capability_fragments"
+      ]
+    },
+    {
+      "case_id": "recon.governed.explicit-architecture",
+      "misses": [
+        "capability_id_recon"
+      ],
+      "supported": [
+        "agents_md_present",
+        "doctrine_present",
+        "capability_fragment_present",
+        "existing_qmr_present",
+        "scripts_validator_present"
+      ]
+    },
+    {
+      "case_id": "recon.ambiguous.incomplete-state",
+      "misses": [],
+      "supported": [
+        "agents_md_absent",
+        "readme_present",
+        "no_canonical_contracts",
+        "no_capability_fragments",
+        "no_existing_qmr"
+      ]
+    }
+  ],
+  "corpus": "corpus.repository-recon-evaluation-v0",
+  "implementation_digest": "sha256:89bfe75b3febaca6e1bef491029311af4c902a63b5c90ef1a7aada1b6b49b1cf",
+  "method_id": "repository-recon/topology-inventory",
+  "metrics": {
+    "assertions": 16,
+    "deterministic": true,
+    "misses": 1,
+    "supported": 15,
+    "unsupported_factual_claims": 0
+  },
+  "result_digest": "sha256:c237cf74c83a6532d97c9b0babef919cc96b52073c5452ee70d406c3e2be7665",
+  "schema": "arsenal/repository-recon-original-16-result/v1"
+}

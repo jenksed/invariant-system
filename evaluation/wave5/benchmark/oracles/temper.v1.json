@@ -1,0 +1,21 @@
+{
+  "schema": "arsenal/repository-recon-oracle/v1",
+  "repository_id": "temper",
+  "assertions": [
+    {"id":"TMP-01","expected_claim":"The product README exists.","evidence_source":["README.md"],"claim_type":"path_presence","importance":"critical","acceptable_unknown_conditions":[],"expected":{"path":"README.md"}},
+    {"id":"TMP-02","expected_claim":"A Node package manifest exists.","evidence_source":["package.json"],"claim_type":"path_presence","importance":"critical","acceptable_unknown_conditions":[],"expected":{"path":"package.json"}},
+    {"id":"TMP-03","expected_claim":"The package identifies @temper/temper.","evidence_source":["package.json#/name"],"claim_type":"json_value","importance":"high","acceptable_unknown_conditions":["package.json is malformed"],"expected":{"path":"package.json","pointer":"/name","value":"@temper/temper"}},
+    {"id":"TMP-04","expected_claim":"The declared Node runtime is >=20.10.0.","evidence_source":["package.json#/engines/node"],"claim_type":"json_value","importance":"high","acceptable_unknown_conditions":["engines.node is absent"],"expected":{"path":"package.json","pointer":"/engines/node","value":">=20.10.0"}},
+    {"id":"TMP-05","expected_claim":"Source is organized under src/.","evidence_source":["src/"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"src/"}},
+    {"id":"TMP-06","expected_claim":"Tests are organized under test/.","evidence_source":["test/"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"test/"}},
+    {"id":"TMP-07","expected_claim":"GitHub Actions CI exists.","evidence_source":[".github/workflows/ci.yml"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":".github/workflows/ci.yml"}},
+    {"id":"TMP-08","expected_claim":"The field-level source map exists.","evidence_source":["docs/SOURCES.md"],"claim_type":"path_presence","importance":"high","acceptable_unknown_conditions":[],"expected":{"path":"docs/SOURCES.md"}},
+    {"id":"TMP-09","expected_claim":"No root AGENTS.md exists.","evidence_source":["AGENTS.md"],"claim_type":"path_absence","importance":"critical","acceptable_unknown_conditions":["repository root is inaccessible"],"expected":{"path":"AGENTS.md"}},
+    {"id":"TMP-10","expected_claim":"No root CLAUDE.md exists.","evidence_source":["CLAUDE.md"],"claim_type":"path_absence","importance":"medium","acceptable_unknown_conditions":["repository root is inaccessible"],"expected":{"path":"CLAUDE.md"}},
+    {"id":"TMP-11","expected_claim":"README.md explicitly references the source map.","evidence_source":["README.md","docs/SOURCES.md"],"claim_type":"text_reference","importance":"high","acceptable_unknown_conditions":["README.md is unreadable"],"expected":{"source":"README.md","target":"docs/SOURCES.md"}},
+    {"id":"TMP-12","expected_claim":"The normal CI command is npm run typecheck && npm test.","evidence_source":["package.json#/scripts/ci"],"claim_type":"json_value","importance":"high","acceptable_unknown_conditions":["scripts.ci is absent"],"expected":{"path":"package.json","pointer":"/scripts/ci","value":"npm run typecheck && npm test"}},
+    {"id":"TMP-13","expected_claim":"The executable build command is declared.","evidence_source":["package.json#/scripts/build"],"claim_type":"json_value","importance":"medium","acceptable_unknown_conditions":["scripts.build is absent"],"expected":{"path":"package.json","pointer":"/scripts/build","value":"tsc -p tsconfig.json && node scripts/make-bin-executable.mjs"}},
+    {"id":"TMP-14","expected_claim":"Repository governance authority is unknown because no accepted root governance file exists.","evidence_source":["AGENTS.md","CLAUDE.md"],"claim_type":"unknown","importance":"critical","acceptable_unknown_conditions":["Neither AGENTS.md nor CLAUDE.md exists at the root."],"expected":{"subject":"governance_authority"}},
+    {"id":"TMP-15","expected_claim":"No Elixir Mix manifest exists.","evidence_source":["mix.exs"],"claim_type":"path_absence","importance":"medium","acceptable_unknown_conditions":["repository root is inaccessible"],"expected":{"path":"mix.exs"}}
+  ]
+}

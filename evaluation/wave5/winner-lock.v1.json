@@ -1,0 +1,19 @@
+{
+  "schema": "arsenal/repository-recon-winner-lock/v1",
+  "selected_at": "2026-08-13",
+  "selection_scope": ["project-arsenal", "loadout", "kiln"],
+  "holdout_excluded_from_selection": "temper",
+  "method_id": "repository-recon/staged-evidence-graph",
+  "implementation_digest": "sha256:7992da31c1394ed9cb872764178d329bb1784605c529fc993aa668736267a99f",
+  "selection_result_digest": "sha256:8b7db97a791827d70eaead47acd8d46ae12fb73b449184b2debd96f12fb7aa8b",
+  "original_16_result_digest": "sha256:4026e2562cd0115808f769aa4e15440600b7277745a918fafcf33c616b6813ec",
+  "baseline_selection_result_digest": "sha256:3c9297f3932c7d8862f7df6874d2fd6e0ed81a1eb4c41236f24d14488ebb156e",
+  "selection_evidence": {
+    "original_16_supported": "16/16",
+    "development_validation_supported": "45/45",
+    "unsupported_factual_claims": 0,
+    "false_certainty": 0,
+    "deterministic": true
+  },
+  "selection_reason": "Highest supported-assertion and evidence coverage after development plus Kiln validation, with zero unsupported factual claims, no original-16 regression, and deterministic output. Temper holdout was not evaluated before this lock."
+}

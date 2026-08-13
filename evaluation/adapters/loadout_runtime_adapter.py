@@ -1,6 +1,6 @@
 """Loadout runtime adapter (ARS-W3 Phase 2).
 
-This adapter shells out to the Loadout Repository Recon v1 procedure
+This adapter shells out to the Loadout Repository Recon procedure
 running at the exact checkpoint supplied by the Loadout Wave 3
 maintainer. It does NOT import Loadout source code (no Python
 ``import`` of any Loadout module) and does NOT depend on Loadout
@@ -15,7 +15,7 @@ The adapter writes a small ESM bootstrap to a private temp file
 and runs it through ``node --input-type=module``. The bootstrap
 dynamically imports ``runRepositoryRecon`` from the Loadout
 installation path and prints the result as JSON to stdout. The
-adapter parses stdout, captures the ``ReconResultV1`` shape, and
+adapter parses stdout, captures the versioned Recon Result shape, and
 translates it into Arsenal findings.
 
 The bootstrap does not embed Loadout source; it only references
@@ -56,7 +56,7 @@ Phase 2 invariants
   mutate the target.
 * A broken Loadout checkpoint produces strictly worse evaluation
   evidence. The adapter rejects runtimes that do not satisfy the
-  ``loadout/repository-recon/v1`` schema; a procedure that throws
+  supported ``loadout/repository-recon/v1|v2`` schemas; a procedure that throws
   is surfaced as an adapter error, not silently masked.
 """
 
@@ -72,7 +72,10 @@ from pathlib import Path
 from .repository_recon_adapter import validate_findings
 
 _ADAPTER_NAME = "loadout-runtime"
-_EXPECTED_SCHEMA = "loadout/repository-recon/v1"
+_EXPECTED_SCHEMAS = {
+    "loadout/repository-recon/v1",
+    "loadout/repository-recon/v2",
+}
 
 # Mirror of Loadout's canonical catalogues (verbatim from
 # src/packs/repository-recon/run.ts at the W3 checkpoint
@@ -203,6 +206,28 @@ class LoadoutRuntimeAdapter:
     # ------------------------------------------------------------------
 
     def run(self, repo_path: Path) -> list[dict]:
+        result = self.run_result(repo_path)
+        findings = _translate_recon_to_findings(result)
+        validate_findings(findings)
+        return findings
+
+    def run_claims(self, repo_path: Path) -> list[dict]:
+        """Return native v2 claims without translating or strengthening them."""
+        result = self.run_result(repo_path)
+        if result.get("schema") != "loadout/repository-recon/v2":
+            raise RuntimeError(
+                "loadout-runtime adapter: native claims require "
+                "loadout/repository-recon/v2"
+            )
+        claims = result.get("evidence_graph")
+        if not isinstance(claims, list):
+            raise RuntimeError(
+                "loadout-runtime adapter: v2 evidence_graph is not a list"
+            )
+        return claims
+
+    def run_result(self, repo_path: Path) -> dict:
+        """Invoke the exact operator-supplied Loadout and return its result."""
         repo_path = Path(repo_path)
         # We refuse to silently fall back to the internal procedure
         # if Node is missing. The operator who selects this adapter
@@ -252,15 +277,13 @@ class LoadoutRuntimeAdapter:
                 "loadout-runtime adapter: Loadout procedure output is not an "
                 f"object (got {type(result).__name__})"
             )
-        if result.get("schema") != _EXPECTED_SCHEMA:
+        if result.get("schema") not in _EXPECTED_SCHEMAS:
             raise RuntimeError(
                 f"loadout-runtime adapter: Loadout procedure schema is "
-                f"{result.get('schema')!r}, expected {_EXPECTED_SCHEMA!r}; "
-                "the operator must point --loadout-root at the W3 checkpoint"
+                f"{result.get('schema')!r}, expected one of "
+                f"{sorted(_EXPECTED_SCHEMAS)!r}"
             )
-        findings = _translate_recon_to_findings(result)
-        validate_findings(findings)
-        return findings
+        return result
 
     # ------------------------------------------------------------------
     # Internal helpers
