@@ -1,0 +1,5 @@
+{
+  "id": "verify-change/proof-obligation",
+  "qmrFixturePath": "fixtures/verify-change-method-record.v0.yaml",
+  "procedureEntry": "./run.ts"
+}

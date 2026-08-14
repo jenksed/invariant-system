@@ -30,7 +30,8 @@ import {
   loadAndValidateQmr,
   compileLoadoutPlan,
   readPackManifest,
-  computePlanId
+  computePlanId,
+  buildVerificationChange
 } from '../index';
 
 export async function validateAllFixtures(fixturesDir: string): Promise<void> {
@@ -65,12 +66,16 @@ export async function compileAgainstGoalCatalog(args: {
   }
   for (const m of manifests) {
     const goal = findGoalById(
-      m.capability.id === 'repository-recon' ? 'understand-a-repository' : m.capability.id
+      m.capability.id === 'repository-recon' ? 'understand-a-repository' : 'verify-this-change'
     );
     if (!goal) throw new Error(`no goal for capability ${m.capability.id}`);
     const cap = await resolveCapability(path.join(args.packsDir, m.id));
     const qmr = await loadAndValidateQmr({ capability: cap, repoRoot: args.repoRoot });
     const snap = await snapshotRepo(args.repoRoot);
+    const verificationChange =
+      m.capability.id === 'verify-change'
+        ? await buildVerificationChange({ repository: args.repoRoot })
+        : undefined;
     const envelope = compileWorkEnvelope({
       goal,
       capability: cap,
@@ -80,7 +85,8 @@ export async function compileAgainstGoalCatalog(args: {
         baseCommit: snap.input.headCommit,
         workspaceStateDigest: snap.digest
       },
-      createdAt: '2026-08-12T00:00:00Z'
+      createdAt: '2026-08-12T00:00:00Z',
+      ...(verificationChange ? { verificationChange } : {})
     });
     const result = invokeFakeKiln(envelope);
     const view = buildResultView(result);
@@ -91,7 +97,7 @@ export async function compileAgainstGoalCatalog(args: {
     // plan_id is a sha256 content address and its execution_boundary
     // is unmistakably SIMULATED.
     const packManifest = await readPackManifest(path.join(args.packsDir, m.id));
-    const plan = await compileLoadoutPlan({
+    const planArgs = {
       goal,
       capability: cap,
       pack: packManifest,
@@ -104,7 +110,10 @@ export async function compileAgainstGoalCatalog(args: {
       },
       createdAt: envelope.created_at,
       packRoot: path.join(args.packsDir, m.id)
-    });
+    };
+    const plan = verificationChange
+      ? await compileLoadoutPlan({ ...planArgs, verificationChange })
+      : await compileLoadoutPlan(planArgs);
     if (!plan.plan_id.startsWith('sha256:')) {
       throw new Error('Plan.plan_id is not a sha256 content address; refusing.');
     }

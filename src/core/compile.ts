@@ -14,8 +14,9 @@
 import { randomUUID } from 'node:crypto';
 import type { Goal } from './goal';
 import type { ResolvedCapability } from './capability-registry';
-import type { QualifiedMethodRecordV0, WorkEnvelopeV0 } from './schemas';
+import type { QualifiedMethodRecordV0, VerificationChangeV0, WorkEnvelopeV0 } from './schemas';
 import { WorkEnvelopeV0Schema } from './schemas';
+import { computeVerificationChangeDigest } from './verification';
 
 export interface ProjectState {
   repository: string;
@@ -30,12 +31,18 @@ export function compileWorkEnvelope(args: {
   projectState: ProjectState;
   createdAt: string;
   workId?: string;
+  verificationChange?: VerificationChangeV0;
 }): WorkEnvelopeV0 {
   const workId = args.workId ?? randomUUID();
   const methodProvenance = [
     `${args.qmr.method_id}@${args.qmr.method_version}`,
     `digest:${args.qmr.provenance.record_digest}`
   ];
+
+  const verification = args.verificationChange;
+  if (args.capability.contract.id === 'verify-change' && verification === undefined) {
+    throw new Error('verify-change requires a frozen verification_change projection');
+  }
 
   const envelope: WorkEnvelopeV0 = {
     schema: 'engineering-system/work-envelope/v0',
@@ -59,28 +66,54 @@ export function compileWorkEnvelope(args: {
       base_commit: args.projectState.baseCommit,
       workspace_state_digest: args.projectState.workspaceStateDigest
     },
-    scope: {
-      included: ['tracked repository files'],
-      excluded: ['mutation']
-    },
-    constraints: {
-      must: ['distinguish observations from inferences'],
-      must_not: ['modify repository state']
-    },
-    context_refs: [],
-    proof_obligations: [
-      {
-        id: 'repo-state-observed',
-        kind: 'evidence',
-        requirement: 'report the exact commit inspected'
-      }
-    ],
-    authority_requests: [
-      {
-        capability: 'git.read',
-        scope: args.projectState.repository
-      }
-    ]
+    scope: verification
+      ? {
+          included: verification.change.changed_files,
+          excluded: verification.skipped_verification.map((item) => item.command_id)
+        }
+      : { included: ['tracked repository files'], excluded: ['mutation'] },
+    constraints: verification
+      ? {
+          must: [
+            'execute only the registered commands frozen in verification_change',
+            'bind Evidence only to the obligations each command is declared to prove',
+            'report READY only when every obligation is satisfied'
+          ],
+          must_not: [
+            'execute arbitrary shell input',
+            'silently reselect verification after Plan creation',
+            'manufacture proof from command completion alone'
+          ]
+        }
+      : {
+          must: ['distinguish observations from inferences'],
+          must_not: ['modify repository state']
+        },
+    context_refs: verification
+      ? [`loadout/verification-change/v0:${computeVerificationChangeDigest(verification)}`]
+      : [],
+    proof_obligations: verification
+      ? verification.proof_obligations.map(({ id, kind, requirement }) => ({
+          id,
+          kind,
+          requirement
+        }))
+      : [
+          {
+            id: 'repo-state-observed',
+            kind: 'evidence',
+            requirement: 'report the exact commit inspected'
+          }
+        ],
+    authority_requests: verification
+      ? [
+          { capability: 'git.read', scope: args.projectState.repository },
+          ...verification.selected_verification.map((command) => ({
+            capability: `verification.run:${command.command_id}`,
+            scope: args.projectState.repository
+          }))
+        ]
+      : [{ capability: 'git.read', scope: args.projectState.repository }]
   };
 
   // Mechanical validation: the envelope must conform to the v0 schema.

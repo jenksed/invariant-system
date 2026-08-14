@@ -38,8 +38,15 @@ import path from 'node:path';
 import type { Goal } from './goal';
 import type { ResolvedCapability } from './capability-registry';
 import type { PackManifest } from './pack';
-import type { QualifiedMethodRecordV0, WorkEnvelopeV0, LoadoutPlanV0 } from './schemas';
-import { LoadoutPlanV0Schema } from './schemas';
+import type {
+  QualifiedMethodRecordV0,
+  WorkEnvelopeV0,
+  LoadoutPlanV0,
+  LoadoutPlanV1,
+  LoadoutPlan,
+  VerificationChangeV0
+} from './schemas';
+import { LoadoutPlanSchema } from './schemas';
 import { computeProcedureInterfaceDigest } from './procedure-registry';
 import { runRepositoryRecon } from '../packs/repository-recon/run';
 import type { ReconResult } from './schemas';
@@ -120,6 +127,8 @@ export interface CompileLoadoutPlanArgs {
    * recon (e.g. for caching) may pass the result through.
    */
   repositoryRecon?: ReconResult;
+  /** Frozen Verify This Change projection, required for verify-change. */
+  verificationChange?: VerificationChangeV0;
   /**
    * The execution boundary the user selected when planning.
    *   - 'simulated' (default): the Plan will be executed through the
@@ -164,12 +173,12 @@ function sortDeep(value: unknown): unknown {
  * are excluded so the same logical plan hashes to the same plan_id
  * regardless of when it was created.
  */
-export function computePlanBody(plan: LoadoutPlanV0): unknown {
+export function computePlanBody(plan: LoadoutPlan): unknown {
   const { plan_id: _planId, created_at: _createdAt, ...rest } = plan;
   return rest;
 }
 
-export function computePlanId(plan: LoadoutPlanV0): string {
+export function computePlanId(plan: LoadoutPlan): string {
   return (
     'sha256:' +
     createHash('sha256')
@@ -202,7 +211,13 @@ export function computeWorkEnvelopeDigest(envelope: WorkEnvelopeV0): string {
  * Plan's digest (because the binding is part of the plan body), and
  * the run path will refuse silently to execute.
  */
-export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlanV0> {
+export function compileLoadoutPlan(
+  args: CompileLoadoutPlanArgs & { verificationChange: VerificationChangeV0 }
+): Promise<LoadoutPlanV1>;
+export function compileLoadoutPlan(
+  args: CompileLoadoutPlanArgs & { verificationChange?: undefined }
+): Promise<LoadoutPlanV0>;
+export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlan> {
   const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt, executionBoundary } =
     args;
   const boundary: 'simulated' | 'kiln' = executionBoundary ?? 'simulated';
@@ -212,8 +227,13 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
   // caller pre-computed recon (e.g. for caching) it can pass the result
   // through; otherwise we run the procedure now. The procedure is
   // deterministic and read-only for fixed repository state.
-  const repositoryRecon: ReconResult =
-    args.repositoryRecon ?? (await runRepositoryRecon(args.projectState.repository));
+  const isVerifyChange = capability.contract.id === 'verify-change';
+  const repositoryRecon: ReconResult | undefined = isVerifyChange
+    ? undefined
+    : (args.repositoryRecon ?? (await runRepositoryRecon(args.projectState.repository)));
+  if (isVerifyChange && args.verificationChange === undefined) {
+    throw new PlanError('verify-change Plan requires a frozen verification_change projection');
+  }
 
   // The compatibility proof is derived from the inputs; it is a
   // record of WHY the QMR satisfies the Capability, computed here
@@ -239,8 +259,8 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
       })
     : computeProcedureInterfaceDigestSync(capability.skill.procedureEntry);
 
-  const plan: LoadoutPlanV0 = {
-    schema: 'loadout/plan/v0',
+  const common = {
+    schema: isVerifyChange ? ('loadout/plan/v1' as const) : ('loadout/plan/v0' as const),
     plan_id: '', // placeholder; assigned below after digest
     created_at: createdAt,
     goal: {
@@ -323,19 +343,34 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
               'obligations unless explicit simulated decisions are provided. To execute against real Kiln, ' +
               're-run `loadout plan --execution kiln` and pass `--execution kiln` to `loadout run --plan`.'
           },
-    repository_recon: repositoryRecon,
+    ...(repositoryRecon ? { repository_recon: repositoryRecon } : {}),
+    ...(args.verificationChange ? { verification_change: args.verificationChange } : {}),
     notes: [
       'Plan is a real artifact; its plan_id and work_envelope_digest are sha256 content addresses.',
       'procedure_binding records the QMR/Skill/procedure binding; tamper with it and the plan_id digest breaks.',
       '`loadout run --plan <path>` will use the embedded Work Envelope without recomputation.',
       `This Plan is bound to execution_boundary='${boundary}'. The user must honor that boundary at run time: --execution kiln for a kiln-bound plan; --simulate for a simulated-bound plan. A mismatch fails closed.`,
       'If repository state changes, the Plan becomes stale and `loadout run --plan` will refuse to silently re-resolve; re-run `loadout plan` instead.',
-      'The Plan embeds a Repository Recon result computed at plan time. It is part of the content-addressable plan body; any change to the recon result changes the plan_id.'
+      isVerifyChange
+        ? 'The Plan embeds the exact base/current state, changed files, patch digest, proof obligations, and selected/skipped registered commands. No command may be silently reselected at run time.'
+        : 'The Plan embeds a Repository Recon result computed at plan time. It is part of the content-addressable plan body; any change to the recon result changes the plan_id.'
     ]
   };
 
+  const plan: LoadoutPlan = isVerifyChange
+    ? ({
+        ...common,
+        schema: 'loadout/plan/v1',
+        verification_change: args.verificationChange!
+      } as LoadoutPlanV1)
+    : ({
+        ...common,
+        schema: 'loadout/plan/v0',
+        repository_recon: repositoryRecon!
+      } as LoadoutPlanV0);
+
   plan.plan_id = computePlanId(plan);
-  return LoadoutPlanV0Schema.parse(plan);
+  return LoadoutPlanSchema.parse(plan);
 }
 
 /**
@@ -365,7 +400,7 @@ function isStatusSufficient(qmrStatus: string, minStatus: string): boolean {
  * integrity or freshness; callers should call `verifyPlanIntegrity` and
  * `verifyPlanFreshness` to enforce those invariants.
  */
-export async function loadPlan(planPath: string): Promise<LoadoutPlanV0> {
+export async function loadPlan(planPath: string): Promise<LoadoutPlan> {
   const resolved = path.isAbsolute(planPath) ? planPath : path.resolve(planPath);
   let raw: string;
   try {
@@ -380,7 +415,7 @@ export async function loadPlan(planPath: string): Promise<LoadoutPlanV0> {
     throw new PlanMalformedError(resolved, `json parse failed: ${(e as Error).message}`);
   }
   try {
-    return LoadoutPlanV0Schema.parse(parsed);
+    return LoadoutPlanSchema.parse(parsed);
   } catch (e) {
     throw new PlanMalformedError(resolved, `schema validation failed: ${(e as Error).message}`);
   }
@@ -397,7 +432,7 @@ export interface VerifyPlanIntegrityResult {
  * tampered with after creation; silently re-running such a plan would
  * be unsafe.
  */
-export function verifyPlanIntegrity(plan: LoadoutPlanV0): VerifyPlanIntegrityResult {
+export function verifyPlanIntegrity(plan: LoadoutPlan): VerifyPlanIntegrityResult {
   const recomputed = computePlanId(plan);
   if (recomputed !== plan.plan_id) {
     throw new PlanIntegrityError(plan.plan_id, recomputed);
@@ -418,7 +453,7 @@ export interface VerifyPlanFreshnessResult {
  * `loadout plan` against the new state.
  */
 export function verifyPlanFreshness(
-  plan: LoadoutPlanV0,
+  plan: LoadoutPlan,
   currentProjectState: { baseCommit: string; workspaceStateDigest: string }
 ): VerifyPlanFreshnessResult {
   const planProjectState = {
@@ -469,7 +504,7 @@ export class PlanProcedureBindingError extends PlanError {
  * Refuse silently to execute.
  */
 export function verifyPlanProcedureBinding(args: {
-  plan: LoadoutPlanV0;
+  plan: LoadoutPlan;
   qmr: { procedure_ref: string };
   skill: { procedureEntry: string };
   procedureInterfaceDigest: string;
@@ -509,7 +544,7 @@ export function verifyPlanProcedureBinding(args: {
 }
 
 export interface WritePlanArgs {
-  plan: LoadoutPlanV0;
+  plan: LoadoutPlan;
   outPath: string;
 }
 
@@ -520,7 +555,7 @@ export async function writePlan(args: WritePlanArgs): Promise<string> {
   return outPath;
 }
 
-export function defaultPlanPath(repoRoot: string, plan: LoadoutPlanV0): string {
+export function defaultPlanPath(repoRoot: string, plan: LoadoutPlan): string {
   return path.join(repoRoot, '.loadout', 'plans', `${plan.plan_id}.json`);
 }
 
@@ -530,7 +565,7 @@ export function defaultPlanPath(repoRoot: string, plan: LoadoutPlanV0): string {
  * a run it is not. The boundary label (SIMULATED or KILN) is always
  * the first thing the user sees.
  */
-export function formatPlanText(plan: LoadoutPlanV0): string {
+export function formatPlanText(plan: LoadoutPlan): string {
   const lines: string[] = [];
   lines.push('=== Loadout Plan (EXPLAIN) ===');
   lines.push('NOTE: This is a plan; nothing has been executed. It is a real,');
@@ -635,36 +670,75 @@ export function formatPlanText(plan: LoadoutPlanV0): string {
   lines.push(`  base_commit:             ${plan.project_state.base_commit}`);
   lines.push(`  workspace_state_digest:  ${plan.project_state.workspace_state_digest}`);
   lines.push('');
-  lines.push(`--- Repository Recon (${plan.repository_recon.schema}, computed at plan time) ---`);
-  const recon = plan.repository_recon;
-  lines.push(`  schema:                  ${recon.schema}`);
-  lines.push(`  repository:              ${recon.repository}`);
-  lines.push('  repository_state:');
-  lines.push(`    is_git_repository:      ${recon.repository_state.is_git_repository}`);
-  lines.push(`    head_commit:            ${recon.repository_state.head_commit}`);
-  lines.push(`    head_ref:               ${recon.repository_state.head_ref ?? '(detached)'}`);
-  lines.push(
-    `    tracked_files:          ${recon.repository_state.tracked_files ?? '(unavailable)'}  source=${recon.repository_state.tracked_files_source}`
-  );
-  lines.push(`    filesystem_walk_files:  ${recon.repository_state.filesystem_walk_files}`);
-  lines.push(`  architecture_anchors:    ${recon.architecture_anchors.length}`);
-  for (const a of recon.architecture_anchors) {
-    lines.push(`    - [${a.kind}] ${a.path}`);
-    lines.push(`        observation: ${a.observation}`);
-    lines.push(`        evidence:    ${a.evidence}`);
+  if (plan.schema === 'loadout/plan/v1') {
+    const verification = plan.verification_change;
+    lines.push(`--- Verify This Change (${verification.schema}, frozen at plan time) ---`);
+    lines.push(
+      `  method:                   ${verification.method.id}@${verification.method.version}`
+    );
+    lines.push(`  method_status:            ${verification.method.status}`);
+    lines.push(`  implementation_digest:   ${verification.method.implementation_digest}`);
+    lines.push(`  selection_result_digest: ${verification.method.selection_result_digest}`);
+    lines.push(
+      `  base:                     ${verification.change.base_state.ref} -> ${verification.change.base_state.commit}`
+    );
+    lines.push(`  current:                  ${verification.change.current_state.commit}`);
+    lines.push(
+      `  workspace_state_digest:  ${verification.change.current_state.workspace_state_digest}`
+    );
+    lines.push(`  patch_digest:             ${verification.change.patch_digest}`);
+    lines.push(`  workspace_clean:          ${verification.change.workspace_state.clean}`);
+    lines.push('  changed_files:');
+    for (const file of verification.change.changed_files) lines.push(`    - ${file}`);
+    lines.push('  affected_surfaces:');
+    for (const surface of verification.affected_surfaces) lines.push(`    - ${surface}`);
+    lines.push('  claims_at_risk:');
+    for (const claim of verification.claims_at_risk) lines.push(`    - ${claim}`);
+    lines.push('  selected_verification:');
+    for (const command of verification.selected_verification) {
+      lines.push(`    - ${command.command_id}: ${command.executable} ${command.argv.join(' ')}`);
+      lines.push(`        proves: ${command.proves.join(', ') || '(none)'}`);
+      lines.push(`        rationale: ${command.rationale}`);
+    }
+    lines.push('  skipped_verification:');
+    for (const command of verification.skipped_verification) {
+      lines.push(`    - ${command.command_id}: ${command.rationale}`);
+    }
+    lines.push('  unknowns:');
+    if (verification.unknowns.length === 0) lines.push('    (none)');
+    for (const unknown of verification.unknowns) lines.push(`    - ${unknown}`);
+  } else {
+    const recon = plan.repository_recon;
+    lines.push(`--- Repository Recon (${recon.schema}, computed at plan time) ---`);
+    lines.push(`  schema:                  ${recon.schema}`);
+    lines.push(`  repository:              ${recon.repository}`);
+    lines.push('  repository_state:');
+    lines.push(`    is_git_repository:      ${recon.repository_state.is_git_repository}`);
+    lines.push(`    head_commit:            ${recon.repository_state.head_commit}`);
+    lines.push(`    head_ref:               ${recon.repository_state.head_ref ?? '(detached)'}`);
+    lines.push(
+      `    tracked_files:          ${recon.repository_state.tracked_files ?? '(unavailable)'}  source=${recon.repository_state.tracked_files_source}`
+    );
+    lines.push(`    filesystem_walk_files:  ${recon.repository_state.filesystem_walk_files}`);
+    lines.push(`  architecture_anchors:    ${recon.architecture_anchors.length}`);
+    for (const a of recon.architecture_anchors) {
+      lines.push(`    - [${a.kind}] ${a.path}`);
+      lines.push(`        observation: ${a.observation}`);
+      lines.push(`        evidence:    ${a.evidence}`);
+    }
+    lines.push(`  constraints:             ${recon.constraints.length}`);
+    for (const c of recon.constraints) {
+      lines.push(`    - [${c.kind}] source=${c.source}`);
+      lines.push(`        observation: ${c.observation}`);
+      lines.push(`        evidence:    ${c.evidence}`);
+    }
+    lines.push(`  unknowns:                ${recon.unknowns.length}`);
+    for (const u of recon.unknowns) {
+      lines.push(`    - subject=${u.subject}`);
+      lines.push(`        reason:   ${u.reason}`);
+    }
+    lines.push(`  summary: ${recon.summary}`);
   }
-  lines.push(`  constraints:             ${recon.constraints.length}`);
-  for (const c of recon.constraints) {
-    lines.push(`    - [${c.kind}] source=${c.source}`);
-    lines.push(`        observation: ${c.observation}`);
-    lines.push(`        evidence:    ${c.evidence}`);
-  }
-  lines.push(`  unknowns:                ${recon.unknowns.length}`);
-  for (const u of recon.unknowns) {
-    lines.push(`    - subject=${u.subject}`);
-    lines.push(`        reason:   ${u.reason}`);
-  }
-  lines.push(`  summary: ${recon.summary}`);
   lines.push('');
   lines.push('--- Notes ---');
   for (const n of plan.notes) lines.push(`  - ${n}`);

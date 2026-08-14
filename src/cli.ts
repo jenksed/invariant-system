@@ -36,6 +36,7 @@ import {
   workspacePaths,
   ensureWorkspace,
   snapshotRepo,
+  buildVerificationChange,
   loadSkillDescriptor,
   compileLoadoutPlan,
   loadPlan,
@@ -357,6 +358,9 @@ program
         // The Plan's embedded Work Envelope is submitted verbatim. We do
         // NOT re-resolve the Capability, re-load the QMR, or recompile.
         const envelope = plan.work_envelope;
+        const isVerificationPlan = plan.schema === 'loadout/plan/v1';
+        const verificationChangeForRun =
+          plan.schema === 'loadout/plan/v1' ? plan.verification_change : undefined;
 
         console.log(
           `=== Loaded plan: ${plan.plan_id} (work_envelope_digest=${plan.work_envelope_digest}) ===`
@@ -389,7 +393,8 @@ program
             kilnResult = await submitWorkEnvelopeToKiln(envelope, {
               ...(opts.kilnBinary ? { kilnBinary: opts.kilnBinary } : {}),
               ...(opts.kilnHome ? { kilnHome: opts.kilnHome } : {}),
-              ...(opts.actorId ? { actorId: opts.actorId } : {})
+              ...(opts.actorId ? { actorId: opts.actorId } : {}),
+              ...(verificationChangeForRun ? { verificationChange: verificationChangeForRun } : {})
             });
           } catch (e) {
             if (
@@ -408,7 +413,7 @@ program
           kilnRawJson = kilnResult.rawJson;
           // 12-step protocol step 9: execute the procedure ONLY IF
           // Kiln granted authority. Sentinel test asserts this.
-          if (kilnResult.procedureShouldRun) {
+          if (kilnResult.procedureShouldRun && !isVerificationPlan) {
             procedureInvocationCount += 1;
             recon = (await invokeProcedure({
               procedureEntry: cap.skill.procedureEntry,
@@ -422,13 +427,15 @@ program
           // procedure (the procedure's observation is what the fake
           // boundary would conceptually observe).
           result = invokeFakeKiln(envelope);
-          procedureInvocationCount += 1;
-          recon = (await invokeProcedure({
-            procedureEntry: cap.skill.procedureEntry,
-            packRoot,
-            loadoutRoot: LOADOUT_ROOT,
-            repoRoot: opts.repository
-          })) as { summary: string };
+          if (!isVerificationPlan) {
+            procedureInvocationCount += 1;
+            recon = (await invokeProcedure({
+              procedureEntry: cap.skill.procedureEntry,
+              packRoot,
+              loadoutRoot: LOADOUT_ROOT,
+              repoRoot: opts.repository
+            })) as { summary: string };
+          }
         }
 
         const view = buildResultView(result);
@@ -496,7 +503,13 @@ program
         console.error(`known goals: ${GOAL_CATALOGUE.map((g) => g.title).join(', ')}`);
         process.exit(2);
       }
-      const packId = opts.pack || 'repository-recon';
+      const packId = opts.pack || goal.capabilityId;
+      if (goal.capabilityId === 'verify-change') {
+        console.error(
+          'loadout run: Verify this change must execute an inspected immutable Plan; run `loadout plan --goal "Verify this change" --execution kiln` first.'
+        );
+        process.exit(2);
+      }
       const ws = workspacePaths(opts.repository);
       const packRoot = path.join(ws.packs, packId);
       try {
@@ -649,7 +662,12 @@ program
   )
   .requiredOption('-g, --goal <title>', 'Goal title (e.g., "Understand this repository")')
   .option('-r, --repository <path>', 'target repository path', DEFAULT_REPO)
-  .option('-p, --pack <packId>', 'pack id to use', 'repository-recon')
+  .option('-p, --pack <packId>', "pack id to use; defaults to the Goal's stable Capability", '')
+  .option(
+    '--base <git-ref>',
+    'base ref for Verify this change; defaults to merge-base with main',
+    ''
+  )
   .option('--qmr-fixture <path>', 'override the QMR fixture path (power user)', '')
   .option(
     '-o, --out <path>',
@@ -671,6 +689,7 @@ program
       goal: string;
       repository: string;
       pack: string;
+      base: string;
       qmrFixture: string;
       out: string;
       execution: string;
@@ -682,13 +701,20 @@ program
         console.error(`known goals: ${GOAL_CATALOGUE.map((g) => g.title).join(', ')}`);
         process.exit(2);
       }
+      const packId = opts.pack || goal.capabilityId;
+      if (packId !== goal.capabilityId) {
+        console.error(
+          `loadout plan: Goal '${goal.title}' requires Capability '${goal.capabilityId}', not pack '${packId}'.`
+        );
+        process.exit(2);
+      }
       const ws = workspacePaths(opts.repository);
-      const packRoot = path.join(ws.packs, opts.pack);
+      const packRoot = path.join(ws.packs, packId);
       try {
         await fs.stat(packRoot);
       } catch {
         console.error(
-          `pack ${opts.pack} not installed at ${opts.repository}; run 'loadout install ${opts.pack}' first.`
+          `pack ${packId} not installed at ${opts.repository}; run 'loadout install ${packId}' first.`
         );
         process.exit(2);
       }
@@ -718,6 +744,14 @@ program
       // distribution).
       const packManifest = await readPackManifest(packRoot);
 
+      const verificationChange =
+        goal.capabilityId === 'verify-change'
+          ? await buildVerificationChange({
+              repository: opts.repository,
+              ...(opts.base ? { baseRef: opts.base } : {})
+            })
+          : undefined;
+
       // Step 4: compile the Work Envelope.
       const envelope = compileWorkEnvelope({
         goal,
@@ -728,7 +762,8 @@ program
           baseCommit: snap.input.headCommit,
           workspaceStateDigest: snap.digest
         },
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        ...(verificationChange ? { verificationChange } : {})
       });
 
       // Resolve the execution boundary for the Plan. The Plan's
@@ -762,7 +797,7 @@ program
       // Step 5: build the Plan. Pass packRoot so the procedure
       // binding (QMR procedure_ref + Skill procedureEntry + procedure
       // module interface digest) is computed and recorded in the Plan.
-      const plan = await compileLoadoutPlan({
+      const planArgs = {
         goal,
         capability: cap,
         pack: packManifest,
@@ -776,7 +811,10 @@ program
         createdAt: envelope.created_at,
         packRoot,
         executionBoundary
-      });
+      };
+      const plan = verificationChange
+        ? await compileLoadoutPlan({ ...planArgs, verificationChange })
+        : await compileLoadoutPlan(planArgs);
 
       // Step 6: print the plan to the terminal.
       console.log(formatPlanText(plan));

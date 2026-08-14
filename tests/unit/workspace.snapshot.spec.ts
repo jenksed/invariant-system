@@ -32,6 +32,14 @@ describe('workspace snapshot', () => {
     expect(d1).not.toBe(d2);
   });
 
+  it('digest changes when file bytes change without changing paths', async () => {
+    const before = await snapshotRepo(repoRoot);
+    await fs.writeFile(path.join(repoRoot, 'README.md'), '# changed in place\n');
+    const after = await snapshotRepo(repoRoot);
+    expect(after.input.trackedPaths).toEqual(before.input.trackedPaths);
+    expect(after.digest).not.toBe(before.digest);
+  });
+
   it('observes standard linked worktrees where .git is a pointer file', async () => {
     const source = await fs.mkdtemp(path.join(os.tmpdir(), 'loadout-worktree-source-'));
     const linked = `${source}-linked`;
