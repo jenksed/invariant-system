@@ -266,6 +266,63 @@ export type ReconResultV2 = z.infer<typeof ReconResultV2Schema>;
 export const ReconResultSchema = z.union([ReconResultV1Schema, ReconResultV2Schema]);
 export type ReconResult = z.infer<typeof ReconResultSchema>;
 
+/* ----------------------- Verify This Change v0 ---------------------- */
+
+export const VerificationCommandV0Schema = z.object({
+  command_id: z.string().min(1),
+  executable: z.string().min(1),
+  argv: z.array(z.string()),
+  working_directory: z.literal('.'),
+  timeout_ms: z.number().int().positive(),
+  environment_policy: z.literal('minimal-toolchain-path'),
+  network_policy: z.literal('not-required'),
+  mutation_expectation: z.enum(['none', 'derived-data-only']),
+  proves: z.array(z.string()),
+  rationale: z.string().min(1)
+});
+export type VerificationCommandV0 = z.infer<typeof VerificationCommandV0Schema>;
+
+export const VerificationChangeV0Schema = z.object({
+  schema: z.literal('loadout/verification-change/v0'),
+  method: z.object({
+    id: z.literal('verify-change/proof-obligation'),
+    version: z.string(),
+    implementation_digest: z.string(),
+    selection_result_digest: z.string(),
+    arsenal_commit: z.string(),
+    status: z.literal('evaluated-winner')
+  }),
+  change: z.object({
+    repository: z.string(),
+    repository_profile: z.string(),
+    base_state: z.object({ ref: z.string(), commit: z.string() }),
+    current_state: z.object({
+      commit: z.string(),
+      workspace_state_digest: z.string()
+    }),
+    changed_files: z.array(z.string()),
+    patch_digest: z.string(),
+    workspace_state: z.object({
+      clean: z.boolean(),
+      status_entries: z.array(z.string())
+    })
+  }),
+  affected_surfaces: z.array(z.string()),
+  claims_at_risk: z.array(z.string()),
+  proof_obligations: z.array(
+    z.object({
+      id: z.string(),
+      kind: z.string(),
+      requirement: z.string(),
+      required_commands: z.array(z.string())
+    })
+  ),
+  selected_verification: z.array(VerificationCommandV0Schema),
+  skipped_verification: z.array(z.object({ command_id: z.string(), rationale: z.string().min(1) })),
+  unknowns: z.array(z.string())
+});
+export type VerificationChangeV0 = z.infer<typeof VerificationChangeV0Schema>;
+
 /* ------------------------- Loadout Plan v0 --------------------------- */
 /**
  * A Loadout Plan v0 is the user-facing, content-addressable description of
@@ -395,3 +452,19 @@ export const LoadoutPlanV0Schema = z.object({
   notes: z.array(z.string())
 });
 export type LoadoutPlanV0 = z.infer<typeof LoadoutPlanV0Schema>;
+
+/**
+ * Plan v1 is the smallest additive evolution required for a second stable
+ * Capability projection. V0 remains byte/schema-compatible for Repository
+ * Recon; v1 carries Verify This Change without inventing a recon result.
+ */
+export const LoadoutPlanV1Schema = LoadoutPlanV0Schema.omit({
+  schema: true,
+  repository_recon: true
+}).extend({
+  schema: z.literal('loadout/plan/v1'),
+  verification_change: VerificationChangeV0Schema
+});
+export type LoadoutPlanV1 = z.infer<typeof LoadoutPlanV1Schema>;
+export const LoadoutPlanSchema = z.union([LoadoutPlanV0Schema, LoadoutPlanV1Schema]);
+export type LoadoutPlan = z.infer<typeof LoadoutPlanSchema>;

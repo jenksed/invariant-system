@@ -1,9 +1,9 @@
 /**
- * workspace_state_digest = sha256 of (HEAD commit || sorted tracked paths).
+ * workspace_state_digest = sha256 of HEAD plus the sorted, observable
+ * workspace entries (path, kind, mode, and content/link-target digest).
  *
- * This is a SIMULATED state digest. It does not use git plumbing; it just
- * hashes the inputs it was given. The point is to bind a request to
- * observable state without claiming canonical authority.
+ * This is a producer-side observation, not Kiln Evidence. It deliberately
+ * includes file bytes so an in-place edit cannot leave a Plan looking fresh.
  */
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
@@ -13,6 +13,14 @@ import path from 'node:path';
 export interface SnapshotInput {
   headCommit: string;
   trackedPaths: string[];
+  entries?: WorkspaceSnapshotEntry[];
+}
+
+export interface WorkspaceSnapshotEntry {
+  path: string;
+  kind: 'file' | 'symlink';
+  mode: number;
+  contentDigest: string;
 }
 
 export async function readHeadCommit(repoRoot: string): Promise<string> {
@@ -49,15 +57,16 @@ export async function readHeadCommit(repoRoot: string): Promise<string> {
 }
 
 export async function listTrackedFiles(repoRoot: string): Promise<string[]> {
-  // We do not shell out to git to keep this deterministic across hosts and
-  // to make it obvious this is a simulated snapshot, not git plumbing.
-  //
+  return (await listWorkspaceEntries(repoRoot)).map((entry) => entry.path);
+}
+
+export async function listWorkspaceEntries(repoRoot: string): Promise<WorkspaceSnapshotEntry[]> {
   // The .loadout/ directory is Loadout's internal workspace (packs, plans,
   // run history, snapshots, catalog). It is NOT part of the user's
   // project state. Excluding it ensures the workspace_state_digest
   // remains stable across Loadout-internal operations (writing a plan
   // file, recording a run, etc.) and is bound only to the user's repo.
-  const out: string[] = [];
+  const out: WorkspaceSnapshotEntry[] = [];
   async function walk(dir: string): Promise<void> {
     let entries;
     try {
@@ -78,27 +87,49 @@ export async function listTrackedFiles(repoRoot: string): Promise<string[]> {
       const rel = path.relative(repoRoot, full);
       if (entry.isDirectory()) {
         await walk(full);
+      } else if (entry.isSymbolicLink()) {
+        const [target, stat] = await Promise.all([fs.readlink(full), fs.lstat(full)]);
+        out.push({
+          path: rel.split(path.sep).join('/'),
+          kind: 'symlink',
+          mode: stat.mode & 0o777,
+          contentDigest: sha256(target)
+        });
       } else if (entry.isFile()) {
-        out.push(rel.split(path.sep).join('/'));
+        const [contents, stat] = await Promise.all([fs.readFile(full), fs.stat(full)]);
+        out.push({
+          path: rel.split(path.sep).join('/'),
+          kind: 'file',
+          mode: stat.mode & 0o777,
+          contentDigest: sha256(contents)
+        });
       }
     }
   }
   await walk(repoRoot);
-  out.sort();
+  out.sort((a, b) => a.path.localeCompare(b.path));
   return out;
 }
 
 export function computeWorkspaceStateDigest(input: SnapshotInput): string {
-  const lines = [input.headCommit, ...input.trackedPaths].join('\n');
-  return 'sha256:' + createHash('sha256').update(lines).digest('hex');
+  const entries = input.entries?.map((entry) =>
+    [entry.path, entry.kind, entry.mode.toString(8), entry.contentDigest].join('\0')
+  );
+  const lines = [input.headCommit, ...(entries ?? input.trackedPaths)].join('\n');
+  return sha256(lines);
 }
 
 export async function snapshotRepo(
   repoRoot: string
 ): Promise<{ digest: string; input: SnapshotInput }> {
   const headCommit = await readHeadCommit(repoRoot);
-  const trackedPaths = await listTrackedFiles(repoRoot);
-  const input: SnapshotInput = { headCommit, trackedPaths };
+  const entries = await listWorkspaceEntries(repoRoot);
+  const trackedPaths = entries.map((entry) => entry.path);
+  const input: SnapshotInput = { headCommit, trackedPaths, entries };
   const digest = computeWorkspaceStateDigest(input);
   return { digest, input };
+}
+
+function sha256(value: string | Buffer): string {
+  return 'sha256:' + createHash('sha256').update(value).digest('hex');
 }

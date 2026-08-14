@@ -203,6 +203,36 @@ describe('KilnDriver (real boundary)', () => {
     expect((result.envelope as unknown as { simulated?: unknown }).simulated).toBeUndefined();
   });
 
+  it('accepts only the exact one-time Mix compile prelude and preserves canonical raw JSON', async () => {
+    const canonical = JSON.stringify(makeEnvelopeJson());
+    await fakeKiln.cleanup();
+    fakeKiln = await buildFakeKilnCli({
+      stdout: `Compiling 11 files (.ex)\nGenerated kiln app\n${canonical}\n`
+    });
+    testPath = `${fakeKiln.tempDir}${path.delimiter}${process.env.PATH ?? ''}`;
+    const result = await submitWorkEnvelopeToKiln(makeEnvelope(), {
+      kilnBinary: fakeKiln.binaryPath,
+      envPath: testPath,
+      tempDir: fakeKiln.tempDir
+    });
+    expect(result.rawJson).toBe(canonical);
+  });
+
+  it('rejects unrecognized stdout before an otherwise valid envelope', async () => {
+    await fakeKiln.cleanup();
+    fakeKiln = await buildFakeKilnCli({
+      stdout: `untrusted noise\n${JSON.stringify(makeEnvelopeJson())}`
+    });
+    testPath = `${fakeKiln.tempDir}${path.delimiter}${process.env.PATH ?? ''}`;
+    await expect(
+      submitWorkEnvelopeToKiln(makeEnvelope(), {
+        kilnBinary: fakeKiln.binaryPath,
+        envPath: testPath,
+        tempDir: fakeKiln.tempDir
+      })
+    ).rejects.toBeInstanceOf(KilnMalformedResponseError);
+  });
+
   it('reports procedureShouldRun=false when Kiln denies authority', async () => {
     const deniedEnvelope = makeEnvelopeJson({
       authority: { requested: ['git.read'], granted: [], denied: ['git.read'] },

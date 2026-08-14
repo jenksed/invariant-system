@@ -41,6 +41,11 @@ export {
 export type { WorkspacePaths } from './core/workspace';
 
 export { snapshotRepo, computeWorkspaceStateDigest } from './core/snapshot';
+export {
+  buildVerificationChange,
+  computeVerificationChangeDigest,
+  VERIFY_CHANGE_METHOD
+} from './core/verification';
 
 export {
   installPack,
@@ -109,7 +114,9 @@ export type {
   QualifiedMethodRecordV0,
   CapabilityContractV0,
   SimulatedFlag,
+  LoadoutPlan,
   LoadoutPlanV0,
+  LoadoutPlanV1,
   PlanCompatibilityV0,
   PlanMethodProvenanceV0,
   PlanProcedureBindingV0,
@@ -120,7 +127,9 @@ export type {
   ArchitectureAnchorV1,
   ObservedConstraintV1,
   UnknownV1,
-  RepositoryStateObservationV1
+  RepositoryStateObservationV1,
+  VerificationChangeV0,
+  VerificationCommandV0
 } from './core/schemas';
 export { ReconResultV1Schema, ReconResultV2Schema, ReconResultSchema } from './core/schemas';
 

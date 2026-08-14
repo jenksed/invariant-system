@@ -50,7 +50,7 @@ import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { RunResultEnvelopeV0Schema } from './schemas';
-import type { WorkEnvelopeV0, RunResultEnvelopeV0 } from './schemas';
+import type { WorkEnvelopeV0, RunResultEnvelopeV0, VerificationChangeV0 } from './schemas';
 
 /**
  * Errors raised by the KilnDriver. Each has a stable `name` and a
@@ -153,6 +153,8 @@ export interface KilnDriverOptions {
    * Pass an explicit value to fully control subprocess environment.
    */
   envPath?: string;
+  /** Frozen Plan v1 projection. Required when the Work Envelope capability is verify-change. */
+  verificationChange?: VerificationChangeV0;
 }
 
 export interface KilnDriverResult {
@@ -169,6 +171,7 @@ export interface KilnDriverResult {
    * method returns.
    */
   envelopeTempfilePath: string;
+  verificationTempfilePath?: string;
   /**
    * Whether the procedure must run based on the authority decision. True
    * iff any requested authority capability was granted by Kiln. The CLI
@@ -199,6 +202,7 @@ const KILN_CLI = 'mix';
 const KILN_TASK = 'kiln';
 const KILN_COMMAND = 'supervise';
 const KILN_FLAG_WORK_ENVELOPE = '--work-envelope';
+const KILN_FLAG_VERIFICATION_CHANGE = '--verification-change';
 const KILN_FLAG_FORMAT = '--format';
 const KILN_FORMAT_JSON = 'json';
 const KILN_FLAG_KILN_HOME = '--kiln-home';
@@ -227,9 +231,24 @@ export async function submitWorkEnvelopeToKiln(
       .toString(36)
       .slice(2, 10)}.json`
   );
+  const verificationTempfilePath = options.verificationChange
+    ? path.join(
+        tempDir,
+        `loadout-verification-change-${process.pid}-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2, 10)}.json`
+      )
+    : undefined;
   // Serialize envelope to the tempfile BEFORE spawn so a partial file
   // never reaches Kiln. utf8 JSON encoding is exactly what Kiln expects.
   await fs.writeFile(envelopeTempfilePath, envJson, 'utf8');
+  if (verificationTempfilePath && options.verificationChange) {
+    await fs.writeFile(
+      verificationTempfilePath,
+      JSON.stringify(options.verificationChange),
+      'utf8'
+    );
+  }
 
   // Build the exact argv. argv[0] is the Kiln CLI executable; by
   // default it is `mix` (the source-development entry point). Power
@@ -244,6 +263,9 @@ export async function submitWorkEnvelopeToKiln(
     KILN_FLAG_FORMAT,
     KILN_FORMAT_JSON
   ];
+  if (verificationTempfilePath) {
+    argv.push(KILN_FLAG_VERIFICATION_CHANGE, verificationTempfilePath);
+  }
   if (options.kilnHome) {
     argv.push(KILN_FLAG_KILN_HOME, options.kilnHome);
   }
@@ -268,6 +290,7 @@ export async function submitWorkEnvelopeToKiln(
   } catch (e) {
     // Always remove the tempfile, even on spawn failure.
     await safeUnlink(envelopeTempfilePath);
+    if (verificationTempfilePath) await safeUnlink(verificationTempfilePath);
     if (e instanceof KilnUnavailableError) {
       throw e;
     }
@@ -276,6 +299,7 @@ export async function submitWorkEnvelopeToKiln(
 
   // Always remove the tempfile.
   await safeUnlink(envelopeTempfilePath);
+  if (verificationTempfilePath) await safeUnlink(verificationTempfilePath);
 
   if (exitCode !== 0) {
     // Try to parse the structured error output. Kiln's CLI emits a
@@ -292,10 +316,15 @@ export async function submitWorkEnvelopeToKiln(
     throw new KilnSupervisionError(exitCode, stderr);
   }
 
+  // Source-development `mix` may emit a one-time, mechanically-recognizable
+  // compile prelude before the CLI JSON. Strip only those exact lines; any
+  // other stdout noise remains a fail-closed malformed response.
+  const canonicalJson = extractCanonicalKilnJson(stdout);
+
   // Parse the canonical envelope.
   let parsed: unknown;
   try {
-    parsed = JSON.parse(stdout);
+    parsed = JSON.parse(canonicalJson);
   } catch (e) {
     throw new KilnMalformedResponseError(
       `Kiln stdout is not valid JSON: ${(e as Error).message}`,
@@ -310,7 +339,7 @@ export async function submitWorkEnvelopeToKiln(
   } catch (e) {
     throw new KilnMalformedResponseError(
       `Kiln envelope failed schema validation: ${(e as Error).message}`,
-      stdout
+      canonicalJson
     );
   }
 
@@ -332,7 +361,7 @@ export async function submitWorkEnvelopeToKiln(
   if (envelopeShape.work_id !== envelope.work_id) {
     throw new KilnMalformedResponseError(
       `Kiln envelope work_id (${envelopeShape.work_id}) does not match submitted work_id (${envelope.work_id}); refusing to bind a mismatched Run.`,
-      stdout
+      canonicalJson
     );
   }
 
@@ -342,11 +371,32 @@ export async function submitWorkEnvelopeToKiln(
 
   return {
     envelope: envelopeShape,
-    rawJson: stdout,
+    rawJson: canonicalJson,
     envelopeTempfilePath,
+    ...(verificationTempfilePath ? { verificationTempfilePath } : {}),
     procedureShouldRun,
     exitCode
   };
+}
+
+function extractCanonicalKilnJson(stdout: string): string {
+  const trimmed = stdout.trim();
+  try {
+    JSON.parse(trimmed);
+    return trimmed;
+  } catch {
+    // Continue only for the exact source-launch compile prelude emitted by Mix.
+  }
+
+  const lines = trimmed.split(/\r?\n/);
+  const jsonIndex = lines.findIndex((line) => line.startsWith('{'));
+  if (jsonIndex <= 0) return trimmed;
+  const prelude = lines.slice(0, jsonIndex);
+  const allowedPrelude = prelude.every(
+    (line) => /^Compiling \d+ files? \(.+\)$/.test(line) || line === 'Generated kiln app'
+  );
+  if (!allowedPrelude) return trimmed;
+  return lines.slice(jsonIndex).join('\n').trim();
 }
 
 /**

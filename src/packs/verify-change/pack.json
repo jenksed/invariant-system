@@ -1,0 +1,14 @@
+{
+  "id": "verify-change",
+  "version": "0.1.0",
+  "sourcePath": "src/packs/verify-change",
+  "capability": {
+    "id": "verify-change",
+    "contract_version": "0.1.0"
+  },
+  "skill": {
+    "id": "verify-change/proof-obligation",
+    "qmr_fixture": "fixtures/verify-change-method-record.v0.yaml"
+  },
+  "description": "Verify This Change: bind an exact change to proof obligations and registered verification commands."
+}

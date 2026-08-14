@@ -99,6 +99,11 @@ const BUNDLED_PROCEDURES: ReadonlyArray<ResolvedProcedure> = [
     sourcePath: 'src/packs/repository-recon/run.ts',
     runtimePath: 'dist/packs/repository-recon/run.js',
     exportName: 'runRepositoryRecon'
+  },
+  {
+    sourcePath: 'src/packs/verify-change/run.ts',
+    runtimePath: 'dist/packs/verify-change/run.js',
+    exportName: 'runVerifyChange'
   }
 ];
 
