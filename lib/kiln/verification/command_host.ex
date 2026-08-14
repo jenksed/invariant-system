@@ -66,7 +66,8 @@ defmodule Kiln.Verification.CommandHost do
                environment_digest:
                  digest(
                    path_value <>
-                     "\n" <> home_value <>
+                     "\n" <>
+                     home_value <>
                      "\n" <> tmpdir_value <> "\nCI=1\nMIX_ENV=test"
                  ),
                network_policy: "not-required",
