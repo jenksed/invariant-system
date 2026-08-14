@@ -70,4 +70,24 @@ defmodule Kiln.CLI.ResultTest do
     assert usage.code == "USAGE_ERROR"
     assert usage.class == "usage"
   end
+
+  test "to_error/1 normalizes a 2-tuple error reason with an atom head" do
+    error = Result.to_error({:command_registration_mismatch, "loadout.contracts"})
+
+    assert error.code == "COMMAND_REGISTRATION_MISMATCH"
+    assert is_binary(error.message)
+    assert error.message =~ "command_registration_mismatch"
+    assert error.message =~ "loadout.contracts"
+    assert error.details == %{}
+    assert is_binary(error.class)
+  end
+
+  test "to_error/1 normalizes an arbitrary 2-tuple without crashing" do
+    error = Result.to_error({:other_tuple_shape, :detail})
+
+    assert error.code == "OTHER_TUPLE_SHAPE"
+    assert is_binary(error.message)
+    assert error.details == %{}
+    assert is_binary(error.class)
+  end
 end

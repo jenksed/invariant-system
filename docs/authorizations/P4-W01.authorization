@@ -1,0 +1,7 @@
+work_id=P4-W01
+state=authorized
+owner=Joshua Jenks
+base_sha=bd2c9bcf715c99ef4f126179c1739c3b031039fc
+plan_sha256=196511c6e3bd2d3e6d9a3cec59c58a52a861cf9b66df27e672142b97e38e0974
+authorized_at=2026-08-13T18:00:00-04:00
+scope=Implement only owner-directed Wave 6 Verify This Change registered command execution: validate the immutable Loadout verification projection; decide exact git.read and verification.run command authority through a static Kiln registry; execute exact argv with no shell, bounded cwd timeout environment and network/mutation policy; persist command stdout stderr result Artifacts and obligation-specific Evidence; compute fail-closed readiness; preserve restart/replay truth; no generic shell, policy engine, agent runtime, orchestration, Loadout or Arsenal runtime import, Temper redesign, QMR repair, or Wave 7.

@@ -27,3 +27,7 @@
 /artifacts/**
 !/artifacts/p1-s01/
 !/artifacts/p1-s01/README.md
+
+# Python virtual environments
+.venv/
+venv/

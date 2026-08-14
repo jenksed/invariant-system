@@ -1014,7 +1014,26 @@ defmodule Kiln.CLI do
         observation_completion: completion
       ]
 
-      case Kiln.Supervision.supervise(attrs, supervise_opts) do
+      supervision_result =
+        if get_in(attrs, ["capability", "id"]) == "verify-change" do
+          case Map.get(opts, "verification-change") do
+            path when is_binary(path) and path != "" ->
+              with {:ok, verification_attrs} <- Kiln.WorkEnvelopeLoader.load(path) do
+                Kiln.Verification.Supervision.supervise(
+                  attrs,
+                  verification_attrs,
+                  supervise_opts
+                )
+              end
+
+            _ ->
+              {:error, :verification_change_required}
+          end
+        else
+          Kiln.Supervision.supervise(attrs, supervise_opts)
+        end
+
+      case supervision_result do
         {:ok, %Kiln.RunResultEnvelope{} = envelope} ->
           result_map = Kiln.RunResultEnvelope.to_map(envelope)
 

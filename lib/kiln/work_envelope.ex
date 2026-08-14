@@ -33,6 +33,7 @@ defmodule Kiln.WorkEnvelope do
   @schema "engineering-system/work-envelope/v0"
 
   @accepted_capability_id "repository-recon"
+  @accepted_capability_ids ["repository-recon", "verify-change"]
   @accepted_producer_product "loadout"
 
   @max_identifier_bytes 256
@@ -181,7 +182,8 @@ defmodule Kiln.WorkEnvelope do
       "scope" => envelope.scope,
       "constraints" => envelope.constraints,
       "proof_obligations" => envelope.proof_obligations,
-      "authority_requests" => envelope.authority_requests
+      "authority_requests" => envelope.authority_requests,
+      "context_refs" => envelope.context_refs
     }
 
     :sha256
@@ -372,13 +374,13 @@ defmodule Kiln.WorkEnvelope do
          {:ok, contract_version} <- map_field(value, "contract_version", :any, value),
          {:ok, provenance_list} <- map_field(value, "method_provenance", :any, value) do
       cond do
-        not is_binary(id) or id != @accepted_capability_id ->
+        not is_binary(id) or id not in @accepted_capability_ids ->
           {:error,
            Error.new(
              :precondition,
              :unsupported_capability,
              "the capability id is not in the accepted Wave 3 set",
-             %{accepted: [@accepted_capability_id], actual: id}
+             %{accepted: @accepted_capability_ids, actual: id}
            )}
 
         not is_binary(contract_version) or byte_size(contract_version) == 0 ->

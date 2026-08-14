@@ -268,10 +268,13 @@ defmodule Kiln.Slices.P1S01Test do
       # The KIL-W3 supervisor explicitly authorizes `git.read` and uses
       # `git rev-parse HEAD` to resolve the current commit; that module
       # is excluded from the P1-S01 check because the Wave 3 wedge
-      # authorizes the call.
+      # authorizes the call. The P4-W01 verification subtree is also an
+      # explicitly-authorized later-wave boundary and is verified by its own
+      # registry, no-shell host, and negative suites.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/repository_observation.ex",
+            not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/System\.cmd|System\.shell|Port\.open|:os\.cmd|open_port/, source),
             do: path
@@ -296,13 +299,15 @@ defmodule Kiln.Slices.P1S01Test do
       # observation module is excluded here and verified separately.
       # Artifact.Store.read/2 reads only Kiln-owned Artifact content,
       # not source from the active Repository, and is covered by the
-      # P3-W01 reconstruction tests.
+      # P3-W01 reconstruction tests. P4-W01 verification reads only the
+      # exact bound patch and registered command output under its own gate.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/store/migrations.ex",
             path != "lib/kiln/artifact/store.ex",
             path != "lib/kiln/repository_observation.ex",
             path != "lib/kiln/work_envelope_loader.ex",
+            not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),
             do: path

@@ -130,6 +130,8 @@ defmodule Kiln.Authority do
     base_commit = Keyword.fetch!(opts, :base_commit)
     decision_id = Keyword.fetch!(opts, :decision_id)
     now = Keyword.fetch!(opts, :now)
+    allowed_capabilities = Keyword.get(opts, :allowed_capabilities, [@accepted_capability])
+    denied_capabilities = Keyword.get(opts, :denied_capabilities, [])
 
     with :ok <- check_observation(observation),
          :ok <- check_base_commit(base_commit) do
@@ -138,7 +140,9 @@ defmodule Kiln.Authority do
           requested_capability,
           requested_scope,
           observation,
-          base_commit
+          base_commit,
+          allowed_capabilities,
+          denied_capabilities
         )
 
       {result, reason, granted_scope} = result_and_reason
@@ -195,9 +199,19 @@ defmodule Kiln.Authority do
 
   # -- helpers --
 
-  defp decide_inner(requested_capability, requested_scope, observation, base_commit) do
+  defp decide_inner(
+         requested_capability,
+         requested_scope,
+         observation,
+         base_commit,
+         allowed_capabilities,
+         denied_capabilities
+       ) do
     cond do
-      requested_capability != @accepted_capability ->
+      requested_capability in denied_capabilities ->
+        {:denied, :unsupported_capability, nil}
+
+      requested_capability not in allowed_capabilities ->
         {:denied, :unsupported_capability, nil}
 
       not observation.head_resolved ->
