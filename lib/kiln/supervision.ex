@@ -947,7 +947,14 @@ defmodule Kiln.Supervision do
       proof_obligations =
         derive_proof_obligations(input_state_row.proof_obligation_ids, evidence_by_id)
 
-      unknowns = build_reconstruction_unknowns(input_state_row, observation, decisions)
+      verification_change = find_optional_verification_change(store, artifact_ids)
+
+      unknowns =
+        build_reconstruction_unknowns(input_state_row, observation, decisions) ++
+          verification_unknowns(verification_change)
+
+      acceptance_readiness =
+        derive_acceptance_readiness(verification_change, status, authority, proof_obligations)
 
       envelope = %RunResultEnvelope{
         schema: RunResultEnvelope.schema(),
@@ -963,10 +970,7 @@ defmodule Kiln.Supervision do
         proof_obligations: proof_obligations,
         unknowns: unknowns,
         recovery: nil,
-        acceptance_readiness: %{
-          ready: false,
-          reasons: ["reconstructed envelope never claims user acceptance"]
-        }
+        acceptance_readiness: acceptance_readiness
       }
 
       {:ok, envelope}
@@ -1084,7 +1088,9 @@ defmodule Kiln.Supervision do
       %{
         "id" => evidence.evidence_id,
         "kind" => "evidence",
-        "state_digest" => evidence.subject_state_digest
+        "state_digest" => evidence.subject_state_digest,
+        "description" =>
+          "#{evidence.criterion_id}: #{Atom.to_string(evidence.result)} via #{Atom.to_string(evidence.method)}"
       }
     end)
   end
@@ -1189,6 +1195,63 @@ defmodule Kiln.Supervision do
          "producer input_state preserved separately from kiln repository_state_digest"
        ])
     |> Enum.uniq()
+  end
+
+  defp find_optional_verification_change(store, artifact_ids) do
+    case each_artifact(store, artifact_ids, fn body ->
+           body["schema"] == "loadout/verification-change/v0"
+         end) do
+      {:ok, [change]} -> change
+      _ -> nil
+    end
+  end
+
+  defp verification_unknowns(nil), do: []
+
+  defp verification_unknowns(change) do
+    Enum.map(change["unknowns"] || [], &to_string/1)
+  end
+
+  defp derive_acceptance_readiness(nil, _status, _authority, _proof_obligations) do
+    %{ready: false, reasons: ["reconstructed envelope never claims user acceptance"]}
+  end
+
+  defp derive_acceptance_readiness(_change, status, authority, proof_obligations) do
+    unsatisfied = proof_obligations.unsatisfied
+    invalidated = proof_obligations.invalidated
+    denied = authority.denied
+
+    ready =
+      status == :completed and unsatisfied == [] and invalidated == [] and denied == [] and
+        Map.get(proof_obligations, :unknown, false) == false
+
+    reasons =
+      if ready do
+        ["all declared proof obligations have durable satisfying Evidence"]
+      else
+        [
+          if(status != :completed, do: "verification Run is not completed", else: nil),
+          if(denied != [],
+            do: "required authority was denied: #{Enum.join(denied, ", ")}",
+            else: nil
+          ),
+          if(invalidated != [],
+            do: "failed proof obligations: #{Enum.join(invalidated, ", ")}",
+            else: nil
+          ),
+          if(unsatisfied != [],
+            do: "incomplete proof obligations: #{Enum.join(unsatisfied, ", ")}",
+            else: nil
+          ),
+          if(Map.get(proof_obligations, :unknown, false),
+            do: "proof obligation identity is unavailable",
+            else: nil
+          )
+        ]
+        |> Enum.reject(&is_nil/1)
+      end
+
+    %{ready: ready, reasons: reasons}
   end
 
   # ============================================================================

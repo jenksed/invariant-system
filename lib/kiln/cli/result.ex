@@ -133,7 +133,7 @@ defmodule Kiln.CLI.Result do
   end
 
   @doc "Build one bounded structured error entry from a domain or store error."
-  @spec to_error(map() | atom() | String.t()) :: error()
+  @spec to_error(map() | atom() | String.t() | tuple()) :: error()
   def to_error(%{code: code, message: message} = error) do
     %{
       code: to_code(code),
@@ -153,6 +153,15 @@ defmodule Kiln.CLI.Result do
 
   def to_error(value) when is_binary(value) do
     %{code: "USAGE_ERROR", class: "usage", message: value, details: %{}}
+  end
+
+  def to_error({code, _detail} = reason) when is_atom(code) do
+    %{
+      code: upcase(code),
+      class: Atom.to_string(code),
+      message: inspect(reason),
+      details: %{}
+    }
   end
 
   @doc "Build one bounded structured warning entry."

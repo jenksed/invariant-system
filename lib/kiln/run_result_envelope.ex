@@ -130,6 +130,12 @@ defmodule Kiln.RunResultEnvelope do
     proof_obligations = Keyword.get(opts, :proof_obligations, %{})
     unknowns = Keyword.get(opts, :unknowns, [])
 
+    acceptance_readiness =
+      Keyword.get(opts, :acceptance_readiness, %{
+        ready: false,
+        reasons: ["Wave 3 v0 envelopes never claim user acceptance"]
+      })
+
     with :ok <- check_status(status),
          :ok <- check_input_state(input_state),
          :ok <- check_final_state(final_state),
@@ -148,10 +154,7 @@ defmodule Kiln.RunResultEnvelope do
         proof_obligations: proof_obligations,
         unknowns: unknowns,
         recovery: nil,
-        acceptance_readiness: %{
-          ready: false,
-          reasons: ["Wave 3 v0 envelopes never claim user acceptance"]
-        }
+        acceptance_readiness: acceptance_readiness
       }
 
       {:ok, envelope}

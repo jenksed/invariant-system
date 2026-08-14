@@ -84,7 +84,7 @@ defmodule Kiln.CLI.Request do
 
   # -- tokenization --
 
-  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope)
+  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change)
   @repeating_flags ~w(criterion constraint exclude)
   @command_flags %{
     start: ~w(repo objective criterion constraint exclude),
@@ -92,7 +92,7 @@ defmodule Kiln.CLI.Request do
     inspect: [],
     cancel: ~w(reason),
     resume: [],
-    supervise: ~w(work-envelope)
+    supervise: ~w(work-envelope verification-change)
   }
 
   defp tokenize(argv) do
