@@ -113,6 +113,15 @@ jobs:
       - name: Check compile-connected cycles
         run: mix xref graph --format cycles --label compile-connected --fail-above 0
 
+      # The `Kiln.Verification.CommandHost` test suite invokes the no-shell
+      # native helper from `c_src/kiln_command_host.c` and compiles it on
+      # demand through `cc`. A fresh `ubuntu-latest` runner does not ship
+      # with a C compiler, so the helper cannot be built and the tests fail
+      # with `:c_compiler_unavailable`. Install the toolchain here so the
+      # helper can be compiled during the test step.
+      - name: Install C toolchain for verification helper
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential
+
       - name: Run tests
         run: mix test
 
