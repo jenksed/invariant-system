@@ -1,0 +1,41 @@
+schema: engineering-system/launch-manifest/v0
+observed_at: "2026-08-12"
+status: hold
+owner_authorization_token: AUTHORIZE ENGINEERING SYSTEM FIRST WAVE
+accepted_contract_ref: f40d143a2cc47ede625375d16cbdc43eff060414
+repositories:
+  engineering_system:
+    repository: jenksed/engineering-system
+    accepted_contract_sha: f40d143a2cc47ede625375d16cbdc43eff060414
+    access: read-only-for-product-agents
+  arsenal:
+    repository: jenksed/project-arsenal
+    canonical_main_sha: 980a58d331f4ed0679e6ae306b9d55b2ee21d179
+    work_branch: agent/ars-01-epistemic-lifecycle
+    package: ARS-01
+  loadout:
+    repository: jenksed/loadout
+    canonical_main_sha: cae07f9364c9a65187a7a6fa68710d72474c5dc8
+    work_branch: agent/lod-01-repository-recon
+    package: LOD-01
+  kiln:
+    repository: jenksed/kiln
+    canonical_main_sha: 0f6164b0eb1f1c8e2f890e18d6636f3c0311347b
+    work_branch: work/p1-s02-t01-artifact-evidence-substrate-v2
+    work_branch_sha: d489d94e1631c982f1579aa7fe378659c9d3805a
+    package: KIL-01
+excluded_pull_requests:
+  - jenksed/project-arsenal#2
+  - jenksed/loadout#2
+  - jenksed/kiln#2
+  - jenksed/engineering-system#5
+agent_policy:
+  writer_count: 3
+  writers_per_product: 1
+  default_model: MiniMax M3
+  thinking: enabled
+  product_checkouts: isolated
+  product_cross_writes: forbidden
+  product_merges: forbidden
+  independent_verification: required
+final_owner_authorization_required: true

@@ -1,0 +1,14 @@
+{
+  "name": "wave-3-proof-repo",
+  "version": "0.1.0",
+  "description": "Deterministic fixture for the Wave 3 integration proof",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/**/*.test.js",
+    "build": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  }
+}

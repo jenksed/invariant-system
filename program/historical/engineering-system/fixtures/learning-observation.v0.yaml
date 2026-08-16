@@ -1,0 +1,27 @@
+schema: engineering-system/learning-observation/v0
+fixture: true
+observation_id: fixture-observation-001
+source_product: loadout
+source_ref: fixture-run-001
+capability_id: repository-recon
+method_provenance:
+  - repository-recon/fixture-method@0.0.0-fixture
+project_context:
+  repository_shape: fixture
+outcome:
+  status: simulated
+  evidence_refs:
+    - fixture-commit-observation
+friction:
+  - no-real-integration
+failures: []
+unknowns:
+  - real model behavior
+  - real runtime behavior
+cost:
+  elapsed_ms: null
+  model_usage: null
+review:
+  reviewed: false
+  reviewer: null
+

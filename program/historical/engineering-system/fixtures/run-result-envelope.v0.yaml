@@ -1,0 +1,35 @@
+schema: engineering-system/run-result-envelope/v0
+fixture: true
+work_id: fixture-repository-recon-001
+run_id: fixture-run-001
+status: completed
+input_state:
+  base_commit: "0000000000000000000000000000000000000000"
+  workspace_state_digest: sha256:fixture-only
+final_state:
+  commit: "0000000000000000000000000000000000000000"
+  workspace_state_digest: sha256:fixture-only
+authority:
+  requested:
+    - git.read
+  granted:
+    - git.read
+  denied: []
+effects: []
+evidence:
+  - id: fixture-commit-observation
+    kind: simulated
+    state_digest: sha256:fixture-only
+proof_obligations:
+  satisfied:
+    - repo-state-observed
+  unsatisfied: []
+  invalidated: []
+unknowns:
+  - this is simulated evidence and not a real Kiln record
+recovery: null
+acceptance_readiness:
+  ready: false
+  reasons:
+    - fixture output cannot establish real acceptance readiness
+

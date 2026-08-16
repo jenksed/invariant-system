@@ -1,0 +1,28 @@
+schema: engineering-system/qualified-method-record/v0
+fixture: true
+method_id: repository-recon/fixture-method
+method_version: 0.0.0-fixture
+status: experimental
+qualified_for:
+  outcome: understand-a-repository
+  contexts:
+    - local-git-repository
+  exclusions:
+    - this-fixture-does-not-claim-behavioral-qualification
+inputs:
+  - repository-state-reference
+outputs:
+  - repository-understanding
+procedure_ref: sha256:fixture-only
+evaluation:
+  evidence_refs: []
+  models: []
+  repositories: []
+  observed_strengths: []
+  observed_failures:
+    - no-real-evaluation-attached
+  confidence: unqualified-fixture
+provenance:
+  arsenal_commit: null
+  record_digest: sha256:fixture-only
+
