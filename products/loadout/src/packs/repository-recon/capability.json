@@ -1,0 +1,19 @@
+{
+  "schema": "loadout/capability-contract/v0",
+  "id": "repository-recon",
+  "contract_version": "0.1.0-fixture",
+  "goal_outcome": "understand-a-repository",
+  "inputs": ["repository-state-reference"],
+  "outputs": ["repository-understanding"],
+  "effects": [],
+  "evidence_expectations": [
+    "exact commit observed",
+    "workspace_state_digest of tracked files",
+    "distinguish observations from inferences"
+  ],
+  "failure_shape": ["blocked: repository unreachable", "unknown: workspace state not determinable"],
+  "compatibility": {
+    "min_method_status": "experimental",
+    "accepted_contexts": ["local-git-repository"]
+  }
+}

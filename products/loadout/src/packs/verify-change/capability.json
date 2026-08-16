@@ -1,0 +1,23 @@
+{
+  "schema": "loadout/capability-contract/v0",
+  "id": "verify-change",
+  "contract_version": "0.1.0",
+  "goal_outcome": "verify-this-change",
+  "inputs": ["bound-change-state", "registered-verification-catalog"],
+  "outputs": ["proof-obligation-status", "change-readiness"],
+  "effects": ["registered-verification-execution-via-kiln"],
+  "evidence_expectations": [
+    "exact base, current state, changed files, and patch digest",
+    "each proof obligation bound only to registered command Evidence",
+    "unsatisfied or unknown proof prevents READY"
+  ],
+  "failure_shape": [
+    "not-ready: a required command failed",
+    "not-ready: a proof obligation remains unknown or incomplete",
+    "blocked: bound repository state changed or authority was denied"
+  ],
+  "compatibility": {
+    "min_method_status": "experimental",
+    "accepted_contexts": ["local-git-repository"]
+  }
+}

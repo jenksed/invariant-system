@@ -1,0 +1,39 @@
+schema: engineering-system/work-envelope/v0
+fixture: true
+work_id: fixture-repository-recon-001
+created_at: '2026-08-12T00:00:00Z'
+producer:
+  product: loadout
+  version: 0.0.0-fixture
+goal:
+  title: Understand this repository
+  success_conditions:
+    - report architecture anchors
+    - report observed constraints and unknowns
+capability:
+  id: repository-recon
+  contract_version: 0.1.0-fixture
+  method_provenance:
+    - repository-recon/fixture-method@0.0.0-fixture
+project_state:
+  repository: fixture/repository
+  base_commit: '0000000000000000000000000000000000000000'
+  workspace_state_digest: sha256:fixture-only
+scope:
+  included:
+    - tracked repository files
+  excluded:
+    - mutation
+constraints:
+  must:
+    - distinguish observations from inferences
+  must_not:
+    - modify repository state
+context_refs: []
+proof_obligations:
+  - id: repo-state-observed
+    kind: evidence
+    requirement: report the exact commit inspected
+authority_requests:
+  - capability: git.read
+    scope: fixture/repository

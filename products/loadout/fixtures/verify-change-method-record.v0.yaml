@@ -1,0 +1,41 @@
+schema: engineering-system/qualified-method-record/v0
+fixture: false
+method_id: verify-change/proof-obligation
+method_version: 1.0.0
+status: experimental
+qualified_for:
+  outcome: verify-this-change
+  contexts:
+    - local-git-repository
+  exclusions:
+    - QMR-v0-cannot-canonically-bind-product-target-and-evaluation-adapter
+inputs:
+  - bound-change-state
+  - registered-verification-catalog
+outputs:
+  - proof-obligation-status
+  - change-readiness
+procedure_ref: sha256:ec329afbb1e6337b8af2edd2a9614a1a034c91e1f3946d757ba1f9970dde5b84
+evaluation:
+  evidence_refs:
+    - project-arsenal@865c1114baa513d9869adbccacba4dfeb973b4f2:evaluation/wave6/results/selection/proof-obligation.json
+    - project-arsenal@865c1114baa513d9869adbccacba4dfeb973b4f2:evaluation/wave6/results/holdout/winner.json
+    - project-arsenal@865c1114baa513d9869adbccacba4dfeb973b4f2:evaluation/wave6/winner-lock.v1.json
+  models: []
+  repositories:
+    - project-arsenal
+    - loadout
+    - kiln
+    - temper
+  observed_strengths:
+    - selection-known-defect-detection-11-of-11
+    - sealed-holdout-known-defect-detection-4-of-4
+    - zero-false-ready
+    - zero-unsupported-claims
+    - deterministic-proof-obligation-selection
+  observed_failures:
+    - QMR-v0-lacks-canonical-product-target-and-adapter-binding
+  confidence: evaluated-winner-contract-binding-incomplete
+provenance:
+  arsenal_commit: 865c1114baa513d9869adbccacba4dfeb973b4f2
+  record_digest: sha256:84ce80946f0f4e343cd38c4b7da2ccdbb51e41b7ffaf530b15157e3cd8e809df

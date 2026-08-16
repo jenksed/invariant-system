@@ -1,0 +1,5 @@
+{
+  "id": "repository-recon/staged-evidence-graph",
+  "qmrFixturePath": "fixtures/qualified-method-record.v0.yaml",
+  "procedureEntry": "./run.ts"
+}

@@ -1,0 +1,52 @@
+{
+  "name": "@loadout/loadout",
+  "version": "0.1.0-fixture",
+  "private": true,
+  "description": "Loadout: human-facing capability environment. LOD-01 vertical slice for 'Understand this repository'. All boundary artifacts are v0 fixtures; no real Kiln enforcement.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "bin": {
+    "loadout": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "fixtures",
+    "web",
+    "src/packs",
+    "README.md",
+    "AGENTS.md",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-pack-assets.js",
+    "cli": "tsx src/cli.ts",
+    "format": "prettier --write \"src/**/*.{ts,json,md}\" \"tests/**/*.{ts,json,md}\" \"docs/**/*.md\" \"fixtures/**/*.yaml\" \"web/**/*.{html,css,js}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,json,md}\" \"tests/**/*.{ts,json,md}\" \"docs/**/*.md\" \"fixtures/**/*.yaml\" \"web/**/*.{html,css,js}\"",
+    "lint": "eslint \"src/**/*.ts\" \"tests/**/*.ts\"",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:contracts": "tsx src/cli.ts validate-contracts",
+    "start:web": "tsx src/cli.ts web",
+    "ci": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run validate:contracts && npm run build"
+  },
+  "dependencies": {
+    "commander": "12.1.0",
+    "yaml": "2.5.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "20.14.10",
+    "@typescript-eslint/eslint-plugin": "7.18.0",
+    "@typescript-eslint/parser": "7.18.0",
+    "eslint": "8.57.0",
+    "prettier": "3.3.3",
+    "tsx": "4.19.1",
+    "typescript": "5.4.5",
+    "vitest": "1.6.0"
+  }
+}
