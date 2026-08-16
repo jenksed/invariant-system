@@ -1,0 +1,54 @@
+{
+  "candidate_output_digest": "sha256:90e7671926ae4c0e1792c454049272770d4fa81eb7ab384cad0ef434a66aa690",
+  "case_results": [
+    {
+      "case_id": "recon.straightforward.small-clean",
+      "misses": [
+        "src_tree_present",
+        "no_canonical_contracts",
+        "no_capability_fragments"
+      ],
+      "supported": [
+        "agents_md_present",
+        "readme_present"
+      ]
+    },
+    {
+      "case_id": "recon.governed.explicit-architecture",
+      "misses": [
+        "doctrine_present",
+        "capability_fragment_present",
+        "existing_qmr_present",
+        "scripts_validator_present",
+        "capability_id_recon"
+      ],
+      "supported": [
+        "agents_md_present"
+      ]
+    },
+    {
+      "case_id": "recon.ambiguous.incomplete-state",
+      "misses": [
+        "agents_md_absent",
+        "no_canonical_contracts",
+        "no_capability_fragments",
+        "no_existing_qmr"
+      ],
+      "supported": [
+        "readme_present"
+      ]
+    }
+  ],
+  "corpus": "corpus.repository-recon-evaluation-v0",
+  "implementation_digest": "sha256:53d56a7402624edd1f48f5bd5dfd5a5625d3c6f660e4edc77ee1338378924ea6",
+  "method_id": "repository-recon/governance-graph",
+  "metrics": {
+    "assertions": 16,
+    "deterministic": true,
+    "misses": 12,
+    "supported": 4,
+    "unsupported_factual_claims": 0
+  },
+  "result_digest": "sha256:3809ae453a7624d1233d8b549ce6f0bf2671e851bc3b4b3bb113d4a06d46b649",
+  "schema": "arsenal/repository-recon-original-16-result/v1"
+}

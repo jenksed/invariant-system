@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+guard_endpoint
+mkdir -p "$ARTIFACT_DIR"
+trap 'compose logs >"$ARTIFACT_DIR/floci-gcp.log" 2>&1 || true' EXIT
+compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+compose pull
+compose up -d
+wait_ready
+"$PACK_DIR/scripts/verify-inner"
+tracer_output="$("$PACK_DIR/scripts/run-tracer")"
+grep -F 'FLC-04 GCP golden path: PASS' <<<"$tracer_output" >/dev/null
+result="${tracer_output%%$'\n'*}"
+image_id="$(compose images -q floci-gcp | head -n1)"
+receipt="$ARTIFACT_DIR/completion-receipt.md"
+cat > "$receipt" <<EOF2
+# GCP Provider Completion Receipt
+
+- Provider: GCP
+- Floci image: \`${FLOCI_GCP_IMAGE:-floci/floci-gcp:0.6.0}\`
+- Container image ID: \`$image_id\`
+- Storage endpoint: \`${STORAGE_EMULATOR_HOST}\`
+- Pub/Sub endpoint: \`${PUBSUB_EMULATOR_HOST}\`
+- Project: \`${FLOCI_GCP_PROJECT}\`
+- Credential mode: anonymous emulator credentials; no service-account secret
+- Fixture: GCS input -> explicit Pub/Sub work item -> host worker -> GCS result
+- Result: \`$result\`
+- Fidelity ledger: \`engineering/development_packs/floci/gcp/FIDELITY_LEDGER.md\`
+- Provider-only proof: IAM enforcement, quotas, regional behavior, durability, billing, managed-service timing, and production auth are not verified.
+- Real-provider mutation: no
+EOF2
+test -s "$receipt"
+grep -F -- '- Provider: GCP' "$receipt" >/dev/null
+grep -F -- '- Result: `' "$receipt" >/dev/null
+grep -F -- '- Real-provider mutation: no' "$receipt" >/dev/null
+compose down --volumes --remove-orphans
+trap - EXIT
+printf 'FLC-04 GCP completion gate: PASS\n'

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=iac-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/iac-common.sh"
+
+mode="${1:-}"
+namespace="${2:-}"
+[[ "$mode" == "present" || "$mode" == "absent" ]] || { echo "usage: assert-iac present|absent <namespace>" >&2; exit 64; }
+[[ -n "$namespace" ]] || { echo "namespace is required" >&2; exit 64; }
+
+ensure_iac_env
+prefix="arsenal-iac-${namespace}"
+bucket="${prefix}-artifacts"
+queue="${prefix}-jobs"
+dlq="${prefix}-jobs-dlq"
+table="${prefix}-locks"
+role="${prefix}-worker"
+
+if [[ "$mode" == "present" ]]; then
+  aws_local s3api head-bucket --bucket "$bucket" >/dev/null
+  versioning="$(aws_local s3api get-bucket-versioning --bucket "$bucket" --query Status --output text)"
+  [[ "$versioning" == "Enabled" ]] || { echo "bucket versioning mismatch: $versioning" >&2; exit 1; }
+
+  queue_url="$(aws_local sqs get-queue-url --queue-name "$queue" --query QueueUrl --output text)"
+  dlq_url="$(aws_local sqs get-queue-url --queue-name "$dlq" --query QueueUrl --output text)"
+  [[ -n "$queue_url" && -n "$dlq_url" ]]
+  visibility="$(aws_local sqs get-queue-attributes --queue-url "$queue_url" --attribute-names VisibilityTimeout --query 'Attributes.VisibilityTimeout' --output text)"
+  [[ "$visibility" == "45" ]] || { echo "queue visibility timeout mismatch: $visibility" >&2; exit 1; }
+  redrive="$(aws_local sqs get-queue-attributes --queue-url "$queue_url" --attribute-names RedrivePolicy --query 'Attributes.RedrivePolicy' --output text)"
+  [[ "$redrive" == *"${dlq}"* ]] || { echo "queue redrive policy does not reference DLQ: $redrive" >&2; exit 1; }
+
+  table_status="$(aws_local dynamodb describe-table --table-name "$table" --query 'Table.TableStatus' --output text)"
+  [[ "$table_status" == "ACTIVE" ]] || { echo "table status mismatch: $table_status" >&2; exit 1; }
+
+  aws_local iam get-role --role-name "$role" >/dev/null
+  printf 'IaC state assertions: PASS (%s present)\n' "$namespace"
+  exit 0
+fi
+
+unexpected=0
+if aws_local s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then echo "unexpected bucket remains: $bucket" >&2; unexpected=1; fi
+if aws_local sqs get-queue-url --queue-name "$queue" >/dev/null 2>&1; then echo "unexpected queue remains: $queue" >&2; unexpected=1; fi
+if aws_local sqs get-queue-url --queue-name "$dlq" >/dev/null 2>&1; then echo "unexpected DLQ remains: $dlq" >&2; unexpected=1; fi
+if aws_local dynamodb describe-table --table-name "$table" >/dev/null 2>&1; then echo "unexpected table remains: $table" >&2; unexpected=1; fi
+if aws_local iam get-role --role-name "$role" >/dev/null 2>&1; then echo "unexpected role remains: $role" >&2; unexpected=1; fi
+
+[[ "$unexpected" -eq 0 ]] || exit 1
+printf 'IaC absence assertions: PASS (%s absent)\n' "$namespace"

@@ -1,0 +1,44 @@
+{
+  "schema": "arsenal/repository-recon-real-corpus/v1",
+  "title": "Wave 5 Repository Recon real-repository corpus",
+  "selection_policy": {
+    "development": ["project-arsenal", "loadout"],
+    "validation": ["kiln"],
+    "holdout": ["temper"],
+    "holdout_gate": "A winner method id and implementation digest must be recorded in winner-lock.v1.json before the evaluator may load the holdout oracle."
+  },
+  "repositories": [
+    {
+      "id": "project-arsenal",
+      "role": "development",
+      "remote": "https://github.com/jenksed/project-arsenal.git",
+      "commit": "4dcc1b0fe5c6a198c62b4b130fc9ff7c0e1b15e6",
+      "language_stack": "Python evaluation tooling plus JSON/YAML/Markdown assets",
+      "oracle": "oracles/project-arsenal.v1.json"
+    },
+    {
+      "id": "loadout",
+      "role": "development",
+      "remote": "https://github.com/jenksed/loadout.git",
+      "commit": "161946be59960ff8e8a16726ca1dc585abf714ec",
+      "language_stack": "TypeScript and Node.js",
+      "oracle": "oracles/loadout.v1.json"
+    },
+    {
+      "id": "kiln",
+      "role": "validation",
+      "remote": "https://github.com/jenksed/kiln.git",
+      "commit": "bd2c9bcf715c99ef4f126179c1739c3b031039fc",
+      "language_stack": "Elixir and OTP",
+      "oracle": "oracles/kiln.v1.json"
+    },
+    {
+      "id": "temper",
+      "role": "holdout",
+      "remote": "https://github.com/jenksed/temper.git",
+      "commit": "57e78b576105dc9c4051f133d0b4697b2e35a8a0",
+      "language_stack": "TypeScript and Node.js",
+      "oracle": "oracles/temper.v1.json"
+    }
+  ]
+}

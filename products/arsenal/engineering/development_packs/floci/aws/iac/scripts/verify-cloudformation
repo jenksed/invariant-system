@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=iac-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/iac-common.sh"
+
+ensure_tools
+ensure_iac_env
+receipt="$IAC_ARTIFACT_DIR/cloudformation-receipt.md"
+stack="arsenal-floci-flc02"
+bucket="arsenal-floci-cfn-artifacts"
+queue="arsenal-floci-cfn-jobs"
+template="$IAC_DIR/cloudformation/template.yaml"
+
+on_error() {
+  local rc=$?
+  capture_floci_evidence cloudformation-failure
+  printf '\n- result: FAIL\n- exit_code: %s\n' "$rc" >>"$receipt" 2>/dev/null || true
+  exit "$rc"
+}
+trap on_error ERR
+
+compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+"$AWS_PACK_DIR/scripts/start"
+
+{
+  echo "# FLC-02 CloudFormation completion receipt"
+  echo
+  echo "- result: RUNNING"
+  echo "- project_arsenal_revision: ${ARSENAL_REVISION:-unknown}"
+  echo "- stack: $stack"
+  echo "- endpoint: $AWS_ENDPOINT_URL"
+  echo "- template_digest: $(sha256_paths "$template")"
+  echo "- floci_image: $FLOCI_IMAGE"
+} >"$receipt"
+
+aws_local cloudformation create-stack --stack-name "$stack" --template-body "file://$template" \
+  >"$IAC_ARTIFACT_DIR/cloudformation-create.json"
+
+created=0
+for _ in $(seq 1 60); do
+  status="$(aws_local cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text)"
+  case "$status" in
+    CREATE_COMPLETE) created=1; break ;;
+    *_FAILED|ROLLBACK_*|DELETE_*) echo "CloudFormation create failed with status $status" >&2; exit 1 ;;
+  esac
+  sleep 1
+done
+[[ "$created" -eq 1 ]] || { echo "timed out waiting for CloudFormation create" >&2; exit 1; }
+
+aws_local s3api head-bucket --bucket "$bucket" >/dev/null
+queue_url="$(aws_local sqs get-queue-url --queue-name "$queue" --query QueueUrl --output text)"
+visibility="$(aws_local sqs get-queue-attributes --queue-url "$queue_url" --attribute-names VisibilityTimeout --query 'Attributes.VisibilityTimeout' --output text)"
+[[ "$visibility" == "45" ]] || { echo "CloudFormation queue visibility mismatch: $visibility" >&2; exit 1; }
+printf '%s\n' "- create_stack: PASS" "- direct_state_assertions: PASS" >>"$receipt"
+
+aws_local cloudformation delete-stack --stack-name "$stack"
+deleted=0
+for _ in $(seq 1 60); do
+  if status="$(aws_local cloudformation describe-stacks --stack-name "$stack" --query 'Stacks[0].StackStatus' --output text 2>/dev/null)"; then
+    if [[ "$status" == "DELETE_COMPLETE" ]]; then
+      deleted=1
+      break
+    fi
+    [[ "$status" != "DELETE_FAILED" ]] || { echo "CloudFormation delete failed" >&2; exit 1; }
+  else
+    deleted=1
+    break
+  fi
+  sleep 1
+done
+[[ "$deleted" -eq 1 ]] || { echo "timed out waiting for CloudFormation delete" >&2; exit 1; }
+
+if aws_local s3api head-bucket --bucket "$bucket" >/dev/null 2>&1; then echo "CloudFormation bucket remains after delete" >&2; exit 1; fi
+if aws_local sqs get-queue-url --queue-name "$queue" >/dev/null 2>&1; then echo "CloudFormation queue remains after delete" >&2; exit 1; fi
+printf '%s\n' "- delete_stack: PASS" "- post_delete_absence_assertions: PASS" >>"$receipt"
+
+capture_floci_evidence cloudformation-pass
+python3 - "$receipt" <<'PY'
+from pathlib import Path
+import sys
+p = Path(sys.argv[1]); p.write_text(p.read_text().replace("- result: RUNNING", "- result: PASS", 1))
+PY
+trap - ERR
+printf 'FLC-02 CloudFormation gate: PASS\nreceipt: %s\n' "$receipt"

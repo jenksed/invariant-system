@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.compiler-contract",
+      "path": "arsenal/compiler/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define deterministic capability compilation, derived distribution artifacts, and competence-lockfile boundaries.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.compiler-export-plan",
+      "path": "arsenal/compiler/export-plan.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Declare target-specific packaging metadata for compiler-generated capability distributions without duplicating canonical behavior.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.competence-lock-schema",
+      "path": "arsenal/lock.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define the deterministic .arsenal.lock structure for pinned capability identity, provenance, qualification, and generated exports.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.competence-lockfile",
+      "path": ".arsenal.lock",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Pin the exact capability versions, source digests, evaluation qualification, and compiled distribution evidence used by this repository.",
+      "invocation": "reference"
+    }
+  ]
+}

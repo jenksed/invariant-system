@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-arsenal.dev/schema/competence-lock-1.0.0.json",
+  "title": "Project Arsenal Competence Lockfile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "compiler_version", "plan_sha256", "capabilities"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "compiler_version": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"},
+    "plan_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id", "version", "lifecycle", "evaluation", "capability_path",
+          "capability_sha256", "primary_asset", "exports"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^capability\\.[a-z][a-z0-9.-]*$"},
+          "version": {"type": "string"},
+          "lifecycle": {"enum": ["draft", "testing", "stable", "deprecated"]},
+          "evaluation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "suite_asset_ids"],
+            "properties": {
+              "status": {"enum": ["unassessed", "planned", "candidate", "qualified"]},
+              "suite_asset_ids": {"type": "array", "items": {"type": "string"}}
+            }
+          },
+          "capability_path": {"type": "string"},
+          "capability_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "primary_asset": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "path", "sha256"],
+            "properties": {
+              "id": {"type": "string"},
+              "path": {"type": "string"},
+              "sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+            }
+          },
+          "exports": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "target", "adapter_version", "package_name", "path",
+                "manifest_path", "package_sha256"
+              ],
+              "properties": {
+                "target": {"type": "string"},
+                "adapter_version": {"type": "string"},
+                "package_name": {"type": "string"},
+                "path": {"type": "string"},
+                "manifest_path": {"type": "string"},
+                "package_sha256": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

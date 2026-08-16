@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""Inventory LocalStack-specific assumptions before migrating a repository to Floci."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import re
+from pathlib import Path
+
+TOOL_ROOT = Path(__file__).resolve().parent.parent
+SKIP_DIRS = {
+    ".git", ".terraform", ".venv", "node_modules", "vendor", "dist", "build",
+    ".next", "target", "_build", "deps", ".floci-artifacts",
+}
+RUNTIME_SUFFIXES = {
+    ".yml", ".yaml", ".json", ".toml", ".env", ".sh", ".bash", ".zsh", ".py",
+    ".js", ".ts", ".tsx", ".jsx", ".go", ".java", ".kt", ".kts", ".ex", ".exs",
+    ".properties", ".conf", ".cfg",
+}
+DOC_SUFFIXES = {".md", ".txt"}
+SPECIAL_NAMES = {
+    "Dockerfile", "Makefile", "Procfile", "compose.yml", "compose.yaml",
+    "docker-compose.yml", "docker-compose.yaml",
+}
+# These are Project Arsenal/FLC-03 implementation files outside TOOL_ROOT. When
+# the pack is installed into a repository and the inventory scans '.', they must
+# not become evidence about the target repository itself.
+OWNED_REPO_PATHS = {
+    ".github/workflows/floci-diagnostics-ci.yml",
+}
+
+RULES = [
+    (r"\bLAMBDA_REMOTE_DOCKER\b", "BLOCKER", None,
+     "Not supported by Floci; redesign the Lambda code-loading path before migration."),
+    (r"/var/lib/localstack\b", "TRANSLATE", "/app/data",
+     "LocalStack and Floci use different persistence directories."),
+    (r"\bLOCALSTACK_AUTH_TOKEN\b", "REMOVE", None,
+     "Floci does not require a LocalStack auth token; remove the dependency without exposing the old token."),
+    (r"\bPERSISTENCE\b", "TRANSLATE", "FLOCI_STORAGE_MODE=persistent",
+     "Floci translates PERSISTENCE=1 by default, but native config should state intended storage explicitly."),
+    (r"\bPERSIST_STATE\b", "TRANSLATE", "FLOCI_STORAGE_MODE=persistent",
+     "Compatibility alias is translated by default."),
+    (r"\bLOCALSTACK_HOST(?:NAME)?\b", "TRANSLATE", "FLOCI_HOSTNAME",
+     "Compatibility translation exists; verify response URLs and container networking."),
+    (r"\bEDGE_PORT\b", "TRANSLATE", "FLOCI_PORT",
+     "Compatibility translation exists; verify callers still target the intended port."),
+    (r"\bGATEWAY_LISTEN\b", "TRANSLATE", "QUARKUS_HTTP_HOST",
+     "Compatibility translation exists; verify bind-address assumptions."),
+    (r"\bLS_LOG\b", "TRANSLATE", "QUARKUS_LOG_LEVEL",
+     "Use Quarkus logging variables; prefer scoped DEBUG/TRACE during diagnosis."),
+    (r"\bDEBUG\b", "TRANSLATE", "QUARKUS_LOG_LEVEL=DEBUG",
+     "DEBUG=1 is translated in compatibility mode."),
+    (r"\bDOCKER_HOST\b", "VERIFY", "FLOCI_DOCKER_DOCKER_HOST",
+     "Translation exists, but Docker daemon access is a security and runtime boundary that must be verified."),
+    (r"\bLAMBDA_DOCKER_NETWORK\b", "TRANSLATE", "FLOCI_SERVICES_LAMBDA_DOCKER_NETWORK",
+     "Compatibility translation exists; verify spawned Lambda connectivity."),
+    (r"\bDOCKER_NETWORK\b", "TRANSLATE", "FLOCI_SERVICES_DOCKER_NETWORK",
+     "Compatibility translation exists; verify spawned service connectivity."),
+    (r"\bLAMBDA_REMOVE_CONTAINERS\b", "TRANSLATE", "FLOCI_SERVICES_LAMBDA_EPHEMERAL=true",
+     "Compatibility translation exists."),
+    (r"\bUSE_SSL\b", "TRANSLATE", "FLOCI_TLS_ENABLED=true",
+     "Compatibility translation exists; verify certificate paths and client trust."),
+    (r"\bCUSTOM_SSL_CERT_PATH\b", "VERIFY", "FLOCI_TLS_CERT_PATH + FLOCI_TLS_KEY_PATH",
+     "LocalStack accepts one combined PEM; Floci mapping still needs certificate/key verification."),
+    (r"\bSERVICES\b", "REMOVE", None,
+     "Floci does not require LocalStack-style service selection; verify no test depends on intentionally disabled services."),
+    (r"\bLAMBDA_EXECUTOR\b", "REMOVE", None,
+     "Floci always runs Lambda in Docker containers; verify executor-specific assumptions."),
+    (r"/etc/localstack/init/", "KEEP_COMPAT", "/etc/floci/init/",
+     "LocalStack init paths are supported. Keep initially; migrate to native paths only when useful."),
+    (r"/_localstack/(?:init|health)\b", "KEEP_COMPAT", "/_floci/init",
+     "Compatibility status endpoints remain available."),
+    (r"localhost\.localstack\.cloud", "KEEP_COMPAT", "localhost.floci.io",
+     "Floci supports the LocalStack wildcard DNS suffix; verify resolution from the actual caller context."),
+    (r"\blocalstack/localstack(?::[A-Za-z0-9._-]+)?\b", "TRANSLATE", "floci/floci:<pinned>-compat-or-standard",
+     "Image replacement is only one step; choose compat when init scripts require aws CLI/boto3."),
+    (r"\bawslocal\b", "VERIFY", "aws (compat image) or explicit aws --endpoint-url",
+     "The Floci compat image ships an awslocal wrapper, but prove it exists in the pinned image."),
+]
+COMPILED_RULES = [(re.compile(p), d, e, n) for p, d, e, n in RULES]
+
+
+def candidate_files(root: Path, include_docs: bool):
+    suffixes = RUNTIME_SUFFIXES | (DOC_SUFFIXES if include_docs else set())
+    skip_tool_root = root != TOOL_ROOT and TOOL_ROOT.is_relative_to(root)
+
+    for path in root.rglob("*"):
+        if not path.is_file() or any(part in SKIP_DIRS for part in path.parts):
+            continue
+        if skip_tool_root and path.is_relative_to(TOOL_ROOT):
+            continue
+        rel = path.relative_to(root).as_posix()
+        if rel in OWNED_REPO_PATHS:
+            continue
+        if path.name in SPECIAL_NAMES or path.suffix.lower() in suffixes or path.name.startswith(".env"):
+            yield path
+
+
+def scan(root: Path, include_docs: bool = False):
+    findings = []
+    for path in candidate_files(root, include_docs):
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (UnicodeDecodeError, OSError):
+            continue
+        rel = str(path.relative_to(root))
+        for lineno, line in enumerate(text.splitlines(), 1):
+            for regex, disposition, equivalent, note in COMPILED_RULES:
+                for match in regex.finditer(line):
+                    findings.append({
+                        "path": rel,
+                        "line": lineno,
+                        "token": match.group(0),
+                        "disposition": disposition,
+                        "floci_equivalent": equivalent,
+                        "note": note,
+                    })
+    return findings
+
+
+def summarize(findings):
+    counts = {}
+    for item in findings:
+        counts[item["disposition"]] = counts.get(item["disposition"], 0) + 1
+    return {
+        "total": len(findings),
+        "by_disposition": dict(sorted(counts.items())),
+        "blockers": counts.get("BLOCKER", 0),
+    }
+
+
+def render_markdown(root: Path, findings, include_docs: bool):
+    s = summarize(findings)
+    lines = [
+        "# LocalStack Migration Inventory", "",
+        f"- Root: `{root}`", f"- Findings: {s['total']}", f"- Blockers: {s['blockers']}",
+        f"- Documentation scanned: `{'yes' if include_docs else 'no'}`", "",
+        "| Disposition | Location | Token | Floci equivalent | Note |",
+        "|---|---|---|---|---|",
+    ]
+    for item in findings:
+        loc = f"{item['path']}:{item['line']}"
+        equivalent = item["floci_equivalent"] or "—"
+        note = item["note"].replace("|", r"\|")
+        lines.append(
+            f"| `{item['disposition']}` | `{loc}` | `{item['token']}` | `{equivalent}` | {note} |"
+        )
+    if not findings:
+        lines.append("| — | — | — | — | No known LocalStack-specific assumptions found. |")
+    lines.extend([
+        "", "## Interpretation", "",
+        "- `BLOCKER`: redesign or explicitly resolve before runtime replacement.",
+        "- `TRANSLATE`: record the Floci equivalent and verify behavior.",
+        "- `KEEP_COMPAT`: preserve the compatibility surface first; simplify later.",
+        "- `VERIFY`: prove contextual or security-sensitive behavior.",
+        "- `REMOVE`: deliberately remove LocalStack-only configuration.", "",
+    ])
+    return "\n".join(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("root", nargs="?", default=".")
+    parser.add_argument("--format", choices=("json", "markdown"), default="markdown")
+    parser.add_argument("--output")
+    parser.add_argument("--include-docs", action="store_true",
+                        help="also scan Markdown/text documentation; disabled by default to avoid prose-only false positives")
+    parser.add_argument("--fail-on-blocker", action="store_true")
+    args = parser.parse_args()
+
+    root = Path(args.root).resolve()
+    if not root.exists():
+        parser.error(f"root does not exist: {root}")
+
+    findings = scan(root, include_docs=args.include_docs)
+    payload = {
+        "schema_version": "1.0.0",
+        "root": str(root),
+        "include_docs": args.include_docs,
+        "summary": summarize(findings),
+        "findings": findings,
+    }
+    rendered = json.dumps(payload, indent=2, sort_keys=True) if args.format == "json" else render_markdown(root, findings, args.include_docs)
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(rendered + "\n", encoding="utf-8")
+    else:
+        print(rendered)
+
+    if args.fail_on_blocker and payload["summary"]["blockers"]:
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

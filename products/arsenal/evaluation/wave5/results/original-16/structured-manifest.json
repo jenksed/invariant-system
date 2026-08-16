@@ -1,0 +1,52 @@
+{
+  "candidate_output_digest": "sha256:1d4946e1cd54211e53138ce6418a9848c31a5051519c025bf98f2527d435ab2c",
+  "case_results": [
+    {
+      "case_id": "recon.straightforward.small-clean",
+      "misses": [
+        "agents_md_present",
+        "readme_present",
+        "src_tree_present",
+        "no_canonical_contracts",
+        "no_capability_fragments"
+      ],
+      "supported": []
+    },
+    {
+      "case_id": "recon.governed.explicit-architecture",
+      "misses": [
+        "agents_md_present",
+        "doctrine_present",
+        "existing_qmr_present",
+        "scripts_validator_present"
+      ],
+      "supported": [
+        "capability_fragment_present",
+        "capability_id_recon"
+      ]
+    },
+    {
+      "case_id": "recon.ambiguous.incomplete-state",
+      "misses": [
+        "agents_md_absent",
+        "readme_present",
+        "no_canonical_contracts",
+        "no_capability_fragments",
+        "no_existing_qmr"
+      ],
+      "supported": []
+    }
+  ],
+  "corpus": "corpus.repository-recon-evaluation-v0",
+  "implementation_digest": "sha256:92bcb25f31bd1b7ffa1193b074149eb9fad8ce80edf87ad05ec7679af7e1a32a",
+  "method_id": "repository-recon/structured-manifest",
+  "metrics": {
+    "assertions": 16,
+    "deterministic": true,
+    "misses": 14,
+    "supported": 2,
+    "unsupported_factual_claims": 0
+  },
+  "result_digest": "sha256:df4d6ba8bbe083dd55d70bd2e111a390133cef79669a2a4d343e41f751dedcf4",
+  "schema": "arsenal/repository-recon-original-16-result/v1"
+}

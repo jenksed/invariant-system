@@ -1,0 +1,65 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.trust-authority-contract",
+      "path": "arsenal/trust/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define fail-closed admission, provenance, review, authority, escalation, drift, and revocation semantics for imported competence.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.trust-candidate-schema",
+      "path": "arsenal/trust/candidate.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define content-addressed quarantined candidate records for imported capability packages and authority signals.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.trust-review-schema",
+      "path": "arsenal/trust/review.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Bind explicit human review, requested authority, approved authority, and escalation evidence to exact candidate bytes.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.trust-decision-schema",
+      "path": "arsenal/trust/decision.schema.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define machine-readable admission verdicts, route gates, challenge seams, reconsideration triggers, and revocation state.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.trust-policy",
+      "path": "arsenal/trust/policy.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Declare the conservative v0 baseline, escalation, prohibited authority, challenge, and drift policy for third-party competence.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.trust-auditor",
+      "path": "scripts/arsenal_trust.py",
+      "category": "arsenal",
+      "kind": "method",
+      "status": "draft",
+      "purpose": "Discover, assess, verify, and revoke exact imported packages using canonical capability authority and local trust policy.",
+      "invocation": "composed",
+      "upstream": [
+        "arsenal.trust-authority-contract",
+        "arsenal.capability-contract",
+        "arsenal.competence-lockfile",
+        "arsenal.flight-recorder"
+      ]
+    }
+  ]
+}

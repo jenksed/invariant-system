@@ -1,0 +1,56 @@
+{
+  "case_id": "recon.governed.explicit-architecture",
+  "case_title": "Governed repository with explicit architecture, doctrine, capability fragments, and existing QMR",
+  "context_kind": "local-git-repository-with-arsenal-canonical-contracts",
+  "expected_assertions": [
+    {
+      "id": "agents_md_present",
+      "kind": "presence",
+      "subject": "AGENTS.md",
+      "expected": true,
+      "evidence_path": "AGENTS.md"
+    },
+    {
+      "id": "doctrine_present",
+      "kind": "presence",
+      "subject": "engineering/doctrine/CORE.md",
+      "expected": true,
+      "evidence_path": "engineering/doctrine/CORE.md"
+    },
+    {
+      "id": "capability_fragment_present",
+      "kind": "presence",
+      "subject": "arsenal/capabilities/recon.json",
+      "expected": true,
+      "evidence_path": "arsenal/capabilities/recon.json"
+    },
+    {
+      "id": "existing_qmr_present",
+      "kind": "presence",
+      "subject": "evaluation/method-records/example.yaml",
+      "expected": true,
+      "evidence_path": "evaluation/method-records/example.yaml"
+    },
+    {
+      "id": "scripts_validator_present",
+      "kind": "presence",
+      "subject": "scripts/recon_method.py",
+      "expected": true,
+      "evidence_path": "scripts/recon_method.py"
+    },
+    {
+      "id": "capability_id_recon",
+      "kind": "capability_identity",
+      "subject": "arsenal/capabilities/recon.json",
+      "expected_id": "capability.recon",
+      "expected_lifecycle": "draft",
+      "expected_evaluation_status": "unassessed",
+      "evidence_path": "arsenal/capabilities/recon.json"
+    }
+  ],
+  "unsupported_claims_allowed": [],
+  "unknowns_allowed": [
+    "behavioral-efficacy-of-recon-method"
+  ],
+  "expected_epistemic_conclusion": "experimental"
+}

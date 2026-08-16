@@ -1,0 +1,8 @@
+#!/usr/bin/env dagger
+container |
+  from python:3.12.11-alpine3.21 |
+  with-directory /pack ./engineering/development_packs/dagger |
+  with-workdir /pack/fixtures/tdd-red-green |
+  with-exec python run_world.py /pack/worlds/tdd-python-container.json |
+  file /receipt.json |
+  export .arsenal-evidence/ars-06-tdd-python-container.world.json

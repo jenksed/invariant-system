@@ -1,0 +1,186 @@
+{
+  "capability": {
+    "aliases": [
+      "Wayfind",
+      "Wayfinding"
+    ],
+    "authority": {
+      "forbidden": [
+        "git.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "filesystem.write",
+        "tracker.read",
+        "tracker.write",
+        "network.read"
+      ],
+      "required": [
+        "filesystem.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Recon is the public capability name for the existing Wayfind/Wayfinding lineage; aliases preserve discoverability without ID churn.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "project.decisions",
+        "repository.current_state",
+        "domain.language",
+        "primary_sources"
+      ],
+      "required": [
+        "task.intent",
+        "project.destination"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The full route can be settled in one session via Pressure Test or ordinary planning"
+        },
+        {
+          "kind": "negative",
+          "text": "The work is a bounded implementation slice already covered by Resume or Plan"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "The destination is visible but the route contains dependent uncertainty that exceeds one reliable planning session"
+        },
+        {
+          "kind": "positive",
+          "text": "The effort will benefit from a durable low-resolution map plus primary-source preservation across multiple sessions"
+        }
+      ]
+    },
+    "display_name": "Recon",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Durable low-resolution map of the effort and current frontier.",
+        "name": "wayfinding_map"
+      },
+      {
+        "description": "Focused decision evidence that can update the map without duplicating full reasoning.",
+        "name": "decision_resolution"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "user-mediated",
+        "reasoning-only",
+        "repository-read",
+        "local-process"
+      ],
+      "preferred": [
+        "user-mediated",
+        "repository-read"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.recon",
+    "implementation": {
+      "asset_ids": [
+        "agent.wayfind",
+        "foundation.wayfinding",
+        "foundation.grilling"
+      ],
+      "primary_asset": "agent.wayfind",
+      "resources": [
+        {
+          "asset_id": "agent.wayfind",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "foundation.wayfinding",
+          "load": "on-demand",
+          "role": "reference"
+        },
+        {
+          "asset_id": "foundation.grilling",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Meaningful destination that bounds the effort.",
+        "name": "destination",
+        "required": true
+      },
+      {
+        "description": "Existing Wayfinding map or durable decision state to continue.",
+        "name": "existing_map",
+        "required": false
+      },
+      {
+        "description": "Repository truth, domain language, prior decisions, and evidence relevant to the map.",
+        "name": "project_context",
+        "required": false
+      }
+    ],
+    "invocation": "human",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "workspace-write",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Destination, decision nodes, fog, out-of-scope areas, and current frontier.",
+        "name": "wayfinding_map"
+      },
+      {
+        "description": "Durable resolution for the focused node when walking an existing map.",
+        "name": "resolution_record"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "Dependent uncertainty cannot be responsibly collapsed into one ordinary planning session.",
+        "id": "multi_session_uncertainty"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.wayfind",
+        "foundation.wayfinding",
+        "foundation.grilling"
+      ]
+    },
+    "purpose": "Map and progressively resolve a large or foggy effort whose dependent uncertainty exceeds one reliable planning session.",
+    "verification": {
+      "receipt_required": true,
+      "requirements": [
+        {
+          "description": "Destination, frontier, fog, blockers, and out-of-scope state are distinguishable.",
+          "evidence_kind": "artifact",
+          "id": "map_coherent"
+        },
+        {
+          "description": "Focused resolution records evidence, uncertainty, consequences, and unlocked or invalidated work.",
+          "evidence_kind": "decision-record",
+          "id": "node_resolution_bounded"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

@@ -1,0 +1,189 @@
+{
+  "capability": {
+    "aliases": [
+      "Specification From Context"
+    ],
+    "authority": {
+      "forbidden": [
+        "filesystem.write",
+        "git.write",
+        "network.write",
+        "tracker.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "git.read"
+      ],
+      "required": [
+        "filesystem.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Public display name Spec is independent of canonical asset id software.spec-from-context.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "repository.current_state",
+        "project.vocabulary",
+        "project.research",
+        "project.prototype_evidence"
+      ],
+      "required": [
+        "task.intent",
+        "project.decisions"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The objective still contains unresolved decisions that require grilling or Wayfinding first"
+        },
+        {
+          "kind": "negative",
+          "text": "The work is small enough to be expressed as a single implementation slice without a separate specification"
+        },
+        {
+          "kind": "negative",
+          "text": "The required output is an architecture decision record, research report, or execution plan rather than a specification"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "An objective has been resolved to the point where a buildable specification can be written without re-asking settled questions"
+        },
+        {
+          "kind": "positive",
+          "text": "Wayfinding, grilling, research, or prototype work has produced decision records that must be consolidated into one specification"
+        },
+        {
+          "kind": "positive",
+          "text": "A specification must precede implementation slicing and downstream tracer tickets"
+        }
+      ]
+    },
+    "display_name": "Spec",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Buildable specification grounded in settled decisions and repository state.",
+        "name": "specification"
+      },
+      {
+        "description": "Pointer map from requirements to the decision records that settled them.",
+        "name": "decision_pointer_map"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "user-mediated"
+      ],
+      "preferred": [
+        "repository-read"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.spec",
+    "implementation": {
+      "asset_ids": [
+        "software.spec-from-context"
+      ],
+      "primary_asset": "software.spec-from-context",
+      "resources": [
+        {
+          "asset_id": "software.spec-from-context",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Conversation, Wayfinding, research, and prototype artifacts whose decisions are already settled.",
+        "name": "resolved_context",
+        "required": true
+      },
+      {
+        "description": "Project domain terminology used to express requirements precisely.",
+        "name": "domain_language",
+        "required": true
+      },
+      {
+        "description": "Current repository state used to ground the specification in real interfaces and constraints.",
+        "name": "repository_truth",
+        "required": false
+      }
+    ],
+    "invocation": "composed",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "read-only",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Buildable specification synthesizing settled decisions without re-interviewing them.",
+        "name": "specification"
+      },
+      {
+        "description": "Pointer map from each spec requirement back to the decision record that settled it.",
+        "name": "decision_pointer_map"
+      },
+      {
+        "description": "Explicit out-of-scope items with rationale to prevent scope expansion during implementation.",
+        "name": "out_of_scope_record"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "Open decisions have been resolved through grilling, Wayfinding, research, or prototype evidence.",
+        "id": "decisions_resolved"
+      },
+      {
+        "description": "Project domain terminology is stable enough to express requirements precisely.",
+        "id": "domain_language_stable"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "software.spec-from-context"
+      ]
+    },
+    "purpose": "Synthesize already-resolved conversation, Wayfinding, research, prototype, and repository evidence into a buildable specification without re-interviewing settled decisions.",
+    "verification": {
+      "receipt_required": false,
+      "requirements": [
+        {
+          "description": "Settled decisions are recorded by pointer rather than re-interviewed in the specification.",
+          "evidence_kind": "decision-record",
+          "id": "decisions_not_reopened"
+        },
+        {
+          "description": "Out-of-scope items are explicit and prevent downstream scope expansion.",
+          "evidence_kind": "report",
+          "id": "scope_bounded"
+        },
+        {
+          "description": "Each requirement is concrete enough that a downstream capability can decompose it into tracer tickets.",
+          "evidence_kind": "verdict",
+          "id": "buildable"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

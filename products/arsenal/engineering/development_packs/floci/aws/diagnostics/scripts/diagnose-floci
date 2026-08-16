@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+endpoint="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+artifact="${1:-}"
+
+case "$endpoint" in
+  http://localhost:4566|http://127.0.0.1:4566) ;;
+  *)
+    printf 'UNSAFE endpoint: %s\n' "$endpoint" >&2
+    exit 64
+    ;;
+esac
+
+report="$(mktemp)"
+native_body="$(mktemp)"
+compat_body="$(mktemp)"
+aws_body="$(mktemp)"
+cleanup() { rm -f "$report" "$native_body" "$compat_body" "$aws_body"; }
+trap cleanup EXIT
+
+{
+  echo '# Floci Environment Diagnostic'
+  echo
+  printf -- '- Endpoint: `%s`\n' "$endpoint"
+  printf -- '- Checked at: `%s`\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  echo
+} > "$report"
+
+if ! curl -fsS --max-time 5 "$endpoint/_floci/init" >"$native_body"; then
+  {
+    echo '## Reachability'
+    echo
+    echo '- Result: **FAIL**'
+    echo '- Native init endpoint was not reachable.'
+  } >> "$report"
+  [[ -n "$artifact" ]] && { mkdir -p "$(dirname "$artifact")"; cp "$report" "$artifact"; }
+  cat "$report"
+  exit 69
+fi
+
+compat_status="$(curl -sS -o "$compat_body" -w '%{http_code}' --max-time 5 "$endpoint/_localstack/init" || true)"
+
+{
+  echo '## Reachability'
+  echo
+  echo '- Result: **PASS**'
+  echo '- `/_floci/init` responded successfully.'
+  printf -- '- `/_localstack/init` HTTP status: `%s`\n' "$compat_status"
+  echo
+} >> "$report"
+
+if command -v aws >/dev/null 2>&1; then
+  if env -u AWS_PROFILE -u AWS_DEFAULT_PROFILE \
+      AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null \
+      AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_SESSION_TOKEN= \
+      AWS_DEFAULT_REGION=us-east-1 AWS_EC2_METADATA_DISABLED=true \
+      AWS_ENDPOINT_URL="$endpoint" \
+      aws --endpoint-url "$endpoint" s3api list-buckets >"$aws_body" 2>&1; then
+    aws_result=PASS
+  else
+    aws_result=FAIL
+  fi
+else
+  aws_result=SKIP
+fi
+
+{
+  echo '## Provider-shaped probe'
+  echo
+  printf -- '- AWS CLI S3 ListBuckets: **%s**\n' "$aws_result"
+  echo
+  echo '## Diagnostic guidance'
+  echo
+  echo '- If reachability fails, inspect container state, port binding, and startup logs before changing application code.'
+  echo '- If init is not ready, inspect hook status and hook logs before retrying the workload.'
+  echo '- If the provider-shaped probe fails while init is healthy, capture the exact operation, response, and relevant service logs.'
+  echo '- Raise only the affected service logging category to DEBUG/TRACE; avoid indiscriminate global TRACE.'
+  echo '- A healthy emulator does not prove target-cloud fidelity; classify the exact operation separately.'
+} >> "$report"
+
+if [[ -n "$artifact" ]]; then
+  mkdir -p "$(dirname "$artifact")"
+  cp "$report" "$artifact"
+fi
+cat "$report"
+[[ "$aws_result" != FAIL ]]

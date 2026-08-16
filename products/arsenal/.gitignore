@@ -1,0 +1,13 @@
+# Local evaluation artifacts. The directory itself is tracked (with
+# a .gitkeep) so source-model path-pattern validation can resolve
+# ``.arsenal-eval/`` as a real base directory. Generated contents
+# are run-evidence and should not be committed.
+.arsenal-eval/*
+!.arsenal-eval/.gitkeep
+
+# Python bytecode caches.
+__pycache__/
+*.pyc
+
+# Distribution build caches.
+.arsenal-compile-cache/

@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/common.sh"
+
+guard_endpoint
+response="$(curl -fsS -X POST "$AWS_ENDPOINT_URL/_floci/state/reset")"
+python3 - "$response" <<'PY'
+import json, sys
+doc=json.loads(sys.argv[1])
+if doc.get("status") != "OK":
+    raise SystemExit(f"unexpected reset response: {doc!r}")
+PY
+
+compose exec -T floci python3 /etc/floci/init/ready.d/10-seed.py >/dev/null
+printf 'Floci state reset and fixture reapplied\n'

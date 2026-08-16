@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+guard_endpoint
+python3 "$PACK_DIR/tracer.py"
+printf 'FLC-04 GCP golden path: PASS\n'

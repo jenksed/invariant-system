@@ -1,0 +1,53 @@
+name: ARS-00B Repository Truth Distribution
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ars-00b-repository-truth.yml"
+      - "agent_workflows/repository_truth_audit.md"
+      - "distribution/agent-skills/repository-truth/**"
+      - "docs/use/repository-truth-quickstart.md"
+      - "docs/source_audits/agent_skills_distribution.md"
+      - "scripts/install-repository-truth-skill"
+      - "scripts/verify-repository-truth-distribution.py"
+      - "README.md"
+      - "docs/roadmap/capability-system.md"
+  workflow_dispatch:
+
+jobs:
+  distribution-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate distribution package
+        run: python3 scripts/verify-repository-truth-distribution.py
+
+      - name: Prove Codex project-local installation contract
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          repo="$work/target"
+          git init -q "$repo"
+
+          scripts/install-repository-truth-skill --project "$repo"
+          test -f "$repo/.agents/skills/repository-truth/SKILL.md"
+          cmp -s \
+            agent_workflows/repository_truth_audit.md \
+            "$repo/.agents/skills/repository-truth/references/repository_truth_audit.md"
+
+          scripts/install-repository-truth-skill --project "$repo"
+
+          printf '\n# local divergence\n' >> "$repo/.agents/skills/repository-truth/SKILL.md"
+          set +e
+          scripts/install-repository-truth-skill --project "$repo"
+          rc=$?
+          set -e
+          test "$rc" -eq 3
+          grep -q '# local divergence' "$repo/.agents/skills/repository-truth/SKILL.md"
+
+          echo "ARS-00B installer contract: PASS"
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+source "$(dirname "$0")/common.sh"
+guard_endpoint
+wait_ready
+python3 - "$FLOCI_OCI_ENDPOINT" "$FLOCI_OCI_NAMESPACE" <<'PY'
+import json,sys,urllib.request
+with urllib.request.urlopen(sys.argv[1]+'/n',timeout=5) as r:
+    assert json.loads(r.read()) == sys.argv[2]
+PY
+printf 'FLC-04 OCI inner gate: PASS\n'

@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0.0",
+  "project": {
+    "org": "jenksed",
+    "repo": "project-arsenal",
+    "doctrine_upstream": "jenksed/project-arsenal",
+    "doctrine_path": "engineering/doctrine/ENGINEERING_DOCTRINE.md"
+  },
+  "distribution": {
+    "enabled_targets": [
+      "agent-skills"
+    ]
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "engineering.floci-aws-iac-ci",
+      "path": "engineering/development_packs/floci/aws/iac/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide the runnable FLC-02 Terraform/OpenTofu/CloudFormation preflight with independent state assertions, snapshot acceleration, isolated CI, failure evidence, and teardown.",
+      "upstream": ["engineering.floci-aws-golden-path", "engineering.floci-verification-contract", "foundation.cloud-fidelity-ledger", "source.floci"],
+      "downstream": ["engineering.floci-aws-iac-fidelity-receipt", "engineering.floci-aws-snapshot-policy", "agent.validate-iac-with-floci"]
+    },
+    {
+      "id": "engineering.floci-aws-iac-fidelity-receipt",
+      "path": "engineering/development_packs/floci/aws/iac/FIDELITY_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Define the FLC-02 provenance, provisioning evidence, operation-level fidelity, and provider-only residue that may be claimed after an IaC preflight.",
+      "upstream": ["engineering.floci-aws-iac-ci", "engineering.floci-fidelity-policy"]
+    },
+    {
+      "id": "engineering.floci-aws-snapshot-policy",
+      "path": "engineering/development_packs/floci/aws/iac/SNAPSHOT_POLICY.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Treat Floci snapshots as provenance-keyed acceleration caches that must invalidate on material input changes and rerun assertions after restore.",
+      "upstream": ["engineering.floci-aws-iac-ci", "foundation.reproducible-cloud-fixtures"]
+    },
+    {
+      "id": "agent.validate-iac-with-floci",
+      "path": "agent_workflows/validate_iac_with_floci.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Inspect repository IaC and run the smallest fail-closed Floci preflight that proves supported provisioning state while preserving explicit provider-only residue.",
+      "upstream": ["engineering.floci-aws-iac-ci", "engineering.floci-fidelity-policy", "foundation.cloud-execution-boundary"]
+    }
+  ]
+}

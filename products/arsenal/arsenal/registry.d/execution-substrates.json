@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "arsenal.execution-substrate-contract",
+      "path": "arsenal/substrates/CONTRACT.md",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Define Reality Budget selection, execution-substrate boundaries, evidence scope, availability, authority, teardown, and escalation semantics.",
+      "invocation": "reference"
+    },
+    {
+      "id": "arsenal.execution-substrate-catalog",
+      "path": "arsenal/substrates/catalog.json",
+      "category": "arsenal",
+      "kind": "router",
+      "status": "draft",
+      "purpose": "Declare the ordered execution-substrate ladder, proof traits, availability profiles, limitations, and explicit escalation boundaries used by Reality Budget selection.",
+      "invocation": "agent"
+    },
+    {
+      "id": "arsenal.proof-requirements",
+      "path": "arsenal/substrates/proof-requirements.json",
+      "category": "arsenal",
+      "kind": "reference",
+      "status": "draft",
+      "purpose": "Bind canonical capability verification requirements to runtime-agnostic proof properties for substrate selection.",
+      "invocation": "reference"
+    }
+  ]
+}

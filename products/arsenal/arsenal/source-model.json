@@ -1,0 +1,460 @@
+{
+  "schema_version": "1.0.0",
+  "artifacts": [
+    {
+      "id": "arsenal.protocol",
+      "path": "scripts/arsenal_protocol.py",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.vocabulary"],
+      "notes": "Canonical core protocol/execution vocabulary. Every domain validator imports from this module."
+    },
+    {
+      "id": "arsenal.governance-vocabulary",
+      "path": "scripts/arsenal_governance.py",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["governance.vocabulary"],
+      "notes": "Closed governance vocabulary: ownership layers, state roles, materialization modes. PR #24 keeps protocol/execution vocabulary in arsenal_protocol.py; this slice adds governance vocabulary as a separate closed surface."
+    },
+    {
+      "id": "arsenal.capability-fragment-schema",
+      "path": "arsenal/capability.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.capability-fragment-schema"],
+      "notes": "Structural schema for one capability fragment. Defines what a valid fragment IS, not which capabilities Arsenal currently ships."
+    },
+    {
+      "id": "arsenal.competence-lock-schema",
+      "path": "arsenal/lock.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.competence-lock-schema"]
+    },
+    {
+      "id": "arsenal.evaluation-case-schema",
+      "path": "evaluation/evaluation-case.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.evaluation-case-schema"]
+    },
+    {
+      "id": "arsenal.evaluation-receipt-schema",
+      "path": "evaluation/evaluation-receipt.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.evaluation-receipt-schema"]
+    },
+    {
+      "id": "arsenal.case-health-receipt-schema",
+      "path": "evaluation/case-health-receipt.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.case-health-receipt-schema"]
+    },
+    {
+      "id": "arsenal.flight-record-schema",
+      "path": "arsenal/observability/flight-record.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.flight-record-schema"]
+    },
+    {
+      "id": "arsenal.knowledge-snapshot-schema",
+      "path": "arsenal/knowledge/snapshot.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.knowledge-snapshot-schema"]
+    },
+    {
+      "id": "arsenal.trust-plane-schemas",
+      "path": "arsenal/trust/policy.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.trust-plane-schemas"],
+      "notes": "The four trust schemas (policy, candidate, review, decision) are co-versioned and treated as one provenance surface."
+    },
+    {
+      "id": "arsenal.governance-source-model-schema",
+      "path": "arsenal/source-model.schema.json",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.governance-source-model-schema"]
+    },
+    {
+      "id": "arsenal.distribution.compiler.targets",
+      "path": "distribution/compiler/targets.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.supported-targets"],
+      "notes": "Supported compiler targets, adapter versions, invocation policy, package-name patterns. A consumer may ENABLE a subset but cannot REDEFINE a target's adapter_version, invocation_support, or package_name_pattern; those are Arsenal-distribution facts."
+    },
+    {
+      "id": "arsenal.distribution.compiler.export-plan",
+      "path": "arsenal/compiler/export-plan.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.compiler.export-plan", "capability.current-target-export"],
+      "notes": "Maps Project Arsenal capabilities to their target packages, qualification suites, and adapter versions. The capability→target mapping is Project Arsenal distribution truth, not consumer configuration."
+    },
+    {
+      "id": "arsenal.distribution.schema-registry",
+      "path": "arsenal/schema-registry.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["distribution.schema-ids"],
+      "notes": "Canonical schema $id URLs. PR #24 explicitly places this on Layer 2; consumer config cannot override it."
+    },
+    {
+      "id": "arsenal.capability-fragments",
+      "path_pattern": "arsenal/capabilities/*.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "capability.identity",
+        "capability.current-lifecycle",
+        "capability.current-evaluation",
+        "capability.authority",
+        "capability.execution",
+        "capability.evidence"
+      ],
+      "notes": "Each fragment is the canonical definition of one Project Arsenal capability. A consuming project installs/uses these fragments but does not redefine them; a fork must publish its own fragment family and its own source-model."
+    },
+    {
+      "id": "arsenal.registry",
+      "path": "arsenal/registry.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["asset.identity"],
+      "notes": "Canonical base asset registry. The merged view (arsenal.registry + arsenal.registry.d) is the canonical read; both the base and the extensions are independently authored Project Arsenal distribution content. COMPOSITE-SOURCE NOTE: asset.identity's physical sources are arsenal/registry.json AND arsenal/registry.d/*.json; the current source model declares arsenal.registry as the single owner and lists arsenal.registry.d separately with no owns_facts. Composite-source modeling is a deferred-design prerequisite for the Project Intelligence tracer; see docs/roadmap/post-pr-24-deferred-architecture.md."
+    },
+    {
+      "id": "arsenal.registry.d",
+      "path_pattern": "arsenal/registry.d/*.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Co-authoritative extension fragments loaded in filename order. Per arsenal/ASSET_CONTRACT.md, both the base and the .d fragments are independently authored. The merged view is the canonical read; each fragment owns its own asset entries. COMPOSITE-SOURCE NOTE: see arsenal.registry; composite-source modeling is deferred until the source model can express multiple physical sources per fact."
+    },
+    {
+      "id": "arsenal.bench.case",
+      "path_pattern": "evaluation/cases/core-engineering.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["bench.case"],
+      "notes": "Concrete Core engineering-judgment bench suite shipped with Project Arsenal. The schema (evaluation-case.schema.json) is protocol; the suite instance is Project Arsenal distribution content."
+    },
+    {
+      "id": "arsenal.bench.distribution-qualification",
+      "path_pattern": "evaluation/cases/distribution-qualification*.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["bench.distribution-qualification-cases"],
+      "notes": "Concrete distribution-qualification suites shipped with Project Arsenal. Distinct from the protocol schema."
+    },
+    {
+      "id": "arsenal.bench.local-cloud-cases",
+      "path_pattern": "evaluation/cases/local-cloud.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["bench.local-cloud-cases"]
+    },
+    {
+      "id": "arsenal.governance-source-model",
+      "path": "arsenal/source-model.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "governance.artifact-classification.project-arsenal",
+        "governance.source-assignment.project-arsenal"
+      ],
+      "notes": "The source-model instance is Project Arsenal's own classification and source-assignment index. The schema (source-model.schema.json) is protocol; this instance is distribution content. The instance owns only classification/source-assignment; it does not store any domain value."
+    },
+    {
+      "id": "arsenal.distribution.skill",
+      "path_pattern": "distribution/agent-skills/*",
+      "ownership": "arsenal-distribution",
+      "state_role": "derived",
+      "materialization": "generated",
+      "owns_facts": [
+        "distribution.skill-snapshot",
+        "distribution.skill-reference",
+        "distribution.skill-manifest"
+      ],
+      "notes": "Every file under distribution/agent-skills/<pkg>/ is a deterministic projection of a capability fragment + the export plan + the target adapter. A fresh compile must produce byte-identical output."
+    },
+    {
+      "id": "arsenal.bench.distribution-qualification-receipt",
+      "path_pattern": "evaluation/qualifications/*.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "generated",
+      "owns_facts": [
+        "qualification-receipt.subject-binding",
+        "qualification-receipt.qualification-id",
+        "qualification-receipt.qualification-verdict"
+      ],
+      "notes": "Generated by the bench runner. The receipt is Project Arsenal's own qualification evidence for its own distributed packages. The receipt BINDS to canonical capability identity/target/adapter/suite/digests (those bindings are NOT duplicate normative owners of the canonical values); the receipt OWNS its own historical subject-binding, qualification identity, and verdict."
+    },
+    {
+      "id": "arsenal.knowledge.snapshot-fixture-kft-0",
+      "path": "arsenal/knowledge/fixtures/kft-0-kiln.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "generated",
+      "owns_facts": ["knowledge.snapshot-fixture-kft-0"],
+      "notes": "Project Arsenal's own regression fixture from KFT-0. The subject of the snapshot is Kiln; the owner of the snapshot is Project Arsenal."
+    },
+    {
+      "id": "arsenal.field-trial.kft-0-report",
+      "path": "docs/field-trials/KFT-0-kiln.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": ["field-trial.kft-0-report"],
+      "notes": "Project Arsenal's own report of the KFT-0 episode. Subject is Kiln; the report is owned by Project Arsenal. The report must not be edited merely because current Kiln state has changed."
+    },
+    {
+      "id": "arsenal.architecture.doctrine",
+      "path": "engineering/doctrine/ARCHITECTURE.md",
+      "ownership": "arsenal-protocol",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["architecture.ownership-layers"],
+      "notes": "Architecture doctrine is protocol because it sets authoritative ownership/state-role boundaries for the repository. It is canonical architecture text, not a free-form explainer."
+    },
+    {
+      "id": "arsenal.method-records",
+      "path_pattern": "evaluation/method-records/*.yaml",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": [
+        "method-record.method-evidence",
+        "method-record.method-provenance",
+        "method-record.qualification-status"
+      ],
+      "notes": "Project Arsenal's own Qualified Method Records emitted under the engineering-system/qualified-method-record/v0 contract. Records are evidence surfaces, not authority; each record binds to the canonical capability fragment via provenance and the contract map (evaluation/method-records/contract-map.md). The records own their own historical evidence and provenance; they do NOT redefine capability identity, lifecycle, or evaluation status owned by arsenal.capability-fragments."
+    },
+    {
+      "id": "arsenal.method-records.schema",
+      "path": "evaluation/method-records/qualified-method-record.v0.schema.json",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-schema"],
+      "notes": "Project Arsenal's reproduction of the engineering-system qualified-method-record/v0 contract as a closed-shape JSON Schema. The schema is normative for records Project Arsenal emits; the upstream contract id (engineering-system/qualified-method-record/v0) is preserved as the required schema identity. Consumers needing the engineering-system canonical schema should resolve the upstream $id."
+    },
+    {
+      "id": "arsenal.method-records.contract-map",
+      "path": "evaluation/method-records/contract-map.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Project Arsenal's narrative traceability between the engineering-system qualified-method-record/v0 contract clauses and the Project Arsenal surface that enforces them. Non-authoritative documentation; the executable enforcement lives in scripts/arsenal_method_record.py and the schema under evaluation/method-records/."
+    },
+    {
+      "id": "arsenal.method-records.validator",
+      "path": "scripts/arsenal_method_record.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-validator"],
+      "notes": "Deterministic CLI that validates Project Arsenal Qualified Method Records against the canonical schema, the contract invariants, the canonical digest rule, and the contract's no-runtime-authority invariant. Exits with documented non-zero codes on every documented failure class."
+    },
+    {
+      "id": "arsenal.method-records.tests",
+      "path": "scripts/test-method-record.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-record-tests"],
+      "notes": "Positive, negative, transition, determinism, and provenance tests for the method-record validator. Each test mutates one property of the canonical record in an isolated temporary directory."
+    },
+    {
+      "id": "arsenal.method-evaluation.cases",
+      "path_pattern": "evaluation/method-cases/",
+      "ownership": "arsenal-distribution",
+      "state_role": "historical",
+      "materialization": "authored",
+      "owns_facts": [
+        "method-evaluation.case-fixtures",
+        "method-evaluation.corpus-manifest"
+      ],
+      "notes": "Bounded, deterministic local-repository evaluation corpus for the Repository Recon method. Each case is a self-contained fixture directory with repo/ and expected.json. The corpus is owned by Project Arsenal distribution; consumers do not redefine its method_id or capability_id. The corpus owns its own case fixtures and corpus manifest; it does NOT redefine capability state owned by arsenal.capability-fragments."
+    },
+    {
+      "id": "arsenal.method-evaluation.evaluator",
+      "path": "scripts/arsenal_evaluate.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-evaluator"],
+      "notes": "Deterministic CLI that evaluates the canonical Repository Recon method against the bounded corpus and emits an evaluation artifact with method identity, version, contexts, per-case successes/misses/unsupported_claims/unknowns/failures, evidence references, qualification gap, and an explicit epistemic conclusion. Exits with documented non-zero codes on every documented failure class. Never promotes capability lifecycle or evaluation status; auto-promotion flags in the artifact are always false."
+    },
+    {
+      "id": "arsenal.method-evaluation.tests",
+      "path": "scripts/test-arsenal-evaluate.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-tests"],
+      "notes": "Positive, determinism, negative, honesty, authority, and provenance tests for the method-evaluation CLI. Each test runs the CLI in an isolated temporary directory and asserts the documented behavior. Tests refuse composite scores, runtime authority tokens, and remote credentials."
+    },
+    {
+      "id": "arsenal.method-evaluation.adapters",
+      "path_pattern": "evaluation/adapters/*",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "protocol.method-evaluation-adapter-contract",
+        "protocol.method-evaluation-adapter-findings-shape"
+      ],
+      "notes": "The adapter seam through which the method evaluator can be configured to invoke an external Repository Recon procedure. Three adapters: internal-fixture-procedure (the canonical default, wraps scripts/arsenal_evaluate._run_recon_procedure), shell-loadout-recon (Phase 1 placeholder, reads pre-emitted findings from a JSON file), and loadout-runtime (Phase 2, shells out to the Loadout W3 checkpoint's runRepositoryRecon via Node.js). Adapter contracts: no Arsenal source import of Loadout, no Arsenal runtime dependency on Loadout, the adapter identity is recorded in the artifact's provenance.adapter block, and a broken candidate produces strictly worse evaluation evidence (no silent fallback)."
+    },
+    {
+      "id": "arsenal.method-evaluation.adapter-tests",
+      "path": "scripts/test-repository-recon-adapter.py",
+      "ownership": "arsenal-distribution",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": ["protocol.method-evaluation-adapter-tests"],
+      "notes": "Positive, negative, regression, determinism, provenance, translation, and no-silent-fallback tests for the adapter surface. Proves the evaluator can be configured to use any of the three adapters, a broken candidate produces strictly more misses than the canonical internal run, the shell and loadout-runtime adapters refuse silent fallback to the internal procedure, the corpus-level end-to-end evaluation pattern is wired up, and the Loadout-to-Arsenal findings translation is honest (1:1 with the ReconResultV1 shape)."
+    },
+    {
+      "id": "arsenal.epistemic-lifecycle",
+      "path": "docs/arsenal-lifecycle.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Canonical documentation for Project Arsenal's epistemic lifecycle (Idea -> Hypothesis -> Experimental -> Replicated/Evaluated -> Qualified) and its mapping onto the existing LIFECYCLE_STATES and EVALUATION_STATES protocol vocabularies. Narrative artifact; the lifecycle itself is owned by arsenal.protocol and arsenal.capability-fragments."
+    },
+    {
+      "id": "arsenal.roadmap.post-pr-24",
+      "path": "docs/roadmap/post-pr-24-deferred-architecture.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": [],
+      "notes": "Project Arsenal's own program roadmap. Consumers do not redefine Project Arsenal's roadmap by configuration."
+    },
+    {
+      "id": "arsenal.roadmap.capability-system",
+      "path": "docs/roadmap/capability-system.md",
+      "ownership": "arsenal-distribution",
+      "state_role": "narrative",
+      "materialization": "authored",
+      "owns_facts": []
+    },
+    {
+      "id": "arsenal.project",
+      "path": "arsenal.project.json",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "authored",
+      "owns_facts": [
+        "project.identity",
+        "project.doctrine-pointer",
+        "project.enabled-targets"
+      ],
+      "notes": "Consumer/deployment configuration. PR #24 explicitly forbids absorbing current branch, current PR, current qualification, or any value that mutates because work happened. This file is the only artifact in the repository owned by the consumer deployment."
+    },
+    {
+      "id": "arsenal.competence-lockfile",
+      "path": ".arsenal.lock",
+      "ownership": "consumer-deployed",
+      "state_role": "normative",
+      "materialization": "generated",
+      "owns_facts": [
+        "lockfile.pinned-capability-identity",
+        "lockfile.pinned-capability-lifecycle",
+        "lockfile.pinned-capability-evaluation",
+        "lockfile.pinned-capability-target-export"
+      ],
+      "notes": "Generated by the compiler; consumer-accepted as the current competence pin. The lockfile's lifecycle/evaluation values are PINS, not duplicate normative owners of the canonical lifecycle. This is the canonical generated+normative counter-example to a generated==derived shortcut."
+    }
+  ],
+  "facts": [
+    {"id": "protocol.vocabulary", "owner_artifact": "arsenal.protocol", "locator": "module-level constants"},
+    {"id": "governance.vocabulary", "owner_artifact": "arsenal.governance-vocabulary", "locator": "module-level frozensets"},
+    {"id": "protocol.capability-fragment-schema", "owner_artifact": "arsenal.capability-fragment-schema", "locator": "schema"},
+    {"id": "protocol.competence-lock-schema", "owner_artifact": "arsenal.competence-lock-schema", "locator": "schema"},
+    {"id": "protocol.evaluation-case-schema", "owner_artifact": "arsenal.evaluation-case-schema", "locator": "schema"},
+    {"id": "protocol.evaluation-receipt-schema", "owner_artifact": "arsenal.evaluation-receipt-schema", "locator": "schema"},
+    {"id": "protocol.case-health-receipt-schema", "owner_artifact": "arsenal.case-health-receipt-schema", "locator": "schema"},
+    {"id": "protocol.flight-record-schema", "owner_artifact": "arsenal.flight-record-schema", "locator": "schema"},
+    {"id": "protocol.knowledge-snapshot-schema", "owner_artifact": "arsenal.knowledge-snapshot-schema", "locator": "schema"},
+    {"id": "protocol.trust-plane-schemas", "owner_artifact": "arsenal.trust-plane-schemas", "locator": "schema"},
+    {"id": "protocol.governance-source-model-schema", "owner_artifact": "arsenal.governance-source-model-schema", "locator": "schema"},
+    {"id": "distribution.supported-targets", "owner_artifact": "arsenal.distribution.compiler.targets", "locator": "targets"},
+    {"id": "distribution.compiler.export-plan", "owner_artifact": "arsenal.distribution.compiler.export-plan", "locator": "exports"},
+    {"id": "distribution.schema-ids", "owner_artifact": "arsenal.distribution.schema-registry", "locator": "schemas"},
+    {"id": "capability.identity", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.id"},
+    {"id": "capability.current-lifecycle", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.lifecycle"},
+    {"id": "capability.current-evaluation", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.evaluation"},
+    {"id": "capability.authority", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.authority"},
+    {"id": "capability.execution", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.execution"},
+    {"id": "capability.evidence", "owner_artifact": "arsenal.capability-fragments", "locator": "capability.evidence_outputs"},
+    {"id": "capability.current-target-export", "owner_artifact": "arsenal.distribution.compiler.export-plan", "locator": "exports[]"},
+    {"id": "asset.identity", "owner_artifact": "arsenal.registry", "locator": "assets[] (merged with arsenal.registry.d)"},
+    {"id": "bench.case", "owner_artifact": "arsenal.bench.case", "locator": "suite.cases[]"},
+    {"id": "bench.local-cloud-cases", "owner_artifact": "arsenal.bench.local-cloud-cases", "locator": "suite.cases[]"},
+    {"id": "bench.distribution-qualification-cases", "owner_artifact": "arsenal.bench.distribution-qualification", "locator": "suite.cases[]"},
+    {"id": "project.identity", "owner_artifact": "arsenal.project", "locator": "project"},
+    {"id": "project.doctrine-pointer", "owner_artifact": "arsenal.project", "locator": "project.doctrine_path"},
+    {"id": "project.enabled-targets", "owner_artifact": "arsenal.project", "locator": "distribution.enabled_targets"},
+    {"id": "lockfile.pinned-capability-identity", "owner_artifact": "arsenal.competence-lockfile", "locator": "capabilities[].id and .version and capability_sha256"},
+    {"id": "lockfile.pinned-capability-lifecycle", "owner_artifact": "arsenal.competence-lockfile", "locator": "capabilities[].lifecycle"},
+    {"id": "lockfile.pinned-capability-evaluation", "owner_artifact": "arsenal.competence-lockfile", "locator": "capabilities[].evaluation"},
+    {"id": "lockfile.pinned-capability-target-export", "owner_artifact": "arsenal.competence-lockfile", "locator": "capabilities[].exports[]"},
+    {"id": "distribution.skill-snapshot", "owner_artifact": "arsenal.distribution.skill", "locator": "SKILL.md"},
+    {"id": "distribution.skill-reference", "owner_artifact": "arsenal.distribution.skill", "locator": "references/"},
+    {"id": "distribution.skill-manifest", "owner_artifact": "arsenal.distribution.skill", "locator": "arsenal-manifest.json"},
+    {"id": "qualification-receipt.subject-binding", "owner_artifact": "arsenal.bench.distribution-qualification-receipt", "locator": "qualification_identity (capability_id, target, adapter_version, suite_id) and binding.*"},
+    {"id": "qualification-receipt.qualification-id", "owner_artifact": "arsenal.bench.distribution-qualification-receipt", "locator": "qualification_id"},
+    {"id": "qualification-receipt.qualification-verdict", "owner_artifact": "arsenal.bench.distribution-qualification-receipt", "locator": "verdict and status"},
+    {"id": "knowledge.snapshot-fixture-kft-0", "owner_artifact": "arsenal.knowledge.snapshot-fixture-kft-0", "locator": "snapshot"},
+    {"id": "field-trial.kft-0-report", "owner_artifact": "arsenal.field-trial.kft-0-report", "locator": "report"},
+    {"id": "architecture.ownership-layers", "owner_artifact": "arsenal.architecture.doctrine", "locator": "ownership-layers"},
+    {"id": "method-record.method-evidence", "owner_artifact": "arsenal.method-records", "locator": "evaluation.evidence_refs and evaluation.observed_strengths and evaluation.observed_failures"},
+    {"id": "method-record.method-provenance", "owner_artifact": "arsenal.method-records", "locator": "provenance.arsenal_commit and provenance.record_digest and procedure_ref"},
+    {"id": "method-record.qualification-status", "owner_artifact": "arsenal.method-records", "locator": "status and qualified_for.contexts and qualified_for.exclusions"},
+    {"id": "protocol.method-record-schema", "owner_artifact": "arsenal.method-records.schema", "locator": "schema"},
+    {"id": "protocol.method-record-validator", "owner_artifact": "arsenal.method-records.validator", "locator": "scripts/arsenal_method_record.py"},
+    {"id": "protocol.method-record-tests", "owner_artifact": "arsenal.method-records.tests", "locator": "scripts/test-method-record.py"},
+    {"id": "method-evaluation.case-fixtures", "owner_artifact": "arsenal.method-evaluation.cases", "locator": "evaluation/method-cases/<case_id>/repo and expected.json"},
+    {"id": "method-evaluation.corpus-manifest", "owner_artifact": "arsenal.method-evaluation.cases", "locator": "evaluation/method-cases/corpus.manifest.json"},
+    {"id": "protocol.method-evaluation-evaluator", "owner_artifact": "arsenal.method-evaluation.evaluator", "locator": "scripts/arsenal_evaluate.py"},
+    {"id": "protocol.method-evaluation-tests", "owner_artifact": "arsenal.method-evaluation.tests", "locator": "scripts/test-arsenal-evaluate.py"},
+    {"id": "protocol.method-evaluation-adapter-contract", "owner_artifact": "arsenal.method-evaluation.adapters", "locator": "evaluation/adapters/repository_recon_adapter.py"},
+    {"id": "protocol.method-evaluation-adapter-findings-shape", "owner_artifact": "arsenal.method-evaluation.adapters", "locator": "evaluation/adapters/repository_recon_adapter.py:ALLOWED_KINDS"},
+    {"id": "protocol.method-evaluation-adapter-tests", "owner_artifact": "arsenal.method-evaluation.adapter-tests", "locator": "scripts/test-repository-recon-adapter.py"},
+    {"id": "governance.artifact-classification.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "artifacts[]"},
+    {"id": "governance.source-assignment.project-arsenal", "owner_artifact": "arsenal.governance-source-model", "locator": "facts[]"}
+  ]
+}

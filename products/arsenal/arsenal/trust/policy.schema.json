@@ -1,0 +1,20 @@
+{
+  "$id": "https://project-arsenal.dev/schema/trust-policy-1.0.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "auto_approval": {"const": false},
+    "baseline_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "canonical_change_action": {"const": "REVIEW_REQUIRED"},
+    "challenge_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "digest_change_action": {"const": "REQUARANTINE"},
+    "escalation_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "policy_change_action": {"const": "REVIEW_REQUIRED"},
+    "policy_id": {"pattern": "^policy\\.[a-z0-9.-]+$", "type": "string"},
+    "prohibited_authority": {"items": {"enum": ["cloud.local","cloud.remote","filesystem.read","filesystem.write","git.read","git.write","human.confirmation","network.read","network.write","production.mutate","secrets.read","shell.execute","tracker.read","tracker.write"]}, "type": "array", "uniqueItems": true},
+    "schema_version": {"const": "1.0.0"}
+  },
+  "required": ["schema_version","policy_id","auto_approval","baseline_authority","escalation_authority","prohibited_authority","challenge_authority","digest_change_action","policy_change_action","canonical_change_action"],
+  "title": "Project Arsenal Trust Policy",
+  "type": "object"
+}

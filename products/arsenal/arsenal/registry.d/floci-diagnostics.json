@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0.0",
+  "assets": [
+    {
+      "id": "engineering.floci-aws-diagnostics-pack",
+      "path": "engineering/development_packs/floci/aws/diagnostics/README.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Provide the runnable FLC-03 LocalStack migration, environment diagnosis, cloud-bug reproduction, state-minimization, and evidence reference pack.",
+      "upstream": ["engineering.floci-aws-golden-path", "engineering.floci-aws-iac-ci", "engineering.floci-fidelity-policy", "software.diagnose-bug"],
+      "downstream": ["engineering.floci-localstack-migration-matrix", "engineering.floci-cloud-repro-receipt", "engineering.floci-cloud-state-minimization", "agent.migrate-localstack-to-floci", "agent.reproduce-cloud-bug-locally", "agent.diagnose-floci-environment", "agent.audit-floci-fidelity-gap"]
+    },
+    {
+      "id": "engineering.floci-localstack-migration-matrix",
+      "path": "engineering/development_packs/floci/aws/diagnostics/MIGRATION_ACCEPTANCE_MATRIX.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Record behavior-level LocalStack-to-Floci migration assumptions, dispositions, verification evidence, results, and residual risk.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "engineering.floci-fidelity-policy"]
+    },
+    {
+      "id": "engineering.floci-cloud-repro-receipt",
+      "path": "engineering/development_packs/floci/aws/diagnostics/BUG_REPRO_RECEIPT.md",
+      "category": "engineering",
+      "kind": "template",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Capture a minimized cloud-bug reproduction with red and control signals, Floci provenance, fidelity bounds, and provider-only residue.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "foundation.cloud-fidelity-ledger", "foundation.reproducible-cloud-fixtures"]
+    },
+    {
+      "id": "engineering.floci-cloud-state-minimization",
+      "path": "engineering/development_packs/floci/aws/diagnostics/STATE_MINIMIZATION.md",
+      "category": "engineering",
+      "kind": "reference",
+      "status": "draft",
+      "invocation": "reference",
+      "purpose": "Reduce cloud incident evidence into sanitized source-controlled fixtures while preserving a red-capable signal and nearby green control.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "foundation.reproducible-cloud-fixtures", "software.diagnose-bug"]
+    },
+    {
+      "id": "agent.migrate-localstack-to-floci",
+      "path": "agent_workflows/migrate_localstack_to_floci.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Inventory LocalStack-specific assumptions, resolve blockers, migrate to a pinned Floci runtime, and prove behavior rather than performing a blind image swap.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "engineering.floci-localstack-migration-matrix", "foundation.cloud-execution-boundary"]
+    },
+    {
+      "id": "agent.reproduce-cloud-bug-locally",
+      "path": "agent_workflows/reproduce_cloud_bug_locally.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Reduce a sanitized remote cloud symptom into a minimal red-capable Floci fixture, prove a nearby green control, and preserve bounded evidence.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "engineering.floci-cloud-state-minimization", "engineering.floci-cloud-repro-receipt", "software.diagnose-bug"]
+    },
+    {
+      "id": "agent.diagnose-floci-environment",
+      "path": "agent_workflows/diagnose_floci_environment.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Diagnose Floci failures from execution boundary through readiness, provider-shaped probes, scoped logging, and failure classification before changing application code.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "foundation.cloud-execution-boundary", "engineering.floci-fidelity-policy"]
+    },
+    {
+      "id": "agent.audit-floci-fidelity-gap",
+      "path": "agent_workflows/audit_floci_fidelity_gap.md",
+      "category": "agent_workflows",
+      "kind": "workflow",
+      "status": "draft",
+      "invocation": "human",
+      "purpose": "Resolve ambiguous local cloud evidence at exact provider-service-operation-semantic granularity and decide whether to proceed locally, block, redesign, or escalate narrowly.",
+      "upstream": ["engineering.floci-aws-diagnostics-pack", "engineering.floci-fidelity-policy", "foundation.cloud-fidelity-ledger"]
+    }
+  ]
+}

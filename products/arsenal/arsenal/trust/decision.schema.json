@@ -1,0 +1,25 @@
+{
+  "$id": "https://project-arsenal.dev/schema/trust-decision-1.0.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "authority": {"type": "object"},
+    "candidate": {"type": "object"},
+    "challenge": {"properties": {"reasons": {"items": {"type": "string"}, "type": "array"}, "required": {"type": "boolean"}, "status": {"enum": ["not-required","pending"]}}, "required": ["required","status","reasons"], "type": "object"},
+    "content_change_action": {"const": "REQUARANTINE"},
+    "decision_id": {"pattern": "^trust-[0-9a-f]{24}$", "type": "string"},
+    "policy": {"type": "object"},
+    "reasons": {"items": {"type": "string"}, "minItems": 1, "type": "array"},
+    "reconsideration_triggers": {"items": {"enum": ["candidate-digest-change","policy-digest-change","canonical-capability-change","authority-increase","evaluation-regression","explicit-revocation"]}, "type": "array", "uniqueItems": true},
+    "review": {"type": "object"},
+    "revocation": {"type": "object"},
+    "route_gate": {"properties": {"authorized": {"type": "boolean"}, "required_decision_id": {"type": "string"}}, "required": ["authorized","required_decision_id"], "type": "object"},
+    "schema_version": {"const": "1.0.0"},
+    "supersedes_decision_id": {"type": ["string","null"]},
+    "target": {"type": "object"},
+    "verdict": {"enum": ["APPROVED","QUARANTINED","REVIEW_REQUIRED","ESCALATION_REQUIRED","REJECTED","REVOKED"]}
+  },
+  "required": ["schema_version","decision_id","supersedes_decision_id","verdict","reasons","candidate","policy","review","target","authority","route_gate","challenge","reconsideration_triggers","content_change_action"],
+  "title": "Project Arsenal Trust Decision",
+  "type": "object"
+}

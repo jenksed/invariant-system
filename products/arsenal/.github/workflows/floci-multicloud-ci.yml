@@ -1,0 +1,152 @@
+name: Floci Multi-Cloud Overlays
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/floci-multicloud-ci.yml"
+      - "engineering/development_packs/floci/providers/**"
+      - "engineering/development_packs/floci/azure/**"
+      - "engineering/development_packs/floci/gcp/**"
+      - "engineering/development_packs/floci/oci/**"
+      - "agent_workflows/route_local_cloud_provider.md"
+      - "arsenal/registry.d/floci-multicloud.json"
+      - "docs/source_audits/floci_multicloud.md"
+      - "engineering/development_packs/floci/ROADMAP.md"
+  workflow_dispatch:
+
+jobs:
+  provider-router:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate router and shell entrypoints
+        run: |
+          python3 -m py_compile engineering/development_packs/floci/providers/scripts/resolve-provider
+          for f in \
+            engineering/development_packs/floci/azure/scripts/* \
+            engineering/development_packs/floci/gcp/scripts/* \
+            engineering/development_packs/floci/oci/scripts/*; do
+            bash -n "$f"
+          done
+          python3 -m py_compile \
+            engineering/development_packs/floci/azure/tracer.py \
+            engineering/development_packs/floci/gcp/tracer.py \
+            engineering/development_packs/floci/oci/tracer.py
+      - name: Prove four-provider routing and ambiguity stop
+        run: |
+          r=engineering/development_packs/floci/providers/scripts/resolve-provider
+          root="$(mktemp -d)"
+          mkdir -p "$root"/{aws,azure,gcp,oci,mixed,unknown}
+          printf 'provider "aws" {}\n' > "$root/aws/main.tf"
+          printf 'AZURE_STORAGE_CONNECTION_STRING=local\n' > "$root/azure/.env"
+          printf 'STORAGE_EMULATOR_HOST=local\n' > "$root/gcp/.env"
+          printf 'provider "oci" {}\n' > "$root/oci/main.tf"
+          printf 'provider "aws" {}\nprovider "google" {}\n' > "$root/mixed/main.tf"
+          echo hello > "$root/unknown/README"
+          for p in aws azure gcp oci; do
+            "$r" "$root/$p" --format json > "$root/$p.json"
+            python3 - "$root/$p.json" "$p" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert data["provider"] == sys.argv[2], data
+          assert data["pack"].endswith("/" + sys.argv[2])
+          PY
+          done
+          set +e
+          "$r" "$root/mixed" >/dev/null; mixed_rc=$?
+          "$r" "$root/unknown" >/dev/null; unknown_rc=$?
+          set -e
+          test "$mixed_rc" -eq 3
+          test "$unknown_rc" -eq 4
+          echo "FLC-04 provider router: PASS"
+
+  azure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Azure SDK dependencies
+        run: python3 -m pip install --disable-pip-version-check -r engineering/development_packs/floci/azure/requirements.txt
+      - name: Configure Azure local environment
+        run: cp engineering/development_packs/floci/azure/env.floci-az.example engineering/development_packs/floci/azure/.env.floci-az
+      - name: Prove Azure endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/azure/scripts/common.sh
+          set +e
+          AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=prod;BlobEndpoint=https://example.blob.core.windows.net;QueueEndpoint=https://example.queue.core.windows.net;' guard_endpoint >/tmp/azure-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run Azure completion gate
+        run: engineering/development_packs/floci/azure/scripts/verify-completion
+      - name: Upload Azure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-azure-evidence
+          path: engineering/development_packs/floci/azure/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down Azure
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/azure/.env.floci-az -f engineering/development_packs/floci/azure/docker-compose.floci-az.yml down --volumes --remove-orphans || true
+
+  gcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GCP SDK dependencies
+        run: python3 -m pip install --disable-pip-version-check -r engineering/development_packs/floci/gcp/requirements.txt
+      - name: Configure GCP local environment
+        run: cp engineering/development_packs/floci/gcp/env.floci-gcp.example engineering/development_packs/floci/gcp/.env.floci-gcp
+      - name: Prove GCP endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/gcp/scripts/common.sh
+          set +e
+          STORAGE_EMULATOR_HOST=https://storage.googleapis.com guard_endpoint >/tmp/gcp-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run GCP completion gate
+        run: engineering/development_packs/floci/gcp/scripts/verify-completion
+      - name: Upload GCP evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-gcp-evidence
+          path: engineering/development_packs/floci/gcp/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down GCP
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/gcp/.env.floci-gcp -f engineering/development_packs/floci/gcp/docker-compose.floci-gcp.yml down --volumes --remove-orphans || true
+
+  oci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure OCI local environment
+        run: cp engineering/development_packs/floci/oci/env.floci-oci.example engineering/development_packs/floci/oci/.env.floci-oci
+      - name: Prove OCI endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/oci/scripts/common.sh
+          set +e
+          FLOCI_OCI_ENDPOINT=https://objectstorage.us-ashburn-1.oraclecloud.com guard_endpoint >/tmp/oci-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run OCI completion gate
+        run: engineering/development_packs/floci/oci/scripts/verify-completion
+      - name: Upload OCI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-oci-evidence
+          path: engineering/development_packs/floci/oci/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down OCI
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/oci/.env.floci-oci -f engineering/development_packs/floci/oci/docker-compose.floci-oci.yml down --volumes --remove-orphans || true

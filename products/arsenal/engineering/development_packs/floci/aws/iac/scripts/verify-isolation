@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=iac-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/iac-common.sh"
+
+ensure_tools
+ensure_iac_env
+command -v aws >/dev/null 2>&1 || { echo "missing required tool: aws" >&2; exit 127; }
+
+name_a="floci-iac-isolation-a-$$"
+name_b="floci-iac-isolation-b-$$"
+endpoint_a="http://127.0.0.1:4567"
+endpoint_b="http://127.0.0.1:4568"
+bucket="arsenal-floci-isolation"
+receipt="$IAC_ARTIFACT_DIR/isolation-receipt.md"
+tmp="$(mktemp -d)"
+printf 'runtime-a\n' >"$tmp/a.txt"
+printf 'runtime-b\n' >"$tmp/b.txt"
+
+cleanup() {
+  docker logs "$name_a" >"$IAC_ARTIFACT_DIR/isolation-a.log" 2>&1 || true
+  docker logs "$name_b" >"$IAC_ARTIFACT_DIR/isolation-b.log" 2>&1 || true
+  docker rm -f "$name_a" "$name_b" >/dev/null 2>&1 || true
+  rm -rf "$tmp"
+}
+trap cleanup EXIT
+
+aws_ep() {
+  local endpoint="$1"; shift
+  env -u AWS_PROFILE -u AWS_DEFAULT_PROFILE \
+    AWS_CONFIG_FILE=/dev/null AWS_SHARED_CREDENTIALS_FILE=/dev/null \
+    AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_SESSION_TOKEN= \
+    AWS_DEFAULT_REGION=us-east-1 AWS_EC2_METADATA_DISABLED=true \
+    aws --endpoint-url "$endpoint" "$@"
+}
+
+wait_health() {
+  local endpoint="$1"
+  for _ in $(seq 1 60); do
+    if curl -fsS "$endpoint/_floci/health" >/dev/null 2>&1; then return 0; fi
+    sleep 1
+  done
+  echo "timed out waiting for $endpoint" >&2
+  return 1
+}
+
+docker run -d --name "$name_a" -p 127.0.0.1:4567:4566 -e FLOCI_STORAGE_MODE=memory "$FLOCI_IMAGE" >/dev/null
+docker run -d --name "$name_b" -p 127.0.0.1:4568:4566 -e FLOCI_STORAGE_MODE=memory "$FLOCI_IMAGE" >/dev/null
+wait_health "$endpoint_a"
+wait_health "$endpoint_b"
+
+aws_ep "$endpoint_a" s3api create-bucket --bucket "$bucket" >/dev/null
+aws_ep "$endpoint_b" s3api create-bucket --bucket "$bucket" >/dev/null
+aws_ep "$endpoint_a" s3api put-object --bucket "$bucket" --key a.txt --body "$tmp/a.txt" >/dev/null
+aws_ep "$endpoint_b" s3api put-object --bucket "$bucket" --key b.txt --body "$tmp/b.txt" >/dev/null
+
+aws_ep "$endpoint_a" s3api head-object --bucket "$bucket" --key a.txt >/dev/null
+aws_ep "$endpoint_b" s3api head-object --bucket "$bucket" --key b.txt >/dev/null
+
+if aws_ep "$endpoint_a" s3api head-object --bucket "$bucket" --key b.txt >/dev/null 2>&1; then
+  echo "runtime A observed runtime B marker" >&2
+  exit 1
+fi
+if aws_ep "$endpoint_b" s3api head-object --bucket "$bucket" --key a.txt >/dev/null 2>&1; then
+  echo "runtime B observed runtime A marker" >&2
+  exit 1
+fi
+
+{
+  echo "# FLC-02 isolation receipt"
+  echo
+  echo "- result: PASS"
+  echo "- project_arsenal_revision: ${ARSENAL_REVISION:-unknown}"
+  echo "- floci_image: $FLOCI_IMAGE"
+  echo "- runtime_a_endpoint: $endpoint_a"
+  echo "- runtime_b_endpoint: $endpoint_b"
+  echo "- shared_bucket_name: $bucket"
+  echo "- a_sees_a: PASS"
+  echo "- b_sees_b: PASS"
+  echo "- a_cannot_see_b: PASS"
+  echo "- b_cannot_see_a: PASS"
+} >"$receipt"
+
+printf 'FLC-02 two-runtime isolation gate: PASS\nreceipt: %s\n' "$receipt"

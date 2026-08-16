@@ -1,0 +1,49 @@
+{
+  "schema": "arsenal/repository-recon-candidates/v1",
+  "candidates": [
+    {
+      "method_id": "repository-recon/topology-inventory",
+      "hypothesis": "A complete tracked-file and directory inventory plus bounded standard-path negatives recovers explicit topology without inference.",
+      "targets_misses": ["W5-M01","W5-M02","W5-M03","W5-M04","W5-M05","W5-M06","W5-M07","W5-M09","W5-M10","W5-M11"],
+      "new_observations_required": ["tracked file inventory","directory parents","bounded standard-path absence","common verification globs"],
+      "inference_introduced": "none",
+      "expected_benefit": "high detection recall with exact path evidence",
+      "false_claim_risk": "low; every claim is revalidated against the filesystem",
+      "cost_latency": "one git ls-files call plus bounded path/glob checks",
+      "determinism_characteristics": "sorted Git/file observations; no network, clock, or model"
+    },
+    {
+      "method_id": "repository-recon/structured-manifest",
+      "hypothesis": "Recursive parsing of bounded JSON and runtime manifests recovers product identity and declared build/runtime facts more precisely than filename catalogues.",
+      "targets_misses": ["W5-M05","W5-M08"],
+      "new_observations_required": ["JSON pointer values","root runtime manifest declarations"],
+      "inference_introduced": "none; structured scalar values and literal manifest lines only",
+      "expected_benefit": "high precision for identity, version, runtime, and command claims",
+      "false_claim_risk": "low; malformed or oversized documents are skipped rather than guessed",
+      "cost_latency": "bounded parse of tracked JSON and standard runtime manifests",
+      "determinism_characteristics": "sorted paths and pointers; no network, clock, or model"
+    },
+    {
+      "method_id": "repository-recon/governance-graph",
+      "hypothesis": "Explicit path references in governing and introductory documents can reconstruct authority/document relationships without semantic guesswork.",
+      "targets_misses": ["W5-M04","W5-M08"],
+      "new_observations_required": ["root governance documents","literal path references","reference target existence"],
+      "inference_introduced": "bounded relationship: a literal path reference means references, not governs",
+      "expected_benefit": "recovers governance hierarchy while preserving unknown authority when no accepted root exists",
+      "false_claim_risk": "low; relationship vocabulary is limited to literal references",
+      "cost_latency": "bounded reads of root governance and README documents",
+      "determinism_characteristics": "literal token extraction and sorted edges; no network, clock, or model"
+    },
+    {
+      "method_id": "repository-recon/staged-evidence-graph",
+      "hypothesis": "Staging topology observation, structured parsing, and literal governance relationships yields broad coverage while keeping every conclusion evidence-bound.",
+      "targets_misses": ["W5-M01","W5-M02","W5-M03","W5-M04","W5-M05","W5-M06","W5-M07","W5-M08","W5-M09","W5-M10","W5-M11"],
+      "new_observations_required": ["topology inventory","bounded negatives","structured manifest values","literal governance edges"],
+      "inference_introduced": "none beyond the explicit references relation",
+      "expected_benefit": "best evidence coverage across heterogeneous repositories without strengthening claims",
+      "false_claim_risk": "low but broader blast radius; invalid emitted claims are counted as false certainty",
+      "cost_latency": "sum of the three bounded deterministic stages",
+      "determinism_characteristics": "deduplicated canonical claim order; no network, clock, or model"
+    }
+  ]
+}

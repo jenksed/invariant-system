@@ -1,0 +1,545 @@
+{
+  "$defs": {
+    "authority": {
+      "enum": [
+        "filesystem.read",
+        "filesystem.write",
+        "shell.execute",
+        "network.read",
+        "network.write",
+        "git.read",
+        "git.write",
+        "tracker.read",
+        "tracker.write",
+        "secrets.read",
+        "cloud.local",
+        "cloud.remote",
+        "production.mutate",
+        "human.confirmation"
+      ]
+    },
+    "capability": {
+      "additionalProperties": false,
+      "properties": {
+        "aliases": {
+          "items": {
+            "minLength": 2,
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "authority": {
+          "additionalProperties": false,
+          "properties": {
+            "forbidden": {
+              "items": {
+                "$ref": "#/$defs/authority"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "optional": {
+              "items": {
+                "$ref": "#/$defs/authority"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "required": {
+              "items": {
+                "$ref": "#/$defs/authority"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "required",
+            "optional",
+            "forbidden"
+          ],
+          "type": "object"
+        },
+        "compatibility": {
+          "additionalProperties": false,
+          "properties": {
+            "notes": {
+              "type": "string"
+            },
+            "supersedes": {
+              "items": {
+                "pattern": "^capability\\.[a-z][a-z0-9.-]*$",
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "supersedes",
+            "notes"
+          ],
+          "type": "object"
+        },
+        "context": {
+          "additionalProperties": false,
+          "properties": {
+            "preferred": {
+              "items": {
+                "minLength": 3,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            "required": {
+              "items": {
+                "minLength": 3,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "required",
+            "preferred"
+          ],
+          "type": "object"
+        },
+        "discovery": {
+          "$ref": "#/$defs/discovery"
+        },
+        "display_name": {
+          "minLength": 2,
+          "type": "string"
+        },
+        "evaluation": {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "enum": [
+                "unassessed",
+                "planned",
+                "candidate",
+                "qualified"
+              ]
+            },
+            "suite_asset_ids": {
+              "items": {
+                "minLength": 3,
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "status",
+            "suite_asset_ids"
+          ],
+          "type": "object"
+        },
+        "evidence_outputs": {
+          "items": {
+            "$ref": "#/$defs/namedDescription"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "execution": {
+          "additionalProperties": false,
+          "properties": {
+            "allowed": {
+              "items": {
+                "$ref": "#/$defs/substrate"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "preferred": {
+              "items": {
+                "$ref": "#/$defs/substrate"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "prohibited": {
+              "items": {
+                "$ref": "#/$defs/substrate"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "preferred",
+            "allowed",
+            "prohibited"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "pattern": "^capability\\.[a-z][a-z0-9.-]*$",
+          "type": "string"
+        },
+        "implementation": {
+          "additionalProperties": false,
+          "properties": {
+            "asset_ids": {
+              "items": {
+                "minLength": 3,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            },
+            "primary_asset": {
+              "minLength": 3,
+              "type": "string"
+            },
+            "resources": {
+              "items": {
+                "$ref": "#/$defs/resource"
+              },
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "primary_asset",
+            "asset_ids"
+          ],
+          "type": "object"
+        },
+        "inputs": {
+          "items": {
+            "$ref": "#/$defs/input"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "invocation": {
+          "enum": [
+            "human",
+            "agent",
+            "composed"
+          ]
+        },
+        "lifecycle": {
+          "enum": [
+            "draft",
+            "testing",
+            "stable",
+            "deprecated"
+          ]
+        },
+        "mutation": {
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "enum": [
+                "read-only",
+                "workspace-write",
+                "external-write",
+                "high-consequence"
+              ]
+            },
+            "reversible": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "class",
+            "reversible"
+          ],
+          "type": "object"
+        },
+        "outputs": {
+          "items": {
+            "$ref": "#/$defs/namedDescription"
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        "preconditions": {
+          "items": {
+            "$ref": "#/$defs/precondition"
+          },
+          "type": "array"
+        },
+        "provenance": {
+          "additionalProperties": false,
+          "properties": {
+            "asset_ids": {
+              "items": {
+                "minLength": 3,
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array",
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "asset_ids"
+          ],
+          "type": "object"
+        },
+        "purpose": {
+          "minLength": 12,
+          "type": "string"
+        },
+        "verification": {
+          "additionalProperties": false,
+          "properties": {
+            "receipt_required": {
+              "type": "boolean"
+            },
+            "requirements": {
+              "items": {
+                "$ref": "#/$defs/verificationRequirement"
+              },
+              "minItems": 1,
+              "type": "array"
+            }
+          },
+          "required": [
+            "requirements",
+            "receipt_required"
+          ],
+          "type": "object"
+        },
+        "version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "display_name",
+        "aliases",
+        "purpose",
+        "lifecycle",
+        "invocation",
+        "discovery",
+        "inputs",
+        "outputs",
+        "preconditions",
+        "context",
+        "implementation",
+        "authority",
+        "mutation",
+        "execution",
+        "verification",
+        "evidence_outputs",
+        "evaluation",
+        "provenance",
+        "compatibility"
+      ],
+      "type": "object"
+    },
+    "discovery": {
+      "additionalProperties": false,
+      "properties": {
+        "do_not_use_when": {
+          "items": {
+            "$ref": "#/$defs/discoveryStatement"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "use_when": {
+          "items": {
+            "$ref": "#/$defs/discoveryStatement"
+          },
+          "minItems": 1,
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "use_when"
+      ],
+      "type": "object"
+    },
+    "discoveryStatement": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "positive",
+            "negative"
+          ]
+        },
+        "text": {
+          "minLength": 8,
+          "type": "string"
+        }
+      },
+      "required": [
+        "text"
+      ],
+      "type": "object"
+    },
+    "input": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 8,
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "required",
+        "description"
+      ],
+      "type": "object"
+    },
+    "namedDescription": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 8,
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "description"
+      ],
+      "type": "object"
+    },
+    "precondition": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 8,
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "description"
+      ],
+      "type": "object"
+    },
+    "resource": {
+      "additionalProperties": false,
+      "properties": {
+        "asset_id": {
+          "minLength": 3,
+          "type": "string"
+        },
+        "load": {
+          "enum": [
+            "always",
+            "on-demand",
+            "execute-not-read"
+          ]
+        },
+        "role": {
+          "enum": [
+            "instructions",
+            "reference",
+            "script",
+            "template",
+            "fixture",
+            "asset"
+          ]
+        }
+      },
+      "required": [
+        "asset_id",
+        "role",
+        "load"
+      ],
+      "type": "object"
+    },
+    "substrate": {
+      "enum": [
+        "reasoning-only",
+        "repository-read",
+        "local-process",
+        "local-container",
+        "local-emulator",
+        "local-cluster",
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production",
+        "user-mediated"
+      ]
+    },
+    "verificationRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "minLength": 8,
+          "type": "string"
+        },
+        "evidence_kind": {
+          "enum": [
+            "report",
+            "artifact",
+            "command",
+            "test",
+            "diff",
+            "receipt",
+            "decision-record",
+            "runtime-observation",
+            "verdict"
+          ]
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9_.-]*$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "description",
+        "evidence_kind"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://project-arsenal.dev/schema/capability-fragment-2.2.0.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capability": {
+      "$ref": "#/$defs/capability"
+    },
+    "schema_version": {
+      "const": "2.2.0"
+    }
+  },
+  "required": [
+    "schema_version",
+    "capability"
+  ],
+  "title": "Project Arsenal Capability Fragment",
+  "type": "object"
+}

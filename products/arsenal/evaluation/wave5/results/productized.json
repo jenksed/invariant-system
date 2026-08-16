@@ -1,0 +1,217 @@
+{
+  "adapter": {
+    "digest": "sha256:9c84d79674f3aca10e8a8e2966cd8e5c4a638e0b9ec280b50e2cd35f4f45e5e9",
+    "id": "loadout-runtime"
+  },
+  "binding": {
+    "capability_contract_digest": "sha256:32bf4718256a3cb5b4a6b24ad061c0863f582b99e8b71e5dd1a640077df901dd",
+    "capability_id": "repository-recon",
+    "loadout_commit": "c29a1df7d302c9043360fdf40431a6f079bbb4b1",
+    "loadout_procedure_ref": "sha256:d3b42aaef36e4c7d8c2c10a86aecee228e04a2b84fb22e5bbc920b95fc2fe6e9",
+    "method_id": "repository-recon/staged-evidence-graph",
+    "method_version": "0.2.0",
+    "reason": "QMR v0 cannot canonically bind the product target, adapter, suite, and result; this lock is evaluation evidence, not a qualified QMR.",
+    "research_commit": "1d239ca262fa2a337897d8f2b4a37104f1506b4e",
+    "research_winner_lock": "evaluation/wave5/winner-lock.v1.json",
+    "schema": "arsenal/repository-recon-productized-lock/v1",
+    "status": "experimental"
+  },
+  "original_16": {
+    "assertions": 16,
+    "candidate_output_digest": "sha256:2bcfe1d91973606cfe77b9d5e95f65ec39b588883633df1f7424ee226cb4336d",
+    "case_results": [
+      {
+        "case_id": "recon.straightforward.small-clean",
+        "misses": [],
+        "supported": [
+          "agents_md_present",
+          "readme_present",
+          "src_tree_present",
+          "no_canonical_contracts",
+          "no_capability_fragments"
+        ]
+      },
+      {
+        "case_id": "recon.governed.explicit-architecture",
+        "misses": [],
+        "supported": [
+          "agents_md_present",
+          "doctrine_present",
+          "capability_fragment_present",
+          "existing_qmr_present",
+          "scripts_validator_present",
+          "capability_id_recon"
+        ]
+      },
+      {
+        "case_id": "recon.ambiguous.incomplete-state",
+        "misses": [],
+        "supported": [
+          "agents_md_absent",
+          "readme_present",
+          "no_canonical_contracts",
+          "no_capability_fragments",
+          "no_existing_qmr"
+        ]
+      }
+    ],
+    "deterministic": true,
+    "misses": 0,
+    "supported": 16,
+    "unsupported_factual_claims": 0
+  },
+  "real_corpus": {
+    "metrics": {
+      "assertions_total": 60,
+      "correct_unknowns": 2,
+      "deterministic": true,
+      "evidence_coverage": 1.0,
+      "execution_cost_ms": 1015.242,
+      "false_certainty": 0,
+      "misses": 0,
+      "supported_assertions": 60,
+      "unsupported_claims": 0
+    },
+    "results": [
+      {
+        "assertions_total": 15,
+        "claim_count": 7844,
+        "claims_digest": "sha256:04e15b0e236e5a0848b9a888af6bf3be3e57a27207c6e8c1eb1b6b8bd054cd3d",
+        "commit": "4dcc1b0fe5c6a198c62b4b130fc9ff7c0e1b15e6",
+        "correct_unknowns": [
+          "ARS-15"
+        ],
+        "evidence_coverage": 1.0,
+        "false_certainty": 0,
+        "miss_count": 0,
+        "misses": [],
+        "repository_id": "project-arsenal",
+        "role": "development",
+        "supported_assertions": [
+          "ARS-01",
+          "ARS-02",
+          "ARS-03",
+          "ARS-04",
+          "ARS-05",
+          "ARS-06",
+          "ARS-07",
+          "ARS-08",
+          "ARS-09",
+          "ARS-10",
+          "ARS-11",
+          "ARS-12",
+          "ARS-13",
+          "ARS-14",
+          "ARS-15"
+        ],
+        "supported_count": 15,
+        "unsupported_claim_count": 0,
+        "unsupported_claims": []
+      },
+      {
+        "assertions_total": 15,
+        "claim_count": 2558,
+        "claims_digest": "sha256:44a51ddcee2ba616041c2a086e988d1c1636f82181c744623ef1d86cc65ccbc5",
+        "commit": "161946be59960ff8e8a16726ca1dc585abf714ec",
+        "correct_unknowns": [],
+        "evidence_coverage": 1.0,
+        "false_certainty": 0,
+        "miss_count": 0,
+        "misses": [],
+        "repository_id": "loadout",
+        "role": "development",
+        "supported_assertions": [
+          "LOD-01",
+          "LOD-02",
+          "LOD-03",
+          "LOD-04",
+          "LOD-05",
+          "LOD-06",
+          "LOD-07",
+          "LOD-08",
+          "LOD-09",
+          "LOD-10",
+          "LOD-11",
+          "LOD-12",
+          "LOD-13",
+          "LOD-14",
+          "LOD-15"
+        ],
+        "supported_count": 15,
+        "unsupported_claim_count": 0,
+        "unsupported_claims": []
+      },
+      {
+        "assertions_total": 15,
+        "claim_count": 7231,
+        "claims_digest": "sha256:46899941a3d975190df950c47db0f4252267ef7da01609a270b258c87f145908",
+        "commit": "bd2c9bcf715c99ef4f126179c1739c3b031039fc",
+        "correct_unknowns": [],
+        "evidence_coverage": 1.0,
+        "false_certainty": 0,
+        "miss_count": 0,
+        "misses": [],
+        "repository_id": "kiln",
+        "role": "validation",
+        "supported_assertions": [
+          "KLN-01",
+          "KLN-02",
+          "KLN-03",
+          "KLN-04",
+          "KLN-05",
+          "KLN-06",
+          "KLN-07",
+          "KLN-08",
+          "KLN-09",
+          "KLN-10",
+          "KLN-11",
+          "KLN-12",
+          "KLN-13",
+          "KLN-14",
+          "KLN-15"
+        ],
+        "supported_count": 15,
+        "unsupported_claim_count": 0,
+        "unsupported_claims": []
+      },
+      {
+        "assertions_total": 15,
+        "claim_count": 88,
+        "claims_digest": "sha256:51fc9912810eded312e1e9d8449ffea909bfc5ff8d7b692629bbd72157032632",
+        "commit": "57e78b576105dc9c4051f133d0b4697b2e35a8a0",
+        "correct_unknowns": [
+          "TMP-14"
+        ],
+        "evidence_coverage": 1.0,
+        "false_certainty": 0,
+        "miss_count": 0,
+        "misses": [],
+        "repository_id": "temper",
+        "role": "holdout",
+        "supported_assertions": [
+          "TMP-01",
+          "TMP-02",
+          "TMP-03",
+          "TMP-04",
+          "TMP-05",
+          "TMP-06",
+          "TMP-07",
+          "TMP-08",
+          "TMP-09",
+          "TMP-10",
+          "TMP-11",
+          "TMP-12",
+          "TMP-13",
+          "TMP-14",
+          "TMP-15"
+        ],
+        "supported_count": 15,
+        "unsupported_claim_count": 0,
+        "unsupported_claims": []
+      }
+    ]
+  },
+  "result_digest": "sha256:e1860e3bfd763c00012e06d46d84415aa2fd5c4794475eef17268c9ba4ed2dfd",
+  "schema": "arsenal/repository-recon-productized-result/v1",
+  "suite_digest": "sha256:f322c1997b11f04ff2156e6fab035a1e27d4b47c3ddc5a6f479f92fc3173f68c"
+}

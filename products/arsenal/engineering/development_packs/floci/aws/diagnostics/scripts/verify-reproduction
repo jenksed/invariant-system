@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DIAG_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+AWS_PACK_DIR="$(cd "$DIAG_DIR/.." && pwd)"
+CASE_DIR="$DIAG_DIR/examples/sqs-redrive-mismatch"
+ARTIFACT_ROOT="${FLOCI_ARTIFACT_DIR:-$AWS_PACK_DIR/.floci-artifacts}"
+ARTIFACT_DIR="$ARTIFACT_ROOT/diagnostics"
+mkdir -p "$ARTIFACT_DIR"
+
+export AWS_ENDPOINT_URL="${AWS_ENDPOINT_URL:-http://localhost:4566}"
+export FLOCI_EXPECTED_ENDPOINT="${FLOCI_EXPECTED_ENDPOINT:-http://localhost:4566}"
+
+if [[ ! -f "${FLOCI_ENV_FILE:-$AWS_PACK_DIR/.env.floci}" ]]; then
+  cp "$AWS_PACK_DIR/env.floci.example" "$AWS_PACK_DIR/.env.floci"
+fi
+
+"$AWS_PACK_DIR/scripts/start"
+"$SCRIPT_DIR/diagnose-floci" "$ARTIFACT_DIR/environment.md"
+"$CASE_DIR/seed.sh"
+
+red_log="$ARTIFACT_DIR/red.log"
+set +e
+"$CASE_DIR/repro.sh" >"$red_log" 2>&1
+red_rc=$?
+set -e
+if [[ "$red_rc" -ne 1 ]]; then
+  printf 'expected red reproduction exit 1, got %s\n' "$red_rc" >&2
+  cat "$red_log" >&2
+  exit 1
+fi
+grep -F 'REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3' "$red_log" >/dev/null
+
+"$CASE_DIR/control.sh" >"$ARTIFACT_DIR/control.log"
+"$CASE_DIR/repro.sh" >"$ARTIFACT_DIR/green.log"
+grep -F 'CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5' "$ARTIFACT_DIR/green.log" >/dev/null
+
+fixture_digest="$(python3 - "$CASE_DIR" <<'PY'
+import hashlib, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+h = hashlib.sha256()
+for name in ["case.json", "seed.sh", "repro.sh", "control.sh"]:
+    data = (root / name).read_bytes()
+    h.update(name.encode())
+    h.update(b"\0")
+    h.update(data)
+    h.update(b"\0")
+print(h.hexdigest())
+PY
+)"
+
+receipt="$ARTIFACT_DIR/reproduction-receipt.md"
+cat >"$receipt" <<EOF
+# FLC-03 Reproduction Receipt
+
+- Case ID: \`flc03.sqs-redrive-mismatch\`
+- Floci endpoint: \`$AWS_ENDPOINT_URL\`
+- Fixture digest: \`$fixture_digest\`
+- Red result: PASS (reproduction observed)
+- Red signal: \`REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3\`
+- Control result: PASS
+- Green signal: \`CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5\`
+- Minimized state: one work queue, one DLQ, one RedrivePolicy attribute
+- Sensitive data: none; synthetic fixture only
+- Provider-only residue: AWS delivery timing, redrive timing, authorization, quota, regional, and managed-service semantics are not established by this local case.
+EOF
+
+test -s "$receipt"
+grep -F 'Case ID: `flc03.sqs-redrive-mismatch`' "$receipt" >/dev/null
+grep -F 'Red signal: `REPRODUCED flc03.sqs-redrive-mismatch expected=5 actual=3`' "$receipt" >/dev/null
+grep -F 'Green signal: `CLEARED flc03.sqs-redrive-mismatch expected=5 actual=5`' "$receipt" >/dev/null
+
+# Cleanup is explicit but not completion authority; CI also tears down the emulator.
+suffix="${REPRO_SUFFIX:-flc03}"
+# shellcheck disable=SC1091
+source "$AWS_PACK_DIR/scripts/common.sh"
+for q in "arsenal-${suffix}-work" "arsenal-${suffix}-dlq"; do
+  if url="$(aws_local sqs get-queue-url --queue-name "$q" --query QueueUrl --output text 2>/dev/null)"; then
+    aws_local sqs delete-queue --queue-url "$url" >/dev/null || true
+  fi
+done
+
+printf 'FLC-03 cloud reproduction gate: PASS\n'
+printf 'receipt: %s\n' "$receipt"

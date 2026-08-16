@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# shellcheck source=iac-common.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/iac-common.sh"
+ensure_iac_env
+trap 'capture_floci_evidence opentofu-wrapper-failure' ERR
+compose down --volumes --remove-orphans >/dev/null 2>&1 || true
+"$AWS_PACK_DIR/scripts/start"
+"$IAC_SCRIPT_DIR/run-hcl-cycle" opentofu opentofu

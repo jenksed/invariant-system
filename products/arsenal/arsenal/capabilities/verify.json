@@ -1,0 +1,177 @@
+{
+  "capability": {
+    "aliases": [
+      "Independent Verification",
+      "Completion Verification"
+    ],
+    "authority": {
+      "forbidden": [
+        "filesystem.write",
+        "network.write",
+        "git.write",
+        "tracker.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "network.read"
+      ],
+      "required": [
+        "filesystem.read",
+        "git.read",
+        "shell.execute"
+      ]
+    },
+    "compatibility": {
+      "notes": "Verification remains non-repairing by default; fixing discovered defects requires a separate implementation capability.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "acceptance.criteria",
+        "repository.current_state",
+        "prior.receipts",
+        "runtime.output"
+      ],
+      "required": [
+        "completion.claims"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The work is in active implementation and no completion claim has been issued"
+        },
+        {
+          "kind": "negative",
+          "text": "Repository truth itself is unverified and must be re-established before any completion claim"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "Completion claims can be stated precisely enough to test against an independent evidence matrix"
+        },
+        {
+          "kind": "positive",
+          "text": "An independent verdict is more valuable than another implementation or review pass"
+        }
+      ]
+    },
+    "display_name": "Verify",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Reproducible claim-to-evidence matrix and check outcomes.",
+        "name": "verification_receipt"
+      },
+      {
+        "description": "PASS, FAIL, or BLOCKED/UNVERIFIED result.",
+        "name": "verification_verdict"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "local-process",
+        "local-container"
+      ],
+      "preferred": [
+        "repository-read",
+        "local-process"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.verify",
+    "implementation": {
+      "asset_ids": [
+        "agent.independent-verification"
+      ],
+      "primary_asset": "agent.independent-verification",
+      "resources": [
+        {
+          "asset_id": "agent.independent-verification",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Work product whose completion claims must be independently checked.",
+        "name": "artifact_or_repository",
+        "required": true
+      },
+      {
+        "description": "Claims or acceptance criteria that define the asserted done state.",
+        "name": "completion_claims",
+        "required": true
+      },
+      {
+        "description": "Prior tests or receipts that may inform but cannot substitute for independent verification.",
+        "name": "prior_results",
+        "required": false
+      }
+    ],
+    "invocation": "agent",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "read-only",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "PASS, FAIL, or BLOCKED/UNVERIFIED verdict.",
+        "name": "verification_verdict"
+      },
+      {
+        "description": "Claim-to-evidence matrix and reproducible checks another person can inspect.",
+        "name": "receipt_bundle"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "Consequential completion claims can be stated precisely enough to test.",
+        "id": "claims_stateable"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.independent-verification"
+      ]
+    },
+    "purpose": "Independently test completion claims and produce a reproducible evidence-backed verdict.",
+    "verification": {
+      "receipt_required": true,
+      "requirements": [
+        {
+          "description": "Each consequential completion claim is mapped to evidence or an explicit gap.",
+          "evidence_kind": "report",
+          "id": "claim_matrix"
+        },
+        {
+          "description": "Strongest practical deterministic or inspectable checks are executed independently.",
+          "evidence_kind": "command",
+          "id": "independent_checks"
+        },
+        {
+          "description": "Skipped, unavailable, failed, and unverified checks are visible in the verdict.",
+          "evidence_kind": "verdict",
+          "id": "verdict_bounded"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

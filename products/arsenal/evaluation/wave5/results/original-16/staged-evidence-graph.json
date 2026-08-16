@@ -1,0 +1,51 @@
+{
+  "candidate_output_digest": "sha256:ddbfb8b909c3b570a0d147d1e3e62d562a4ff0e8252d57b61f255bab01c721a3",
+  "case_results": [
+    {
+      "case_id": "recon.straightforward.small-clean",
+      "misses": [],
+      "supported": [
+        "agents_md_present",
+        "readme_present",
+        "src_tree_present",
+        "no_canonical_contracts",
+        "no_capability_fragments"
+      ]
+    },
+    {
+      "case_id": "recon.governed.explicit-architecture",
+      "misses": [],
+      "supported": [
+        "agents_md_present",
+        "doctrine_present",
+        "capability_fragment_present",
+        "existing_qmr_present",
+        "scripts_validator_present",
+        "capability_id_recon"
+      ]
+    },
+    {
+      "case_id": "recon.ambiguous.incomplete-state",
+      "misses": [],
+      "supported": [
+        "agents_md_absent",
+        "readme_present",
+        "no_canonical_contracts",
+        "no_capability_fragments",
+        "no_existing_qmr"
+      ]
+    }
+  ],
+  "corpus": "corpus.repository-recon-evaluation-v0",
+  "implementation_digest": "sha256:7992da31c1394ed9cb872764178d329bb1784605c529fc993aa668736267a99f",
+  "method_id": "repository-recon/staged-evidence-graph",
+  "metrics": {
+    "assertions": 16,
+    "deterministic": true,
+    "misses": 0,
+    "supported": 16,
+    "unsupported_factual_claims": 0
+  },
+  "result_digest": "sha256:4026e2562cd0115808f769aa4e15440600b7277745a918fafcf33c616b6813ec",
+  "schema": "arsenal/repository-recon-original-16-result/v1"
+}

@@ -1,0 +1,109 @@
+name: Floci IaC + CI Preflight
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/floci-iac-ci.yml"
+      - "engineering/development_packs/floci/aws/**"
+      - "agent_workflows/validate_iac_with_floci.md"
+      - "arsenal/registry.d/floci.json"
+      - "docs/source_audits/floci.md"
+  workflow_dispatch:
+
+env:
+  ARSENAL_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  hcl:
+    name: ${{ matrix.engine }}
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [terraform, opentofu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Run zero-state IaC completion gate
+        run: ./scripts/verify-${{ matrix.engine }}
+
+      - name: Upload IaC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-${{ matrix.engine }}-evidence
+          path: engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file ../.env.floci -f ../docker-compose.floci.yml down --volumes --remove-orphans
+
+  cloudformation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Run CloudFormation completion gate
+        run: ./scripts/verify-cloudformation
+
+      - name: Upload CloudFormation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-cloudformation-evidence
+          path: engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file ../.env.floci -f ../docker-compose.floci.yml down --volumes --remove-orphans
+
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Prove two Floci runtimes do not share state
+        run: ./scripts/verify-isolation
+
+      - name: Upload isolation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-isolation-evidence
+          path: engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true

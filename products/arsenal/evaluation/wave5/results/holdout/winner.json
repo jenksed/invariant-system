@@ -1,0 +1,56 @@
+{
+  "corpus_digest": "sha256:f322c1997b11f04ff2156e6fab035a1e27d4b47c3ddc5a6f479f92fc3173f68c",
+  "implementation_digest": "sha256:7992da31c1394ed9cb872764178d329bb1784605c529fc993aa668736267a99f",
+  "method_id": "repository-recon/staged-evidence-graph",
+  "metrics": {
+    "assertions_total": 15,
+    "correct_unknowns": 1,
+    "deterministic": true,
+    "evidence_coverage": 1.0,
+    "execution_cost_ms": 30.069,
+    "false_certainty": 0,
+    "misses": 0,
+    "supported_assertions": 15,
+    "unsupported_claims": 0
+  },
+  "phase": "holdout",
+  "result_digest": "sha256:8b4a52396a4c75b29bd1c3a817862c795f02dcebb7fd9fdc867c7899d7bd88cd",
+  "results": [
+    {
+      "assertions_total": 15,
+      "claim_count": 88,
+      "claims_digest": "sha256:5f9d26252dd219b9cc5c46de7747b5d5f8e7a4366dc2322cd28afa65856270f8",
+      "commit": "57e78b576105dc9c4051f133d0b4697b2e35a8a0",
+      "correct_unknowns": [
+        "TMP-14"
+      ],
+      "evidence_coverage": 1.0,
+      "false_certainty": 0,
+      "miss_count": 0,
+      "misses": [],
+      "repository_id": "temper",
+      "role": "holdout",
+      "supported_assertions": [
+        "TMP-01",
+        "TMP-02",
+        "TMP-03",
+        "TMP-04",
+        "TMP-05",
+        "TMP-06",
+        "TMP-07",
+        "TMP-08",
+        "TMP-09",
+        "TMP-10",
+        "TMP-11",
+        "TMP-12",
+        "TMP-13",
+        "TMP-14",
+        "TMP-15"
+      ],
+      "supported_count": 15,
+      "unsupported_claim_count": 0,
+      "unsupported_claims": []
+    }
+  ],
+  "schema": "arsenal/repository-recon-benchmark-result/v1"
+}

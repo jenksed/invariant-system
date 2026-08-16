@@ -1,0 +1,181 @@
+{
+  "capability": {
+    "aliases": [
+      "Bug Diagnosis"
+    ],
+    "authority": {
+      "forbidden": [
+        "network.write",
+        "git.write",
+        "tracker.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "network.read"
+      ],
+      "required": [
+        "filesystem.read",
+        "filesystem.write",
+        "shell.execute",
+        "git.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Generic Diagnose defaults to local/workspace authority; provider-only or production diagnosis requires a specialized capability or explicit escalation.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "logs",
+        "tests",
+        "runtime.evidence",
+        "domain.knowledge"
+      ],
+      "required": [
+        "task.failure_symptom",
+        "repository.current_state"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The reported issue is a missing feature or enhancement with no failure to reproduce"
+        },
+        {
+          "kind": "negative",
+          "text": "Repository truth itself is the immediate blocker rather than the failure"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "A reported bug, regression, flake, or performance failure requires a red-capable feedback loop before causal commitment"
+        },
+        {
+          "kind": "positive",
+          "text": "The failure can be reproduced or a measurable signal can be constructed against the affected seam"
+        }
+      ]
+    },
+    "display_name": "Diagnose",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Root cause, falsified alternatives, loop command or artifact, fix, and bounded follow-up.",
+        "name": "diagnostic_report"
+      },
+      {
+        "description": "Inspectable red-to-green evidence for the reported failure.",
+        "name": "regression_evidence"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "local-process",
+        "local-container"
+      ],
+      "preferred": [
+        "local-process",
+        "repository-read"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.diagnose",
+    "implementation": {
+      "asset_ids": [
+        "software.diagnose-bug"
+      ],
+      "primary_asset": "software.diagnose-bug",
+      "resources": [
+        {
+          "asset_id": "software.diagnose-bug",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Observed bug, regression, flake, or performance failure to reproduce.",
+        "name": "failure_symptom",
+        "required": true
+      },
+      {
+        "description": "Code and execution surface in which the failure should be investigated.",
+        "name": "repository_scope",
+        "required": true
+      },
+      {
+        "description": "Existing logs, traces, tests, requests, or prior hypotheses.",
+        "name": "known_evidence",
+        "required": false
+      }
+    ],
+    "invocation": "agent",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "workspace-write",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Evidence-backed causal explanation or explicit statement of missing evidence.",
+        "name": "root_cause"
+      },
+      {
+        "description": "Red-to-green regression evidence at the strongest useful public seam.",
+        "name": "regression_proof"
+      },
+      {
+        "description": "Smallest correct implementation change when the cause is established.",
+        "name": "fix"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "A signal capable of detecting the reported failure can be built or recovered.",
+        "id": "reproducible_signal_possible"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "software.diagnose-bug"
+      ]
+    },
+    "purpose": "Reproduce, minimize, explain, and correct a hard failure through a tight red-capable feedback loop.",
+    "verification": {
+      "receipt_required": true,
+      "requirements": [
+        {
+          "description": "The exact symptom is detected by a repeatable red-capable loop before causal commitment.",
+          "evidence_kind": "test",
+          "id": "red_receipt"
+        },
+        {
+          "description": "The minimized regression and original feedback loop pass after the fix.",
+          "evidence_kind": "test",
+          "id": "fix_replays"
+        },
+        {
+          "description": "Temporary instrumentation is removed and follow-up work is separated from the correctness fix.",
+          "evidence_kind": "diff",
+          "id": "cleanup_complete"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

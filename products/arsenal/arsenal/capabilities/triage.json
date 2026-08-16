@@ -1,0 +1,185 @@
+{
+  "capability": {
+    "aliases": [
+      "Request Triage"
+    ],
+    "authority": {
+      "forbidden": [
+        "filesystem.write",
+        "git.write",
+        "tracker.write",
+        "network.write",
+        "secrets.read",
+        "cloud.remote",
+        "production.mutate"
+      ],
+      "optional": [
+        "git.read"
+      ],
+      "required": [
+        "filesystem.read",
+        "tracker.read"
+      ]
+    },
+    "compatibility": {
+      "notes": "Public display name Triage is independent of canonical asset id agent.triage-to-agent-ready.",
+      "supersedes": []
+    },
+    "context": {
+      "preferred": [
+        "project.vocabulary",
+        "project.decisions",
+        "repository.current_state",
+        "project.rejected_decisions"
+      ],
+      "required": [
+        "task.intent"
+      ]
+    },
+    "discovery": {
+      "do_not_use_when": [
+        {
+          "kind": "negative",
+          "text": "The request already has a single actionable state and an agent-ready brief and only needs implementation"
+        },
+        {
+          "kind": "negative",
+          "text": "Implementation is already in progress and the next action is to continue work rather than classify the request"
+        }
+      ],
+      "use_when": [
+        {
+          "kind": "positive",
+          "text": "A new request has arrived in needs-triage state and must be evaluated against project vocabulary and prior decisions"
+        },
+        {
+          "kind": "positive",
+          "text": "A reported bug or external change needs the core claim verified before being expanded into scope"
+        },
+        {
+          "kind": "positive",
+          "text": "A request must be routed to ready-for-agent, ready-for-human, needs-information, or rejected with an evidence-based reason"
+        }
+      ]
+    },
+    "display_name": "Triage",
+    "evaluation": {
+      "status": "unassessed",
+      "suite_asset_ids": []
+    },
+    "evidence_outputs": [
+      {
+        "description": "Defensible triage state with evidence-based reason.",
+        "name": "classified_state"
+      },
+      {
+        "description": "Behavioral brief sufficient for autonomous work when state is ready-for-agent.",
+        "name": "agent_ready_brief"
+      }
+    ],
+    "execution": {
+      "allowed": [
+        "repository-read",
+        "user-mediated"
+      ],
+      "preferred": [
+        "repository-read"
+      ],
+      "prohibited": [
+        "remote-sandbox",
+        "shared-nonproduction",
+        "staging",
+        "production"
+      ]
+    },
+    "id": "capability.triage",
+    "implementation": {
+      "asset_ids": [
+        "agent.triage-to-agent-ready"
+      ],
+      "primary_asset": "agent.triage-to-agent-ready",
+      "resources": [
+        {
+          "asset_id": "agent.triage-to-agent-ready",
+          "load": "on-demand",
+          "role": "reference"
+        }
+      ]
+    },
+    "inputs": [
+      {
+        "description": "Incoming bug, feature request, or external change including discussion, labels, attachments, and any code samples.",
+        "name": "request",
+        "required": true
+      },
+      {
+        "description": "Project domain language and durable decisions used to interpret the request.",
+        "name": "project_vocabulary",
+        "required": false
+      },
+      {
+        "description": "Prior decisions on the same concept, including reasons and reconsideration triggers.",
+        "name": "rejected_decision_memory",
+        "required": false
+      }
+    ],
+    "invocation": "human",
+    "lifecycle": "draft",
+    "mutation": {
+      "class": "read-only",
+      "reversible": true
+    },
+    "outputs": [
+      {
+        "description": "Single actionable state with evidence-based reason: ready-for-agent, ready-for-human, needs-information, or rejected.",
+        "name": "classified_state"
+      },
+      {
+        "description": "Durable behavioral brief with summary, current and desired behavior, interfaces, acceptance criteria, out-of-scope, and pointers.",
+        "name": "agent_ready_brief"
+      },
+      {
+        "description": "Concept, reason, prior request pointer, and reconsideration trigger when state is rejected.",
+        "name": "rejected_decision_record"
+      }
+    ],
+    "preconditions": [
+      {
+        "description": "The original request, discussion, and attachments are available for inspection.",
+        "id": "request_artifact_available"
+      },
+      {
+        "description": "The project's triage state vocabulary is known or a defensible default taxonomy is adopted.",
+        "id": "state_taxonomy_known"
+      }
+    ],
+    "provenance": {
+      "asset_ids": [
+        "agent.triage-to-agent-ready"
+      ]
+    },
+    "purpose": "Move an incoming bug, feature request, or external change from raw report to a defensible next state and durable agent-ready brief when appropriate.",
+    "verification": {
+      "receipt_required": false,
+      "requirements": [
+        {
+          "description": "The request ends in exactly one actionable state with an evidence-based reason.",
+          "evidence_kind": "report",
+          "id": "single_actionable_state"
+        },
+        {
+          "description": "The core claim is reproduced or refuted before the request is expanded.",
+          "evidence_kind": "verdict",
+          "id": "core_claim_verified"
+        },
+        {
+          "description": "Rejected durable decisions include concept, reason, prior pointer, and reconsideration trigger.",
+          "evidence_kind": "decision-record",
+          "id": "rejected_decisions_recorded"
+        }
+      ]
+    },
+    "version": "0.1.0"
+  },
+  "schema_version": "2.2.0"
+}

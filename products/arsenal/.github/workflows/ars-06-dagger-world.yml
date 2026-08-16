@@ -1,0 +1,116 @@
+name: ARS-06 Dagger Executable World
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ars-06-dagger-world.yml"
+      - "engineering/development_packs/dagger/**"
+      - "arsenal/substrates/**"
+      - "arsenal/capabilities/**"
+      - "arsenal/graph/**"
+      - "arsenal/registry.json"
+      - "arsenal/registry.d/**"
+      - "scripts/arsenal_dagger.py"
+      - "scripts/test-arsenal-dagger.py"
+      - "scripts/arsenal_substrate.py"
+      - "scripts/arsenal_graph.py"
+      - "scripts/arsenal_compile.py"
+      - "scripts/arsenal_bench.py"
+      - "docs/source_audits/dagger.md"
+      - "docs/roadmap/capability-system.md"
+      - "README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  executable-world:
+    runs-on: ubuntu-latest
+    env:
+      DAGGER_NO_NAG: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check ARS-06
+        run: |
+          python3 -m py_compile \
+            scripts/arsenal_dagger.py \
+            scripts/test-arsenal-dagger.py \
+            engineering/development_packs/dagger/fixtures/tdd-red-green/run_world.py
+
+      - name: Validate Dagger world contract
+        run: |
+          python3 scripts/arsenal_dagger.py validate
+          python3 scripts/test-arsenal-dagger.py
+
+      - name: Prove Reality Budget selects local-container only when requested
+        run: |
+          python3 scripts/arsenal_dagger.py preflight
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.tdd \
+            --requirement red_observed \
+            --authority-profile workspace-safe \
+            --availability-profile minimal-local
+
+      - name: Install pinned Dagger CLI
+        uses: dagger/dagger-for-github@v8.3.0
+        with:
+          version: "0.21.7"
+
+      - name: Execute proof-gated Dagger world
+        run: python3 scripts/arsenal_dagger.py run
+
+      - name: Prove deterministic replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .arsenal-evidence/ars-06-tdd-python-container.json /tmp/ars-06-first.json
+          cp .arsenal-evidence/ars-06-tdd-python-container.world.json /tmp/ars-06-first-world.json
+          rm -f .arsenal-evidence/ars-06-tdd-python-container.json
+          rm -f .arsenal-evidence/ars-06-tdd-python-container.world.json
+          python3 scripts/arsenal_dagger.py run
+          cmp /tmp/ars-06-first.json .arsenal-evidence/ars-06-tdd-python-container.json
+          cmp /tmp/ars-06-first-world.json .arsenal-evidence/ars-06-tdd-python-container.world.json
+          python3 scripts/arsenal_dagger.py verify
+
+      - name: Upload executable-world receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ars-06-tdd-python-container-receipt
+          path: |
+            .arsenal-evidence/ars-06-tdd-python-container.json
+            .arsenal-evidence/ars-06-tdd-python-container.world.json
+          if-no-files-found: error
+
+      - name: Preserve Reality Budget regression
+        run: |
+          python3 scripts/arsenal_substrate.py validate
+          python3 scripts/test-arsenal-substrate.py
+
+      - name: Preserve Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+
+      - name: Preserve compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve Bench lifecycle evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py

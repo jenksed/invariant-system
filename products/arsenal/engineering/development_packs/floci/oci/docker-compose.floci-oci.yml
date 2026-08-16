@@ -1,0 +1,9 @@
+services:
+  floci-oci:
+    image: ${FLOCI_OCI_IMAGE:-floci/floci-oci:0.2.0}
+    ports:
+      - "127.0.0.1:4599:4599"
+    environment:
+      FLOCI_OCI_STORAGE_MODE: memory
+      FLOCI_OCI_AUTH_REQUIRE_SIGNATURE: "false"
+      FLOCI_OCI_SERVICES_FUNCTIONS_MOCK: "true"

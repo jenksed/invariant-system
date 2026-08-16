@@ -1,0 +1,9 @@
+{
+  "capability": {
+    "id": "capability.recon",
+    "version": "0.1.0",
+    "lifecycle": "draft",
+    "evaluation": {"status": "unassessed"},
+    "purpose": "Map and progressively resolve a large or foggy effort."
+  }
+}
