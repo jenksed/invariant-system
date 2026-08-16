@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+# Invariant — monorepo developer command.
+#
+# Usage:
+#   ./invariant status                 repository and environment overview
+#   ./invariant doctor                 toolchain prerequisites check
+#   ./invariant check                  fast structural checks
+#   ./invariant check boundaries       deterministic architecture-boundary checks
+#   ./invariant test [product]         canonical validation (default: all)
+#       products: arsenal loadout kiln temper integration
+#
+# Root commands delegate to each product's own canonical commands; nothing
+# here reimplements product logic.
+
+set -euo pipefail
+
+ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+cd "$ROOT"
+
+say()  { printf '%s\n' "$*"; }
+fail() { printf 'invariant: %s\n' "$1" >&2; exit 1; }
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+version_of() { # tool, args...
+  local tool=$1; shift
+  if have "$tool"; then
+    "$tool" "$@" 2>&1 | head -1
+  else
+    say "MISSING"
+  fi
+}
+
+cmd_status() {
+  say "invariant-system monorepo"
+  say "  root:    $ROOT"
+  say "  branch:  $(git branch --show-current 2>/dev/null || echo '(detached)')"
+  say "  commit:  $(git rev-parse --short HEAD 2>/dev/null || echo '(none)')"
+  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+    say "  tree:    dirty"
+  else
+    say "  tree:    clean"
+  fi
+  say "products:"
+  for p in arsenal loadout kiln temper manifold; do
+    if [[ -d "products/$p" ]]; then
+      say "  $p: products/$p"
+    else
+      say "  $p: MISSING"
+    fi
+  done
+  say "runtimes:"
+  say "  git:     $(version_of git --version)"
+  say "  node:    $(version_of node --version)"
+  say "  python3: $(version_of python3 --version)"
+  if have elixir; then
+    say "  elixir:  $(elixir --version 2>/dev/null | grep '^Elixir' || echo present)"
+  else
+    say "  elixir:  MISSING"
+  fi
+}
+
+cmd_doctor() {
+  local rc=0
+  check_tool() { # name, purpose
+    if have "$1"; then
+      printf 'ok       %-10s %s\n' "$1" "$(version_of "$1" --version 2>/dev/null | head -c 60)"
+    else
+      printf 'MISSING  %-10s (%s)\n' "$1" "$2"
+      rc=1
+    fi
+  }
+  check_tool git "required"
+  check_tool gh "GitHub operations"
+  check_tool python3 "arsenal tooling"
+  check_tool node "loadout/temper"
+  check_tool npm "loadout/temper"
+  check_tool mix "kiln"
+  check_tool cc "kiln command-host helper, exqlite"
+  check_tool vale "kiln prose lint (scripts/check)"
+  check_tool jq "helpers"
+  if have python3; then
+    for mod in yaml jsonschema; do
+      if python3 -c "import $mod" 2>/dev/null; then
+        printf 'ok       python3:%s\n' "$mod"
+      else
+        printf 'MISSING  python3:%s (%s)\n' "$mod" "$([ "$mod" = yaml ] && echo 'arsenal governance tests' || echo 'kiln contract validators: pip install -r products/kiln/requirements/conformance.txt')"
+        rc=1
+      fi
+    done
+  fi
+  if have elixir; then
+    printf 'ok       %-10s %s\n' elixir "$(elixir --version 2>/dev/null | grep '^Elixir')"
+  else
+    printf 'MISSING  %-10s (%s)\n' elixir "kiln (see products/kiln/mise.toml)"
+    rc=1
+  fi
+  say ""
+  say "doctor does not install anything. See product READMEs for setup."
+  return $rc
+}
+
+check_structure() {
+  local rc=0
+  note() { printf '%s\n' "$*"; }
+  bad() { printf 'FAIL: %s\n' "$1"; rc=1; }
+
+  [[ -d .git ]] || bad "no .git at monorepo root"
+  [[ -x ./invariant ]] || note "warn: ./invariant is not executable"
+  for f in README.md AGENTS.md invariant.boundaries.json; do
+    [[ -f "$f" ]] || bad "missing root file: $f"
+  done
+  for p in arsenal loadout kiln temper manifold; do
+    [[ -d "products/$p" ]] || bad "missing product tree: products/$p"
+  done
+  for d in contracts integration program; do
+    [[ -d "$d" ]] || bad "missing directory: $d"
+  done
+
+  # Exactly one active Git root: no nested .git anywhere below root.
+  local nested
+  nested=$(find . -mindepth 2 -name .git -not -path './.git/*' 2>/dev/null | head -5)
+  [[ -z "$nested" ]] || bad "nested Git roots found: $nested"
+
+  # No submodules / gitlinks for core products.
+  if git ls-files -s | awk '$1==160000' | grep -q .; then
+    bad "gitlinks (submodules) present in index"
+  fi
+  [[ ! -f .gitmodules ]] || bad ".gitmodules present at root"
+  return $rc
+}
+
+check_boundaries() {
+  local rc=0
+  bad() { printf 'FAIL: %s\n' "$1"; rc=1; }
+  ok()  { printf 'ok:   %s\n' "$1"; }
+
+  [[ -f invariant.boundaries.json ]] || fail "invariant.boundaries.json missing"
+  python3 -c 'import json,sys; json.load(open("invariant.boundaries.json"))' \
+    || fail "invariant.boundaries.json is not valid JSON"
+
+  # 1. No nested Git roots.
+  if [[ -z "$(find . -mindepth 2 -name .git -not -path './.git/*' 2>/dev/null)" ]]; then
+    ok "single Git root"
+  else
+    bad "nested .git directories found"
+  fi
+
+  # 2. No submodules.
+  if git ls-files -s | awk '$1==160000' | grep -q .; then
+    bad "gitlinks present (submodules are not used for core products)"
+  else
+    ok "no submodules"
+  fi
+
+  # 3. Manifold is a boundary, not a runtime: no executable source.
+  if git ls-files products/manifold | grep -vq '\.md$'; then
+    bad "products/manifold contains non-documentation files (it must not become a runtime here)"
+  else
+    ok "manifold is documentation-only"
+  fi
+
+  # 4. Temper presents and operates; it must not reach into sibling product trees.
+  if rg -q 'products/(arsenal|loadout|kiln|manifold)|\.\./\.\./(arsenal|loadout|kiln)' products/temper/src 2>/dev/null; then
+    bad "temper src references sibling product trees"
+  else
+    ok "temper has no sibling-product source coupling"
+  fi
+
+  # 5. Canonical contracts live exactly once, at contracts/.
+  local c count
+  for c in work-envelope.v0.md run-result-envelope.v0.md qualified-method-record.v0.md learning-observation.v0.md; do
+    count=$(git ls-files | grep -c "/$c\|^$c" || true)
+    if [[ "$count" -eq 1 && -f "contracts/$c" ]]; then
+      ok "contract canonical: contracts/$c"
+    else
+      bad "contract $c: expected exactly one canonical copy at contracts/ (found $count)"
+    fi
+  done
+
+  return $rc
+}
+
+ensure_node_deps() { # product dir
+  if [[ ! -d "$1/node_modules" ]]; then
+    (cd "$1" && npm ci)
+  fi
+}
+
+test_arsenal() {
+  (cd products/arsenal
+  python3 scripts/arsenal_audit.py
+  python3 scripts/arsenal_source_validate.py
+  python3 scripts/test-arsenal-governance.py
+  python3 scripts/capability_audit.py
+  python3 scripts/test-capability-contract.py
+  python3 scripts/test-method-record.py
+  python3 scripts/arsenal_bench.py validate
+  python3 scripts/test-arsenal-bench.py
+  python3 scripts/test-arsenal-evaluate.py
+  python3 scripts/test-repository-recon-adapter.py
+  python3 scripts/test-wave5-recon-bench.py
+  python3 scripts/arsenal_compile.py validate
+  python3 scripts/arsenal_compile.py verify
+  python3 scripts/test-arsenal-compiler.py
+  python3 scripts/test-arsenal-compiler-resources.py
+  python3 scripts/test-arsenal-graph.py
+  python3 scripts/test-arsenal-knowledge.py
+  python3 scripts/test-arsenal-trust.py
+  python3 scripts/test-arsenal-qualification.py)
+}
+
+test_loadout() {
+  ensure_node_deps products/loadout
+  (cd products/loadout && npm run ci)
+}
+
+test_kiln() {
+  (cd products/kiln
+  [[ -d deps ]] || mix deps.get
+  if python3 -c 'import jsonschema' 2>/dev/null; then
+    python3 scripts/validate_first_month_contracts.py
+    python3 scripts/validate_json_schema_contracts.py
+  else
+    say "note: skipping python contract validators (jsonschema not installed;"
+    say "      see products/kiln/requirements/conformance.txt)"
+  fi
+  mix format --check-formatted
+  mix compile --warnings-as-errors
+  mix xref graph --format cycles --label compile-connected --fail-above 0
+  mix test)
+}
+
+test_temper() {
+  ensure_node_deps products/temper
+  (cd products/temper && npm run ci)
+}
+
+test_integration() {
+  ./integration/scenarios/repository-recon/run.sh
+}
+
+cmd_test() {
+  local target=${1:-all}
+  case "$target" in
+    arsenal|loadout|kiln|temper|integration) "test_$target" ;;
+    all)
+      test_arsenal
+      test_loadout
+      test_kiln
+      test_temper
+      test_integration
+      say ""
+      say "invariant test: all products passed"
+      ;;
+    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|integration)" ;;
+  esac
+}
+
+main() {
+  local cmd=${1:-help}
+  shift || true
+  case "$cmd" in
+    status)  cmd_status ;;
+    doctor)  cmd_doctor ;;
+    check)
+      if [[ "${1:-}" == "boundaries" ]]; then
+        check_boundaries
+      elif [[ -z "${1:-}" ]]; then
+        check_structure
+      else
+        fail "unknown check target: $1 (expected: boundaries)"
+      fi
+      ;;
+    test)    cmd_test "$@" ;;
+    help|--help|-h)
+      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+      ;;
+    *) fail "unknown command: $cmd (try: ./invariant help)" ;;
+  esac
+}
+
+main "$@"

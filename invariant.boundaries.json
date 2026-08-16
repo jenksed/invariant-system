@@ -1,0 +1,60 @@
+{
+  "version": 0,
+  "system": "invariant-system",
+  "doctrine": [
+    "Determinism over discretion.",
+    "Capability is not authority.",
+    "Intelligence can propose. Infrastructure should enforce.",
+    "Context should be compiled, not accumulated.",
+    "Completion requires evidence.",
+    "Test the property, not the proxy."
+  ],
+  "products": {
+    "arsenal": {
+      "path": "products/arsenal",
+      "owns": ["intelligence", "methods", "evaluation", "qualification", "learning"],
+      "may_not": ["become execution authority", "grant mutation authority"],
+      "notes": "Bench lives inside Arsenal (evaluation/); it is not a peer product."
+    },
+    "bench": {
+      "path": "products/arsenal/evaluation",
+      "owns": ["evaluation", "qualification evidence"],
+      "may_not": ["select runtime assignments as authority"],
+      "notes": "Domain within Arsenal, not a top-level product directory."
+    },
+    "manifold": {
+      "path": "products/manifold",
+      "owns": ["intelligence selection", "allocation"],
+      "may_not": [
+        "execute work",
+        "mutate repositories",
+        "grant Kiln authority",
+        "qualify models",
+        "fabricate evidence",
+        "become a generic workflow engine"
+      ]
+    },
+    "loadout": {
+      "path": "products/loadout",
+      "owns": ["capabilities", "goals", "planning", "work envelope preparation"],
+      "may_not": ["become durable execution truth", "grant authority"]
+    },
+    "kiln": {
+      "path": "products/kiln",
+      "owns": ["authority", "execution", "effects", "artifacts", "evidence", "registered verification", "acceptance truth"],
+      "may_not": ["absorb R&D intelligence", "own model qualification"]
+    },
+    "temper": {
+      "path": "products/temper",
+      "owns": ["operator experience", "projection"],
+      "may_not": ["become canonical authority", "become execution truth", "mutate state"]
+    }
+  },
+  "checks": {
+    "no_nested_git": true,
+    "no_submodules": true,
+    "manifold_no_runtime": true,
+    "temper_no_sibling_source_coupling": true,
+    "single_canonical_contracts": true
+  }
+}
