@@ -1,0 +1,41 @@
+name: Loadout
+
+on:
+  pull_request:
+    paths:
+      - "products/loadout/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/loadout.yml"
+  push:
+    branches: [main]
+    paths:
+      - "products/loadout/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/loadout.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/loadout
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+          cache: npm
+          cache-dependency-path: products/loadout/package-lock.json
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run validate:contracts
+      - run: npm run build

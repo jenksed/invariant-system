@@ -1,0 +1,524 @@
+name: Arsenal Floci Gates
+
+# Consolidated from products/arsenal/.github/workflows/floci-*.yml
+# (5 workflows). Originals remain reachable in git history. Run blocks are
+# verbatim; job-level working-directory restores the old repo-relative root.
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/arsenal-floci.yml"
+      - "products/arsenal/engineering/development_packs/floci/**"
+      - "products/arsenal/agent_workflows/adopt_floci_in_repo.md"
+      - "products/arsenal/agent_workflows/validate_iac_with_floci.md"
+      - "products/arsenal/agent_workflows/route_local_cloud_provider.md"
+      - "products/arsenal/agent_workflows/local_cloud_router.md"
+      - "products/arsenal/agent_workflows/arsenal_router.md"
+      - "products/arsenal/agent_workflows/reproduce_cloud_bug_locally.md"
+      - "products/arsenal/agent_workflows/diagnose_floci_environment.md"
+      - "products/arsenal/agent_workflows/migrate_localstack_to_floci.md"
+      - "products/arsenal/agent_workflows/audit_floci_fidelity_gap.md"
+      - "products/arsenal/arsenal/registry.d/floci.json"
+      - "products/arsenal/arsenal/registry.d/floci-multicloud.json"
+      - "products/arsenal/arsenal/registry.d/floci-composed-delivery.json"
+      - "products/arsenal/arsenal/registry.d/floci-diagnostics.json"
+      - "products/arsenal/docs/source_audits/floci.md"
+      - "products/arsenal/docs/source_audits/floci_multicloud.md"
+      - "products/arsenal/workflows/floci_first_cloud_feature_delivery.md"
+      - "products/arsenal/workflows/software_feature_delivery.md"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/arsenal-floci.yml"
+      - "products/arsenal/engineering/development_packs/floci/**"
+      - "products/arsenal/agent_workflows/adopt_floci_in_repo.md"
+      - "products/arsenal/agent_workflows/validate_iac_with_floci.md"
+      - "products/arsenal/agent_workflows/route_local_cloud_provider.md"
+      - "products/arsenal/agent_workflows/local_cloud_router.md"
+      - "products/arsenal/agent_workflows/arsenal_router.md"
+      - "products/arsenal/agent_workflows/reproduce_cloud_bug_locally.md"
+      - "products/arsenal/agent_workflows/diagnose_floci_environment.md"
+      - "products/arsenal/agent_workflows/migrate_localstack_to_floci.md"
+      - "products/arsenal/agent_workflows/audit_floci_fidelity_gap.md"
+      - "products/arsenal/arsenal/registry.d/floci.json"
+      - "products/arsenal/arsenal/registry.d/floci-multicloud.json"
+      - "products/arsenal/arsenal/registry.d/floci-composed-delivery.json"
+      - "products/arsenal/arsenal/registry.d/floci-diagnostics.json"
+      - "products/arsenal/docs/source_audits/floci.md"
+      - "products/arsenal/docs/source_audits/floci_multicloud.md"
+      - "products/arsenal/workflows/floci_first_cloud_feature_delivery.md"
+      - "products/arsenal/workflows/software_feature_delivery.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  ARSENAL_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  golden-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: products/arsenal/engineering/development_packs/floci/aws
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp env.floci.example .env.floci
+
+      - name: Prove endpoint guard fails closed
+        run: |
+          set +e
+          env -u AWS_ENDPOINT_URL FLOCI_ENV_FILE=/tmp/no-floci-env ./scripts/aws-local s3 ls >/tmp/missing-endpoint.out 2>&1
+          missing_rc=$?
+          AWS_ENDPOINT_URL=https://s3.amazonaws.com ./scripts/aws-local s3 ls >/tmp/public-endpoint.out 2>&1
+          public_rc=$?
+          set -e
+
+          test "$missing_rc" -ne 0
+          test "$public_rc" -ne 0
+          grep -q "AWS_ENDPOINT_URL is not set" /tmp/missing-endpoint.out
+          grep -q "refusing AWS call" /tmp/public-endpoint.out
+
+      - name: Run completion gate
+        run: ./scripts/verify-completion
+
+      - name: Upload local-cloud evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-aws-golden-path-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file .env.floci -f docker-compose.floci.yml down --volumes --remove-orphans
+
+  hcl:
+    name: ${{ matrix.engine }}
+    strategy:
+      fail-fast: false
+      matrix:
+        engine: [terraform, opentofu]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: products/arsenal/engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Run zero-state IaC completion gate
+        run: ./scripts/verify-${{ matrix.engine }}
+
+      - name: Upload IaC evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-${{ matrix.engine }}-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file ../.env.floci -f ../docker-compose.floci.yml down --volumes --remove-orphans
+
+  cloudformation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: products/arsenal/engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Run CloudFormation completion gate
+        run: ./scripts/verify-cloudformation
+
+      - name: Upload CloudFormation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-cloudformation-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: docker compose --env-file ../.env.floci -f ../docker-compose.floci.yml down --volumes --remove-orphans
+
+  isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal/engineering/development_packs/floci/aws/iac
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure local environment
+        run: cp ../env.floci.example ../.env.floci
+
+      - name: Prove two Floci runtimes do not share state
+        run: ./scripts/verify-isolation
+
+      - name: Upload isolation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-iac-isolation-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/iac/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+  provider-router:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate router and shell entrypoints
+        run: |
+          python3 -m py_compile engineering/development_packs/floci/providers/scripts/resolve-provider
+          for f in \
+            engineering/development_packs/floci/azure/scripts/* \
+            engineering/development_packs/floci/gcp/scripts/* \
+            engineering/development_packs/floci/oci/scripts/*; do
+            bash -n "$f"
+          done
+          python3 -m py_compile \
+            engineering/development_packs/floci/azure/tracer.py \
+            engineering/development_packs/floci/gcp/tracer.py \
+            engineering/development_packs/floci/oci/tracer.py
+      - name: Prove four-provider routing and ambiguity stop
+        run: |
+          r=engineering/development_packs/floci/providers/scripts/resolve-provider
+          root="$(mktemp -d)"
+          mkdir -p "$root"/{aws,azure,gcp,oci,mixed,unknown}
+          printf 'provider "aws" {}\n' > "$root/aws/main.tf"
+          printf 'AZURE_STORAGE_CONNECTION_STRING=local\n' > "$root/azure/.env"
+          printf 'STORAGE_EMULATOR_HOST=local\n' > "$root/gcp/.env"
+          printf 'provider "oci" {}\n' > "$root/oci/main.tf"
+          printf 'provider "aws" {}\nprovider "google" {}\n' > "$root/mixed/main.tf"
+          echo hello > "$root/unknown/README"
+          for p in aws azure gcp oci; do
+            "$r" "$root/$p" --format json > "$root/$p.json"
+            python3 - "$root/$p.json" "$p" <<'PY'
+          import json, sys
+          data=json.load(open(sys.argv[1],encoding="utf-8"))
+          assert data["provider"] == sys.argv[2], data
+          assert data["pack"].endswith("/" + sys.argv[2])
+          PY
+          done
+          set +e
+          "$r" "$root/mixed" >/dev/null; mixed_rc=$?
+          "$r" "$root/unknown" >/dev/null; unknown_rc=$?
+          set -e
+          test "$mixed_rc" -eq 3
+          test "$unknown_rc" -eq 4
+          echo "FLC-04 provider router: PASS"
+
+  azure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Azure SDK dependencies
+        run: python3 -m pip install --disable-pip-version-check -r engineering/development_packs/floci/azure/requirements.txt
+      - name: Configure Azure local environment
+        run: cp engineering/development_packs/floci/azure/env.floci-az.example engineering/development_packs/floci/azure/.env.floci-az
+      - name: Prove Azure endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/azure/scripts/common.sh
+          set +e
+          AZURE_STORAGE_CONNECTION_STRING='DefaultEndpointsProtocol=https;AccountName=prod;BlobEndpoint=https://example.blob.core.windows.net;QueueEndpoint=https://example.queue.core.windows.net;' guard_endpoint >/tmp/azure-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run Azure completion gate
+        run: engineering/development_packs/floci/azure/scripts/verify-completion
+      - name: Upload Azure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-azure-evidence
+          path: products/arsenal/engineering/development_packs/floci/azure/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down Azure
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/azure/.env.floci-az -f engineering/development_packs/floci/azure/docker-compose.floci-az.yml down --volumes --remove-orphans || true
+
+  gcp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GCP SDK dependencies
+        run: python3 -m pip install --disable-pip-version-check -r engineering/development_packs/floci/gcp/requirements.txt
+      - name: Configure GCP local environment
+        run: cp engineering/development_packs/floci/gcp/env.floci-gcp.example engineering/development_packs/floci/gcp/.env.floci-gcp
+      - name: Prove GCP endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/gcp/scripts/common.sh
+          set +e
+          STORAGE_EMULATOR_HOST=https://storage.googleapis.com guard_endpoint >/tmp/gcp-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run GCP completion gate
+        run: engineering/development_packs/floci/gcp/scripts/verify-completion
+      - name: Upload GCP evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-gcp-evidence
+          path: products/arsenal/engineering/development_packs/floci/gcp/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down GCP
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/gcp/.env.floci-gcp -f engineering/development_packs/floci/gcp/docker-compose.floci-gcp.yml down --volumes --remove-orphans || true
+
+  oci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure OCI local environment
+        run: cp engineering/development_packs/floci/oci/env.floci-oci.example engineering/development_packs/floci/oci/.env.floci-oci
+      - name: Prove OCI endpoint guard fails closed
+        run: |
+          source engineering/development_packs/floci/oci/scripts/common.sh
+          set +e
+          FLOCI_OCI_ENDPOINT=https://objectstorage.us-ashburn-1.oraclecloud.com guard_endpoint >/tmp/oci-unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+      - name: Run OCI completion gate
+        run: engineering/development_packs/floci/oci/scripts/verify-completion
+      - name: Upload OCI evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f04-oci-evidence
+          path: products/arsenal/engineering/development_packs/floci/oci/.floci-artifacts/
+          if-no-files-found: error
+          include-hidden-files: true
+      - name: Tear down OCI
+        if: always()
+        run: docker compose --env-file engineering/development_packs/floci/oci/.env.floci-oci -f engineering/development_packs/floci/oci/docker-compose.floci-oci.yml down --volumes --remove-orphans || true
+
+  routing-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate routing scripts
+        run: |
+          python3 -m py_compile \
+            engineering/development_packs/floci/providers/scripts/route-local-cloud-capability.py \
+            engineering/development_packs/floci/evaluation/verify_flc05_routing.py
+          python3 -m json.tool engineering/development_packs/floci/evaluation/flc05_cases.json >/dev/null
+
+      - name: Run FLC-05 routing evaluation
+        run: python3 engineering/development_packs/floci/evaluation/verify_flc05_routing.py
+
+      - name: Validate Arsenal registry and catalog
+        run: python3 scripts/arsenal_audit.py
+
+      - name: Validate receipt
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path(".floci-artifacts/flc05-routing-receipt.json")
+          data = json.loads(p.read_text(encoding="utf-8"))
+          assert data["verdict"] == "PASS"
+          assert data["case_count"] >= 18
+          assert data["unsupported_route_count"] >= 4
+          assert data["automatic_real_cloud_fallback"] is False
+          assert data["requires_explicit_real_cloud_authorization"] is True
+          assert all(case["pass"] for case in data["cases"])
+          print("FLC-05 receipt: PASS")
+          PY
+
+      - name: Upload FLC-05 routing evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f05-routing-evidence
+          path: products/arsenal/.floci-artifacts/flc05-routing-receipt.json
+          if-no-files-found: error
+
+  inventory:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate inventory and scripts
+        run: |
+          python3 -m py_compile engineering/development_packs/floci/aws/diagnostics/scripts/inventory-localstack
+          bash -n engineering/development_packs/floci/aws/diagnostics/scripts/diagnose-floci
+          bash -n engineering/development_packs/floci/aws/diagnostics/scripts/verify-migration-fixture
+          bash -n engineering/development_packs/floci/aws/diagnostics/scripts/verify-reproduction
+          for f in engineering/development_packs/floci/aws/diagnostics/examples/sqs-redrive-mismatch/*.sh; do bash -n "$f"; done
+
+      - name: Prove root scan is not contaminated by the installed pack
+        run: |
+          out="$(mktemp)"
+          python3 engineering/development_packs/floci/aws/diagnostics/scripts/inventory-localstack \
+            . --format json --output "$out" --fail-on-blocker
+          python3 - "$out" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert data["summary"]["blockers"] == 0, data["summary"]
+          owned = "engineering/development_packs/floci/aws/diagnostics/"
+          assert not any(x["path"].startswith(owned) for x in data["findings"])
+          assert not any(x["path"] == ".github/workflows/floci-diagnostics-ci.yml" for x in data["findings"])
+          print("FLC-03 inventory self-contamination probe: PASS")
+          PY
+
+      - name: Prove blocker detection
+        run: |
+          out="$(mktemp)"
+          python3 engineering/development_packs/floci/aws/diagnostics/scripts/inventory-localstack \
+            engineering/development_packs/floci/aws/diagnostics/fixtures/localstack-legacy \
+            --format json --output "$out"
+          python3 - "$out" <<'PY'
+          import json, sys
+          data = json.load(open(sys.argv[1], encoding="utf-8"))
+          assert data["summary"]["blockers"] >= 1
+          assert any(x["token"] == "LAMBDA_REMOTE_DOCKER" and x["disposition"] == "BLOCKER" for x in data["findings"])
+          print("FLC-03 inventory blocker probe: PASS")
+          PY
+          set +e
+          python3 engineering/development_packs/floci/aws/diagnostics/scripts/inventory-localstack \
+            engineering/development_packs/floci/aws/diagnostics/fixtures/localstack-legacy \
+            --format json --fail-on-blocker >/dev/null
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+
+  migration-compat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Run LocalStack compatibility migration gate
+        run: |
+          chmod +x engineering/development_packs/floci/aws/diagnostics/scripts/diagnose-floci
+          bash engineering/development_packs/floci/aws/diagnostics/scripts/verify-migration-fixture
+
+      - name: Upload migration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f03-migration-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/diagnostics/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down migration fixture
+        if: always()
+        run: |
+          docker compose -p flc03migration \
+            -f engineering/development_packs/floci/aws/diagnostics/fixtures/floci-compat/docker-compose.yml \
+            down --volumes --remove-orphans || true
+
+  reproduction:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install AWS CLI
+        run: python3 -m pip install --disable-pip-version-check awscli
+
+      - name: Configure FLC-01 runtime
+        run: cp engineering/development_packs/floci/aws/env.floci.example engineering/development_packs/floci/aws/.env.floci
+
+      - name: Prove diagnostics fail closed
+        run: |
+          chmod +x engineering/development_packs/floci/aws/diagnostics/scripts/diagnose-floci
+          set +e
+          AWS_ENDPOINT_URL=https://sqs.us-east-1.amazonaws.com \
+            engineering/development_packs/floci/aws/diagnostics/scripts/diagnose-floci >/tmp/unsafe.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 64
+          grep -F 'UNSAFE endpoint' /tmp/unsafe.log
+
+      - name: Run red-green cloud reproduction gate
+        run: |
+          chmod +x engineering/development_packs/floci/aws/diagnostics/scripts/diagnose-floci
+          chmod +x engineering/development_packs/floci/aws/diagnostics/examples/sqs-redrive-mismatch/*.sh
+          bash engineering/development_packs/floci/aws/diagnostics/scripts/verify-reproduction
+
+      - name: Upload reproduction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: floci-f03-reproduction-evidence
+          path: products/arsenal/engineering/development_packs/floci/aws/.floci-artifacts/diagnostics/
+          if-no-files-found: warn
+          include-hidden-files: true
+
+      - name: Tear down
+        if: always()
+        run: |
+          docker compose \
+            --env-file engineering/development_packs/floci/aws/.env.floci \
+            -f engineering/development_packs/floci/aws/docker-compose.floci.yml \
+            down --volumes --remove-orphans || true

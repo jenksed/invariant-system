@@ -1,0 +1,36 @@
+name: Temper
+
+on:
+  pull_request:
+    paths:
+      - "products/temper/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/temper.yml"
+  push:
+    branches: [main]
+    paths:
+      - "products/temper/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/temper.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/temper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: products/temper/package-lock.json
+      - run: npm ci
+      - run: npm run ci

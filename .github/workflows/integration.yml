@@ -1,0 +1,54 @@
+name: Integration
+
+on:
+  pull_request:
+    paths:
+      - "products/**"
+      - "contracts/**"
+      - "integration/**"
+      - "invariant"
+      - "invariant.boundaries.json"
+      - ".github/workflows/integration.yml"
+  push:
+    branches: [main]
+    paths:
+      - "products/**"
+      - "contracts/**"
+      - "integration/**"
+      - "invariant"
+      - "invariant.boundaries.json"
+      - ".github/workflows/integration.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./invariant check
+      - run: ./invariant check boundaries
+
+  repository-recon-golden-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.4"
+          elixir-version: "1.20.2"
+
+      # The scenario runner builds Loadout and Temper (npm) and compiles
+      # Kiln (mix) from this checkout, then executes the Wave 3 golden
+      # path: Loadout plan -> real Kiln supervision -> Temper rendering.
+      - name: Run repository-recon golden path
+        run: ./integration/scenarios/repository-recon/run.sh

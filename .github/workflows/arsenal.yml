@@ -1,0 +1,895 @@
+name: Arsenal Gates
+
+# Consolidated from products/arsenal/.github/workflows/ars*.yml and
+# arsenal-integrity.yml (14 workflows, one job each). Originals remain
+# reachable in git history. Run blocks are verbatim; job-level
+# working-directory: products/arsenal restores the old repo root.
+
+on:
+  pull_request:
+    paths:
+      - "products/arsenal/**"
+      - ".github/workflows/arsenal.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "products/arsenal/**"
+      - ".github/workflows/arsenal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate governance source model
+        run: python3 scripts/arsenal_source_validate.py
+      - name: Run governance characterization tests
+        run: python3 scripts/test-arsenal-governance.py
+      - name: Check registry, catalog, and prompt integrity
+        run: python3 scripts/arsenal_audit.py
+
+  distribution-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate distribution package
+        run: python3 scripts/verify-repository-truth-distribution.py
+
+      - name: Prove Codex project-local installation contract
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          repo="$work/target"
+          git init -q "$repo"
+
+          scripts/install-repository-truth-skill --project "$repo"
+          test -f "$repo/.agents/skills/repository-truth/SKILL.md"
+          cmp -s \
+            agent_workflows/repository_truth_audit.md \
+            "$repo/.agents/skills/repository-truth/references/repository_truth_audit.md"
+
+          scripts/install-repository-truth-skill --project "$repo"
+
+          printf '\n# local divergence\n' >> "$repo/.agents/skills/repository-truth/SKILL.md"
+          set +e
+          scripts/install-repository-truth-skill --project "$repo"
+          rc=$?
+          set -e
+          test "$rc" -eq 3
+          grep -q '# local divergence' "$repo/.agents/skills/repository-truth/SKILL.md"
+
+          echo "ARS-00B installer contract: PASS"
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  capability-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate capability contracts
+        run: python3 scripts/capability_audit.py
+
+      - name: Run negative contract suite
+        run: python3 scripts/test-capability-contract.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  epistemic-lifecycle:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML (method records use it)
+        run: python3 -m pip install pyyaml
+
+      - name: Validate governance source model
+        run: python3 scripts/arsenal_source_validate.py
+
+      - name: Run governance characterization tests
+        run: python3 scripts/test-arsenal-governance.py
+
+      - name: Validate qualified method records
+        run: python3 scripts/arsenal_method_record.py
+
+      - name: Run method-record tests
+        run: python3 scripts/test-method-record.py
+
+  bench-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check Bench and Local Cloud router
+        run: |
+          python3 -m py_compile scripts/arsenal_bench.py scripts/test-arsenal-bench.py
+          python3 -m py_compile engineering/development_packs/floci/providers/scripts/route-local-cloud-capability.py
+
+      - name: Validate Bench contract and 19-case corpus
+        run: python3 scripts/arsenal_bench.py validate
+
+      - name: Run Bench negative contract suite
+        run: python3 scripts/test-arsenal-bench.py
+
+      - name: Execute Local Cloud candidate cases
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Prove Local Cloud testing lifecycle claim
+        run: |
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+      - name: Upload Bench evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arsenal-bench-local-cloud-candidate
+          path: products/arsenal/.arsenal-bench/local-cloud-receipt.json
+          if-no-files-found: error
+          include-hidden-files: true
+
+  compiler-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check compiler
+        run: python3 -m py_compile scripts/arsenal_compile.py scripts/test-arsenal-compiler.py scripts/verify-repository-truth-distribution.py
+
+      - name: Validate compiler contract
+        run: |
+          python3 scripts/arsenal_compile.py validate
+          python3 scripts/arsenal_compile.py explain
+
+      - name: Run negative and determinism suite
+        run: python3 scripts/test-arsenal-compiler.py
+
+      - name: Prove checked-in distributions and lockfile are generated
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve ARS-00B Repository Truth regression
+        run: python3 scripts/verify-repository-truth-distribution.py
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  graph-contract:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check graph
+        run: python3 -m py_compile scripts/arsenal_graph.py scripts/test-arsenal-graph.py
+
+      - name: Validate graph contract
+        run: python3 scripts/arsenal_graph.py validate
+
+      - name: Explain feature route
+        run: python3 scripts/arsenal_graph.py explain --route route.feature-delivery
+
+      - name: Run Capability Graph and Gap Preflight suite
+        run: python3 scripts/test-arsenal-graph.py
+
+      - name: Prove canonical feature route READY
+        run: |
+          python3 scripts/arsenal_graph.py preflight \
+            --route route.feature-delivery \
+            --inventory canonical \
+            --authority-profile workspace-safe
+
+      - name: Prove locked feature route detects missing competence
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/arsenal_graph.py preflight \
+            --route route.feature-delivery \
+            --inventory lock \
+            --authority-profile workspace-safe
+          rc=$?
+          set -e
+          test "$rc" -eq 3
+
+      - name: Prove Local Cloud consumes testing/candidate evidence
+        run: |
+          python3 scripts/arsenal_graph.py preflight \
+            --route route.local-cloud-feature-delivery \
+            --inventory canonical \
+            --authority-profile local-cloud-safe
+
+      - name: Preserve compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve Bench lifecycle evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  method-evaluation:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install PyYAML
+        run: python3 -m pip install pyyaml
+
+      - name: Validate governance source model
+        run: python3 scripts/arsenal_source_validate.py
+
+      - name: Run governance characterization tests
+        run: python3 scripts/test-arsenal-governance.py
+
+      - name: Validate canonical QMR (must remain experimental)
+        run: python3 scripts/arsenal_method_record.py
+
+      - name: Run QMR characterization tests
+        run: python3 scripts/test-method-record.py
+
+      - name: Run Repository Recon method evaluation
+        run: |
+          python3 scripts/arsenal_evaluate.py repository-recon \
+            --corpus evaluation/method-cases/corpus.manifest.json \
+            --out .arsenal-eval/repository-recon-evaluation.v0.json \
+            --revised-qmr .arsenal-eval/repository-recon.method-record.v0.yaml
+
+      - name: Validate the emitted evaluation artifact
+        run: |
+          python3 scripts/arsenal_evaluate.py validate \
+            --artifact .arsenal-eval/repository-recon-evaluation.v0.json
+
+      - name: Run method-evaluation characterization tests
+        run: python3 scripts/test-arsenal-evaluate.py
+
+  reality-budget:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check selector
+        run: python3 -m py_compile scripts/arsenal_substrate.py scripts/test-arsenal-substrate.py
+
+      - name: Validate substrate and proof contracts
+        run: python3 scripts/arsenal_substrate.py validate
+
+      - name: Run Reality Budget suite
+        run: python3 scripts/test-arsenal-substrate.py
+
+      - name: Prove TDD selects the lowest sufficient world
+        run: |
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.tdd \
+            --requirement red_observed \
+            --authority-profile workspace-safe \
+            --availability-profile minimal-local
+
+      - name: Prove Local Cloud boundary stops at emulator
+        run: |
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.local-cloud-feature-delivery \
+            --requirement local_boundary \
+            --authority-profile local-cloud-safe \
+            --availability-profile floci-local
+
+      - name: Prove provider semantics require explicit escalation
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.local-cloud-feature-delivery \
+            --requirement local_boundary \
+            --authority-profile local-cloud-safe \
+            --availability-profile floci-local \
+            --require-trait real-provider-semantics
+          rc=$?
+          set -e
+          test "$rc" -eq 6
+
+      - name: Preserve Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+          python3 scripts/arsenal_graph.py preflight \
+            --route route.local-cloud-feature-delivery \
+            --inventory canonical \
+            --authority-profile local-cloud-safe
+
+      - name: Preserve compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve Bench lifecycle evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  executable-world:
+    runs-on: ubuntu-latest
+    env:
+      DAGGER_NO_NAG: "1"
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check ARS-06
+        run: |
+          python3 -m py_compile \
+            scripts/arsenal_dagger.py \
+            scripts/test-arsenal-dagger.py \
+            engineering/development_packs/dagger/fixtures/tdd-red-green/run_world.py
+
+      - name: Validate Dagger world contract
+        run: |
+          python3 scripts/arsenal_dagger.py validate
+          python3 scripts/test-arsenal-dagger.py
+
+      - name: Prove Reality Budget selects local-container only when requested
+        run: |
+          python3 scripts/arsenal_dagger.py preflight
+          python3 scripts/arsenal_substrate.py select \
+            --capability capability.tdd \
+            --requirement red_observed \
+            --authority-profile workspace-safe \
+            --availability-profile minimal-local
+
+      - name: Install pinned Dagger CLI
+        uses: dagger/dagger-for-github@v8.3.0
+        with:
+          version: "0.21.7"
+
+      - name: Execute proof-gated Dagger world
+        run: python3 scripts/arsenal_dagger.py run
+
+      - name: Prove deterministic replay
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp .arsenal-evidence/ars-06-tdd-python-container.json /tmp/ars-06-first.json
+          cp .arsenal-evidence/ars-06-tdd-python-container.world.json /tmp/ars-06-first-world.json
+          rm -f .arsenal-evidence/ars-06-tdd-python-container.json
+          rm -f .arsenal-evidence/ars-06-tdd-python-container.world.json
+          python3 scripts/arsenal_dagger.py run
+          cmp /tmp/ars-06-first.json .arsenal-evidence/ars-06-tdd-python-container.json
+          cmp /tmp/ars-06-first-world.json .arsenal-evidence/ars-06-tdd-python-container.world.json
+          python3 scripts/arsenal_dagger.py verify
+
+      - name: Upload executable-world receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: ars-06-tdd-python-container-receipt
+          path: |
+            products/arsenal/.arsenal-evidence/ars-06-tdd-python-container.json
+            products/arsenal/.arsenal-evidence/ars-06-tdd-python-container.world.json
+          if-no-files-found: error
+
+      - name: Preserve Reality Budget regression
+        run: |
+          python3 scripts/arsenal_substrate.py validate
+          python3 scripts/test-arsenal-substrate.py
+
+      - name: Preserve Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+
+      - name: Preserve compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve Bench lifecycle evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  flight-recorder:
+    runs-on: ubuntu-latest
+    env:
+      DAGGER_NO_NAG: "1"
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check ARS-07
+        run: |
+          python3 -m py_compile \
+            scripts/arsenal_observe.py \
+            scripts/test-arsenal-observe.py
+
+      - name: Validate Flight Recorder contract
+        run: python3 scripts/test-arsenal-observe.py
+
+      - name: Produce Bench source evidence
+        run: |
+          python3 scripts/arsenal_bench.py run \
+            --suite local-cloud \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+          python3 scripts/arsenal_bench.py lifecycle \
+            --capability capability.local-cloud-feature-delivery \
+            --receipt .arsenal-bench/local-cloud-receipt.json
+
+      - name: Install pinned Dagger CLI
+        uses: dagger/dagger-for-github@v8.3.0
+        with:
+          version: "0.21.7"
+
+      - name: Produce proof-gated executable-world evidence
+        run: |
+          python3 scripts/arsenal_dagger.py validate
+          python3 scripts/arsenal_dagger.py preflight
+          python3 scripts/arsenal_dagger.py run
+          python3 scripts/arsenal_dagger.py verify
+
+      - name: Normalize Dagger and Bench into one Flight Record contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .arsenal-observatory
+          python3 scripts/arsenal_observe.py record-dagger \
+            --source .arsenal-evidence/ars-06-tdd-python-container.json \
+            --output .arsenal-observatory/dagger-flight-a.json \
+            --instance-id "github-actions:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:dagger:a" \
+            --repository-sha "$GITHUB_SHA"
+          python3 scripts/arsenal_observe.py record-dagger \
+            --source .arsenal-evidence/ars-06-tdd-python-container.json \
+            --output .arsenal-observatory/dagger-flight-b.json \
+            --instance-id "github-actions:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:dagger:b" \
+            --repository-sha "$GITHUB_SHA"
+          python3 scripts/arsenal_observe.py record-bench \
+            --source .arsenal-bench/local-cloud-receipt.json \
+            --output .arsenal-observatory/bench-flight.json \
+            --instance-id "github-actions:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}:bench" \
+            --repository-sha "$GITHUB_SHA"
+
+      - name: Verify source-addressed records and stable fingerprint
+        run: |
+          python3 scripts/arsenal_observe.py verify \
+            --record .arsenal-observatory/dagger-flight-a.json
+          python3 scripts/arsenal_observe.py verify \
+            --record .arsenal-observatory/dagger-flight-b.json
+          python3 scripts/arsenal_observe.py verify \
+            --record .arsenal-observatory/bench-flight.json
+          python3 scripts/arsenal_observe.py compare \
+            --left .arsenal-observatory/dagger-flight-a.json \
+            --right .arsenal-observatory/dagger-flight-b.json
+
+      - name: Verify evidence bundle source set
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find .arsenal-observatory -maxdepth 1 -type f -name '*.json' | wc -l | tr -d ' ')" = "3"
+          test -f .arsenal-evidence/ars-06-tdd-python-container.json
+          test -f .arsenal-evidence/ars-06-tdd-python-container.world.json
+          test -f .arsenal-bench/local-cloud-receipt.json
+
+      - name: Upload Flight Recorder evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ars-07-flight-recorder-evidence
+          path: |
+            products/arsenal/.arsenal-observatory/*.json
+            products/arsenal/.arsenal-evidence/ars-06-tdd-python-container.json
+            products/arsenal/.arsenal-evidence/ars-06-tdd-python-container.world.json
+            products/arsenal/.arsenal-bench/local-cloud-receipt.json
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: Preserve ARS-06 executable-world regression
+        run: |
+          python3 scripts/arsenal_dagger.py validate
+          python3 scripts/test-arsenal-dagger.py
+          python3 scripts/arsenal_dagger.py verify
+
+      - name: Preserve ARS-05 Reality Budget regression
+        run: |
+          python3 scripts/arsenal_substrate.py validate
+          python3 scripts/test-arsenal-substrate.py
+
+      - name: Preserve ARS-04 Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+
+      - name: Preserve ARS-03 compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve ARS-02 Bench regression
+        run: python3 scripts/test-arsenal-bench.py
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  trust-authority:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax check ARS-08
+        run: python3 -m py_compile scripts/arsenal_trust.py scripts/test-arsenal-trust.py
+
+      - name: Validate Trust & Authority contract
+        run: |
+          python3 scripts/arsenal_trust.py validate
+          python3 scripts/test-arsenal-trust.py
+
+      - name: Produce reviewed third-party approval tracer
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .arsenal-trust
+          python3 scripts/arsenal_trust.py discover \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --source-kind local-directory \
+            --source fixture://third-party-safe \
+            --output .arsenal-trust/third-party-safe-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate = json.loads(Path('.arsenal-trust/third-party-safe-candidate.json').read_text())
+          review = {
+            'schema_version': '1.0.0',
+            'candidate_sha256': candidate['package']['sha256'],
+            'target_capability_id': 'capability.repository-truth',
+            'disposition': 'approve',
+            'review_reference': 'ci.ars-08.third-party-safe',
+            'requested_authority': ['filesystem.read','git.read','shell.execute'],
+            'approved_authority': ['filesystem.read','git.read','shell.execute'],
+            'acknowledged_unmapped_tools': [],
+            'reviewed_executable_paths': [],
+            'evidence_refs': ['scripts/test-arsenal-trust.py'],
+            'escalation': {'confirmed': False, 'confirmation_reference': None},
+            'notes': 'Synthetic third-party fixture used only to prove ARS-08 admission semantics.'
+          }
+          Path('.arsenal-trust/third-party-safe-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/third-party-safe-candidate.json \
+            --review .arsenal-trust/third-party-safe-review.json \
+            --output .arsenal-trust/third-party-safe-decision.json
+          python3 scripts/arsenal_trust.py verify \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --decision .arsenal-trust/third-party-safe-decision.json
+
+      - name: Prove overbroad third-party authority is rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py discover \
+            --package arsenal/trust/fixtures/third-party-overbroad \
+            --source-kind local-directory \
+            --source fixture://third-party-overbroad \
+            --output .arsenal-trust/third-party-overbroad-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate = json.loads(Path('.arsenal-trust/third-party-overbroad-candidate.json').read_text())
+          authority = candidate['declaration']['authority_signals']
+          review = {
+            'schema_version':'1.0.0','candidate_sha256':candidate['package']['sha256'],
+            'target_capability_id':'capability.repository-truth','disposition':'approve',
+            'review_reference':'ci.ars-08.third-party-overbroad',
+            'requested_authority':authority,'approved_authority':authority,
+            'acknowledged_unmapped_tools':candidate['declaration']['unmapped_tools'],
+            'reviewed_executable_paths':candidate['risk']['executable_paths'],
+            'evidence_refs':['scripts/test-arsenal-trust.py'],
+            'escalation':{'confirmed':True,'confirmation_reference':'ci.synthetic-confirmation'},
+            'notes':'Synthetic overbroad fixture; rejection is expected.'
+          }
+          Path('.arsenal-trust/third-party-overbroad-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          set +e
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/third-party-overbroad-candidate.json \
+            --review .arsenal-trust/third-party-overbroad-review.json \
+            --output .arsenal-trust/third-party-overbroad-decision.json
+          code=$?
+          set -e
+          test "$code" = "6"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          d=json.loads(Path('.arsenal-trust/third-party-overbroad-decision.json').read_text())
+          assert d['verdict']=='REJECTED'
+          assert any(r.startswith('canonical-authority-conflict:') for r in d['reasons'])
+          PY
+
+      - name: Re-verify compiler-generated Repository Truth provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py discover \
+            --package distribution/agent-skills/repository-truth \
+            --source-kind arsenal-compiled \
+            --source arsenal://compiler/repository-truth \
+            --revision "$GITHUB_SHA" \
+            --output .arsenal-trust/compiler-package-candidate.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          candidate=json.loads(Path('.arsenal-trust/compiler-package-candidate.json').read_text())
+          assert candidate['provenance']['assurance']=='compiler-manifest-verified'
+          assert candidate['provenance']['manifest_verified'] is True
+          authority=candidate['declaration']['authority_signals']
+          review={
+            'schema_version':'1.0.0','candidate_sha256':candidate['package']['sha256'],
+            'target_capability_id':'capability.repository-truth','disposition':'approve',
+            'review_reference':'ci.ars-08.compiler-package','requested_authority':authority,
+            'approved_authority':authority,'acknowledged_unmapped_tools':[],
+            'reviewed_executable_paths':[],'evidence_refs':['distribution/agent-skills/repository-truth/arsenal-manifest.json'],
+            'escalation':{'confirmed':False,'confirmation_reference':None},
+            'notes':'First-party compiler package tracer.'
+          }
+          Path('.arsenal-trust/compiler-package-review.json').write_text(json.dumps(review, indent=2, sort_keys=True) + '\n')
+          PY
+          python3 scripts/arsenal_trust.py assess \
+            --candidate .arsenal-trust/compiler-package-candidate.json \
+            --review .arsenal-trust/compiler-package-review.json \
+            --output .arsenal-trust/compiler-package-decision.json
+          python3 scripts/arsenal_trust.py verify \
+            --package distribution/agent-skills/repository-truth \
+            --decision .arsenal-trust/compiler-package-decision.json
+
+      - name: Prove explicit revocation closes route gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/arsenal_trust.py revoke \
+            --decision .arsenal-trust/third-party-safe-decision.json \
+            --reason "synthetic CI revocation proof" \
+            --reference ci.ars-08.revocation \
+            --output .arsenal-trust/third-party-safe-revoked.json
+          set +e
+          python3 scripts/arsenal_trust.py verify \
+            --package arsenal/trust/fixtures/third-party-safe \
+            --decision .arsenal-trust/third-party-safe-revoked.json
+          code=$?
+          set -e
+          test "$code" = "7"
+
+      - name: Upload Trust & Authority evidence bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ars-08-trust-authority-evidence
+          path: products/arsenal/.arsenal-trust/*.json
+          if-no-files-found: error
+          include-hidden-files: true
+
+      - name: Preserve ARS-07 Flight Recorder regression
+        run: python3 scripts/test-arsenal-observe.py
+
+      - name: Preserve ARS-04 Capability Graph regression
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+
+      - name: Preserve ARS-03 compiler regression
+        run: python3 scripts/arsenal_compile.py verify
+
+      - name: Preserve ARS-02 Bench regression
+        run: python3 scripts/test-arsenal-bench.py
+
+      - name: Validate Capability Contract
+        run: python3 scripts/capability_audit.py
+
+      - name: Arsenal integrity
+        run: python3 scripts/arsenal_audit.py
+
+  knowledge-plane:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Syntax and JSON checks
+        run: |
+          python3 -m py_compile scripts/arsenal_knowledge.py scripts/test-arsenal-knowledge.py
+          python3 -m json.tool arsenal/knowledge/snapshot.schema.json >/dev/null
+          python3 -m json.tool arsenal/knowledge/fixtures/kft-0-kiln.json >/dev/null
+
+      - name: Validate KFT-0 Knowledge Snapshot
+        run: |
+          python3 scripts/arsenal_knowledge.py validate \
+            --snapshot arsenal/knowledge/fixtures/kft-0-kiln.json
+
+      - name: Prove unauthorized work fails closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          set +e
+          python3 scripts/arsenal_knowledge.py adjudicate \
+            --snapshot arsenal/knowledge/fixtures/kft-0-kiln.json \
+            --query query.kft-0.p1-s02-t01-authority \
+            > /tmp/kft-0-authority.json
+          code=$?
+          set -e
+          test "$code" = "3"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result = json.loads(Path('/tmp/kft-0-authority.json').read_text())
+          assert result['verdict'] == 'NOT_AUTHORIZED'
+          assert result['may_implement'] is False
+          assert 'claim.kiln.pr48.authorized' in result['resolution']['challenged_by']
+          assert any(x['predicate'] == 'implementation_authorization' for x in result['contradictions'])
+          PY
+
+      - name: Compile bounded KFT-0 context
+        run: |
+          python3 scripts/arsenal_knowledge.py compile \
+            --snapshot arsenal/knowledge/fixtures/kft-0-kiln.json \
+            --query query.kft-0.p1-s02-t01-authority \
+            > /tmp/kft-0-context.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          context = json.loads(Path('/tmp/kft-0-context.json').read_text())
+          assert context['selection']['excluded_count'] > 0
+          assert context['authority']['verdict'] == 'NOT_AUTHORIZED'
+          PY
+
+      - name: Run Knowledge Plane contract suite
+        run: python3 scripts/test-arsenal-knowledge.py
+
+      - name: Preserve Trust and Flight Recorder regressions
+        run: |
+          python3 scripts/test-arsenal-trust.py
+          python3 scripts/test-arsenal-observe.py
+
+      - name: Preserve Capability Graph and compiler regressions
+        run: |
+          python3 scripts/arsenal_graph.py validate
+          python3 scripts/test-arsenal-graph.py
+          python3 scripts/arsenal_compile.py verify
+
+      - name: Validate Capability Contract and Arsenal integrity
+        run: |
+          python3 scripts/capability_audit.py
+          python3 scripts/arsenal_audit.py
+
+  capability-evolution:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/arsenal
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile deterministic evaluators
+        run: python3 -m py_compile scripts/wave5_recon_bench.py scripts/wave5_original_16.py evaluation/wave5/candidates.py
+      - name: Validate Wave 5 benchmark and evidence
+        run: python3 scripts/test-wave5-recon-bench.py

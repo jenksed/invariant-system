@@ -1,0 +1,153 @@
+name: Kiln
+
+on:
+  pull_request:
+    paths:
+      - "products/kiln/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/kiln.yml"
+  push:
+    branches: [main]
+    paths:
+      - "products/kiln/**"
+      - "contracts/**"
+      - "integration/**"
+      - ".github/workflows/kiln.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prose:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/kiln
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Plain Vale from the pinned tarball (same invocation as
+      # products/kiln/scripts/check) instead of vale-action: the action
+      # expects .vale.ini at the repository root, which does not exist in
+      # the monorepo.
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          version=3.14.2
+          curl -sSfL \
+            "https://github.com/errata-ai/vale/releases/download/v${version}/vale_${version}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+          vale --version
+
+      - name: Check prose
+        run: vale --glob='!{deps,_build}/**' .
+
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: products/kiln
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.4"
+          elixir-version: "1.20.2"
+
+      - name: Restore Mix cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            products/kiln/deps
+            products/kiln/_build
+          key: ${{ runner.os }}-otp-28.4-elixir-1.20.2-${{ hashFiles('products/kiln/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-otp-28.4-elixir-1.20.2-
+
+      - name: Install conformance validator
+        run: python3 -m pip install --disable-pip-version-check --requirement requirements/conformance.txt
+
+      # The exact Vale version pinned in `mise.toml` must be available: the
+      # aggregate slice gate runs the prose check as one of its components.
+      - name: Install Vale
+        run: |
+          set -euo pipefail
+          version=3.14.2
+          curl -sSfL \
+            "https://github.com/errata-ai/vale/releases/download/v${version}/vale_${version}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+          vale --version
+
+      - name: Test agent preflight behavior
+        run: scripts/test-agent-preflight
+
+      - name: Validate first-month semantic contracts
+        run: python3 scripts/validate_first_month_contracts.py
+
+      - name: Validate first-month JSON Schema contracts
+        run: python3 scripts/validate_json_schema_contracts.py
+
+      - name: Validate project agent assets
+        run: scripts/validate-agent-assets
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Compile without warnings
+        run: mix compile --warnings-as-errors
+
+      - name: Check compile-connected cycles
+        run: mix xref graph --format cycles --label compile-connected --fail-above 0
+
+      # The `Kiln.Verification.CommandHost` test suite invokes the no-shell
+      # native helper from `c_src/kiln_command_host.c` and compiles it on
+      # demand through `cc`. A fresh `ubuntu-latest` runner does not ship
+      # with a C compiler, so the helper cannot be built and the tests fail
+      # with `:c_compiler_unavailable`.
+      - name: Install C toolchain for verification helper
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends build-essential
+
+      - name: Run tests
+        run: mix test
+
+      # The P1-S01 aggregate slice gate re-verifies a historical slice. It
+      # blocks a PR only when the PR changes Kiln implementation, tests,
+      # migrations, the gate itself, or a contract protected by that slice.
+      # Changed paths are repo-root-relative in the monorepo, so the
+      # products/kiln/ prefix is stripped before the applicability check.
+      - name: Detect P1-S01 aggregate-gate applicability
+        if: github.event_name == 'pull_request'
+        id: p1-s01-applicability
+        run: |
+          set -euo pipefail
+          changed=$(git diff --name-only origin/main...HEAD | sed 's|^products/kiln/||' || true)
+          if printf '%s\n' "$changed" | scripts/check-p1-s01-applicability; then
+            echo "p1_s01_applicable=true" >> "$GITHUB_OUTPUT"
+            echo "P1-S01 aggregate gate is applicable for this PR."
+          else
+            echo "p1_s01_applicable=false" >> "$GITHUB_OUTPUT"
+            echo "P1-S01 aggregate gate is NOT applicable for this PR."
+          fi
+
+      - name: Run P1-S01 aggregate slice gate
+        if: steps.p1-s01-applicability.outputs.p1_s01_applicable == 'true'
+        run: scripts/gates/slice-01
+
+      - name: Upload P1-S01 slice gate result
+        if: steps.p1-s01-applicability.outputs.p1_s01_applicable == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: p1-s01-slice-gate-result
+          path: products/kiln/artifacts/p1-s01/*.json
+          if-no-files-found: warn
