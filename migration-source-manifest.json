@@ -1,0 +1,59 @@
+{
+  "generated_at": "2026-08-16T23:24:59.936942+00:00",
+  "monorepo": "jenksed/invariant-system",
+  "import_method": "unsquashed git subtree add (full source history reachable)",
+  "sources": [
+    {
+      "repository": "jenksed/project-arsenal",
+      "clone_url": "git@github.com:jenksed/project-arsenal.git",
+      "branch": "main",
+      "head_sha": "c33f95121eb72518c75c3761f5428684517fc5a7",
+      "commit_count": 334,
+      "tags": [],
+      "destination": "products/arsenal",
+      "earlier_commit_verified": "0acbad2f298cd26cfc66b6ca9ff2948bd75e03c8"
+    },
+    {
+      "repository": "jenksed/loadout",
+      "clone_url": "git@github.com:jenksed/loadout.git",
+      "branch": "main",
+      "head_sha": "9ca0f4ec4c7a993c21ba8bf438be3c75a550421d",
+      "commit_count": 22,
+      "tags": [],
+      "destination": "products/loadout",
+      "earlier_commit_verified": "c29a1df7d302c9043360fdf40431a6f079bbb4b1"
+    },
+    {
+      "repository": "jenksed/kiln",
+      "clone_url": "git@github.com:jenksed/kiln.git",
+      "branch": "main",
+      "head_sha": "e47c1da5fd13f7deaea4691e48dd0769c1e5ed6c",
+      "commit_count": 576,
+      "tags": [
+        "archive/pr40-pre-workflow"
+      ],
+      "destination": "products/kiln",
+      "earlier_commit_verified": "bd2c9bcf715c99ef4f126179c1739c3b031039fc"
+    },
+    {
+      "repository": "jenksed/temper",
+      "clone_url": "git@github.com:jenksed/temper.git",
+      "branch": "main",
+      "head_sha": "57e78b576105dc9c4051f133d0b4697b2e35a8a0",
+      "commit_count": 5,
+      "tags": [],
+      "destination": "products/temper",
+      "earlier_commit_verified": "1ec41bdc3738e5a1aeaf6be20c171043c3204571"
+    },
+    {
+      "repository": "jenksed/engineering-system",
+      "clone_url": "git@github.com:jenksed/engineering-system.git",
+      "branch": "main",
+      "head_sha": "5dcb5d274350f9a23b0bb332c7ee20e81de66e28",
+      "commit_count": 19,
+      "tags": [],
+      "destination": "program/historical/engineering-system (content redistributed)",
+      "earlier_commit_verified": "67c23a0c27a2ca642ac0bb9905e089f0d4b22e38"
+    }
+  ]
+}
