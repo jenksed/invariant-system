@@ -611,7 +611,6 @@ def _loadout_root_for_tests() -> Path | None:
     candidates = [
         Path(os.environ.get("ARSENAL_W3_LOADOUT_ROOT", "")),
         ROOT.parent / "loadout",
-        Path("/Users/jenksed/Developer/engineering-system-workspace/loadout"),
     ]
     for c in candidates:
         if c and c.is_dir() and (c / "dist" / "packs" / "repository-recon" / "run.js").is_file():

@@ -178,7 +178,7 @@ validate_authorization() {
     fail "$authorization base_sha is not an ancestor of authority source $authority_source"
 }
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$root"
 
 checkout_commit=$(git rev-parse --verify HEAD)

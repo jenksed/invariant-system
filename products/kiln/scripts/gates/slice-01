@@ -28,10 +28,7 @@
 #   * any P1-S02 capability.
 set -uo pipefail
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || {
-  printf 'slice-01: not inside a Git repository\n' >&2
-  exit 1
-}
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)
 cd "$root"
 
 SLICE="P1-S01"

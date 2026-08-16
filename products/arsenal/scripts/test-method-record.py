@@ -325,21 +325,22 @@ def test_status_field_must_be_in_enum() -> None:
 
 
 def test_upstream_fixture_loads_unchanged() -> None:
-    """The upstream engineering-system fixture at
-    ``engineering-system/fixtures/qualified-method-record.v0.yaml`` must be
-    loadable by the Arsenal validator without modification. This is the
-    compatibility test: Arsenal's reproduction of the v0 contract MUST accept
-    the official fixture semantics so consumers do not silently fork the
-    contract.
+    """The canonical contract fixture at
+    ``integration/fixtures/qualified-method-record.v0.yaml`` (formerly the
+    engineering-system sibling repository fixture) must be loadable by the
+    Arsenal validator without modification. This is the compatibility test:
+    Arsenal's reproduction of the v0 contract MUST accept the official
+    fixture semantics so consumers do not silently fork the contract.
     """
     upstream = (
-        Path("/Users/jenksed/Developer/engineering-system-workspace/engineering-system")
+        ROOT.parents[1]
+        / "integration"
         / "fixtures"
         / "qualified-method-record.v0.yaml"
     )
     if not upstream.is_file():
-        # The compatibility target is a sibling repo (engineering-system).
-        # If that workspace is not present in this checkout, skip — the
+        # The compatibility target lives at the monorepo root. If this
+        # checkout is not the invariant-system monorepo, skip — the
         # compatibility test is opt-in by workspace layout.
         print("SKIP compatibility case: upstream fixture not present")
         return

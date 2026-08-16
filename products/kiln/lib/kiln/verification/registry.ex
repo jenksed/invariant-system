@@ -78,7 +78,7 @@ defmodule Kiln.Verification.Registry do
       end
 
     with {expected_profile, executable, argv} when not is_nil(expected_profile) <- expected,
-         true <- expected_profile == profile,
+         true <- profile_match?(expected_profile, profile),
          true <- command["executable"] == executable,
          true <- command["argv"] == argv,
          true <- command["working_directory"] == ".",
@@ -107,6 +107,15 @@ defmodule Kiln.Verification.Registry do
 
   def validate(command, _repository, _base_commit),
     do: {:error, {:invalid_command_registration, command}}
+
+  # The invariant-system monorepo hosts Arsenal at products/arsenal, so the
+  # repository basename "arsenal" is the same profile as the historical
+  # standalone checkout name "project-arsenal". Registration digests continue
+  # to be computed over the canonical expected profile.
+  defp profile_match?(expected_profile, profile) do
+    expected_profile == profile or
+      (expected_profile == "project-arsenal" and profile == "arsenal")
+  end
 
   defp registration_digest(id, executable, argv, profile) do
     bytes =

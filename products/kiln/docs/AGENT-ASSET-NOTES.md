@@ -114,24 +114,18 @@ A third-party development dependency that the Claude coding agent consumes at bu
 
 `jenksed/project-arsenal` is referenced as a Claude skill dependency for read-only repository truth work. Kiln does not vendor or copy any of its content.
 
-- Submodule path: `.claude/dependencies/project-arsenal`
-- Submodule URL: `https://github.com/jenksed/project-arsenal.git`
-- Pinned commit: `980a58d331f4ed0679e6ae306b9d55b2ee21d179`
-- Reviewed lockfile digests (from `.claude/dependencies/project-arsenal/.arsenal.lock`):
+Since the invariant-system monorepo consolidation, the dependency is the Arsenal product tree at `../arsenal` (`products/arsenal` from the monorepo root), tracked in the same Git root and therefore always at the same commit as Kiln. The former pinned Git submodule (`.claude/dependencies/project-arsenal`, last reviewed pin `980a58d331f4ed0679e6ae306b9d55b2ee21d179`) was retired; the imported Arsenal tree carries the identical reviewed lockfile digests, which remain enforced.
+
+- Arsenal tree: `../arsenal` (monorepo sibling, same Git root; nested checkouts are forbidden and fail the verifier)
+- Reviewed lockfile digests (from `../arsenal/.arsenal.lock`):
   - plan: `sha256:8284fab44cd6f27d7e5533f79b6b64f5feffb1590ae569c623983180e4c76c9f`
   - repository-truth package: `sha256:741905b11ff97ec44da34cf17a3f9ab418b3973103e7aa21c6d2bf3b9fb1e310`
-- Claude skill path: `.claude/skills/repository-truth` (tracked symbolic link to `<submodule>/distribution/agent-skills/repository-truth`)
+- Claude skill path: `.claude/skills/repository-truth` (tracked symbolic link to `../../../arsenal/distribution/agent-skills/repository-truth`)
 - Verifier: `scripts/check-project-arsenal-dependency` is invoked from `scripts/validate-agent-assets` after the existing Kiln-owned asset and doctrine checks.
 
 ### Initialization
 
-A fresh checkout initializes the dependency before using the Arsenal-backed skill:
-
-```bash
-git submodule update --init --recursive
-```
-
-Do not configure branch tracking. Future updates require an explicit reviewed commit change and a new work package that records the new pin and digests.
+No initialization step is required in the monorepo: the Arsenal sibling tree is part of the same checkout. Changes to the reviewed digests require an explicit reviewed change that records the new digests.
 
 ### Authority boundary
 
@@ -159,4 +153,4 @@ The Kiln asset contract (`invocation` and `status` fields, fixed name convention
 | P0-W39 (initial adoption) | `ecc8797d45447060b0c4aacd8efb6b1909e9e690` | `sha256:468117f9c6397003522b62c1e7db6d4869a7cbfe0ed7614c8bb9244d9e91059d` | `sha256:1c6f8c72582c10d53475c0c865a2ee31fce20a2bbe7582198f510091470f3f84` |
 | P0-W45 (GC01 main update) | `980a58d331f4ed0679e6ae306b9d55b2ee21d179` | `sha256:8284fab44cd6f27d7e5533f79b6b64f5feffb1590ae569c623983180e4c76c9f` | `sha256:741905b11ff97ec44da34cf17a3f9ab418b3973103e7aa21c6d2bf3b9fb1e310` |
 
-Each pin update is a separate reviewed work package. The historical evidence for P0-W39 (initial adoption) lives in `docs/work/P0-W39-adopt-project-arsenal-dependency.md` and is not rewritten.
+Each pin update was a separate reviewed work package. The historical evidence for P0-W39 (initial adoption) lives in `docs/work/P0-W39-adopt-project-arsenal-dependency.md` and is not rewritten. The pin mechanism itself was retired by the monorepo consolidation; the table above is preserved as provenance.

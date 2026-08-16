@@ -1,3 +1,0 @@
-[submodule ".claude/dependencies/project-arsenal"]
-	path = .claude/dependencies/project-arsenal
-	url = https://github.com/jenksed/project-arsenal.git

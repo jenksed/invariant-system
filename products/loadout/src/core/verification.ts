@@ -348,6 +348,8 @@ function isProjectPath(value: string): boolean {
 async function detectProfile(repository: string): Promise<string> {
   const name = path.basename(repository);
   if (name === 'project-arsenal') return name;
+  // invariant-system monorepo: Arsenal lives at products/arsenal.
+  if (name === 'arsenal') return 'project-arsenal';
   if (name === 'loadout' || name === 'kiln' || name === 'temper') return name;
   if (await exists(path.join(repository, 'mix.exs'))) return 'kiln';
   if (await exists(path.join(repository, 'evaluation'))) return 'project-arsenal';

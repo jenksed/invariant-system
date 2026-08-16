@@ -6,7 +6,7 @@ fail() {
   exit 1
 }
 
-root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$root"
 
 command -v vale >/dev/null 2>&1 || fail "Vale is not installed or not available on PATH"

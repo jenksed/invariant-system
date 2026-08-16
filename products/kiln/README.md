@@ -274,19 +274,22 @@ Kiln targets Elixir 1.20 on Erlang/OTP 28.
 ```bash
 mise install
 mix deps.get
-git submodule update --init --recursive
 scripts/agent-preflight
 scripts/check
 ```
 
-The third-party `project-arsenal` development-agent dependency at
-`.claude/dependencies/project-arsenal` is a pinned Git submodule. CI and
-`scripts/validate-agent-assets` both expect the submodule to be initialized
-and at the reviewed commit (`ecc8797d45447060b0c4aacd8efb6b1909e9e690`);
-re-initialize it on every fresh checkout with
-`git submodule update --init --recursive` before running the agent-asset
-validator. The dependency is reference content only and is not a Kiln runtime
-component.
+The `project-arsenal` development-agent dependency is the Arsenal product
+tree at `../arsenal` (`products/arsenal` in the invariant-system monorepo),
+tracked in the same Git root and therefore always at the same commit as Kiln.
+It replaced the former pinned Git submodule at
+`.claude/dependencies/project-arsenal` (last reviewed pin
+`980a58d331f4ed0679e6ae306b9d55b2ee21d179`) during the monorepo
+consolidation; the reviewed `.arsenal.lock` plan and `repository-truth`
+package digests are unchanged and still verified by
+`scripts/check-project-arsenal-dependency`, which
+`scripts/validate-agent-assets` invokes. `.claude/skills/repository-truth`
+remains a symlink, now resolving into the sibling Arsenal tree. The
+dependency is reference content only and is not a Kiln runtime component.
 
 Current development-agent conformance still requires reconciliation before Phase 1 tickets begin.
 
