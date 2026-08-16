@@ -105,6 +105,16 @@ GitHub Actions; preserved in history). Kiln's PR branch-governance steps
 were not ported (no monorepo governance model yet); its behavior tests and
 the P1-S01 conditional slice gate are retained.
 
+Post-publication CI inspection (all six workflows dispatched on `main`):
+**all green**. Kiln CI passed 689/689 (its `jsonschema` conformance
+dependency is installed from `requirements/conformance.txt`, confirming
+the 4 local failures are environment-only). The Integration workflow
+executed the repository-recon golden path with real Kiln supervision:
+PASS. One transient failure was observed on the first Loadout run
+(`kiln-driver.spec.ts` fake-CLI spawn, a timing-sensitive test that is
+byte-identical to source); it passed on rerun and passes locally
+repeatedly — recorded here, not hidden.
+
 # Root Developer Experience
 
 `./invariant status | doctor | check | check boundaries | test [product]`.
