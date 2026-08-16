@@ -1,0 +1,59 @@
+-- P1-S01-T06 durable idempotency lookup by key alone.
+--
+-- The workflow's start_session/1 retry must find the original commit by
+-- idempotency_key without knowing the original session_id, since the
+-- retry generates a fresh session_id. The existing
+-- UNIQUE (session_id, idempotency_key) constraint requires the session_id
+-- to be known at lookup time, so we add a global UNIQUE INDEX on
+-- idempotency_key. Idempotency keys are random 16-byte opaque identifiers,
+-- so global uniqueness is the right contract.
+--
+-- The per-session UNIQUE constraint from migration 0001 is left in place
+-- because it is logically implied by the new global uniqueness and dropping
+-- it would require recreating the table. The new index is the only one
+-- that enforces the lookup contract.
+--
+-- Upgrade policy from v1:
+--
+-- A v1 store that stored two action_commits rows with the same
+-- idempotency_key under different session_ids (the v1 constraint
+-- permitted this) will fail to apply this migration. The migration
+-- runner pre-detects the duplicates in a read-only query and returns a
+-- specific `:duplicate_global_idempotency_keys` error listing the
+-- offending keys and the affected session_ids; the migration transaction
+-- never opens, so the schema migration version stays at v1 and no
+-- partial v2 index is created. A v1 store with no cross-session
+-- duplicates upgrades cleanly and the global index is enforced after the
+-- commit.
+--
+-- Operator remediation. The migration runner will not silently
+-- rekey or delete rows. The original idempotency contract was
+-- content-addressed; same-key duplicates with different stored
+-- `request_digest` values are real corruption and cannot be resolved
+-- automatically. The operator must:
+--
+--   1. List the duplicate keys returned in the error.
+--   2. Decide per-key which row to keep and which to discard. The
+--      `request_digest` is the durable identity of the request; if both
+--      rows carry the same digest the duplicates represent a single
+--      intent recorded twice and one row may be deleted; if they differ,
+--      the operator must decide which intent is authoritative.
+--   3. Remove the duplicate row BEFORE any associated journal rows.
+--      Removing an `action_commits` row without removing its
+--      `journal_entries` orphans those entries and causes the next
+--      replay to fail. The safe remediation is therefore to remove the
+--      duplicate Session end-to-end (its `journal_entries`, its
+--      `session_projections`, and its `action_commits`) or to rekey
+--      the duplicate row plus all associated `journal_entries` with a
+--      new idempotency_key.
+--   4. Retry the migration. After the upgrade, the global index makes
+--      further cross-session duplicates impossible.
+--
+-- Tests in test/kiln/store/migrations_test.exs cover the clean-apply
+-- path, the duplicate-blocked path with structured error details, the
+-- post-failure further-v1-writes path, and the post-upgrade replay
+-- contract (a valid v1 store with distinct keys still replays cleanly
+-- through Replay.rebuild/2 after the upgrade).
+
+CREATE UNIQUE INDEX action_commits_idempotency_key_idx
+  ON action_commits (idempotency_key);

@@ -1,0 +1,472 @@
+#!/usr/bin/env bash
+# P1-S01 aggregate slice gate.
+#
+# This is the sole P1-S01 aggregate command (P1-S01-T05-R01). It orchestrates
+# the checks that already own each property rather than reimplementing them,
+# records the exact classification of every component, binds the result to the
+# exact Repository and toolchain state it proved, and generates and validates
+# the P1-S01-V01 slice verification manifest.
+#
+# Rules this script holds itself to:
+#
+#   * No `|| true`. No warning-only required component. No model judgment.
+#   * A required component that fails makes the gate fail.
+#   * A required control that cannot run is BLOCKED, never a silent skip
+#     and never a pass (gate rule 5).
+#   * The structured result binds to commit, dirty fingerprint, toolchain,
+#     migration identity, and fixture identity, so a passing artifact cannot
+#     silently prove a later commit (gate rule 1).
+#   * The gate proves implementation Evidence only. It cannot satisfy a Task,
+#     complete a Run, record product acceptance, seal a product Receipt, or
+#     authorize P1-S02.
+#
+# What this gate deliberately does NOT prove:
+#
+#   * owner-machine (OD-02) Evidence, unless explicitly invoked on that host
+#     with KILN_OWNER_MACHINE=1 — CI is not an OD-02 host;
+#   * owner acceptance of the slice (P1-S01-T05-AC07);
+#   * any P1-S02 capability.
+set -uo pipefail
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  printf 'slice-01: not inside a Git repository\n' >&2
+  exit 1
+}
+cd "$root"
+
+SLICE="P1-S01"
+MANIFEST_ID="P1-S01-V01"
+ARTIFACT_DIR="artifacts/p1-s01"
+
+# ------------------------------------------------------------------
+# Component recording
+# ------------------------------------------------------------------
+
+COMPONENT_NAMES=()
+COMPONENT_OUTCOMES=()
+COMPONENT_DETAILS=()
+COMPONENT_PROVES=()
+
+FAILED=0
+BLOCKED=0
+
+record() {
+  COMPONENT_NAMES+=("$1")
+  COMPONENT_OUTCOMES+=("$2")
+  COMPONENT_DETAILS+=("$3")
+  COMPONENT_PROVES+=("$4")
+
+  case "$2" in
+    fail) FAILED=$((FAILED + 1)) ;;
+    blocked) BLOCKED=$((BLOCKED + 1)) ;;
+  esac
+
+  local marker
+  case "$2" in
+    pass) marker='PASS' ;;
+    fail) marker='FAIL' ;;
+    blocked) marker='BLOCKED' ;;
+    not_applicable) marker='N/A' ;;
+    *) marker="$2" ;;
+  esac
+
+  printf '  [%-7s] %-28s %s\n' "$marker" "$1" "$4"
+  if [[ -n "$3" && "$2" != "pass" ]]; then
+    printf '            %s\n' "$3"
+  fi
+}
+
+# Run a required component. A nonzero exit is a gate failure, never a warning.
+#
+# On failure the full stdout+stderr is preserved to a per-component log
+# under the slice artifact directory and the recorded `detail` carries
+# the exit status, the command, and the key diagnostic lines (ENOENT
+# paths, compiler errors, the last 20 lines as context). `tail -5`
+# truncates too aggressively and previously discarded the missing path
+# before it could be classified, so it is no longer used here.
+run_required() {
+  local name="$1" proves="$2"
+  shift 2
+
+  local out status
+  out=$("$@" 2>&1)
+  status=$?
+
+  if [[ $status -eq 0 ]]; then
+    record "$name" pass '' "$proves"
+    return
+  fi
+
+  local cmd="$*"
+  local log_path="$ARTIFACT_DIR/${name}.log"
+  mkdir -p "$ARTIFACT_DIR"
+  printf '%s\n' "$out" > "$log_path"
+
+  # Prefer a line that names the missing artifact (ENOENT, no such file,
+  # undefined module) because that is the line the integrator needs to
+  # classify the failure. Fall back to the first File.Error / CompileError
+  # marker, then to the last 20 lines as context.
+  local key_line
+  key_line=$(printf '%s' "$out" | grep -E -m1 'ENOENT|no such file|undef |cannot load module|is not loaded|does not exist' || true)
+  if [[ -z "$key_line" ]]; then
+    key_line=$(printf '%s' "$out" | grep -E -m1 '\*\* \(CompileError\)|\*\* \(File.Error\)|\*\* \(RuntimeError\)|could not compile' || true)
+  fi
+  if [[ -z "$key_line" ]]; then
+    key_line=$(printf '%s' "$out" | tail -20 | tr '\n' '|')
+  else
+    key_line=$(printf '%s' "$key_line" | tr '\n' ' ')
+  fi
+
+  record "$name" fail \
+    "exit $status | cmd: $cmd | log: $log_path | key: $key_line" \
+    "$proves"
+}
+
+# Run a required component that needs an external tool. A missing tool is
+# BLOCKED (the control is unavailable), never a skip.
+run_required_tool() {
+  local name="$1" proves="$2" tool="$3"
+  shift 3
+
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    record "$name" blocked "required tool '$tool' is not available on PATH" "$proves"
+    return
+  fi
+
+  run_required "$name" "$proves" "$@"
+}
+
+printf '== P1-S01 aggregate slice gate ==\n'
+
+# ------------------------------------------------------------------
+# Exact state binding
+# ------------------------------------------------------------------
+
+COMMIT=$(git rev-parse HEAD)
+# A pull-request checkout is detached, so `git branch --show-current` is empty
+# there. `KILN_BRANCH` carries the real head ref in that case, matching the
+# convention P0-W32 established for the governing-plan preflight step.
+BRANCH=${KILN_BRANCH:-$(git branch --show-current)}
+[[ -n "$BRANCH" ]] || BRANCH='DETACHED'
+
+# Tracked modifications always count as dirty. Untracked files count as dirty
+# only when they can affect the build or the proof (source, tests, scripts,
+# migrations, workflow, or dependency manifests); an untracked editor or agent
+# directory does not change what the gate proved about the Repository.
+TRACKED_DIRTY=$(git status --porcelain --untracked-files=no)
+BUILD_AFFECTING_UNTRACKED=$(git ls-files --others --exclude-standard \
+  -- lib test scripts priv config .github mix.exs mix.lock 2>/dev/null)
+
+DIRTY_INPUT="${TRACKED_DIRTY}${BUILD_AFFECTING_UNTRACKED}"
+
+if [[ -n "$DIRTY_INPUT" ]]; then
+  DIRTY=true
+  DIRTY_FINGERPRINT="sha256:$(printf '%s' "$DIRTY_INPUT" | shasum -a 256 | awk '{print $1}')"
+else
+  DIRTY=false
+  DIRTY_FINGERPRINT='clean'
+fi
+
+ELIXIR_VERSION=$(elixir --version 2>/dev/null | awk '/^Elixir/ {print $2; exit}')
+OTP_VERSION=$(erl -noshell -eval 'io:format("~s",[erlang:system_info(otp_release)]),halt().' 2>/dev/null)
+GIT_VERSION=$(git --version | awk '{print $3}')
+
+# Migration identity: the exact bundled migration files and their digests.
+MIGRATION_FINGERPRINT="sha256:$(find priv/store/migrations -type f -name '*.sql' | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')"
+MIGRATION_COUNT=$(find priv/store/migrations -type f -name '*.sql' | wc -l | tr -d ' ')
+
+# Fixture identity: the exact conformance fixtures and slice test surface.
+FIXTURE_FINGERPRINT="sha256:$(find test/fixtures -type f | sort | xargs shasum -a 256 | shasum -a 256 | awk '{print $1}')"
+
+HOST_OS=$(uname -s)
+HOST_ARCH=$(uname -m)
+HOST_KERNEL=$(uname -sr)
+HOST_MODEL=$(sysctl -n hw.model 2>/dev/null || echo unknown)
+
+printf 'commit: %s\n' "$COMMIT"
+printf 'branch: %s\n' "$BRANCH"
+printf 'working tree: %s (%s)\n' "$([[ $DIRTY == true ]] && echo dirty || echo clean)" "$DIRTY_FINGERPRINT"
+printf 'toolchain: Elixir %s / OTP %s / Git %s\n' "$ELIXIR_VERSION" "$OTP_VERSION" "$GIT_VERSION"
+printf 'migrations: %s files (%s)\n' "$MIGRATION_COUNT" "$MIGRATION_FINGERPRINT"
+printf 'host: %s %s\n' "$HOST_OS" "$HOST_ARCH"
+
+# ------------------------------------------------------------------
+# Component 1: Repository conformance and governing plan
+# ------------------------------------------------------------------
+
+printf '\n[repository conformance]\n'
+
+# The real governing-plan preflight validates the current branch's work
+# package. P0-W32 accepted that this check is a pull-request property: running
+# implementation preflight against trunk is invalid by design, not a skipped
+# requirement. On trunk it is recorded as not applicable with that reason; on
+# any work branch it is required and a failure fails the gate.
+case "$BRANCH" in
+  main | master | develop)
+    record governing_plan_preflight not_applicable \
+      "P0-W32 accepted design: implementation preflight is a pull-request property and is not valid against '$BRANCH'" \
+      'current branch has one conforming governing work package'
+    ;;
+  DETACHED)
+    record governing_plan_preflight blocked \
+      'the head ref could not be determined; set KILN_BRANCH on a detached checkout' \
+      'current branch has one conforming governing work package'
+    ;;
+  *)
+    run_required governing_plan_preflight \
+      'current branch has one conforming governing work package' \
+      scripts/agent-preflight
+    ;;
+esac
+
+run_required preflight_fixture_regression \
+  'the preflight validator itself accepts and rejects the right plans' \
+  scripts/test-agent-preflight
+
+run_required_tool semantic_contracts \
+  'first-month semantic domain contracts hold' \
+  python3 python3 scripts/validate_first_month_contracts.py
+
+run_required_tool json_schema_contracts \
+  'first-month JSON Schema contracts hold' \
+  python3 python3 scripts/validate_json_schema_contracts.py
+
+run_required agent_asset_contract \
+  'development-agent assets satisfy their invocation and lifecycle contract' \
+  scripts/validate-agent-assets
+
+run_required_tool prose_quality \
+  'project prose satisfies the accepted style rules' \
+  vale vale --glob='!{deps,_build,.claude/dependencies}/**' .
+
+# ------------------------------------------------------------------
+# Component 2: Deterministic build integrity
+# ------------------------------------------------------------------
+
+printf '\n[build integrity]\n'
+
+run_required_tool source_formatting \
+  'source matches the canonical format' \
+  mix mix format --check-formatted
+
+run_required_tool warning_free_compile \
+  'the project compiles with warnings as errors' \
+  mix mix compile --warnings-as-errors
+
+run_required_tool compile_connected_cycles \
+  'no compile-connected dependency cycle exists' \
+  mix mix xref graph --format cycles --label compile-connected --fail-above 0
+
+# ------------------------------------------------------------------
+# Component 3: P1-S01 property coverage
+#
+# Each named component runs the suite that owns the property, so the gate
+# output states which property was proved rather than reporting one opaque
+# "tests" result. The full suite then runs once as the complete regression.
+# ------------------------------------------------------------------
+
+printf '\n[P1-S01 property coverage]\n'
+
+run_required_tool migration_fixtures \
+  'migration application, checksum immutability, and version blocking' \
+  mix mix test test/kiln/store/migrations_test.exs
+
+run_required_tool corruption_fixtures \
+  'a corrupt store integrity-blocks and preserves files' \
+  mix mix test test/kiln/store/fixtures_test.exs test/kiln/store/connection_test.exs
+
+run_required_tool restart_reconstruction \
+  'restart rebuilds current truth from the durable journal' \
+  mix mix test test/kiln/restart_test.exs test/kiln/journal/replay_test.exs
+
+run_required_tool idempotency_and_revision \
+  'expected-revision and idempotency protections reject without a durable write' \
+  mix mix test test/kiln/workflow_test.exs test/kiln/journal/commit_parity_test.exs
+
+run_required_tool slice_protected_matrix \
+  'the protected failure matrix and excluded-capability audit hold when integrated' \
+  mix mix test test/kiln/slices/p1_s01_test.exs
+
+run_required_tool verification_manifest_contract \
+  'the slice manifest binds to exact state and cannot claim authority' \
+  mix mix test test/kiln/verification_manifest_test.exs
+
+run_required_tool full_deterministic_suite \
+  'the complete deterministic suite passes at this exact state' \
+  mix mix test
+
+# ------------------------------------------------------------------
+# Component 4: the exact P1-S01 demo
+# ------------------------------------------------------------------
+
+printf '\n[demo]\n'
+
+run_required p1_s01_d01_demo \
+  'the user-visible durable foundation survives restart and rebuilds from the journal' \
+  scripts/demos/p1-s01
+
+# ------------------------------------------------------------------
+# Component 5: owner-machine Evidence (OD-02)
+#
+# CI is not an OD-02 host. This component records `not_run` unless the caller
+# explicitly asserts the accepted owner machine with KILN_OWNER_MACHINE=1, in
+# which case the diagnostic is required to pass. It is never inferred from the
+# fact that the current machine happens to be an Apple Silicon Mac.
+# ------------------------------------------------------------------
+
+printf '\n[owner-machine Evidence]\n'
+
+if [[ "${KILN_OWNER_MACHINE:-}" == "1" ]]; then
+  if [[ "$HOST_OS" != "Darwin" || "$HOST_ARCH" != "arm64" ]]; then
+    record owner_machine_diagnostic blocked \
+      "KILN_OWNER_MACHINE=1 was asserted on $HOST_OS/$HOST_ARCH, which is not an OD-02 host" \
+      'OD-02 host, filesystem, SQLite, WAL, and migration facts'
+  else
+    # The accepted OD-02 acceptance machine is the owner's M1 Pro MacBook Pro.
+    # Refuse the assertion on any other Apple Silicon Mac, even when the
+    # general host profile is satisfied, so a wrong machine cannot produce a
+    # passing `KILN_OWNER_MACHINE=1` result. Operators can override only by
+    # acknowledging the named machine explicitly.
+    expected_model=${KILN_OWNER_MACHINE_MODEL:-MacBookPro18,1}
+    actual_model=$(sysctl -n hw.model 2>/dev/null || echo unknown)
+
+    if [[ "$actual_model" != "$expected_model" ]]; then
+      record owner_machine_diagnostic blocked \
+        "KILN_OWNER_MACHINE=1 was asserted on hw.model='$actual_model'; expected '$expected_model' (set KILN_OWNER_MACHINE_MODEL to override only when a successor acceptance machine is approved)" \
+        'OD-02 host, filesystem, SQLite, WAL, and migration facts'
+    else
+      run_required owner_machine_diagnostic \
+        'OD-02 host, filesystem, SQLite, WAL, and migration facts' \
+        scripts/diagnostics/p1-s01-store-host
+    fi
+  fi
+else
+  record owner_machine_diagnostic not_run \
+    'not asserted as the accepted OD-02 acceptance host; rerun with KILN_OWNER_MACHINE=1 on that host' \
+    'OD-02 host, filesystem, SQLite, WAL, and migration facts'
+fi
+
+# ------------------------------------------------------------------
+# Structured result and P1-S01-V01
+# ------------------------------------------------------------------
+
+printf '\n[structured result]\n'
+
+mkdir -p "$ARTIFACT_DIR"
+
+if [[ $DIRTY == true ]]; then
+  RESULT_PATH="$ARTIFACT_DIR/slice-01-${COMMIT}-dirty.json"
+else
+  RESULT_PATH="$ARTIFACT_DIR/slice-01-${COMMIT}.json"
+fi
+
+# Serialize the components for the manifest builder. Use `--` so a future
+# component name that happens to equal a flag word cannot be misread as one.
+COMPONENTS_JSON=$(
+  python3 - <<'PY' -- "${COMPONENT_NAMES[@]}" --outcomes "${COMPONENT_OUTCOMES[@]}" --details "${COMPONENT_DETAILS[@]}" --proves "${COMPONENT_PROVES[@]}"
+import json, sys
+
+# `sys.argv` is [script, --, *names, --outcomes, *outcomes, --details, *details, --proves, *proves]
+args = sys.argv[1:]
+if args and args[0] == "--":
+    args = args[1:]
+
+names, outcomes, details, proves = [], [], [], []
+bucket = names
+for arg in args:
+    if arg == "--outcomes":
+        bucket = outcomes
+    elif arg == "--details":
+        bucket = details
+    elif arg == "--proves":
+        bucket = proves
+    else:
+        bucket.append(arg)
+
+print(json.dumps([
+    {"name": n, "outcome": o, "detail": d, "proves": p}
+    for n, o, d, p in zip(names, outcomes, details, proves)
+]))
+PY
+)
+
+# Derive the aggregate outcome. Any failed required component fails the gate.
+# Any blocked required component blocks it. `not_run` owner-machine Evidence
+# blocks slice acceptance without failing the deterministic gate.
+if [[ $FAILED -gt 0 ]]; then
+  GATE_OUTCOME=fail
+elif [[ $BLOCKED -gt 0 ]]; then
+  GATE_OUTCOME=blocked
+else
+  GATE_OUTCOME=pass
+fi
+
+OWNER_OUTCOME=not_run
+for index in "${!COMPONENT_NAMES[@]}"; do
+  if [[ "${COMPONENT_NAMES[$index]}" == "owner_machine_diagnostic" ]]; then
+    OWNER_OUTCOME="${COMPONENT_OUTCOMES[$index]}"
+  fi
+done
+
+export KILN_GATE_COMMIT="$COMMIT"
+export KILN_GATE_BRANCH="$BRANCH"
+export KILN_GATE_DIRTY="$DIRTY"
+export KILN_GATE_DIRTY_FINGERPRINT="$DIRTY_FINGERPRINT"
+export KILN_GATE_ELIXIR="$ELIXIR_VERSION"
+export KILN_GATE_OTP="$OTP_VERSION"
+export KILN_GATE_GIT="$GIT_VERSION"
+export KILN_GATE_MIGRATION_FINGERPRINT="$MIGRATION_FINGERPRINT"
+export KILN_GATE_MIGRATION_COUNT="$MIGRATION_COUNT"
+export KILN_GATE_FIXTURE_FINGERPRINT="$FIXTURE_FINGERPRINT"
+export KILN_GATE_HOST_OS="$HOST_OS"
+export KILN_GATE_HOST_ARCH="$HOST_ARCH"
+export KILN_GATE_HOST_KERNEL="$HOST_KERNEL"
+export KILN_GATE_HOST_MODEL="$HOST_MODEL"
+export KILN_GATE_OUTCOME="$GATE_OUTCOME"
+export KILN_GATE_OWNER_OUTCOME="$OWNER_OUTCOME"
+export KILN_GATE_COMPONENTS="$COMPONENTS_JSON"
+export KILN_GATE_RESULT_PATH="$RESULT_PATH"
+export KILN_GATE_SLICE="$SLICE"
+export KILN_GATE_MANIFEST_ID="$MANIFEST_ID"
+
+if ! mix run --no-start scripts/gates/build_manifest.exs; then
+  printf '  [FAIL   ] %-28s %s\n' 'slice_verification_manifest' 'manifest generation or validation failed'
+  FAILED=$((FAILED + 1))
+  GATE_OUTCOME=fail
+else
+  printf '  [PASS   ] %-28s %s\n' 'slice_verification_manifest' "$MANIFEST_ID generated and validated"
+fi
+
+# ------------------------------------------------------------------
+# Verdict
+# ------------------------------------------------------------------
+
+printf '\n[verdict]\n'
+printf 'components: %s\n' "${#COMPONENT_NAMES[@]}"
+printf 'failed: %s\n' "$FAILED"
+printf 'blocked: %s\n' "$BLOCKED"
+printf 'structured result: %s\n' "$RESULT_PATH"
+
+printf '\nThis gate proves implementation Evidence for %s only. It does not satisfy a\n' "$SLICE"
+printf 'Task, complete a Run, record product acceptance, seal a product Receipt, or\n'
+printf 'authorize P1-S02.\n'
+
+if [[ $FAILED -gt 0 ]]; then
+  printf '\nslice-01: FAIL (%s required component(s) failed)\n' "$FAILED" >&2
+  exit 1
+fi
+
+if [[ $BLOCKED -gt 0 ]]; then
+  printf '\nslice-01: BLOCKED (%s required control(s) unavailable)\n' "$BLOCKED" >&2
+  exit 2
+fi
+
+if [[ "$OWNER_OUTCOME" != "pass" ]]; then
+  printf '\nslice-01: pass (deterministic components)\n'
+  printf 'NOTE: owner-machine (OD-02) Evidence is %s. P1-S01 cannot be accepted until it\n' "$OWNER_OUTCOME"
+  printf 'is collected on the accepted OD-02 acceptance host.\n'
+  exit 0
+fi
+
+printf '\nslice-01: pass\n'
+exit 0

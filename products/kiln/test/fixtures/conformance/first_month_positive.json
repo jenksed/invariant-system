@@ -1,0 +1,95 @@
+[
+  {
+    "kind": "run_projection",
+    "session_id": "ses_1",
+    "run_id": "run_1",
+    "run_state": "ready",
+    "workflow_step": "investigation",
+    "operation_state": null,
+    "revision": 1
+  },
+  {
+    "kind": "context_manifest",
+    "provider": "minimax",
+    "model": "MiniMax-M3",
+    "estimated_input_tokens": 12000,
+    "tool_names": ["repo.search", "repo.read", "artifact.read", "change.propose"],
+    "package_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+    "fallback": false
+  },
+  {
+    "kind": "patch_manifest",
+    "patch_id": "pat_1",
+    "base_repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+    "operations": [
+      {
+        "operation_index": 0,
+        "operation_kind": "replace",
+        "path": "lib/kiln.ex",
+        "before_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000003",
+        "after_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+      }
+    ],
+    "patch_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+    "total_after_image_bytes": 1024
+  },
+  {
+    "kind": "approval",
+    "approval_id": "app_1",
+    "patch_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+    "base_repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+    "status": "active",
+    "actor_kind": "local_user",
+    "expires_at": "2026-07-29T05:00:00Z"
+  },
+  {
+    "kind": "command_registration",
+    "command_id": "cmd_test",
+    "executable_path": "/Users/example/.local/bin/mix",
+    "shell": false,
+    "network_requirement": "not_required",
+    "registration_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000006"
+  },
+  {
+    "kind": "command_result",
+    "command_result_id": "res_1",
+    "status": "succeeded",
+    "process_group_cleanup": "proved_gone",
+    "result_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007"
+  },
+  {
+    "kind": "evidence",
+    "evidence_id": "ev_1",
+    "criterion_id": "criterion_1",
+    "status": "pass",
+    "freshness": "current",
+    "completeness": "complete",
+    "contradiction": "none",
+    "repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000008",
+    "record_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000009"
+  },
+  {
+    "kind": "criterion_evaluation",
+    "criterion_id": "criterion_1",
+    "result": "pass",
+    "repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000008",
+    "evaluation_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000010"
+  },
+  {
+    "kind": "receipt",
+    "receipt_id": "rec_1",
+    "completion_record_reference": "completion_1",
+    "authority": false,
+    "manifest_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000011"
+  },
+  {
+    "kind": "cli_result",
+    "schema": "kiln.cli.result/v1",
+    "command": "status",
+    "status": "ok",
+    "exit_code": 0,
+    "errors": [],
+    "warnings": [],
+    "next_actions": []
+  }
+]

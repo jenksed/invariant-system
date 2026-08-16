@@ -1,0 +1,190 @@
+[
+  {
+    "expected_error": "run_state",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "run_projection",
+      "session_id": "ses_1",
+      "run_id": "run_1",
+      "run_state": "verifying",
+      "workflow_step": "verification",
+      "operation_state": null,
+      "revision": 1
+    }
+  },
+  {
+    "expected_error": "tool_count",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "context_manifest",
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "estimated_input_tokens": 12000,
+      "tool_names": ["repo.search", "repo.read", "artifact.read", "change.propose", "shell"],
+      "package_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+      "fallback": false
+    }
+  },
+  {
+    "expected_error": "fallback",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "context_manifest",
+      "provider": "minimax",
+      "model": "MiniMax-M3",
+      "estimated_input_tokens": 12000,
+      "tool_names": ["repo.read"],
+      "package_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+      "fallback": true
+    }
+  },
+  {
+    "expected_error": "patch_operation",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "patch_manifest",
+      "patch_id": "pat_1",
+      "base_repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+      "operations": [
+        {
+          "operation_index": 0,
+          "operation_kind": "rename",
+          "path": "lib/new.ex",
+          "before_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000003",
+          "after_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+        }
+      ],
+      "patch_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+      "total_after_image_bytes": 1024
+    }
+  },
+  {
+    "expected_error": "patch_path",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "patch_manifest",
+      "patch_id": "pat_1",
+      "base_repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+      "operations": [
+        {
+          "operation_index": 0,
+          "operation_kind": "replace",
+          "path": "/etc/passwd",
+          "before_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000003",
+          "after_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000004"
+        }
+      ],
+      "patch_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+      "total_after_image_bytes": 1024
+    }
+  },
+  {
+    "expected_error": "approval_actor",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "approval",
+      "approval_id": "app_1",
+      "patch_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000005",
+      "base_repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000002",
+      "status": "active",
+      "actor_kind": "model",
+      "expires_at": "2026-07-29T05:00:00Z"
+    }
+  },
+  {
+    "expected_error": "shell",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "command_registration",
+      "command_id": "cmd_test",
+      "executable_path": "/bin/sh",
+      "shell": true,
+      "network_requirement": "not_required",
+      "registration_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000006"
+    }
+  },
+  {
+    "expected_error": "cleanup",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "command_result",
+      "command_result_id": "res_1",
+      "status": "timed_out",
+      "process_group_cleanup": "unknown",
+      "result_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000007"
+    }
+  },
+  {
+    "expected_error": "passing_evidence",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "evidence",
+      "evidence_id": "ev_1",
+      "criterion_id": "criterion_1",
+      "status": "pass",
+      "freshness": "stale",
+      "completeness": "partial",
+      "contradiction": "present",
+      "repository_state_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000008",
+      "record_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000009"
+    }
+  },
+  {
+    "expected_error": "receipt_authority",
+    "expected_validation": {
+      "schema": "reject",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "receipt",
+      "receipt_id": "rec_1",
+      "completion_record_reference": "completion_1",
+      "authority": true,
+      "manifest_digest": "sha256:0000000000000000000000000000000000000000000000000000000000000011"
+    }
+  },
+  {
+    "expected_error": "cli_exit",
+    "expected_validation": {
+      "schema": "accept",
+      "semantic": "reject"
+    },
+    "document": {
+      "kind": "cli_result",
+      "schema": "kiln.cli.result/v1",
+      "command": "status",
+      "status": "ok",
+      "exit_code": 6,
+      "errors": [],
+      "warnings": [],
+      "next_actions": []
+    }
+  }
+]

@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kiln.local/schemas/assurance-plan.schema.json",
+  "title": "Kiln Assurance Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "requested",
+    "required",
+    "effective",
+    "profile_version",
+    "reasons",
+    "status"
+  ],
+  "properties": {
+    "schema": {
+      "const": "kiln.quality.assurance_plan/v1alpha1"
+    },
+    "requested": {
+      "enum": [
+        "auto",
+        "rapid",
+        "standard",
+        "thorough",
+        "critical",
+        "formal"
+      ]
+    },
+    "required": {
+      "enum": [
+        "rapid",
+        "standard",
+        "thorough",
+        "critical",
+        "formal"
+      ]
+    },
+    "effective": {
+      "enum": [
+        "rapid",
+        "standard",
+        "thorough",
+        "critical",
+        "formal"
+      ]
+    },
+    "profile_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "missing_requirements": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "enum": [
+        "satisfied",
+        "blocked_missing_tool",
+        "blocked_missing_control",
+        "blocked_budget",
+        "waiver_required",
+        "unknown"
+      ]
+    },
+    "waiver_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

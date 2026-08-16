@@ -1,0 +1,14 @@
+{
+  "schema": "kiln.quality.assurance_plan/v1alpha1",
+  "requested": "rapid",
+  "required": "critical",
+  "effective": "critical",
+  "profile_version": "1",
+  "reasons": [
+    "The Patch changes external Command cancellation behavior.",
+    "Critical risk requires independent falsification."
+  ],
+  "missing_requirements": [],
+  "status": "satisfied",
+  "waiver_id": null
+}

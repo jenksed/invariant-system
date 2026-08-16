@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# P1-S01-T02 owner-machine store-host diagnostic.
+#
+# Records the exact host, filesystem, Exqlite, and embedded SQLite facts the
+# OD-02 supported-host profile requires, plus a live open/verify of a throwaway
+# store. It reads no Repository source and no secrets. It creates its database
+# under a temporary directory and removes it before exiting.
+set -euo pipefail
+
+fail() {
+  printf 'p1-s01-store-host: %s\n' "$1" >&2
+  exit 1
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+cd "$root"
+
+command -v mix >/dev/null 2>&1 || fail "Mix is not installed or not available on PATH"
+
+target=$(mktemp -d "${TMPDIR:-/tmp}/kiln-store-host.XXXXXX")
+trap 'rm -rf "$target"' EXIT
+
+printf '== P1-S01-T02 store-host diagnostic ==\n'
+printf 'collected_at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+printf '\n[host]\n'
+printf 'macos_product_version: %s\n' "$(sw_vers -productVersion 2>/dev/null || echo unknown)"
+printf 'macos_build_version: %s\n' "$(sw_vers -buildVersion 2>/dev/null || echo unknown)"
+printf 'architecture: %s\n' "$(uname -m)"
+printf 'kernel: %s\n' "$(uname -sr)"
+
+# Hardware identity is required so an operator can verify the diagnostic
+# actually ran on the accepted acceptance machine rather than on any other
+# Apple Silicon Mac. `hw.model` and `hw.machine` are part of the kernel
+# sysctl interface and are not influenced by user environment variables.
+printf 'hw_model: %s\n' "$(sysctl -n hw.model 2>/dev/null || echo unknown)"
+printf 'hw_machine: %s\n' "$(sysctl -n hw.machine 2>/dev/null || echo unknown)"
+
+printf '\n[filesystem: %s]\n' "$target"
+mount_dev=$(df "$target" | awk 'NR==2 {print $1}')
+printf 'device: %s\n' "$mount_dev"
+if command -v diskutil >/dev/null 2>&1; then
+  printf 'personality: %s\n' "$(diskutil info "$mount_dev" 2>/dev/null | awk -F': *' '/File System Personality/ {print $2; exit}')"
+  printf 'location: %s\n' "$(diskutil info "$mount_dev" 2>/dev/null | awk -F': *' '/Device Location/ {print $2; exit}')"
+  printf 'internal: %s\n' "$(diskutil info "$mount_dev" 2>/dev/null | awk -F': *' '/Internal/ {print $2; exit}')"
+else
+  printf 'personality: unknown (diskutil unavailable)\n'
+fi
+
+printf '\n[toolchain]\n'
+printf 'erlang_otp: %s\n' "$(erl -noshell -eval 'io:format("~s", [erlang:system_info(otp_release)]), halt().' 2>/dev/null || echo unknown)"
+printf 'elixir: %s\n' "$(elixir --version 2>/dev/null | awk '/Elixir/ {print $2; exit}')"
+printf 'git: %s\n' "$(git --version 2>/dev/null | awk '{print $3}')"
+
+printf '\n[store]\n'
+export KILN_DIAG_DIR="$target"
+mix run --no-start -e '
+  {:ok, _} = Application.ensure_all_started(:exqlite)
+  exqlite = Application.spec(:exqlite, :vsn) |> to_string()
+  IO.puts("exqlite: " <> exqlite)
+
+  path = Path.join(System.fetch_env!("KILN_DIAG_DIR"), "state.sqlite3")
+
+  case Kiln.Store.start(path: path, store_id: "diagnostic", now: DateTime.utc_now() |> DateTime.to_iso8601()) do
+    {:ready, store} ->
+      IO.puts("embedded_sqlite: " <> store.sqlite_version)
+      IO.puts("store_format: " <> store.store_format)
+      IO.puts("store_version: " <> Integer.to_string(store.store_version))
+      IO.puts("journal_mode: " <> store.info.journal_mode)
+      IO.puts("synchronous: " <> Integer.to_string(store.info.synchronous))
+      IO.puts("foreign_keys: " <> Integer.to_string(store.info.foreign_keys))
+      IO.puts("busy_timeout: " <> Integer.to_string(store.info.busy_timeout))
+      IO.puts("quick_check: " <> store.info.quick_check)
+      IO.puts("startup: ready")
+
+    other ->
+      IO.puts("startup: " <> inspect(other))
+      System.halt(1)
+  end
+' 2>/dev/null || fail "store open/verify failed"
+
+printf '\np1-s01-store-host: pass\n'

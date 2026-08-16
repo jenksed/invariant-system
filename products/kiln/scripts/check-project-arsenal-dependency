@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Read-only verifier for the project-arsenal development-agent dependency.
+#
+# Asserts, against the exact current repository state:
+#   1. the superproject's gitlink for .claude/dependencies/project-arsenal is
+#      mode 160000 and records exactly the reviewed upstream commit;
+#   2. .gitmodules declares the canonical upstream URL for that submodule;
+#   3. the materialized submodule working tree (when initialized) is at the
+#      same reviewed commit;
+#   4. .claude/skills/repository-truth is a symbolic link that resolves inside
+#      the pinned submodule to the expected package directory;
+#   5. the lockfile at .claude/dependencies/project-arsenal/.arsenal.lock
+#      records the reviewed plan and repository-truth package digests and
+#      does not record more than one matching agent-skills export.
+#
+# This script performs no mutation. It does not fetch, reset, init, or update
+# the submodule. A failed check MUST mean "do not proceed"; each failure path
+# prints an actionable message to stderr.
+
+set -euo pipefail
+
+fail() {
+  printf 'check-project-arsenal-dependency: %s\n' "$1" >&2
+  exit 1
+}
+
+root=$(git rev-parse --show-toplevel 2>/dev/null) || fail "not inside a Git repository"
+cd "$root"
+
+Pinned_Commit="980a58d331f4ed0679e6ae306b9d55b2ee21d179"
+Pinned_Url="https://github.com/jenksed/project-arsenal.git"
+Plan_Digest="sha256:8284fab44cd6f27d7e5533f79b6b64f5feffb1590ae569c623983180e4c76c9f"
+Package_Digest="sha256:741905b11ff97ec44da34cf17a3f9ab418b3973103e7aa21c6d2bf3b9fb1e310"
+
+Submodule_Path=".claude/dependencies/project-arsenal"
+Symlink_Path=".claude/skills/repository-truth"
+Lockfile_Path="${Submodule_Path}/.arsenal.lock"
+
+# 1. Superproject gitlink: require BOTH mode 160000 AND the exact recorded SHA.
+# `git ls-files --stage` is the authoritative record of what the superproject
+# believes the pinned dependency revision is; this is independent of whether
+# the working tree has been materialized.
+Index_Entry=$(git ls-files --stage "$Submodule_Path" 2>/dev/null) || true
+[[ -n "$Index_Entry" ]] || fail "submodule gitlink is missing from index: $Submodule_Path"
+Index_Mode=$(printf '%s' "$Index_Entry" | awk 'NR==1 { print $1; exit }')
+Index_Sha=$(printf '%s' "$Index_Entry" | awk 'NR==1 { print $2; exit }')
+if [[ "$Index_Mode" != "160000" ]]; then
+  fail "submodule $Submodule_Path is not a gitlink (index mode is $Index_Mode)"
+fi
+if [[ "$Index_Sha" != "$Pinned_Commit" ]]; then
+  fail "superproject gitlink SHA for $Submodule_Path is $Index_Sha; expected pinned commit $Pinned_Commit"
+fi
+
+# 2. .gitmodules must bind the canonical URL and the expected submodule path
+#    into the same `[submodule "<path>"]` section. Section-bound config
+#    lookup proves the two values co-locate; independent `grep` checks
+#    would accept a split or rearranged file.
+[[ -f .gitmodules ]] || fail ".gitmodules is missing"
+Configured_Path=$(git config -f .gitmodules --get "submodule.$Submodule_Path.path" 2>/dev/null) \
+  || fail ".gitmodules does not declare path for submodule $Submodule_Path"
+Configured_Url=$(git config -f .gitmodules --get "submodule.$Submodule_Path.url" 2>/dev/null) \
+  || fail ".gitmodules does not declare url for submodule $Submodule_Path"
+[[ "$Configured_Path" == "$Submodule_Path" ]] \
+  || fail ".gitmodules path for $Submodule_Path is '$Configured_Path'; expected '$Submodule_Path'"
+[[ "$Configured_Url" == "$Pinned_Url" ]] \
+  || fail ".gitmodules url for $Submodule_Path is '$Configured_Url'; expected '$Pinned_Url'"
+
+# 3. Materialized working tree must exist and be at the same reviewed commit.
+#    The verifier requires an initialized submodule; a missing directory or an
+#    uninitialized checkout both fail closed with actionable messages. CI and
+#    local developers must run `git submodule update --init --recursive`.
+if [[ ! -d "$Submodule_Path" ]]; then
+  fail "submodule working tree is missing at $Submodule_Path; run: git submodule update --init"
+fi
+if [[ ! -e "$Submodule_Path/.git" ]]; then
+  fail "submodule working tree at $Submodule_Path is not a valid Git checkout; run: git submodule update --init"
+fi
+Materialized_Head=$(git -C "$Submodule_Path" rev-parse HEAD 2>/dev/null) \
+  || fail "submodule $Submodule_Path HEAD could not be resolved"
+if [[ "$Materialized_Head" != "$Pinned_Commit" ]]; then
+  fail "submodule $Submodule_Path is at $Materialized_Head; expected pinned commit $Pinned_Commit"
+fi
+Materialized_Url=$(git -C "$Submodule_Path" config --get remote.origin.url 2>/dev/null) \
+  || fail "submodule $Submodule_Path has no remote.origin.url configured"
+if [[ "$Materialized_Url" != "$Pinned_Url" ]]; then
+  fail "submodule $Submodule_Path remote URL is $Materialized_Url; expected $Pinned_Url"
+fi
+
+# 4. The Claude skill symlink must resolve inside the pinned submodule and
+#    MUST NOT escape to anywhere outside the expected package directory.
+[[ -L "$Symlink_Path" ]] || fail "expected symlink at $Symlink_Path"
+Resolved=$(readlink -f "$Symlink_Path" 2>/dev/null) \
+  || fail "$Symlink_Path could not be resolved"
+Expected_Resolved="$root/$Submodule_Path/distribution/agent-skills/repository-truth"
+if [[ "$Resolved" != "$Expected_Resolved" ]]; then
+  fail "$Symlink_Path resolves to $Resolved; expected $Expected_Resolved"
+fi
+[[ -f "$Resolved/SKILL.md" ]] || fail "resolved skill path is missing SKILL.md: $Resolved"
+
+# 5. The lockfile must parse as JSON, expose the reviewed plan digest, and
+#    record exactly one repository-truth agent-skills export with the
+#    reviewed package digest. Multiple matches must fail closed to avoid
+#    silently validating an ambiguous export.
+if [[ ! -f "$Lockfile_Path" ]]; then
+  fail "lockfile is missing: $Lockfile_Path"
+fi
+
+if ! Lockfile_Json=$(python3 - "$Lockfile_Path" <<'PY'
+import json, sys
+try:
+    with open(sys.argv[1], "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+except json.JSONDecodeError as exc:
+    print(f"__invalid_json__:{exc.msg}", end="")
+    sys.exit(0)
+except OSError as exc:
+    print(f"__io_error__:{exc.strerror}", end="")
+    sys.exit(0)
+print(json.dumps(data))
+PY
+); then
+  fail "lockfile could not be read: $Lockfile_Path"
+fi
+
+if [[ "$Lockfile_Json" == __invalid_json__:* ]]; then
+  Reason=${Lockfile_Json#__invalid_json__:}
+  fail "lockfile is not valid JSON: $Lockfile_Path ($Reason)"
+fi
+if [[ "$Lockfile_Json" == __io_error__:* ]]; then
+  Reason=${Lockfile_Json#__io_error__:}
+  fail "lockfile could not be opened: $Lockfile_Path ($Reason)"
+fi
+
+Actual_Plan=$(printf '%s' "$Lockfile_Json" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+value = data.get('plan_sha256', '')
+print(value)
+")
+[[ -n "$Actual_Plan" ]] || fail "lockfile does not record plan_sha256"
+if [[ "$Actual_Plan" != "$Plan_Digest" ]]; then
+  fail "lockfile plan_sha256 is $Actual_Plan; expected $Plan_Digest"
+fi
+
+Actual_Package=$(printf '%s' "$Lockfile_Json" | python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+matches = []
+for capability in data.get('capabilities', []):
+    for export in capability.get('exports', []):
+        if export.get('target') == 'agent-skills' and export.get('package_name') == 'repository-truth':
+            matches.append(export.get('package_sha256', ''))
+if len(matches) != 1:
+    print(f'__ambiguous__:{len(matches)}')
+else:
+    print(matches[0])
+")
+
+if [[ "$Actual_Package" == __ambiguous__:* ]]; then
+  Count=${Actual_Package#__ambiguous__:}
+  fail "lockfile records $Count repository-truth agent-skills exports; expected exactly 1"
+fi
+[[ -n "$Actual_Package" ]] || fail "lockfile does not record the repository-truth package digest"
+if [[ "$Actual_Package" != "$Package_Digest" ]]; then
+  fail "lockfile repository-truth package_sha256 is $Actual_Package; expected $Package_Digest"
+fi
+
+printf 'check-project-arsenal-dependency: pass\n'
+printf 'pinned commit: %s\n' "$Pinned_Commit"
+printf 'remote url:    %s\n' "$Pinned_Url"
+printf 'plan digest:   %s\n' "$Actual_Plan"
+printf 'pkg digest:    %s\n' "$Actual_Package"
+printf 'skill symlink: %s -> %s\n' "$Symlink_Path" "$Resolved"

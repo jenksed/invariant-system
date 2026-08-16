@@ -1,0 +1,19 @@
+{
+  "schema": "kiln.quality.verification_obligation/v1alpha1",
+  "id": "obl_cancel_children",
+  "claim_id": "claim_cancel_children",
+  "statement": "A canceled parent leaves no active child operation.",
+  "assumptions": [
+    "The registered process host owns the complete process group."
+  ],
+  "accepted_methods": [
+    "deterministic_state_validator",
+    "cancellation_integration_test",
+    "independent_counterexample_search"
+  ],
+  "required_guarantee": "empirical",
+  "minimum_completeness": "complete",
+  "minimum_assurance": "critical",
+  "freshness_rule": "same_patch_repository_command_pack_and_environment",
+  "fallback": "Block acceptance when independent falsification is unavailable."
+}

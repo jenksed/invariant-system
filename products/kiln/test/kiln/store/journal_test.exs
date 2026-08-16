@@ -1,0 +1,631 @@
+defmodule Kiln.Store.JournalTest do
+  use ExUnit.Case, async: true
+
+  alias Kiln.Domain.{Action, ProjectObservation, Session}
+  alias Kiln.Journal.Replay
+  alias Kiln.Store
+  alias Kiln.Store.{Connection, Journal}
+
+  @now "2026-07-29T13:30:00Z"
+  @at ~U[2026-07-29 13:30:00Z]
+  @digest_a "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  @digest_b "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  @fingerprint "sha256:0000000000000000000000000000000000000000000000000000000000000001"
+
+  setup do
+    dir = Path.join(System.tmp_dir!(), "kiln-journal-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    state_path = Path.join(dir, "state.sqlite3")
+
+    {:ready, store} =
+      Store.start(path: state_path, store_id: "store_fixture", now: @now)
+
+    entropy = fn 16 -> :binary.copy(<<1>>, 16) end
+    {:ok, po} = ProjectObservation.new(observation(), entropy)
+
+    {:ok, %{session: session, task: task, run: run}} =
+      Session.start(intent(po), entropy_source: entropy)
+
+    {:ok, conn: store.conn, session: session, task: task, run: run, path: state_path}
+  end
+
+  test "commits a session_started action atomically", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+
+    assert {:ok, result} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+    assert result.status == :committed
+    assert result.session_revision == 0
+    assert is_integer(result.last_sequence)
+
+    assert result.projection["session"]["state"] == "active"
+    assert result.projection["run"]["state"] == "ready"
+
+    assert count(ctx.conn, "journal_entries") == 1
+    assert count(ctx.conn, "action_commits") == 1
+    assert count(ctx.conn, "session_projections") == 1
+
+    assert [["session_started/v1", 0]] =
+             Connection.query!(
+               ctx.conn,
+               "SELECT entry_type, session_revision FROM journal_entries"
+             )
+  end
+
+  test "advances the Session revision on a later action", ctx do
+    {:ok, start} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, start, start_entries(ctx), now: @now)
+
+    {:ok, transition} = transition_action(ctx, idem(3), @digest_b, 0)
+
+    assert {:ok, result} =
+             Journal.commit(ctx.conn, transition, transition_entries(ctx), now: @now)
+
+    assert result.session_revision == 1
+    assert result.projection["run"]["state"] == "running"
+    assert count(ctx.conn, "journal_entries") == 2
+  end
+
+  test "replays a duplicate identical action without a new entry", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    assert {:ok, replay} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+    assert replay.status == :replayed
+    assert count(ctx.conn, "journal_entries") == 1
+    assert count(ctx.conn, "action_commits") == 1
+  end
+
+  test "rejects a duplicate replay after the stored journal rows are deleted", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Simulate incomplete durable state: the action commit remains but the
+    # journal rows it depends on are gone. A duplicate replay must not succeed
+    # by trusting the cached idempotency result alone.
+    Connection.query!(ctx.conn, "DELETE FROM journal_entries")
+
+    assert {:error, %{class: :integrity, code: :journal_invalid}} =
+             Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Nothing is appended: the transaction rolled back before any write.
+    assert count(ctx.conn, "journal_entries") == 0
+    assert count(ctx.conn, "action_commits") == 1
+  end
+
+  test "rejects a duplicate replay after the stored journal payload is corrupted", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # Tamper the persisted payload so its recorded digest no longer matches.
+    Connection.query!(
+      ctx.conn,
+      ~s|UPDATE journal_entries SET payload = '{"tampered":true}'|
+    )
+
+    assert {:error, %{class: :integrity, code: :journal_invalid}} =
+             Journal.commit(ctx.conn, action, start_entries(ctx), now: @now)
+
+    # The duplicate must not append a new journal row or a new action commit.
+    assert count(ctx.conn, "journal_entries") == 1
+    assert count(ctx.conn, "action_commits") == 1
+  end
+
+  test "rejects a reused idempotency key with a different request", ctx do
+    {:ok, start} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, start, start_entries(ctx), now: @now)
+
+    # Same idempotency key, different action and digest.
+    {:ok, conflicting} = transition_action(ctx, idem(2), @digest_b, 0)
+
+    assert {:error, %{class: :idempotency_conflict}} =
+             Journal.commit(ctx.conn, conflicting, transition_entries(ctx), now: @now)
+
+    assert count(ctx.conn, "journal_entries") == 1
+  end
+
+  test "rejects a stale expected revision and makes no durable change", ctx do
+    {:ok, start} = start_action(ctx, idem(2), @digest_a)
+    {:ok, _} = Journal.commit(ctx.conn, start, start_entries(ctx), now: @now)
+
+    {:ok, stale} = transition_action(ctx, idem(3), @digest_b, 5)
+
+    assert {:error, %{class: :revision, code: :stale_revision, details: %{current: 0}}} =
+             Journal.commit(ctx.conn, stale, transition_entries(ctx), now: @now)
+
+    assert count(ctx.conn, "journal_entries") == 1
+    assert count(ctx.conn, "session_projections") == 1
+  end
+
+  test "leaves no partial state when the transaction faults", ctx do
+    {:ok, action} = start_action(ctx, idem(2), @digest_a)
+
+    assert {:error, %{class: :unknown, code: :transaction_failed}} =
+             Journal.commit(ctx.conn, action, start_entries(ctx), now: @now, fault: :boom)
+
+    assert count(ctx.conn, "journal_entries") == 0
+    assert count(ctx.conn, "action_commits") == 0
+    assert count(ctx.conn, "session_projections") == 0
+  end
+
+  # -- precondition: Store-owned transaction guard --
+
+  describe ":no_existing_session precondition" do
+    test "a fresh start_session commit with no existing Session commits normally", ctx do
+      {:ok, action} = start_action(ctx, idem(11), @digest_a)
+
+      assert {:ok, result} =
+               Journal.commit(ctx.conn, action, start_entries(ctx),
+                 now: @now,
+                 precondition: :no_existing_session
+               )
+
+      assert result.status == :committed
+      assert count(ctx.conn, "journal_entries") == 1
+      assert count(ctx.conn, "action_commits") == 1
+      assert count(ctx.conn, "session_projections") == 1
+    end
+
+    test "a second distinct start commit with the precondition rolls back with a Store error",
+         ctx do
+      {:ok, first_action} = start_action(ctx, idem(12), @digest_a)
+
+      assert {:ok, _} =
+               Journal.commit(ctx.conn, first_action, start_entries(ctx),
+                 now: @now,
+                 precondition: :no_existing_session
+               )
+
+      # Same precondition, different idempotency key, same fixture.
+      {:ok, second_action} = start_action(ctx, idem(13), @digest_b)
+
+      assert {:error, %Kiln.Store.Error{class: :precondition, code: :session_already_exists}} =
+               Journal.commit(ctx.conn, second_action, start_entries(ctx),
+                 now: @now,
+                 precondition: :no_existing_session
+               )
+
+      # Zero new writes — the rollback must be total.
+      assert count(ctx.conn, "journal_entries") == 1
+      assert count(ctx.conn, "action_commits") == 1
+      assert count(ctx.conn, "session_projections") == 1
+    end
+
+    test "the same idempotency key still replays even with the precondition set", ctx do
+      {:ok, action} = start_action(ctx, idem(14), @digest_a)
+
+      assert {:ok, _first} =
+               Journal.commit(ctx.conn, action, start_entries(ctx),
+                 now: @now,
+                 precondition: :no_existing_session
+               )
+
+      # Retry of the same key — must replay, not fail the precondition.
+      assert {:ok, replay} =
+               Journal.commit(ctx.conn, action, start_entries(ctx),
+                 now: @now,
+                 precondition: :no_existing_session
+               )
+
+      assert replay.status == :replayed
+      assert count(ctx.conn, "journal_entries") == 1
+      assert count(ctx.conn, "action_commits") == 1
+    end
+
+    test "an unsupported precondition atom is rejected before any transaction opens",
+         ctx do
+      {:ok, action} = start_action(ctx, idem(15), @digest_a)
+
+      assert {:error, %Kiln.Store.Error{class: :precondition, code: :unsupported_precondition}} =
+               Journal.commit(ctx.conn, action, start_entries(ctx),
+                 now: @now,
+                 precondition: :unknown_atom
+               )
+
+      assert count(ctx.conn, "journal_entries") == 0
+      assert count(ctx.conn, "action_commits") == 0
+      assert count(ctx.conn, "session_projections") == 0
+    end
+
+    test "passing nil precondition is equivalent to omitting it", ctx do
+      # Without the precondition, a second commit attempt for a Session
+      # that already exists is rejected by the reducer (the session_id
+      # is already recorded as started), not by the precondition. The
+      # precondition only fires when the caller explicitly opts in via
+      # `:no_existing_session`; `nil` and omission are equivalent.
+      {:ok, action} = start_action(ctx, idem(16), @digest_a)
+
+      assert {:ok, _} =
+               Journal.commit(ctx.conn, action, start_entries(ctx),
+                 now: @now,
+                 precondition: nil
+               )
+
+      assert count(ctx.conn, "journal_entries") == 1
+    end
+  end
+
+  # -- precondition: independent SQLite connection contention --
+
+  describe "independent SQLite connection contention" do
+    test "two independent Store connections to the same DB file produce exactly one Session",
+         ctx do
+      # This test is sensitive to removal or breakage of the **global**
+      # one-Session guard. It constructs two DISTINCT start candidates
+      # (different Session/Task/Run IDs, different action IDs, different
+      # idempotency keys, different request digests) and races them
+      # across two independent SQLite connections. Without the global
+      # precondition, both candidates are independently valid; the
+      # only thing that prevents both from committing is
+      # `Journal.commit`'s `:no_existing_session` check inside the
+      # first writer's `BEGIN IMMEDIATE` transaction.
+      #
+      # Earlier versions of this test reused the setup's session/task/
+      # run IDs for both contenders, which meant the reducer's own
+      # `:session_already_started` rejection could mask a missing
+      # precondition. With distinct IDs the precondition is the sole
+      # one-Session gate.
+      path = ctx.path
+
+      {:ready, second_store} =
+        Store.start(path: path, store_id: "store_writer_b", now: @now)
+
+      try do
+        domain_a = build_distinct_domain(byte_a())
+        domain_b = build_distinct_domain(byte_b())
+        action_a = build_distinct_start_action(domain_a, idem(41), @digest_a, 41)
+        action_b = build_distinct_start_action(domain_b, idem(42), @digest_b, 42)
+
+        # Distinctness assertions — every important identity must
+        # actually differ between the two candidates. Earlier versions
+        # of this test reused byte_size(domain.session.id) for both
+        # action IDs, which silently collided because every Session ID
+        # is the same length. These assertions turn that ambiguity
+        # into a hard tripwire.
+        refute domain_a.session.id == domain_b.session.id
+        refute domain_a.task.id == domain_b.task.id
+        refute domain_a.run.id == domain_b.run.id
+        refute action_a.id == action_b.id
+        refute action_a.idempotency_key == action_b.idempotency_key
+        refute action_a.request_digest == action_b.request_digest
+        entries_a = build_distinct_start_entries(domain_a)
+        entries_b = build_distinct_start_entries(domain_b)
+
+        # Both tasks register readiness with the parent, then wait
+        # for `:go`. The parent releases both simultaneously so the
+        # scheduler order does not decide the race — only the SQLite
+        # IMMEDIATE write lock acquisition order does.
+        parent = self()
+        barrier_a = :erlang.unique_integer([:positive])
+        barrier_b = :erlang.unique_integer([:positive])
+
+        task_a =
+          Task.async(fn ->
+            send(parent, {:ready, self(), barrier_a})
+
+            receive do
+              :go ->
+                Journal.commit(
+                  ctx.conn,
+                  action_a,
+                  entries_a,
+                  now: @now,
+                  precondition: :no_existing_session
+                )
+            end
+          end)
+
+        task_b =
+          Task.async(fn ->
+            send(parent, {:ready, self(), barrier_b})
+
+            receive do
+              :go ->
+                Journal.commit(
+                  second_store.conn,
+                  action_b,
+                  entries_b,
+                  now: @now,
+                  precondition: :no_existing_session
+                )
+            end
+          end)
+
+        # Wait until both tasks are inside their pre-Write sections,
+        # then release both simultaneously.
+        receive do
+          {:ready, _, ^barrier_a} ->
+            receive do
+              {:ready, _, ^barrier_b} ->
+                send(task_a.pid, :go)
+                send(task_b.pid, :go)
+            end
+        end
+
+        result_a = Task.await(task_a)
+        result_b = Task.await(task_b)
+
+        outcomes = [result_a, result_b]
+        successes = Enum.filter(outcomes, &match?({:ok, _}, &1))
+        rejections = Enum.filter(outcomes, &match?({:error, _}, &1))
+
+        # Exactly one commit, exactly one rejection.
+        assert length(successes) == 1,
+               "exactly one distinct-candidate start must commit; got #{inspect(outcomes)}"
+
+        assert length(rejections) == 1,
+               "exactly one distinct-candidate start must be rejected; got #{inspect(outcomes)}"
+
+        # The losing rejection is constrained to one of two typed Store
+        # errors, AND the class/code pair must match exactly. Anything
+        # else (e.g. an :integrity, :unknown, :io error, or a crossed
+        # class/code pair such as :precondition/:store_busy) would
+        # mean a regression in the durable invariant path rather than
+        # a benign timeout.
+        [{:error, %Kiln.Store.Error{} = rejection}] = rejections
+
+        assert match?(
+                 %Kiln.Store.Error{
+                   class: :precondition,
+                   code: :session_already_exists
+                 },
+                 rejection
+               ) or
+                 match?(
+                   %Kiln.Store.Error{
+                     class: :busy,
+                     code: :store_busy
+                   },
+                   rejection
+                 ),
+               "the losing rejection must be exactly :precondition/:session_already_exists " <>
+                 "(the precondition path observed the first writer's session inside its own " <>
+                 "IMMEDIATE transaction) or :busy/:store_busy (the accepted two-second busy " <>
+                 "timeout expired before the first writer committed); got #{inspect(rejection)}"
+
+        # The durable Session ID is exactly the winner's candidate ID.
+        [{:ok, %{projection: %{"session" => %{"id" => winner_session_id}}}} | _] = successes
+
+        all_session_ids =
+          Connection.query!(
+            ctx.conn,
+            "SELECT session_id FROM journal_entries"
+          )
+          |> List.flatten()
+
+        assert all_session_ids == [winner_session_id],
+               "exactly one Session ID must persist and match the winner; got #{inspect(all_session_ids)}"
+
+        # Redundant authoritative proof via Replay.sessions/1: the
+        # Store's session enumeration must see exactly one session
+        # matching the winner's candidate ID. This guards against any
+        # SQL-level proof becoming stale (e.g. if the projection
+        # column moved or the row was duplicated in a regression).
+        {:ok, replayed_sessions} =
+          Replay.sessions(ctx.conn) |> then(&{:ok, &1})
+
+        assert replayed_sessions == [winner_session_id],
+               "Replay.sessions must see exactly the winner's candidate ID; " <>
+                 "got #{inspect(replayed_sessions)}"
+
+        # Read durable counts via the test-setup connection.
+        entries_count = count(ctx.conn, "journal_entries")
+        commits_count = count(ctx.conn, "action_commits")
+        projections_count = count(ctx.conn, "session_projections")
+
+        assert entries_count == 1,
+               "exactly one session_started entry must persist; got journal_entries=#{entries_count}, " <>
+                 "action_commits=#{commits_count}, session_projections=#{projections_count}, " <>
+                 "successes=#{length(successes)}, rejections=#{length(rejections)}, " <>
+                 "outcomes=#{inspect(outcomes)}"
+
+        assert commits_count == 1
+        assert projections_count == 1
+      after
+        GenServer.stop(second_store.conn, :normal, 1_000)
+      end
+    end
+  end
+
+  defp byte_a, do: 41
+  defp byte_b, do: 42
+
+  # Build a deterministic but distinct domain struct for the
+  # cross-connection test. Different entropy bytes produce different
+  # Session, Task, and Run identifiers, so two candidates racing the
+  # same DB file would both be independently valid if the precondition
+  # were removed.
+  defp build_distinct_domain(byte) do
+    entropy = fn 16 -> :binary.copy(<<byte>>, 16) end
+
+    {:ok, po} =
+      ProjectObservation.new(
+        %{
+          repository_root: "/tmp/kiln-fixture-#{byte}",
+          repository_fingerprint:
+            "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+          observed_at: @at
+        },
+        entropy
+      )
+
+    {:ok, %{session: session, task: task, run: run}} =
+      Session.start(
+        %{
+          project_observation: po,
+          objective: "Concurrent start candidate #{byte}",
+          criteria: ["Passes"],
+          constraints: [],
+          exclusions: [],
+          started_at: @at
+        },
+        entropy_source: entropy
+      )
+
+    %{session: session, task: task, run: run}
+  end
+
+  defp build_distinct_start_action(domain, idempotency_key, digest, action_byte) do
+    {:ok, action} =
+      Action.new(%{
+        # Distinct entropy byte per candidate. The earlier
+        # `id(:action, 50 + byte_size(domain.session.id))` produced the
+        # same byte for both candidates because every Session ID is
+        # `ses_` + 32 hex chars (same length), so both candidates
+        # would collide on `action_commits.action_id` — a global
+        # primary key. The precondition test must still pass with
+        # truly independent action IDs so the global one-Session guard
+        # is the sole reason the second commit fails.
+        id: id(:action, action_byte),
+        session_id: domain.session.id,
+        run_id: domain.run.id,
+        expected_session_revision: 0,
+        idempotency_key: idempotency_key,
+        actor_kind: :local_user,
+        actor_id: "user:local",
+        kind: :start_session,
+        request_digest: digest,
+        payload: %{},
+        causation_action_id: nil,
+        correlation_id: nil,
+        requested_at: @at
+      })
+
+    action
+  end
+
+  defp build_distinct_start_entries(domain) do
+    [
+      %{
+        type: "session_started/v1",
+        payload_schema: "session_started/v1",
+        payload: %{
+          "session" => %{"id" => domain.session.id, "state" => "active"},
+          "task" => %{"id" => domain.task.id, "state" => "in_progress"},
+          "run" => %{
+            "id" => domain.run.id,
+            "state" => "ready",
+            "root_run_id" => domain.run.root_run_id
+          },
+          "workflow_step" => "intent",
+          "objective" => domain.session.objective,
+          "criteria" => domain.task.criteria,
+          "constraints" => domain.task.constraints,
+          "exclusions" => domain.task.exclusions,
+          "objective_revision" => domain.session.revision,
+          "criteria_revision" => domain.session.criteria_revision,
+          "references" => %{"project_observation_id" => domain.session.project_observation_id}
+        }
+      }
+    ]
+  end
+
+  # -- helpers --
+
+  defp observation do
+    %{
+      repository_root: "/tmp/kiln-fixture",
+      repository_fingerprint: @fingerprint,
+      observed_at: @at
+    }
+  end
+
+  defp intent(po) do
+    %{
+      project_observation: po,
+      objective: "Correct one bounded defect",
+      criteria: ["The focused test passes"],
+      constraints: ["Do not change dependencies"],
+      exclusions: ["No provider access"],
+      started_at: @at
+    }
+  end
+
+  defp start_action(ctx, idempotency_key, digest) do
+    Action.new(%{
+      id: id(:action, 10),
+      session_id: ctx.session.id,
+      run_id: ctx.run.id,
+      expected_session_revision: 0,
+      idempotency_key: idempotency_key,
+      actor_kind: :local_user,
+      actor_id: "user:local",
+      kind: :start_session,
+      request_digest: digest,
+      payload: %{},
+      causation_action_id: nil,
+      correlation_id: nil,
+      requested_at: @at
+    })
+  end
+
+  defp transition_action(ctx, idempotency_key, digest, expected) do
+    Action.new(%{
+      id: id(:action, 11),
+      session_id: ctx.session.id,
+      run_id: ctx.run.id,
+      expected_session_revision: expected,
+      idempotency_key: idempotency_key,
+      actor_kind: :system,
+      actor_id: "kiln:workflow",
+      kind: :transition_run,
+      request_digest: digest,
+      payload: %{from: "ready", to: "running"},
+      causation_action_id: nil,
+      correlation_id: nil,
+      requested_at: @at
+    })
+  end
+
+  defp start_entries(ctx) do
+    [
+      %{
+        type: "session_started/v1",
+        payload_schema: "session_started/v1",
+        payload: %{
+          "session" => %{"id" => ctx.session.id, "state" => "active"},
+          "task" => %{"id" => ctx.task.id, "state" => "in_progress"},
+          "run" => %{
+            "id" => ctx.run.id,
+            "state" => "ready",
+            "root_run_id" => ctx.run.root_run_id
+          },
+          "workflow_step" => "intent",
+          "objective" => ctx.session.objective,
+          "criteria" => ctx.task.criteria,
+          "constraints" => ctx.task.constraints,
+          "exclusions" => ctx.task.exclusions,
+          "objective_revision" => ctx.session.revision,
+          "criteria_revision" => ctx.session.criteria_revision,
+          "references" => %{"project_observation_id" => ctx.session.project_observation_id}
+        }
+      }
+    ]
+  end
+
+  defp transition_entries(ctx) do
+    [
+      %{
+        type: "run_transitioned/v1",
+        payload_schema: "run_transitioned/v1",
+        payload: %{
+          "run" => %{"id" => ctx.run.id, "from" => "ready", "to" => "running"},
+          "workflow_step" => "application"
+        }
+      }
+    ]
+  end
+
+  defp count(conn, table) do
+    [[n]] = Connection.query!(conn, "SELECT count(*) FROM #{table}")
+    n
+  end
+
+  defp idem(byte), do: id(:idempotency, byte)
+
+  defp id(kind, byte) do
+    {:ok, value} = Kiln.Domain.Id.generate(kind, fn 16 -> :binary.copy(<<byte>>, 16) end)
+    value
+  end
+end
