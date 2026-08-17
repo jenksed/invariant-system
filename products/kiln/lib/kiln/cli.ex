@@ -22,6 +22,7 @@ defmodule Kiln.CLI do
 
   alias Kiln.CLI.{ErrorMap, Request, Result, Runtime}
   alias Kiln.Domain.Error
+  alias Kiln.M0Currentness
   alias Kiln.OperationLifecycle
   alias Kiln.Workflow
 
@@ -369,6 +370,8 @@ defp run_patch_recover(%Request{options: opts}) do
     verdict = opts["verdict"]
 
     with {:ok, impl_assign} <- load_artifact_ref(opts["implementer-assignment"], "implementer-assignment"),
+         {:ok, eligibility_doc} <- load_json(opts["eligibility"], "eligibility"),
+         :ok <- check_reviewer_currentness(eligibility_doc),
          {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
          {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
          {:ok, verifier_ref} <- load_artifact_ref(opts["verification"], "verification"),
@@ -468,6 +471,27 @@ defp run_patch_recover(%Request{options: opts}) do
       {:ok, doc} -> {:ok, doc}
       {:error, %{reason: reason}} -> {:error, usage_result(reason)}
     end
+  end
+
+  # C6: REVIEWER-dispatch currentness revalidation.
+  # The M9 work package (E2) requires "current QUALIFIED eligibility" for the
+  # REVIEWER. The M8 IMPLEMENTER-dispatch boundary revalidates this; the M9
+  # REVIEWER-dispatch boundary did not. This helper applies the same
+  # canonical 168-hour currentness check at the M9 dispatcher boundary.
+  # IMPLEMENTER currentness does not substitute for REVIEWER currentness:
+  # the reviewer eligibility loaded here is the REVIEWER's, not the
+  # implementer's. The structural separation invariant (REVIEWER digest !=
+  # IMPLEMENTER digest) is enforced by Kiln.Review.build/9.
+  defp check_reviewer_currentness(eligibility_doc) when is_map(eligibility_doc) do
+    if M0Currentness.within_currentness_window?(eligibility_doc) do
+      :ok
+    else
+      M0Currentness.stale_error(eligibility_doc)
+    end
+  end
+
+  defp check_reviewer_currentness(_eligibility_doc) do
+    {:error, %{code: :E_QUALIFICATION_NOT_CURRENT, reason: "eligibility is missing or malformed at the reviewer dispatch boundary"}}
   end
 
   defp load_json(nil, field) do

@@ -132,7 +132,7 @@ defmodule Kiln.CLI.Request do
     patch_apply: ~w(decision operations out),
     patch_recover: ~w(proposal decision observed-state-digest out),
     verify_run: ~w(plan patch result-state-digest registered-verifier status evidence out),
-    review_propose: ~w(implementer-assignment plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
+    review_propose: ~w(implementer-assignment eligibility plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
     human_decide: ~w(plan patch result-state-digest review decision out)
   }
 
