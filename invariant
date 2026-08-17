@@ -95,6 +95,62 @@ cmd_doctor() {
     printf 'MISSING  %-10s (%s)\n' elixir "kiln (see products/kiln/mise.toml)"
     rc=1
   fi
+
+  # ---- M11 E5: doctor additions (read-only, no network, no credential printed) ----
+
+  # 1. M0 packet present + DIGESTS.json parseable.
+  if [[ -f contracts/m0/DIGESTS.json ]]; then
+    if python3 -c 'import json,sys; json.load(open("contracts/m0/DIGESTS.json"))' 2>/dev/null; then
+      printf 'ok       m0-packet    DIGESTS.json present and parseable\n'
+    else
+      printf 'FAIL     m0-packet    DIGESTS.json present but unparseable\n'
+      rc=1
+    fi
+  else
+    printf 'MISSING  m0-packet    contracts/m0/DIGESTS.json not present\n'
+    rc=1
+  fi
+
+  # 2. Every Kiln registry script path exists (mirrors registry_paths_test).
+  for regscript in products/kiln/lib/kiln/verification/command_host.ex \
+                   products/kiln/lib/kiln/verification/registry.ex \
+                   products/kiln/lib/kiln/verification/change.ex \
+                   products/kiln/lib/kiln/verification/state.ex \
+                   products/kiln/lib/kiln/verification/supervision.ex; do
+    if [[ -f "$regscript" ]]; then
+      printf 'ok       registry      %s\n' "$regscript"
+    else
+      printf 'FAIL     registry      missing %s\n' "$regscript"
+      rc=1
+    fi
+  done
+
+  # 3. MINIMAX_API_KEY presence only — value is NEVER printed.
+  # Credential presence is a configuration fact, NOT provider health.
+  # Do not report presence as proof of live dispatch.
+  if [[ -n "${MINIMAX_API_KEY:-}" ]]; then
+    printf 'ok       credential   MINIMAX_API_KEY present (value not shown)\n'
+  else
+    printf 'note     credential   MINIMAX_API_KEY not set (live dispatch unavailable; deterministic fakes still supported)\n'
+  fi
+
+  # 4. Manifold selector test file present.
+  if [[ -f products/manifold/tests/test_selector.py ]]; then
+    printf 'ok       manifold      products/manifold/tests/test_selector.py present\n'
+  else
+    printf 'MISSING  manifold      products/manifold/tests/test_selector.py not present\n'
+    rc=1
+  fi
+
+  # 5. Pinned Kiln toolchain line (products/kiln/mise.toml) vs detected
+  #    Erlang / Elixir versions. Display only.
+  pinned_erlang=$(grep -E '^erlang *=' products/kiln/mise.toml 2>/dev/null | sed -E 's/.*"([0-9.]+)".*/\1/' | head -1)
+  pinned_elixir=$(grep -E '^elixir *=' products/kiln/mise.toml 2>/dev/null | sed -E 's/.*"([0-9.ot-]+)".*/\1/' | head -1)
+  detected_erlang=$(if have elixir; then elixir --version 2>/dev/null | grep -oE 'Erlang [0-9.]+' | head -1 | awk '{print $2}'; fi)
+  detected_elixir=$(if have elixir; then elixir --version 2>/dev/null | grep -oE 'Elixir [0-9.]+' | head -1 | awk '{print $2}'; fi)
+  printf 'info     kiln-pinned   mise.toml: erlang=%s elixir=%s; detected: erlang=%s elixir=%s\n' \
+    "${pinned_erlang:-?}" "${pinned_elixir:-?}" "${detected_erlang:-?}" "${detected_elixir:-?}"
+
   say ""
   say "doctor does not install anything. See product READMEs for setup."
   return $rc
