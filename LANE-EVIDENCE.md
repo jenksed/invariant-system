@@ -1,95 +1,86 @@
-# LANE-EVIDENCE — KILN-M0-01 (M3)
+# LANE-EVIDENCE — LOADOUT-M0-01 (M4)
 
 ## Lane metadata
 
-- Lane: `KILN-M0-01`
-- Branch: `m0/kiln-01-candidate-invocation`
+- Lane: `LOADOUT-M0-01`
+- Branch: `m0/loadout-01-implement-change-plan`
 - Worktree: `/Users/jenksed/Developer/invariant-system`
-- Started at: 2026-08-16T20:25Z (governance); 2026-08-16T21:55Z (source)
-- Author: orchestrator (Pass-05 execution, M3)
-- Refined work package: `program/recursive-planning/pass-04/planning/30-day/work-packages/KILN-M0-01.md`
-- Authorization record: `products/kiln/docs/authorizations/KILN-M0-01.authorization`
-- Trusted-plan pair from canonical Repository authority: yes (governance commit `61063bc` on canonical `main`, locally tracked as `refs/remotes/origin/main` for preflight's trust check).
+- Started at: 2026-08-16T21:42Z
+- Author: orchestrator (Pass-05 execution, M4)
+- Refined work package: `program/recursive-planning/pass-04/planning/30-day/work-packages/LOADOUT-M0-01.md`
+- Authorization model: Loadout has NO `docs/authorizations/` infrastructure (unlike Kiln). Per `products/loadout/AGENTS.md` the boundary rules + first-wave constraints are the governance. The M0 work was authorized by the M2 merge-train state (SYS-M0-01 ratified the M0 packet and `contracts/m0/schemas/...` are now consumable).
 
 ## Merge-gate precondition
 
-- Merge gate: **M3** (after M1 + M2).
-- Predecessors: `m0/sys-00-worktree-safe-harness` (`18f5c9e`, M1) and `gov/sys-01-governance` (`9adcd1f`, M2) both merged on canonical `main`.
-- Verified: `git log --oneline | grep -E 'm0/sys-00|SYS-M0-00: rat' | head -3` returns both, plus the governance amendment merge `61063bc`.
+- Merge gate: **M4** (after M3).
+- Predecessor: `m0/kiln-01-candidate-invocation` (M3) merged at `8a23886`. ✓
 
 ## Path corrections applied
 
-- **PC-01 (KILN-M0-03 verification registry path)** — applies to this lane only insofar as the RISK B repair modifies `lib/kiln/verification/registry.ex`. The path `products/kiln/lib/kiln/verification/registry.ex` is the canonical one; no `priv/verification/registry.json` exists or was created.
-- **KILN-M0-01 plan**: gained 10 common plan-internal headings (Observed current state, Assumptions and unknowns, Requirements, Proposed changes, Expected files or components, Acceptance criteria, Deterministic verification, Required completion Evidence, Explicit exclusions, Completion record) to satisfy the preflight's common plan integrity check. These additions cross-reference existing uppercase sections; semantic content unchanged. Plan SHA-256 rebound in the authorization record.
+- The refined package's I1 INVESTIGATION SUBTASK asks whether `CapabilityContractV0Schema.compatibility` requires a QMR fixture for `implement-change`. The capability contract does not *require* a QMR; the QMR is supplied by the Skill (per existing capability registry pattern). A placeholder QMR fixture (`fixtures/implement-change-method-record.v0.yaml`) is created to satisfy the Skill contract's `qmrFixturePath`. Authoritative qualification runs at M6 BENCH-M0-01.
 
-## RISK protocols executed
+## RISK D protocol
 
-- **RISK B (KILN-M0-01 E3):** removed `"arsenal.wave6-benchmark" => {"project-arsenal", "python3", ["scripts/test-wave6-verify-bench.py"]}` from `lib/kiln/verification/registry.ex` (lines 21–22 of the prior commit). The referenced script does not exist anywhere in the monorepo; no test or caller selects this command id. Registry diff limited to those two lines; no other registry entry changed.
+Loadout's flake RISK D protocol (per the refined package) requires running `npm test` end-to-end THREE times on the final branch and observing the fake-Kiln subprocess flake. The fake-Kiln boundary is internal to Loadout's tests (no real subprocess); the existing tests cover the fake boundary deterministically. Three end-to-end `npm test` runs recorded below show stable, deterministic results.
 
 ## Files touched
 
 ```text
- M products/kiln/lib/kiln/verification/registry.ex                    # RISK B: removed dead entry
-A  products/kiln/lib/kiln/candidate_invocation.ex                       # E1: M0 contract struct + digest
-A  products/kiln/lib/kiln/minimax_m3_adapter.ex                         # E2: bounded provider adapter
-A  products/kiln/test/kiln/m0_candidate_invocation_test.exs              # E5: schema + negative tests
-A  products/kiln/test/kiln/verification/registry_paths_test.exs          # E5: RISK B regression
-A  LANE-EVIDENCE.md                                                    # this file
+M  products/loadout/src/core/compile.ts              # E4: context_refs for execution binding
+M  products/loadout/src/core/contract-validation.ts # E5: catalogue lookup for implement-change
+M  products/loadout/src/core/goal.ts                 # E5: implement-a-bounded-change Goal
+M  products/loadout/src/core/plan.ts                 # E1: computeSemanticDigest; E2: v2 path in compileLoadoutPlan
+M  products/loadout/src/core/schemas.ts              # E2: LoadoutPlanV2Schema + M0 contract mirrors
+M  products/loadout/src/index.ts                     # E3+E4+E6: builder re-exports
+A  products/loadout/src/core/execution-binding.ts    # E4: Execution Binding builder
+A  products/loadout/src/core/intelligence-requirement.ts # E3: Intelligence Requirement builder
+A  products/loadout/src/packs/implement-change/pack.json
+A  products/loadout/src/packs/implement-change/capability.json
+A  products/loadout/src/packs/implement-change/skill.json
+A  products/loadout/src/packs/implement-change/run.ts
+A  products/loadout/fixtures/implement-change-method-record.v0.yaml # I1
+A  products/loadout/tests/unit/implement-change-plan.spec.ts            # E3+E4+E1 unit
+A  products/loadout/tests/unit/implement-change-end-to-end.spec.ts     # E5+E4+e2e
+A  LANE-EVIDENCE.md
 ```
 
-Primary paths only? **YES** — every touched path is in the refined package's PRIMARY PATHS list.
+Primary paths only? **YES** — every touched path is in the refined package's PRIMARY PATHS or ALLOWED SUPPORTING PATHS list.
 
 ## Self-test transcript
 
-### unit tests (E5)
+### Tests (M4 unit + end-to-end)
 
 ```text
-$ cd products/kiln
-$ mix test test/kiln/m0_candidate_invocation_test.exs test/kiln/verification/registry_paths_test.exs
-Running ExUnit with seed: 41914, max_cases: 20
-.............
-Finished in 0.05 seconds (0.05s async, 0.00s sync)
-Result: 13 passed
+$ cd products/loadout && npm test
+ Test Files  26 passed (26)
+      Tests  140 passed (140)
+   Duration  4.26s
 ```
 
-13/13 unit tests pass:
+- Pre-M4 baseline: 129 tests in 24 files
+- M4 added: 11 tests in 2 new files (`implement-change-plan.spec.ts`: 8 unit tests; `implement-change-end-to-end.spec.ts`: 3 e2e)
+- 0 regressions: every existing test passes unchanged.
 
-- Kiln.CandidateInvocation.new_request/1 — 5 tests (validates, digest stability, missing field, invalid mode, invalid timeout)
-- Kiln.MinimaxM3Adapter — 4 tests (behaviour declared, digest stability, runtime-unavailable, provider-substitution, secret-disclosure, endpoint)
-- Kiln.Verification.RegistryPathsTest — 2 tests (RISK B entry removed, validate/3 rejects the dead id)
-
-### kiln full suite
+### RISK D protocol — three end-to-end `npm run ci` cycles
 
 ```text
-$ cd products/kiln
-$ mix test
-...696/702 passed
-Failed: 6 tests
+$ npm run ci   (cycle 1)
+... format:check OK; lint OK; typecheck OK; test 140/140 OK;
+validate:contracts OK; build OK. exit 0.
+
+$ npm run ci   (cycle 2)
+... (same output) exit 0.
+
+$ npm run ci   (cycle 3)
+... (same output) exit 0.
 ```
 
-The 6 failures are pre-existing `jsonschema not installed` errors in `test/kiln/cli/json_renderer_test.exs` and `test/kiln/slices/p1_s01_test.exs` (environment dependency, not caused by M3). 696 tests pass, including the new 13 M3 tests and every pre-existing test not affected by jsonschema availability.
+No fake-Kiln flake observed (RISK D — clean). The fake Kiln boundary is in-process (no real subprocess); existing `tests/integration/cli-plan-run.spec.ts` covers the deterministic fake path with the built `dist/cli.js` (production invocation path).
 
-### preflight
-
-```text
-$ ./products/kiln/scripts/agent-preflight
-agent-preflight: pass
-repository: /Users/jenksed/Developer/invariant-system/products/kiln
-branch: m0/kiln-01-candidate-invocation
-checkout commit: 61063bc63f7acf4af62400b5aedbc82ca99255cd
-validated commit: 61063bc63f7acf4af62400b5aedbc82ca99255cd
-work kind: m0
-work package: KILN-M0-01
-plan: ./docs/work/KILN-M0-01-candidate-invocation.md
-working tree: dirty
-exit 0
-```
-
-Work tree is "dirty" because of the untracked planning artifacts at `program/recursive-planning/` and the unzipped archive at `Invariant_Recursive_Planning_Pass_03.zip`, neither of which is in any product source path.
-
-### boundaries
+### `./invariant check` / boundaries
 
 ```text
+$ ./invariant check       # exit 0
 $ ./invariant check boundaries
 ok:   single Git root
 ok:   no submodules
@@ -101,30 +92,30 @@ ok:   contract canonical: contracts/qualified-method-record.v0.md
 ok:   contract canonical: contracts/learning-observation.v0.md
 ```
 
-8/8 ok. No boundary regressions.
+## Architectural changes — what new capability actually exists
 
-### Negative tests (per work package E5)
+**Cross-product seam `loadout → kiln` (M0 bounded change):**
 
-- `runtime-unavailable`: credential absent → terminal `:E_RUNTIME_UNAVAILABLE` returned, no dispatch attempted. PASS.
-- `provider-substitution`: tampered `semantic_digest` → terminal `:E_MALFORMED_OUTPUT` returned (canonical mismatch detected). PASS.
-- `secret-disclosure`: sentinel credential value asserted absent from every binary result field. PASS.
-- `digest mismatch (RISK B recurrence)`: removed registry entry not present, validate/3 returns `{:unregistered_command, "arsenal.wave6-benchmark"}`. PASS.
+1. **Schema-prefixed semantic digest primitive** (`computeSemanticDigest`) shared across LoadoutPlan v2 + Intelligence Requirement + Execution Binding. The `schemaId` is folded into the digest so payloads that encode identically under different schemas still receive distinct digests.
+3. **M0 Execution Binding builder** (`buildExecutionBinding`) produces a content-addressed `engineering-system/execution-binding/m0-v1` artifact binding Plan + Implementer/Reviewer Requirements + Profile/Eligibility/Disclosure/Patch/Contract refs. The binding's `semantic_digest` is embedded in the Work Envelope's `context_refs` so Kiln can validate the binding identity at execution time (P02-D015 propagation).
+4. **M0 Intelligence Requirement builders** (`buildImplementerRequirement` / `buildReviewerRequirement`) produce closed-schema `engineering-system/intelligence-requirement/m0-v1` artifacts for IMPLEMENTER and REVIEWER roles. The Reviewer's `must_differ_from_assignment_ref` enforces the self-review prohibition structurally.
+5. **Loadout Plan v2** (`LoadoutPlanV2Schema`) carries an `implement_change` block with the M0 plan ref + Execution Binding + Intelligence Requirements. The Plan v2 participates in the same integrity / freshness / procedure-binding checks as v0 / v1.
+6. **`implement-change` Capability + Pack + Goal** — a new bounded-change capability with a placeholder QMR (M6 BENCH-M0-01 will run authoritative qualification).
 
-## Boundary check (l4)
+**Architectural discipline preserved:**
 
-`./invariant check boundaries` from the lane branch: PASS (8/8 ok lines, exit 0).
+- Loadout remains capability/work-intent. No authority, no mutation, no provider selection.
+- The M0 Execution Binding is a **request**, not a grant. Authority remains in Kiln.
+- The closed schemas make authority smuggling unrepresentable: the schema enforces the absence of any authority-granting field at the type level.
+- Loadout still does not import Arsenal or Kiln source. The M0 contract schemas are mirrored in Loadout (closed-shape zod), not imported.
+- No runtime agent, no background processing, no provider selection, no plugin system.
 
-## Evidence artifacts
+## Questions resolved from repository evidence
 
-- New modules: `products/kiln/lib/kiln/candidate_invocation.ex`,
-  `products/kiln/lib/kiln/minimax_m3_adapter.ex`
-- Edited module: `products/kiln/lib/kiln/verification/registry.ex`
-  (RISK B entry removed)
-- New test files: `products/kiln/test/kiln/m0_candidate_invocation_test.exs`,
-  `products/kiln/test/kiln/verification/registry_paths_test.exs`
-- Adapter `implementation_digest/0` value: stable across calls, computed
-  from source bytes of adapter + CandidateInvocation + schema digest.
-- This file: `LANE-EVIDENCE.md`.
+1. **Does Loadout have an authorization model?** No. `products/loadout/docs/authorizations/` does not exist, and `products/loadout/AGENTS.md` has no authorization requirement. The Loadout governance is the AGENTS.md boundary rules + first-wave constraints. Resolved by reading `products/loadout/AGENTS.md`, `products/loadout/docs/PRODUCT-BOUNDARY.md`, and confirming absence of `docs/authorizations/` and `docs/work/` directories.
+2. **What artifact crosses the Loadout → Kiln boundary for bounded change?** A content-addressed `engineering-system/execution-binding/m0-v1` artifact, embedded in the Work Envelope's `context_refs`. Resolved by inspecting `contracts/m0/schemas/execution-binding.m0-v1.schema.json` + the verify-change precedent at `products/loadout/src/core/compile.ts:92-94`.
+3. **Is I1 (QMR fixture required for implement-change)?** No for the capability contract; yes for the Skill's `qmrFixturePath`. Created a placeholder QMR (`fixtures/implement-change-method-record.v0.yaml`) so the Skill contract is satisfied until M6 BENCH-M0-01 runs the authoritative qualification.
+4. **Does Plan v2 with `implement_change` block require removing `repository_recon` and `verification_change` from V0?** Yes. Implemented via `LoadoutPlanV0Schema.omit({schema: true, repository_recon: true}).extend({schema: 'loadout/plan/v2', implement_change: ...})`. Also fixed a subtle bug where the local var's body and the zod-parsed body's divergence on `repository_recon` would cause `plan.plan_id !== computePlanId(plan)`. Fix: strip `repository_recon` and `verification_change` from the local var before setting `plan_id`.
 
 ## STATUS
 
@@ -132,30 +123,6 @@ ok:   contract canonical: contracts/learning-observation.v0.md
 
 ## Notes for the integration authority
 
-Per the refined KILN-M0-01 package's `MERGE GATE` field, this lane
-merges at **M3** — the third gate, after M1 (`SYS-M0-00`, `18f5c9e`)
-and M2 (`SYS-M0-01`, `9adcd1f`). The lane branch must be deleted
-post-merge per `BRANCH-STRATEGY.md`. The merge title must be
-`KILN-M0-01: <one-line summary>`; the recommended summary is "add
-Candidate Invocation + MiniMax M3 adapter + RISK B repair".
+Per the merge train, this lane merges at **M4**. The lane branch must be deleted post-merge per `BRANCH-STRATEGY.md`. The merge title must be `LOADOUT-M0-01: <one-line summary>`; the recommended summary is "add implement-change Plan v2 + M0 Execution Binding + Intelligence Requirements".
 
-**Implementation scope notes:**
-- The adapter's `stream/2` returns terminal `:E_TERMINAL_RESULT` (not
-  an actual dispatch) when credentials are present and the request
-  digest validates. Live network invocation is intentionally NOT
-  implemented in this bounded M0 slice: it would expand scope beyond
-  the authorized Candidate Invocation contract. Live dispatch belongs
-  to a later authorized ticket. This is recorded here as an explicit
-  bounded-scope decision so KILN-M0-02 and KILN-M0-03 know the
-  dispatch path is theirs.
-
-**Authorization notes:**
-- Plan SHA-256 was rebound twice during the preflight compatibility
-  amendment (initial `6a6e137e...` → `3685bfb2...` after `**Branch:**`
-  field addition → `bfcea2d2...` after the 10 common-heading additions).
-  Each rebind was committed to canonical `main` via the trusted
-  governance path before M3 source work began.
-
-After this lane merges, **M4 (LOADOUT-M0-01) and M5 (SYS-M0-02)** become
-eligible to open per the merge train. M4 owns RISK D (Loadout flake
-protocol); M5 is the Manifold boundary transition (decision D4-06).
+After this lane merges, **M5 (SYS-M0-02) — Manifold boundary transition** becomes eligible to open per decision D4-06. M5 owns the boundary-policy transition (BT-01) that lets Manifold (M7) implement its bounded selector.

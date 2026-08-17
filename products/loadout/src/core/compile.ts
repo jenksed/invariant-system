@@ -14,9 +14,15 @@
 import { randomUUID } from 'node:crypto';
 import type { Goal } from './goal';
 import type { ResolvedCapability } from './capability-registry';
-import type { QualifiedMethodRecordV0, VerificationChangeV0, WorkEnvelopeV0 } from './schemas';
+import type {
+  M0ExecutionBinding,
+  QualifiedMethodRecordV0,
+  VerificationChangeV0,
+  WorkEnvelopeV0
+} from './schemas';
 import { WorkEnvelopeV0Schema } from './schemas';
 import { computeVerificationChangeDigest } from './verification';
+import { executionBindingContextRef } from './execution-binding';
 
 export interface ProjectState {
   repository: string;
@@ -24,7 +30,7 @@ export interface ProjectState {
   workspaceStateDigest: string;
 }
 
-export function compileWorkEnvelope(args: {
+export interface CompileWorkEnvelopeArgs {
   goal: Goal;
   capability: ResolvedCapability;
   qmr: QualifiedMethodRecordV0;
@@ -32,7 +38,17 @@ export function compileWorkEnvelope(args: {
   createdAt: string;
   workId?: string;
   verificationChange?: VerificationChangeV0;
-}): WorkEnvelopeV0 {
+  /**
+   * Optional M0 Execution Binding (M4 — implement). When supplied
+   * alongside `capability.contract.id === 'implement-change'`, the
+   * binding's canonical context_refs entry is embedded in the Work
+   * Envelope. The binding's `semantic_digest` then propagates into
+   * the envelope digest (P02-D015).
+   */
+  executionBinding?: M0ExecutionBinding;
+}
+
+export function compileWorkEnvelope(args: CompileWorkEnvelopeArgs): WorkEnvelopeV0 {
   const workId = args.workId ?? randomUUID();
   const methodProvenance = [
     `${args.qmr.method_id}@${args.qmr.method_version}`,
@@ -40,8 +56,14 @@ export function compileWorkEnvelope(args: {
   ];
 
   const verification = args.verificationChange;
+  const executionBinding = args.executionBinding;
   if (args.capability.contract.id === 'verify-change' && verification === undefined) {
     throw new Error('verify-change requires a frozen verification_change projection');
+  }
+  if (args.capability.contract.id === 'implement-change' && executionBinding === undefined) {
+    throw new Error(
+      'implement-change requires a frozen Execution Binding (engineering-system/execution-binding/m0-v1).'
+    );
   }
 
   const envelope: WorkEnvelopeV0 = {
@@ -89,9 +111,7 @@ export function compileWorkEnvelope(args: {
           must: ['distinguish observations from inferences'],
           must_not: ['modify repository state']
         },
-    context_refs: verification
-      ? [`loadout/verification-change/v0:${computeVerificationChangeDigest(verification)}`]
-      : [],
+    context_refs: collectContextRefs(verification, executionBinding),
     proof_obligations: verification
       ? verification.proof_obligations.map(({ id, kind, requirement }) => ({
           id,
@@ -118,4 +138,18 @@ export function compileWorkEnvelope(args: {
 
   // Mechanical validation: the envelope must conform to the v0 schema.
   return WorkEnvelopeV0Schema.parse(envelope);
+}
+
+function collectContextRefs(
+  verification: VerificationChangeV0 | undefined,
+  executionBinding: M0ExecutionBinding | undefined
+): string[] {
+  const refs: string[] = [];
+  if (verification) {
+    refs.push(`loadout/verification-change/v0:${computeVerificationChangeDigest(verification)}`);
+  }
+  if (executionBinding) {
+    refs.push(executionBindingContextRef(executionBinding));
+  }
+  return refs;
 }

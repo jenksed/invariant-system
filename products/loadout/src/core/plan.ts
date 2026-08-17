@@ -43,8 +43,12 @@ import type {
   WorkEnvelopeV0,
   LoadoutPlanV0,
   LoadoutPlanV1,
+  LoadoutPlanV2,
   LoadoutPlan,
-  VerificationChangeV0
+  VerificationChangeV0,
+  M0ArtifactRef,
+  M0ExecutionBinding,
+  M0IntelligenceRequirement
 } from './schemas';
 import { LoadoutPlanSchema } from './schemas';
 import { computeProcedureInterfaceDigest } from './procedure-registry';
@@ -130,6 +134,13 @@ export interface CompileLoadoutPlanArgs {
   /** Frozen Verify This Change projection, required for verify-change. */
   verificationChange?: VerificationChangeV0;
   /**
+   * Frozen M0 implement-change artifacts (LOADOUT-M0-01). When the
+   * Capability id is `implement-change`, the Plan v2 must carry the
+   * M0 plan reference, the M0 Execution Binding, and the M0
+   * Implementer/Reviewer Intelligence Requirements.
+   */
+  implementChange?: ImplementChangePlanArgs;
+  /**
    * The execution boundary the user selected when planning.
    *   - 'simulated' (default): the Plan will be executed through the
    *     in-process fake Kiln boundary (`src/core/fake-kiln-boundary.ts`).
@@ -165,6 +176,47 @@ function sortDeep(value: unknown): unknown {
     return sorted;
   }
   return value;
+}
+
+/**
+ * Per IDENTITY-CONSTITUTION P02-D013: a schema-prefixed semantic digest
+ * is `sha256:"\n" + canonicalize(identityPayload)` where the schema
+ * identifier is folded in so two payloads that encode identically under
+ * different schemas still receive distinct digests.
+ *
+ * Floating-point numbers are not permitted in identity payloads; the
+ * M0 IDENTITY-CONSTITUTION requires canonical decimal encoding for any
+ * numeric field that participates in identity. Float-bearing payloads
+ * must be rejected by caller at.
+ */
+export function computeSemanticDigest(schemaId: string, identityPayload: unknown): string {
+  assertNoFloatingPoint(identityPayload);
+  return (
+    'sha256:' +
+    createHash('sha256')
+      .update(schemaId + '\n' + canonicalize(identityPayload))
+      .digest('hex')
+  );
+}
+
+function assertNoFloatingPoint(value: unknown): void {
+  if (typeof value === 'number') {
+    if (!Number.isInteger(value)) {
+      throw new PlanError(
+        `Identity payload contains non-integer float ${value}; canonical IDENTITY-CONSTITUTION requires decimal-encoded integer.`
+      );
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const v of value) assertNoFloatingPoint(v);
+    return;
+  }
+  if (value && typeof value === 'object') {
+    for (const v of Object.values(value as Record<string, unknown>)) {
+      assertNoFloatingPoint(v);
+    }
+  }
 }
 
 /**
@@ -212,11 +264,16 @@ export function computeWorkEnvelopeDigest(envelope: WorkEnvelopeV0): string {
  * the run path will refuse silently to execute.
  */
 export function compileLoadoutPlan(
-  args: CompileLoadoutPlanArgs & { verificationChange: VerificationChangeV0 }
+  args: Omit<CompileLoadoutPlanArgs, 'verificationChange' | 'implementChange'> & {
+    verificationChange: VerificationChangeV0;
+  }
 ): Promise<LoadoutPlanV1>;
 export function compileLoadoutPlan(
-  args: CompileLoadoutPlanArgs & { verificationChange?: undefined }
-): Promise<LoadoutPlanV0>;
+  args: Omit<CompileLoadoutPlanArgs, 'verificationChange' | 'implementChange'> & {
+    implementChange: ImplementChangePlanArgs;
+  }
+): Promise<LoadoutPlanV2>;
+export function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlanV0>;
 export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<LoadoutPlan> {
   const { goal, capability, pack, qmr, workEnvelope, projectState, createdAt, executionBoundary } =
     args;
@@ -357,17 +414,39 @@ export async function compileLoadoutPlan(args: CompileLoadoutPlanArgs): Promise<
     ]
   };
 
+  const isImplementChange = capability.contract.id === 'implement-change';
+  if (isImplementChange && !args.implementChange) {
+    throw new PlanError('implement-change Plan requires frozen M0 implement-change artifacts');
+  }
+
   const plan: LoadoutPlan = isVerifyChange
     ? ({
         ...common,
         schema: 'loadout/plan/v1',
         verification_change: args.verificationChange!
       } as LoadoutPlanV1)
-    : ({
-        ...common,
-        schema: 'loadout/plan/v0',
-        repository_recon: repositoryRecon!
-      } as LoadoutPlanV0);
+    : isImplementChange
+      ? ((() => {
+          // v2 omits `repository_recon` and `verification_change` from
+          // the v0 base. Build a v2 object that does NOT carry the
+          // om- fields before plan_id is computed, otherwise
+          // parse-time stripping and the pre-parse hash diverge.
+          const { repository_recon: _r, verification_change: _v, ...v0Stripped } = common;
+          return {
+            ...v0Stripped,
+            schema: 'loadout/plan/v2' as const,
+            implement_change: {
+              m0_plan_ref: args.implementChange!.m0PlanRef,
+              m0_execution_binding: args.implementChange!.m0ExecutionBinding,
+              m0_intelligence_requirements: args.implementChange!.m0IntelligenceRequirements
+            }
+          };
+        })() as LoadoutPlanV2)
+      : ({
+          ...common,
+          schema: 'loadout/plan/v0',
+          repository_recon: repositoryRecon!
+        } as LoadoutPlanV0);
 
   plan.plan_id = computePlanId(plan);
   return LoadoutPlanSchema.parse(plan);
@@ -471,6 +550,12 @@ export function verifyPlanFreshness(
     planProjectState,
     currentProjectState
   };
+}
+
+export interface ImplementChangePlanArgs {
+  m0PlanRef: M0ArtifactRef;
+  m0ExecutionBinding: M0ExecutionBinding;
+  m0IntelligenceRequirements: M0IntelligenceRequirement[];
 }
 
 export class PlanProcedureBindingError extends PlanError {
@@ -707,7 +792,7 @@ export function formatPlanText(plan: LoadoutPlan): string {
     lines.push('  unknowns:');
     if (verification.unknowns.length === 0) lines.push('    (none)');
     for (const unknown of verification.unknowns) lines.push(`    - ${unknown}`);
-  } else {
+  } else if (plan.schema === 'loadout/plan/v0') {
     const recon = plan.repository_recon;
     lines.push(`--- Repository Recon (${recon.schema}, computed at plan time) ---`);
     lines.push(`  schema:                  ${recon.schema}`);
