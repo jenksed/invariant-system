@@ -328,6 +328,10 @@ defmodule Kiln.Slices.P1S01Test do
       # patch loop; these are authorized by the canonical
       # KILN-M0-02 authorization record (derived from M3 + ADR-0024)
       # and ship with this lane.
+      # M11 E2 (SYS-M0-03) adds `:patch_apply_governed` for the governed
+      # apply path (WorkerOutputStore.resolve → decode_envelope →
+      # build_from_worker_output → apply), authorized by the M11 work
+      # package.
       assert Enum.sort(Kiln.CLI.Request.commands()) ==
                Enum.sort([
                  :start,
@@ -341,6 +345,7 @@ defmodule Kiln.Slices.P1S01Test do
                  :worker_propose,
                  :patch_decide,
                  :patch_apply,
+                 :patch_apply_governed,
                  :patch_recover,
                  :verify_run,
                  :review_propose,
@@ -365,6 +370,9 @@ defmodule Kiln.Slices.P1S01Test do
       #     bounded implementation digest (self-reference, not Repository).
       # Both are bounded, non-Repository reads authorised by
       # `docs/authorizations/KILN-M0-01.authorization`.
+      # `Kiln.PatchService`'s File.read calls are the bounded exact-byte
+      # preimage/postimage observations of the M8/M11 authorized patch
+      # loop (KILN-M0-02 / ADR-0024), not general Repository source reads.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/store/migrations.ex",
@@ -374,6 +382,7 @@ defmodule Kiln.Slices.P1S01Test do
             path != "lib/kiln/candidate_invocation_loader.ex",
             path != "lib/kiln/minimax_m3_adapter.ex",
             path != "lib/kiln/m0_command_loader.ex",
+            path != "lib/kiln/patch_service.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),

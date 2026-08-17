@@ -167,7 +167,8 @@ defmodule Kiln.M11E3ScenariosTest do
       }
     ]
 
-    assert {:error, %{code: :E_PATCH_PATH_ESCAPE}} = PatchProposal.build(wo(), ops, plan_ref(), ".")
+    assert {:error, %{code: :E_PATCH_PATH_ESCAPE}} =
+             PatchProposal.build(wo(), ops, plan_ref(), ".")
   end
 
   test "Case 4 — PatchProposal.build rejects out-of-scope paths (.git/config)" do
@@ -181,7 +182,8 @@ defmodule Kiln.M11E3ScenariosTest do
       }
     ]
 
-    assert {:error, %{code: :E_PATCH_PATH_ESCAPE}} = PatchProposal.build(wo(), ops, plan_ref(), ".")
+    assert {:error, %{code: :E_PATCH_PATH_ESCAPE}} =
+             PatchProposal.build(wo(), ops, plan_ref(), ".")
   end
 
   # ─── Case 5 — verification failure ───
@@ -274,7 +276,10 @@ defmodule Kiln.M11E3ScenariosTest do
     }
 
     # Revised patch: new digest "9999...". Reuse the prior review.
-    revised_patch_ref = %{"id" => "pp_revised", "digest" => "sha256:" <> String.duplicate("9", 64)}
+    revised_patch_ref = %{
+      "id" => "pp_revised",
+      "digest" => "sha256:" <> String.duplicate("9", 64)
+    }
 
     assert {:error, %{code: :E_REVIEW_STALE}} =
              Review.revalidate(prior_review, revised_patch_ref, prior_review.result_state_digest)
@@ -402,7 +407,9 @@ defmodule Kiln.M11E3ScenariosTest do
     {:ok, proposal} = PatchProposal.build(wo(), ops, plan_ref(), ".")
 
     base_state = "sha256:" <> String.duplicate("a", 64)
-    {:ok, %Kiln.M0PatchDecision{} = pd} = PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
+
+    {:ok, %Kiln.M0PatchDecision{} = pd} =
+      PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
 
     assert {:error, %{code: :E_PATCH_RECOVERY_DENIED}} =
              PatchService.recover(proposal, pd, base_state)
@@ -422,10 +429,14 @@ defmodule Kiln.M11E3ScenariosTest do
     {:ok, proposal} = PatchProposal.build(wo(), ops, plan_ref(), ".")
 
     base_state = "sha256:" <> String.duplicate("a", 64)
-    {:ok, %Kiln.M0PatchDecision{} = pd} = PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
+
+    {:ok, %Kiln.M0PatchDecision{} = pd} =
+      PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
 
     unknown = "sha256:" <> String.duplicate("9", 64)
-    assert {:error, %{code: :E_PATCH_RECOVERY_DENIED}} = PatchService.recover(proposal, pd, unknown)
+
+    assert {:error, %{code: :E_PATCH_RECOVERY_DENIED}} =
+             PatchService.recover(proposal, pd, unknown)
   end
 
   test "Case 10 — recover/3 returns EXACT_TARGET_STATE_OBSERVED when observed matches canonical expected post-state" do
@@ -445,7 +456,9 @@ defmodule Kiln.M11E3ScenariosTest do
     {:ok, proposal} = PatchProposal.build(wo(), ops, plan_ref(), ".")
 
     base_state = "sha256:" <> String.duplicate("a", 64)
-    {:ok, %Kiln.M0PatchDecision{} = pd} = PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
+
+    {:ok, %Kiln.M0PatchDecision{} = pd} =
+      PatchService.decide(proposal, "APPROVE_EXACT_BYTES", base_state)
 
     expected_post = PatchService.compute_post_state_digest(proposal)
 

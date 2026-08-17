@@ -42,7 +42,8 @@ defmodule Kiln.M0CommandLoader do
     end
   end
 
-  def load_json(_, field), do: {:error, %{reason: "--#{field} is required", path: "<not provided>"}}
+  def load_json(_, field),
+    do: {:error, %{reason: "--#{field} is required", path: "<not provided>"}}
 
   @doc "Default placeholder for `--plan` when the operator does not supply one."
   @spec default_plan_ref() :: map()
@@ -63,18 +64,22 @@ defmodule Kiln.M0CommandLoader do
       Path.join(profiles_root, "reviewer.json")
     ]
 
-    Enum.find_value(candidates, {:error, %{reason: "profile not found by digest", path: "<profiles>"}}, fn path ->
-      case File.read(path) do
-        {:ok, body} ->
-          case JSON.decode(body) do
-            {:ok, %{"semantic_digest" => ^digest} = profile} -> {:ok, profile}
-            _ -> nil
-          end
+    Enum.find_value(
+      candidates,
+      {:error, %{reason: "profile not found by digest", path: "<profiles>"}},
+      fn path ->
+        case File.read(path) do
+          {:ok, body} ->
+            case JSON.decode(body) do
+              {:ok, %{"semantic_digest" => ^digest} = profile} -> {:ok, profile}
+              _ -> nil
+            end
 
-        _ ->
-          nil
+          _ ->
+            nil
+        end
       end
-    end)
+    )
   end
 
   defp default_profiles_root do

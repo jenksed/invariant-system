@@ -66,8 +66,7 @@ defmodule Kiln.Verification.Registry do
     # verify-run boundary (Kiln.Verification.CommandHost.run/2) and
     # observe the `result: :fail` classification. No new authority
     # or network capability; spawn is no-shell via the C helper.
-    "m11.fail-verifier" =>
-      {"kiln", "python3", ["-c", "import sys; sys.exit(1)"]}
+    "m11.fail-verifier" => {"kiln", "python3", ["-c", "import sys; sys.exit(1)"]}
   }
 
   @spec validate(map(), String.t(), String.t()) :: {:ok, map()} | {:error, term()}

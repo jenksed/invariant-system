@@ -32,14 +32,15 @@ defmodule Kiln.M0VerificationTest do
     test "PASS produces a canonical envelope" do
       r = base_refs()
 
-      assert {:ok, vr} = Kiln.VerificationResult.build(
-               r.plan_ref,
-               r.patch_ref,
-               r.result_state_digest,
-               r.registered_verifier,
-               "PASS",
-               r.evidence_refs
-             )
+      assert {:ok, vr} =
+               Kiln.VerificationResult.build(
+                 r.plan_ref,
+                 r.patch_ref,
+                 r.result_state_digest,
+                 r.registered_verifier,
+                 "PASS",
+                 r.evidence_refs
+               )
 
       assert vr.id =~ ~r/^ver_[0-9a-f]+$/
       assert vr.semantic_digest =~ ~r/^sha256:[0-9a-f]{64}$/

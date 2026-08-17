@@ -242,13 +242,29 @@ defmodule Kiln.PatchProposal do
 
   defp reject_authority_smuggling(_), do: error_envelope_not_object()
 
-  defp validate_envelope_shape(%{"schema" => @envelope_schema_id, "operations" => ops})
+  defp validate_envelope_shape(%{"schema" => @envelope_schema_id, "operations" => ops} = envelope)
        when is_list(ops) do
-    if length(ops) == 0 do
-      {:error,
-       %{code: :E_PATCH_OPERATIONS_EMPTY, reason: "operations must be a non-empty list"}}
-    else
-      :ok
+    cond do
+      length(ops) == 0 ->
+        {:error,
+         %{code: :E_PATCH_OPERATIONS_EMPTY, reason: "operations must be a non-empty list"}}
+
+      true ->
+        # Closed-shape envelope (additionalProperties: false, consistent
+        # with every other M0 schema): only `schema` + `operations` may
+        # appear at the top level.
+        case Map.keys(envelope) -- ["schema", "operations"] do
+          [] ->
+            :ok
+
+          [unknown | _] ->
+            {:error,
+             %{
+               code: :E_PATCH_ENVELOPE_SHAPE_INVALID,
+               reason:
+                 "envelope carries unknown top-level field #{inspect(unknown)}; only schema + operations are permitted"
+             }}
+        end
     end
   end
 
@@ -293,6 +309,7 @@ defmodule Kiln.PatchProposal do
 
     with {:ok, kind} <- normalized_kind,
          :ok <- check_required_fields(kind, op),
+         :ok <- check_unknown_fields(kind, op),
          :ok <- check_path_length(path),
          :ok <- check_text_only(after_image) do
       ok_op(kind, path, after_image, expected_preimage, op)
@@ -312,6 +329,7 @@ defmodule Kiln.PatchProposal do
   defp decode_op_kind("add"), do: {:ok, :add}
   defp decode_op_kind("replace"), do: {:ok, :replace}
   defp decode_op_kind("delete"), do: {:ok, :delete}
+
   defp decode_op_kind(other) do
     {:error,
      %{
@@ -343,6 +361,30 @@ defmodule Kiln.PatchProposal do
          code: :E_PATCH_OP_MISSING_FIELD,
          reason: "operation missing required field(s) #{inspect(missing)}"
        }}
+    end
+  end
+
+  # Closed-shape operations (additionalProperties: false on each op
+  # object): every key outside the per-kind allowed set is rejected.
+  defp check_unknown_fields(kind, op) do
+    allowed =
+      case kind do
+        :add -> ["op", "path", "after_image_bytes", "mode"]
+        :replace -> ["op", "path", "after_image_bytes", "expected_before_digest", "mode"]
+        :delete -> ["op", "path", "expected_before_digest"]
+      end
+
+    case Map.keys(op) -- allowed do
+      [] ->
+        :ok
+
+      [unknown | _] ->
+        {:error,
+         %{
+           code: :E_PATCH_OPERATIONS_SHAPE_INVALID,
+           reason:
+             "#{kind} operation carries unknown field #{inspect(unknown)}; allowed fields are #{inspect(allowed)}"
+         }}
     end
   end
 
@@ -432,7 +474,7 @@ defmodule Kiln.PatchProposal do
     end
   end
 
-  defp ok_op(:delete, path, expected_preimage, _unused, _op) do
+  defp ok_op(:delete, path, _after_image, expected_preimage, _op) do
     with {:ok, preimage} <- require_digest(expected_preimage) do
       {:ok,
        %{
@@ -447,6 +489,7 @@ defmodule Kiln.PatchProposal do
 
   defp decode_mode("100644"), do: {:ok, "100644"}
   defp decode_mode(nil), do: {:ok, "100644"}
+
   defp decode_mode(other) do
     {:error,
      %{
@@ -541,8 +584,7 @@ defmodule Kiln.PatchProposal do
       {:error,
        %{
          code: :E_PATCH_PATH_LIMIT_EXCEEDED,
-         reason:
-           "patch touches #{length(operations)} paths; canonical limit is #{limit}"
+         reason: "patch touches #{length(operations)} paths; canonical limit is #{limit}"
        }}
     end
   end

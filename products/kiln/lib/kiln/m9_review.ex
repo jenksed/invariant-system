@@ -393,8 +393,7 @@ defmodule Kiln.RunResultProjection do
         {:error,
          %{
            code: :E_PROJECTION_NOT_CANONICAL,
-           reason:
-             "truth.run_status must be one of completed|blocked|cancelled|failed|unknown"
+           reason: "truth.run_status must be one of completed|blocked|cancelled|failed|unknown"
          }}
 
       truth["verification_status"] not in @allowed_verification_status ->

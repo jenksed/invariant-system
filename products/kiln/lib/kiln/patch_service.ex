@@ -22,8 +22,15 @@ defmodule Kiln.PatchService do
 
     * Recovery / crash semantics: `NO_EFFECT_OBSERVED`,
       `TARGET_EFFECT_OBSERVED`, `PARTIAL_KNOWN_EFFECT`,
-      `UNKNOWN_EFFECT`, `EXACT_TARGET_STATE_OBSERVED`. `UNKNOWN_EFFECT`
-      denies retry/mutation authority until operator reconciliation.
+      `UNKNOWN_EFFECT`, `EXACT_TARGET_STATE_OBSERVED`. A mid-mutation
+      crash (raise or throw during the mutation step or the postimage
+      observation) returns the bounded
+      `{:error, %{code: :E_MUTATION_UNKNOWN_EFFECT}}` envelope; the
+      repository may be partially applied and retry is denied until
+      operator reconciliation. Recovery proceeds via `recover/3`
+      classification: exact base (denied — nothing applied), exact
+      target (canonical evidence re-emitted without re-applying), or
+      any other observed state (`E_PATCH_RECOVERY_DENIED`).
 
   The service never opens a network connection. The service never
   accepts a decision the Worker emitted. The service applies the
@@ -60,8 +67,13 @@ defmodule Kiln.PatchService do
 
   Returns `{:ok, %Kiln.M0PatchDecision{}}` or a bounded error envelope.
   """
-  @spec decide(proposal :: M0PatchProposal.t(), decision_kind :: atom(), base_state_digest :: String.t()) ::
-          {:ok, Decision.t()} | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
+  @spec decide(
+          proposal :: M0PatchProposal.t(),
+          decision_kind :: atom(),
+          base_state_digest :: String.t()
+        ) ::
+          {:ok, Decision.t()}
+          | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
   def decide(proposal, decision_kind, base_state_digest)
       when not is_nil(proposal) and is_binary(base_state_digest) do
     normalized = normalize_decision(decision_kind)
@@ -185,7 +197,10 @@ defmodule Kiln.PatchService do
      }}
   end
 
-  defp assert_rebuild_matches_approved(%M0PatchProposal{} = approved, %M0PatchProposal{} = rebuilt) do
+  defp assert_rebuild_matches_approved(
+         %M0PatchProposal{} = approved,
+         %M0PatchProposal{} = rebuilt
+       ) do
     cond do
       approved.semantic_digest != rebuilt.semantic_digest ->
         {:error,
@@ -235,15 +250,15 @@ defmodule Kiln.PatchService do
   Returns `{:ok, %Kiln.M0PatchEvidence{}}` or a bounded error envelope.
   """
   @spec apply(Proposal.t(), Decision.t(), operations_with_bytes :: [map()]) ::
-          {:ok, Evidence.t()} | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
+          {:ok, Evidence.t()}
+          | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
   def apply(proposal, decision, operations_with_bytes)
       when not is_nil(proposal) and not is_nil(decision) and is_list(operations_with_bytes) do
     if decision.decision not in ["APPROVE_EXACT_BYTES"] do
       {:error,
        %{
          code: :E_PATCH_DECISION_NOT_APPROVE,
-         reason:
-           "apply() requires an APPROVE_EXACT_BYTES decision; got #{decision.decision}"
+         reason: "apply() requires an APPROVE_EXACT_BYTES decision; got #{decision.decision}"
        }}
     else
       do_apply(proposal, decision, operations_with_bytes)
@@ -274,12 +289,12 @@ defmodule Kiln.PatchService do
         {:error,
          %{
            code: :E_PATCH_RECOVERY_DENIED,
-           reason:
-             "observed state still matches the proposal base; nothing was applied yet"
+           reason: "observed state still matches the proposal base; nothing was applied yet"
          }}
 
       observed_state_digest == expected_post_state_digest(proposal) ->
-        {:ok, build_evidence(proposal, decision, :EXACT_TARGET_STATE_OBSERVED, observed_state_digest)}
+        {:ok,
+         build_evidence(proposal, decision, :EXACT_TARGET_STATE_OBSERVED, observed_state_digest)}
 
       true ->
         {:error,
@@ -296,11 +311,10 @@ defmodule Kiln.PatchService do
   defp do_apply(proposal, decision, operations_with_bytes) do
     repository = proposal.repository
 
-    with :ok <- validate_repository_root(repository),
+    with :ok <- check_decision_binding(decision, proposal),
+         :ok <- validate_repository_root(repository),
          :ok <- verify_preimage_digests(repository, operations_with_bytes) do
-      perform_mutation(repository, operations_with_bytes)
-
-      case verify_postimage(repository, operations_with_bytes) do
+      case mutate_and_observe(repository, operations_with_bytes) do
         :ok ->
           expected_post = expected_post_state_digest(proposal)
 
@@ -318,6 +332,93 @@ defmodule Kiln.PatchService do
           err
       end
     end
+  end
+
+  # Decision↔proposal authority binding: an APPROVE_EXACT_BYTES decision
+  # authorizes exactly one proposal. A decision whose patch_ref digest or
+  # base_state_digest does not match the proposal being applied never
+  # transfers authority across proposals.
+  defp check_decision_binding(decision, proposal) do
+    decision_patch_digest =
+      case decision.patch_ref do
+        %{"digest" => digest} -> digest
+        _ -> nil
+      end
+
+    cond do
+      decision_patch_digest != proposal.patch_digest ->
+        {:error,
+         %{
+           code: :E_PATCH_DECISION_INVALID,
+           reason:
+             "decision does not bind proposal patch_digest #{proposal.patch_digest}; got patch_ref.digest #{inspect(decision_patch_digest)}; approval never transfers across proposals"
+         }}
+
+      decision.base_state_digest != proposal.base_state_digest ->
+        {:error,
+         %{
+           code: :E_PATCH_BASE_MISMATCH,
+           reason:
+             "decision base_state_digest #{decision.base_state_digest} does not match proposal base_state_digest #{proposal.base_state_digest}"
+         }}
+
+      true ->
+        :ok
+    end
+  end
+
+  # M11 E2 bounded partial-effect semantics (canonical code
+  # E_MUTATION_UNKNOWN_EFFECT per the frozen error mapping and ADR-0024
+  # crash classification): once the mutation step begins, any raised
+  # exception or thrown value (File.write!/File.mkdir_p! File.Error from
+  # write_op/2, the raise in apply_one(:delete), the raises in
+  # safe_join/2, or a fault during postimage observation) means the
+  # repository may be PARTIALLY applied. The bounded result names the
+  # op path being applied when the fault occurred and directs the
+  # operator to `recover/3` classification; it never claims zero effect.
+  # Bounded `{:error, %{code: ...}}` results from verify_postimage/2
+  # (e.g. E_PATCH_POSTIMAGE_MISMATCH) flow through unchanged.
+  defp mutate_and_observe(repository, operations_with_bytes) do
+    outcome =
+      try do
+        perform_mutation(repository, operations_with_bytes)
+        {verify_postimage(repository, operations_with_bytes), :observation}
+      rescue
+        e -> {:raised, e, current_op_path()}
+      catch
+        kind, reason -> {:thrown, kind, reason, current_op_path()}
+      end
+
+    case outcome do
+      {{:error, %{code: _} = err}, :observation} ->
+        {:error, err}
+
+      {:ok, :observation} ->
+        :ok
+
+      {:raised, exception, op_path} ->
+        unknown_effect_error(op_path, Exception.message(exception))
+
+      {:thrown, kind, reason, op_path} ->
+        unknown_effect_error(op_path, "#{kind}: #{inspect(reason)}")
+    end
+  end
+
+  # Records the path of the op currently being applied so a mid-mutation
+  # fault can name it. Process-local scratch only; never persisted.
+  defp current_op_path do
+    Process.get(:kiln_patch_current_op_path)
+  end
+
+  defp unknown_effect_error(op_path, detail) do
+    path = op_path || "unknown"
+
+    {:error,
+     %{
+       code: :E_MUTATION_UNKNOWN_EFFECT,
+       reason:
+         "mutation/observation failed after authorization at op #{inspect(path)} (#{detail}); repository may be partially applied; reconcile via patch-recover"
+     }}
   end
 
   # M11 E2 P1-1 conformance repair: the approved repository root must
@@ -383,7 +484,12 @@ defmodule Kiln.PatchService do
     end
   end
 
-  defp check_afterimage_digest(%{op: op, path: path, content: content, after_image_digest: after_digest})
+  defp check_afterimage_digest(%{
+         op: op,
+         path: path,
+         content: content,
+         after_image_digest: after_digest
+       })
        when op in [:add, :replace] do
     actual = sha256_hex(content || "")
 
@@ -432,8 +538,7 @@ defmodule Kiln.PatchService do
         {:error,
          %{
            code: :E_PATCH_PREIMAGE_MISMATCH,
-           reason:
-             "could not read preimage at #{inspect(path)}: #{inspect(reason)}"
+           reason: "could not read preimage at #{inspect(path)}: #{inspect(reason)}"
          }}
     end
   end
@@ -445,7 +550,10 @@ defmodule Kiln.PatchService do
   # refuses to follow symlinks (path-traversal immunity on top of the
   # path classification already enforced at proposal-build time).
   defp perform_mutation(repository, operations_with_bytes) do
-    Enum.each(operations_with_bytes, fn op -> apply_one(repository, op) end)
+    Enum.each(operations_with_bytes, fn op ->
+      Process.put(:kiln_patch_current_op_path, op[:path] || op["path"])
+      apply_one(repository, op)
+    end)
   end
 
   defp apply_one(repository, %{op: :add, path: path, content: content}) do
@@ -501,6 +609,8 @@ defmodule Kiln.PatchService do
   # (interrupted write, sandbox drift).
   defp verify_postimage(repository, operations_with_bytes) do
     Enum.reduce_while(operations_with_bytes, :ok, fn op, :ok ->
+      Process.put(:kiln_patch_current_op_path, op[:path] || op["path"])
+
       case check_postimage(repository, op) do
         :ok -> {:cont, :ok}
         {:error, _} = err -> {:halt, err}
@@ -531,8 +641,7 @@ defmodule Kiln.PatchService do
         {:error,
          %{
            code: :E_PATCH_POSTIMAGE_MISMATCH,
-           reason:
-             "post-mutation read of #{inspect(path)} failed: #{inspect(reason)}"
+           reason: "post-mutation read of #{inspect(path)} failed: #{inspect(reason)}"
          }}
     end
   end

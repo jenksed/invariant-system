@@ -22,7 +22,9 @@ defmodule Kiln.M0CandidateInvocationTest do
 
   describe "Kiln.CandidateInvocation.new_request/1" do
     test "validates a canonical request and computes semantic_digest" do
-      assert {:ok, %CandidateInvocation{} = request} = CandidateInvocation.new_request(@valid_request)
+      assert {:ok, %CandidateInvocation{} = request} =
+               CandidateInvocation.new_request(@valid_request)
+
       assert request.schema == "engineering-system/candidate-invocation/m0-v1"
       assert request.invocation_id == "inv-test-001"
       assert request.mode == :PRODUCTION
@@ -44,15 +46,21 @@ defmodule Kiln.M0CandidateInvocationTest do
 
     test "rejects requests whose mode is not in the canonical set" do
       attrs = Map.put(@valid_request, "mode", "evaluation")
-      assert {:error, {:invalid_field, :mode, "evaluation"}} = CandidateInvocation.new_request(attrs)
+
+      assert {:error, {:invalid_field, :mode, "evaluation"}} =
+               CandidateInvocation.new_request(attrs)
     end
 
     test "rejects requests with a timeout outside the bounded 1s..30min window" do
       too_short = Map.put(@valid_request, "timeout_ms", 100)
-      assert {:error, {:invalid_field, :timeout_ms, 100}} = CandidateInvocation.new_request(too_short)
+
+      assert {:error, {:invalid_field, :timeout_ms, 100}} =
+               CandidateInvocation.new_request(too_short)
 
       too_long = Map.put(@valid_request, "timeout_ms", 1_900_000)
-      assert {:error, {:invalid_field, :timeout_ms, 1_900_000}} = CandidateInvocation.new_request(too_long)
+
+      assert {:error, {:invalid_field, :timeout_ms, 1_900_000}} =
+               CandidateInvocation.new_request(too_long)
     end
   end
 
@@ -76,7 +84,9 @@ defmodule Kiln.M0CandidateInvocationTest do
       System.delete_env("MINIMAX_API_KEY")
 
       {:ok, request} = CandidateInvocation.new_request(@valid_request)
-      assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} = MinimaxM3Adapter.stream(request, fn _ -> :ok end)
+
+      assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} =
+               MinimaxM3Adapter.stream(request, fn _ -> :ok end)
     end
 
     test "NEGATIVE provider-substitution: malformed-output terminal when semantic_digest does not match" do
@@ -84,7 +94,9 @@ defmodule Kiln.M0CandidateInvocationTest do
 
       {:ok, request} = CandidateInvocation.new_request(@valid_request)
       tampered = %{request | semantic_digest: "sha256:" <> String.duplicate("0", 64)}
-      assert {:error, %{status: :E_MALFORMED_OUTPUT}} = MinimaxM3Adapter.stream(tampered, fn _ -> :ok end)
+
+      assert {:error, %{status: :E_MALFORMED_OUTPUT}} =
+               MinimaxM3Adapter.stream(tampered, fn _ -> :ok end)
 
       System.delete_env("MINIMAX_API_KEY")
     end

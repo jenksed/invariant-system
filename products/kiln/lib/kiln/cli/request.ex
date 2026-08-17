@@ -65,7 +65,10 @@ defmodule Kiln.CLI.Request do
     "human-decide" => :human_decide
   }
 
-  @command_lookup Map.merge(Map.new(@supported_commands, &{Atom.to_string(&1), &1}), @command_aliases)
+  @command_lookup Map.merge(
+                    Map.new(@supported_commands, &{Atom.to_string(&1), &1}),
+                    @command_aliases
+                  )
 
   # The accepted default home directory. Matches
   # `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md` §3.1 rule 9.
@@ -135,7 +138,8 @@ defmodule Kiln.CLI.Request do
     patch_apply_governed: ~w(proposal decision worker-output out),
     patch_recover: ~w(proposal decision observed-state-digest out),
     verify_run: ~w(plan patch result-state-digest registered-verifier status evidence out),
-    review_propose: ~w(implementer-assignment eligibility plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
+    review_propose:
+      ~w(implementer-assignment eligibility plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
     human_decide: ~w(plan patch result-state-digest review decision out)
   }
 
@@ -347,7 +351,9 @@ defmodule Kiln.CLI.Request do
         usage_result("--mode is required (production|evaluation)")
 
       options["mode"] not in ["production", "evaluation"] ->
-        usage_result("--mode must be one of: production|evaluation (got #{inspect(options["mode"])})")
+        usage_result(
+          "--mode must be one of: production|evaluation (got #{inspect(options["mode"])})"
+        )
 
       true ->
         :ok

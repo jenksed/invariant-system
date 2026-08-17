@@ -135,6 +135,9 @@ defmodule Kiln.Artifact.Store do
            artifact_id: artifact_id,
            integrity_status: status
          })}
+
+      {:error, %Error{} = error} ->
+        {:error, error}
     end
   end
 

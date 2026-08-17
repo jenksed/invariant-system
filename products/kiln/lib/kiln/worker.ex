@@ -81,8 +81,7 @@ defmodule Kiln.Worker do
         {:error,
          %{
            code: :E_PROFILE_REF_MISMATCH,
-           reason:
-             "eligibility.profile_ref.digest does not match assignment.profile_ref.digest"
+           reason: "eligibility.profile_ref.digest does not match assignment.profile_ref.digest"
          }}
 
       eligibility["role"] != "IMPLEMENTER" ->
@@ -278,8 +277,12 @@ defmodule Kiln.Worker do
 
   defp validate_dispatch(profile, eligibility, assignment) do
     case validate_binding(profile, eligibility, assignment) do
-      :ok -> :ok
-      {:ok, :validated} -> :ok
+      :ok ->
+        :ok
+
+      {:ok, :validated} ->
+        :ok
+
       {:error, %{code: code, reason: reason}} ->
         {:error, %Error{class: :precondition, code: code, message: reason}}
     end
@@ -291,7 +294,13 @@ defmodule Kiln.Worker do
         if obs.head_resolved do
           {:ok, obs}
         else
-          {:error, Error.new(:precondition, :repository_not_initialized, "repository has no HEAD commit", %{repository: root})}
+          {:error,
+           Error.new(
+             :precondition,
+             :repository_not_initialized,
+             "repository has no HEAD commit",
+             %{repository: root}
+           )}
         end
 
       {:error, %Error{} = err} ->

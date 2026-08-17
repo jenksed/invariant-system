@@ -46,7 +46,10 @@ defmodule Kiln.M0PatchTest do
       assignment_ref: %{"id" => "asg_test", "digest" => "sha256:" <> String.duplicate("f", 64)},
       profile_ref: %{"id" => "prf_test", "digest" => "sha256:" <> String.duplicate("1", 64)},
       output_kind: "PATCH_CANDIDATE",
-      raw_completion_ref: %{"id" => "raw_test", "digest" => "sha256:" <> String.duplicate("2", 64)},
+      raw_completion_ref: %{
+        "id" => "raw_test",
+        "digest" => "sha256:" <> String.duplicate("2", 64)
+      },
       parsed_candidate_digest: "sha256:" <> String.duplicate("3", 64),
       completion_bytes: "{}",
       base_commit: String.duplicate("a", 40),
@@ -57,7 +60,10 @@ defmodule Kiln.M0PatchTest do
     operations = Keyword.get(attrs, :operations, [base_proposal_attrs()])
 
     plan_ref =
-      Keyword.get(attrs, :plan_ref, %{"id" => "pln_test", "digest" => "sha256:" <> String.duplicate("6", 64)})
+      Keyword.get(attrs, :plan_ref, %{
+        "id" => "pln_test",
+        "digest" => "sha256:" <> String.duplicate("6", 64)
+      })
 
     repository = Keyword.get(attrs, :repository, ".")
 
@@ -430,10 +436,13 @@ defmodule Kiln.M0PatchTest do
       end)
 
     "sha256:" <>
-      Kiln.Store.Canonical.digest("engineering-system/patch-application-evidence/m0-v1/expected-post", %{
-        "base_state_digest" => proposal.base_state_digest,
-        "operations" => canon_ops
-      })
+      Kiln.Store.Canonical.digest(
+        "engineering-system/patch-application-evidence/m0-v1/expected-post",
+        %{
+          "base_state_digest" => proposal.base_state_digest,
+          "operations" => canon_ops
+        }
+      )
   end
 
   # M11 E2 P1 helper: produce an isolated tmp directory for one test.

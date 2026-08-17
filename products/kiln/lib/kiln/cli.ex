@@ -148,7 +148,7 @@ defmodule Kiln.CLI do
 
       File.write!(
         out_path,
-        Jason.encode!(output_to_map(rewired))
+        JSON.encode!(output_to_map(rewired))
       )
 
       {:ok,
@@ -173,7 +173,9 @@ defmodule Kiln.CLI do
              ]
        )}
     else
-      {:error, %Result{} = result} -> {:error, result}
+      {:error, %Result{} = result} ->
+        {:error, result}
+
       {:error, %{code: code, reason: reason}} when is_atom(code) ->
         {:error,
          Result.error("worker-propose", :denied,
@@ -202,7 +204,7 @@ defmodule Kiln.CLI do
 
       File.write!(
         out_path,
-        Jason.encode!(decision_to_map(decision))
+        JSON.encode!(decision_to_map(decision))
       )
 
       is_approve = decision.decision == "APPROVE_EXACT_BYTES"
@@ -230,7 +232,9 @@ defmodule Kiln.CLI do
            end
        )}
     else
-      {:error, %Result{} = result} -> {:error, result}
+      {:error, %Result{} = result} ->
+        {:error, result}
+
       {:error, %{code: code, reason: reason}} when is_atom(code) ->
         {:error,
          Result.error("patch-decide", :denied,
@@ -253,7 +257,7 @@ defmodule Kiln.CLI do
       case Kiln.PatchService.apply(proposal, decision, operations_with_bytes) do
         {:ok, evidence} ->
           out_path = opts["out"] || default_out("patch_application_evidence.json")
-          File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+          File.write!(out_path, JSON.encode!(evidence_to_map(evidence)))
 
           {:ok,
            Result.ok("patch-apply",
@@ -292,7 +296,7 @@ defmodule Kiln.CLI do
   # KILN-M0-02 E4: bounded recovery from a non-terminal M8 state.
   # Refuses to repair an unknown repository state. Accepts a
   # known post-state digest and re-emits the canonical evidence.
-defp run_patch_recover(%Request{options: opts}) do
+  defp run_patch_recover(%Request{options: opts}) do
     with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
          {:ok, decision_map} <- load_json(opts["decision"], "decision"),
          {:ok, proposal} <- build_proposal_from_map(proposal_map),
@@ -303,26 +307,26 @@ defp run_patch_recover(%Request{options: opts}) do
         {:error, usage_result("--observed-state-digest is required")}
       else
         case Kiln.PatchService.recover(proposal, decision, observed_digest) do
-        {:ok, evidence} ->
-          out_path = opts["out"] || default_out("patch_recovery_evidence.json")
-          File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+          {:ok, evidence} ->
+            out_path = opts["out"] || default_out("patch_recovery_evidence.json")
+            File.write!(out_path, JSON.encode!(evidence_to_map(evidence)))
 
-          {:ok,
-           Result.ok("patch-recover",
-             data: %{
-               "application_id" => evidence.id,
-               "semantic_digest" => evidence.semantic_digest,
-               "effect" => evidence.effect,
-               "post_state_digest" => evidence.post_state_digest
-             },
-             next_actions: navigation_actions("patch-recover")
-           )}
+            {:ok,
+             Result.ok("patch-recover",
+               data: %{
+                 "application_id" => evidence.id,
+                 "semantic_digest" => evidence.semantic_digest,
+                 "effect" => evidence.effect,
+                 "post_state_digest" => evidence.post_state_digest
+               },
+               next_actions: navigation_actions("patch-recover")
+             )}
 
-        {:error, %{code: code, reason: reason}} when is_atom(code) ->
-          {:error,
-           Result.error("patch-recover", :failed,
-             errors: [Result.to_error(%{code: code, message: reason})]
-           )}
+          {:error, %{code: code, reason: reason}} when is_atom(code) ->
+            {:error,
+             Result.error("patch-recover", :failed,
+               errors: [Result.to_error(%{code: code, message: reason})]
+             )}
         end
       end
     else
@@ -373,7 +377,7 @@ defp run_patch_recover(%Request{options: opts}) do
            ) do
       out_path = opts["out"] || default_out("patch_application_evidence.json")
 
-      File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+      File.write!(out_path, JSON.encode!(evidence_to_map(evidence)))
 
       {:ok,
        Result.ok("patch-apply-governed",
@@ -389,7 +393,8 @@ defp run_patch_recover(%Request{options: opts}) do
          next_actions: navigation_actions("patch-apply-governed")
        )}
     else
-      {:error, %Result{} = result} -> {:error, result}
+      {:error, %Result{} = result} ->
+        {:error, result}
 
       {:error, %{code: code, reason: reason}} when is_atom(code) ->
         {:error,
@@ -402,16 +407,18 @@ defp run_patch_recover(%Request{options: opts}) do
     end
   end
 
-  defp build_worker_output_from_map(%{
-         "worker_output_id" => id,
-         "semantic_digest" => semantic,
-         "attempt_ref" => attempt_ref,
-         "assignment_ref" => assignment_ref,
-         "profile_ref" => profile_ref,
-         "raw_completion_ref" => raw_completion_ref,
-         "parsed_candidate_digest" => parsed,
-         "base_state_digest" => base_state_digest
-       } = map)
+  defp build_worker_output_from_map(
+         %{
+           "worker_output_id" => id,
+           "semantic_digest" => semantic,
+           "attempt_ref" => attempt_ref,
+           "assignment_ref" => assignment_ref,
+           "profile_ref" => profile_ref,
+           "raw_completion_ref" => raw_completion_ref,
+           "parsed_candidate_digest" => parsed,
+           "base_state_digest" => base_state_digest
+         } = map
+       )
        when is_binary(id) and is_binary(semantic) and is_map(raw_completion_ref) do
     {:ok,
      %Kiln.M0WorkerOutput{
@@ -432,7 +439,9 @@ defp run_patch_recover(%Request{options: opts}) do
   end
 
   defp build_worker_output_from_map(_),
-    do: {:error, usage_result("worker-output JSON must carry raw_completion_ref + bounded identity fields")}
+    do:
+      {:error,
+       usage_result("worker-output JSON must carry raw_completion_ref + bounded identity fields")}
 
   defp decode_hex_bytes(nil), do: ""
   defp decode_hex_bytes(""), do: ""
@@ -450,7 +459,8 @@ defp run_patch_recover(%Request{options: opts}) do
     with {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
          {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
          true <- is_binary(result_state_digest),
-         {:ok, verifier_ref} <- load_artifact_ref(opts["registered-verifier"], "registered-verifier"),
+         {:ok, verifier_ref} <-
+           load_artifact_ref(opts["registered-verifier"], "registered-verifier"),
          true <- is_binary(status),
          {:ok, evidence_refs} <- load_evidence_refs(opts["evidence"]) do
       case Kiln.VerificationResult.build(
@@ -463,7 +473,7 @@ defp run_patch_recover(%Request{options: opts}) do
            ) do
         {:ok, vr} ->
           out_path = opts["out"] || default_out("verification_result.json")
-          File.write!(out_path, Jason.encode!(Kiln.M0VerificationResult.to_map(vr)))
+          File.write!(out_path, JSON.encode!(Kiln.M0VerificationResult.to_map(vr)))
 
           {:ok,
            Result.ok("verify-run",
@@ -500,7 +510,8 @@ defp run_patch_recover(%Request{options: opts}) do
     result_state_digest = opts["result-state-digest"]
     verdict = opts["verdict"]
 
-    with {:ok, impl_assign} <- load_artifact_ref(opts["implementer-assignment"], "implementer-assignment"),
+    with {:ok, impl_assign} <-
+           load_artifact_ref(opts["implementer-assignment"], "implementer-assignment"),
          {:ok, eligibility_doc} <- load_json(opts["eligibility"], "eligibility"),
          :ok <- check_reviewer_currentness(eligibility_doc),
          {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
@@ -526,7 +537,7 @@ defp run_patch_recover(%Request{options: opts}) do
            ) do
         {:ok, review} ->
           out_path = opts["out"] || default_out("review.json")
-          File.write!(out_path, Jason.encode!(Kiln.M0Review.to_map(review)))
+          File.write!(out_path, JSON.encode!(Kiln.M0Review.to_map(review)))
 
           {:ok,
            Result.ok("review-propose",
@@ -534,8 +545,7 @@ defp run_patch_recover(%Request{options: opts}) do
                "review_id" => review.id,
                "semantic_digest" => review.semantic_digest,
                "verdict" => Atom.to_string(review.verdict),
-               "implementer_transcript_received" =>
-                 review.implementer_transcript_received,
+               "implementer_transcript_received" => review.implementer_transcript_received,
                "findings" => review.findings
              },
              next_actions: navigation_actions("review-propose")
@@ -568,10 +578,16 @@ defp run_patch_recover(%Request{options: opts}) do
          true <- is_binary(result_state_digest),
          true <- is_nil(review_ref) or is_map(review_ref),
          true <- is_binary(decision) do
-      case Kiln.HumanDecision.build(plan_ref, patch_ref, result_state_digest, review_ref, decision) do
+      case Kiln.HumanDecision.build(
+             plan_ref,
+             patch_ref,
+             result_state_digest,
+             review_ref,
+             decision
+           ) do
         {:ok, hd_struct} ->
           out_path = opts["out"] || default_out("human_decision.json")
-          File.write!(out_path, Jason.encode!(Kiln.M0HumanDecision.to_map(hd_struct)))
+          File.write!(out_path, JSON.encode!(Kiln.M0HumanDecision.to_map(hd_struct)))
 
           {:ok,
            Result.ok("human-decide",
@@ -622,14 +638,19 @@ defp run_patch_recover(%Request{options: opts}) do
   end
 
   defp check_reviewer_currentness(_eligibility_doc) do
-    {:error, %{code: :E_QUALIFICATION_NOT_CURRENT, reason: "eligibility is missing or malformed at the reviewer dispatch boundary"}}
+    {:error,
+     %{
+       code: :E_QUALIFICATION_NOT_CURRENT,
+       reason: "eligibility is missing or malformed at the reviewer dispatch boundary"
+     }}
   end
 
   defp load_json(nil, field) do
     {:error, usage_result("--#{field} is required")}
   end
 
-  defp load_plan_ref(nil), do: {:ok, %{"id" => "pln_default", "digest" => "sha256:" <> String.duplicate("0", 64)}}
+  defp load_plan_ref(nil),
+    do: {:ok, %{"id" => "pln_default", "digest" => "sha256:" <> String.duplicate("0", 64)}}
 
   defp load_plan_ref(path) when is_binary(path) do
     load_json(path, "plan")
@@ -666,7 +687,8 @@ defp run_patch_recover(%Request{options: opts}) do
     {:ok, proposal}
   end
 
-  defp build_proposal_from_map(_), do: {:error, usage_result("proposal JSON must contain operations")}
+  defp build_proposal_from_map(_),
+    do: {:error, usage_result("proposal JSON must contain operations")}
 
   defp deserialize_op(map) do
     %{
@@ -817,8 +839,7 @@ defp run_patch_recover(%Request{options: opts}) do
            "mode" => mode,
            "invocation_id" => invocation.invocation_id,
            "semantic_digest" => invocation.semantic_digest,
-           "adapter_implementation_digest" =>
-             Kiln.MinimaxM3Adapter.implementation_digest()
+           "adapter_implementation_digest" => Kiln.MinimaxM3Adapter.implementation_digest()
          }
        )}
     else
@@ -1733,7 +1754,10 @@ defp run_patch_recover(%Request{options: opts}) do
 
   defp navigation_actions("patch-apply") do
     [
-      Result.next_action("patch-recover", "if the run died between mutation and evidence, run recovery"),
+      Result.next_action(
+        "patch-recover",
+        "if the run died between mutation and evidence, run recovery"
+      ),
       Result.next_action("status", "show the current projection")
     ]
   end
