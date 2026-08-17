@@ -54,7 +54,25 @@ defmodule Kiln.CLI do
     {result, result.exit_code}
   end
 
-  def run(%Request{} = request), do: dispatch(request)
+  # M11 E2 B1: any uncaught exception raised by a dispatcher (e.g.
+  # a FunctionClauseError from a downstream library call passing
+  # `nil` where a binary is required) is caught here and routed
+  # through the canonical normalize_dispatch_result/2 catch-all
+  # so the CLI emits a structured bounded Result envelope rather
+  # than crashing the Mix task. The dispatchers themselves remain
+  # authoritative; this is the last line of defense.
+  def run(%Request{} = request) do
+    try do
+      dispatch(request)
+    rescue
+      exception ->
+        # Pass the exception directly (not wrapped in {:error, _})
+        # so the catch-all in normalize_dispatch_result/2 routes
+        # through Result.to_error/1's __exception__: true clause
+        # and surfaces Exception.message/1 cleanly.
+        normalize_dispatch_result(exception, request)
+    end
+  end
 
   # -- dispatch --
 
@@ -115,15 +133,16 @@ defmodule Kiln.CLI do
       {:ok, :ready} ->
         try do
           dispatch_worker_propose(request)
+          |> normalize_dispatch_result(request)
         after
           Runtime.stop()
         end
 
       {:absent} ->
-        {:error, absent_result(request)}
+        absent_result(request)
 
       {:blocked, state, _error} ->
-        {:error, blocked_result(request, state)}
+        blocked_result(request, state)
     end
   end
 
@@ -193,7 +212,7 @@ defmodule Kiln.CLI do
   # human-decision source for M8; the Worker cannot pass --decision
   # approve. `--decision` is bounded to APPROVE_EXACT_BYTES / REJECT /
   # REQUEST_REVISION. Approval binds to the proposal's base_state_digest.
-  defp run_patch_decide(%Request{options: opts}) do
+  defp run_patch_decide(%Request{options: opts} = request) do
     with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
          {:ok, proposal} <- build_proposal_from_map(proposal_map),
          decision_kind <- parse_decision_kind(opts["decision"]),
@@ -241,6 +260,7 @@ defmodule Kiln.CLI do
            errors: [Result.to_error(%{code: code, message: reason})]
          )}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- command: patch-apply --
@@ -248,12 +268,19 @@ defmodule Kiln.CLI do
   # KILN-M0-02 E4: apply the exact approved bytes after explicit
   # APPROVE_EXACT_BYTES decision. Emits patch-application-evidence.
   # Refuses REJECT / REQUEST_REVISION decisions with a bounded error.
-  defp run_patch_apply(%Request{options: opts}) do
+  defp run_patch_apply(%Request{options: opts} = request) do
     with {:ok, decision_map} <- load_json(opts["decision"], "decision"),
          {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
-         {:ok, operations_with_bytes} <- load_json(opts["operations"], "operations"),
+         {:ok, operations_raw} <- load_json(opts["operations"], "operations"),
          {:ok, proposal} <- build_proposal_from_map(proposal_map),
          {:ok, decision} <- build_decision_from_map(decision_map, proposal) do
+      # M11 E2 B-repair: convert each op from the canonical
+      # serialized form (`{"op" => "replace", "path" => ..., ...}`)
+      # to the atom form (`%{op: :replace, path: ..., ...}`) that
+      # `PatchService.apply_one/2` matches on. The inverse is
+      # the proposal's `serialize_op/1` (patch_proposal.ex:732).
+      operations_with_bytes = Enum.map(operations_raw, &normalize_op_for_apply/1)
+
       case Kiln.PatchService.apply(proposal, decision, operations_with_bytes) do
         {:ok, evidence} ->
           out_path = opts["out"] || default_out("patch_application_evidence.json")
@@ -289,6 +316,7 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- command: patch-recover --
@@ -296,7 +324,7 @@ defmodule Kiln.CLI do
   # KILN-M0-02 E4: bounded recovery from a non-terminal M8 state.
   # Refuses to repair an unknown repository state. Accepts a
   # known post-state digest and re-emits the canonical evidence.
-  defp run_patch_recover(%Request{options: opts}) do
+  defp run_patch_recover(%Request{options: opts} = request) do
     with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
          {:ok, decision_map} <- load_json(opts["decision"], "decision"),
          {:ok, proposal} <- build_proposal_from_map(proposal_map),
@@ -332,6 +360,7 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- command: patch-apply-governed --
@@ -348,15 +377,16 @@ defmodule Kiln.CLI do
       {:ok, :ready} ->
         try do
           dispatch_patch_apply_governed(request)
+          |> normalize_dispatch_result(request)
         after
           Runtime.stop()
         end
 
       {:absent} ->
-        {:error, absent_result(request)}
+        absent_result(request)
 
       {:blocked, state, _error} ->
-        {:error, blocked_result(request, state)}
+        blocked_result(request, state)
     end
   end
 
@@ -452,7 +482,7 @@ defmodule Kiln.CLI do
   # KILN-M0-03 E5: bounded verifier invocation against the
   # post-mutation state. Emits canonical verification-result/m0-v1.
   # Verification is evidence, not authority — PASS does not auto-accept.
-  defp run_verify_run(%Request{options: opts}) do
+  defp run_verify_run(%Request{options: opts} = request) do
     result_state_digest = opts["result-state-digest"]
     status = opts["status"]
 
@@ -497,6 +527,7 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- command: review-propose --
@@ -506,7 +537,7 @@ defmodule Kiln.CLI do
   # implementer_assignment_ref.digest). The Reviewer context never
   # includes the IMPLEMENTER's transcript (implementer_transcript_received:
   # false is enforced by Kiln.Review.build/9).
-  defp run_review_propose(%Request{options: opts}) do
+  defp run_review_propose(%Request{options: opts} = request) do
     result_state_digest = opts["result-state-digest"]
     verdict = opts["verdict"]
 
@@ -560,6 +591,7 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- command: human-decide --
@@ -568,15 +600,24 @@ defmodule Kiln.CLI do
   # human-decision/m0-v1 envelope and emits the run-result-projection/m0-v1
   # complementing the v0 Run Result Envelope. HumanDecision is the
   # authoritative final decision; nothing infers it.
-  defp run_human_decide(%Request{options: opts}) do
+  defp run_human_decide(%Request{options: opts} = request) do
     result_state_digest = opts["result-state-digest"]
-    review_ref = opts["review"]
     decision = opts["decision"]
 
     with {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
          {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
          true <- is_binary(result_state_digest),
-         true <- is_nil(review_ref) or is_map(review_ref),
+         # M11 E2 B-repair: `--review` is optional. When supplied,
+         # the value is a JSON file path; decode it here so
+         # `HumanDecision.build/5` receives a map (artifactRef)
+         # rather than a string. Without this, the `is_map/2`
+         # guard below raises WithClauseError.
+         {:ok, review_ref} <-
+           (case opts["review"] do
+              nil -> {:ok, nil}
+              path when is_binary(path) -> load_json(path, "review")
+              other -> {:ok, other}
+            end),
          true <- is_binary(decision) do
       case Kiln.HumanDecision.build(
              plan_ref,
@@ -609,6 +650,7 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
+    |> normalize_dispatch_result(request)
   end
 
   # -- private helpers for M8 commands --
@@ -700,6 +742,35 @@ defmodule Kiln.CLI do
     }
   end
 
+  # M11 E2 B-repair: the `--operations` argument to
+  # `mix kiln patch-apply` is loaded via the generic JSON loader
+  # which returns string-keyed maps. `PatchService.apply_one/2`
+  # matches on atom-keyed maps with atom-valued ops
+  # (`%{op: :replace, path: ..., content: ..., before_digest: ...,
+  # after_image_digest: ..., mode: ...}`). This function
+  # performs the bounded conversion. The op string is mapped
+  # through the canonical closed enum [:add, :replace, :delete];
+  # anything else is left as-is and fails closed at
+  # `apply_one/2`.
+  defp normalize_op_for_apply(map) when is_map(map) do
+    op_atom =
+      case map["op"] do
+        "add" -> :add
+        "replace" -> :replace
+        "delete" -> :delete
+        other -> other
+      end
+
+    %{
+      op: op_atom,
+      path: map["path"],
+      content: map["after_image_bytes"],
+      before_digest: map["before_digest"],
+      after_image_digest: map["after_image_digest"],
+      mode: map["mode"]
+    }
+  end
+
   defp parse_decision_kind("APPROVE_EXACT_BYTES"), do: :approve
   defp parse_decision_kind("approve"), do: :approve
   defp parse_decision_kind("REJECT"), do: :reject
@@ -742,8 +813,16 @@ defmodule Kiln.CLI do
   defp default_out(name), do: Path.join(System.tmp_dir!(), name)
 
   defp output_to_map(%Kiln.M0WorkerOutput{} = output) do
-    Map.from_struct(output)
+    output
+    |> Map.from_struct()
     |> Map.update!(:completion_bytes, &Base.encode16(&1, case: :lower))
+    # M11 E2 B-repair: include `worker_output_id` alongside the raw
+    # struct field `id` so the file output is consumable by
+    # `build_worker_output_from_map/1` (the patch-apply-governed
+    # CLI's worker-output loader, which expects the public
+    # `worker_output_id` key). The struct field `id` is preserved
+    # for any caller that reads the raw struct map.
+    |> Map.put("worker_output_id", output.id)
   end
 
   # M9 helpers — bounded loading for the verify/review/human-decide surfaces.
@@ -987,6 +1066,23 @@ defmodule Kiln.CLI do
   defp normalize_dispatch_result({%Result{} = result, exit_code}, _request)
        when is_integer(exit_code),
        do: {result, exit_code}
+
+  # M11 E2 B1: catch-all. Any term that escapes the canonical
+  # dispatcher normalization (raw atom, raw map, raw struct from
+  # Store/Worker/etc., unwrapped tuple) is wrapped in a structured
+  # bounded Result envelope rather than reaching the renderer as
+  # `:ok` / `:error` and crashing the Mix task. This is the last
+  # line of defense; the canonical repair is in each dispatcher's
+  # else clause to wrap its own error shapes — this catch-all only
+  # exists so an unanticipated shape does not destroy the CLI.
+  defp normalize_dispatch_result(other, request) do
+    result =
+      Result.error(atom_to_command(request.command), :failed,
+        errors: [Result.to_error(other)]
+      )
+
+    {result, 6}
+  end
 
   defp absent_result(%Request{command: command}) do
     {result, exit_code} =
@@ -1557,6 +1653,26 @@ defmodule Kiln.CLI do
     {result, exit_code}
   end
 
+  # M11 E2 B1: accept %Kiln.Store.Error{} as a dispatch-error shape.
+  # The Store layer emits its own error struct (different from the
+  # Domain layer); map it through the canonical ErrorMap so the
+  # exit code and status reflect the actual store failure class
+  # (e.g. :integrity -> :blocked, :idempotency_conflict -> :blocked,
+  # :unknown -> :unknown).
+  defp error_result_tuple(%Request{command: command}, %Kiln.Store.Error{} = err) do
+    {status, exit_code} = ErrorMap.map(err.code)
+
+    result =
+      Result.error(atom_to_command(command), status,
+        exit_code: exit_code,
+        errors: [
+          Result.to_error(%{code: err.code, message: err.message, details: err.details || %{}})
+        ]
+      )
+
+    {result, exit_code}
+  end
+
   # Build a CLI-owned `Result` for an internal guard code. The CLI never
   # constructs `%Kiln.Domain.Error{}` directly; it picks a CLI-native code
   # atom that the ErrorMap already maps to a `{status, exit_code}` pair.
@@ -1758,6 +1874,19 @@ defmodule Kiln.CLI do
         "patch-recover",
         "if the run died between mutation and evidence, run recovery"
       ),
+      Result.next_action("status", "show the current projection")
+    ]
+  end
+
+  # M11 E2 B/D-repair: the governed-apply surface completes the
+  # patch application cycle; its forward actions are the post-apply
+  # verification + downstream review/human-decide + projection
+  # consumers, matching the E2 chain.
+  defp navigation_actions("patch-apply-governed") do
+    [
+      Result.next_action("verify-run", "execute the registered verifier on the post-mutation state"),
+      Result.next_action("review-propose", "dispatch the independent reviewer"),
+      Result.next_action("human-decide", "capture the explicit human decision"),
       Result.next_action("status", "show the current projection")
     ]
   end

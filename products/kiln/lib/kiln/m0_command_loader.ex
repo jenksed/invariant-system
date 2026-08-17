@@ -33,8 +33,20 @@ defmodule Kiln.M0CommandLoader do
           {:ok, doc} when is_map(doc) ->
             {:ok, doc}
 
+          # M11 E2 B-repair: the `--operations` argument to
+          # `mix kiln patch-apply` is a JSON array of bounded ops
+          # (e.g. [{op, path, ...}, ...]). The previous loader
+          # accepted only JSON objects, which forced every
+          # caller of `--operations` to wrap the list in a
+          # map (e.g. {"operations": [...]}). Accept JSON arrays
+          # here so the canonical CLI can pass the bounded ops
+          # list directly. The downstream PatchService.apply/3
+          # iterates the value as a list either way.
+          {:ok, doc} when is_list(doc) ->
+            {:ok, doc}
+
           _ ->
-            {:error, %{reason: "#{field} JSON must be an object", path: path}}
+            {:error, %{reason: "#{field} JSON must be an object or array", path: path}}
         end
 
       {:error, reason} ->
@@ -83,9 +95,27 @@ defmodule Kiln.M0CommandLoader do
   end
 
   defp default_profiles_root do
-    Path.expand(
-      "../../../../products/arsenal/evaluation/profiles/m0",
-      File.cwd!()
-    )
+    # Existing canonical seam: when KILN_PROFILES_ROOT is set in the
+    # environment, the resolver uses it as the profiles root. This
+    # lets the M11 E2 scenario point at a fixture-staged profiles
+    # dir without mutating the Arsenal source tree or adding a second
+    # resolver. When the env var is unset, fall back to the
+    # canonical Arsenal M0 profile location relative to CWD.
+    case System.get_env("KILN_PROFILES_ROOT") do
+      nil ->
+        Path.expand(
+          "../../../../products/arsenal/evaluation/profiles/m0",
+          File.cwd!()
+        )
+
+      root when is_binary(root) and root != "" ->
+        root
+
+      _ ->
+        Path.expand(
+          "../../../../products/arsenal/evaluation/profiles/m0",
+          File.cwd!()
+        )
+    end
   end
 end

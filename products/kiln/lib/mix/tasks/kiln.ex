@@ -71,6 +71,38 @@ defmodule Mix.Tasks.Kiln do
   defp render(%Kiln.CLI.Request{}, %Kiln.CLI.Result{} = result),
     do: Kiln.CLI.TextRenderer.render(result)
 
+  # M11 E2 B1: defensive crash containment. If a non-Result term
+  # somehow reaches the renderer (e.g. a dispatcher's error term
+  # was not wrapped by normalize_dispatch_result/2), emit a
+  # structured bounded internal error rather than crashing the Mix
+  # task. The canonical fix lives in the dispatchers; this is the
+  # last-line-of-defense fallback.
+  defp render(%Kiln.CLI.Request{} = request, other) do
+    result =
+      Kiln.CLI.Result.error(
+        kiln_command_name(request.command),
+        :failed,
+        errors: [
+          Kiln.CLI.Result.to_error(%{
+            code: :internal_invalid_dispatch_result,
+            message:
+              "dispatcher did not return a structured %Kiln.CLI.Result{}; renderer received " <>
+                inspect(other)
+          })
+        ]
+      )
+
+    if request.format == :json do
+      Kiln.CLI.JsonRenderer.render(result)
+    else
+      Kiln.CLI.TextRenderer.render(result)
+    end
+  end
+
+  defp kiln_command_name(nil), do: "kiln"
+  defp kiln_command_name(atom) when is_atom(atom), do: Atom.to_string(atom)
+  defp kiln_command_name(_), do: "kiln"
+
   defp requested_format(argv) do
     if "--format=json" in argv or
          Enum.any?(Enum.chunk_every(argv, 2, 1, :discard), &(&1 == ["--format", "json"])) do
