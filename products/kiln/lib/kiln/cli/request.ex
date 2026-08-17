@@ -30,8 +30,23 @@ defmodule Kiln.CLI.Request do
 
   alias Kiln.CLI.Result
 
-  @supported_commands [:start, :status, :inspect, :cancel, :resume, :supervise]
-  @command_lookup Map.new(@supported_commands, &{Atom.to_string(&1), &1})
+  @supported_commands [
+    :start,
+    :status,
+    :inspect,
+    :cancel,
+    :resume,
+    :supervise,
+    :candidate_invocation,
+    :candidate_invocation_digest
+  ]
+
+  # The CLI accepts kebab-case command names on the command line; the
+  # dispatch atom is snake_case. This explicit alias maps the two
+  # forms for the KILN-M0-01 (E4) public consumer-visible surface.
+  @command_aliases %{"candidate-invocation" => :candidate_invocation, "candidate-invocation-digest" => :candidate_invocation_digest}
+
+  @command_lookup Map.merge(Map.new(@supported_commands, &{Atom.to_string(&1), &1}), @command_aliases)
 
   # The accepted default home directory. Matches
   # `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md` §3.1 rule 9.
@@ -84,7 +99,7 @@ defmodule Kiln.CLI.Request do
 
   # -- tokenization --
 
-  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change)
+  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change --request --mode)
   @repeating_flags ~w(criterion constraint exclude)
   @command_flags %{
     start: ~w(repo objective criterion constraint exclude),
@@ -92,7 +107,9 @@ defmodule Kiln.CLI.Request do
     inspect: [],
     cancel: ~w(reason),
     resume: [],
-    supervise: ~w(work-envelope verification-change)
+    supervise: ~w(work-envelope verification-change),
+    candidate_invocation: ~w(request mode),
+    candidate_invocation_digest: []
   }
 
   defp tokenize(argv) do
@@ -293,6 +310,24 @@ defmodule Kiln.CLI.Request do
       usage_result("--work-envelope is required")
     end
   end
+
+  defp required_command_options(:candidate_invocation, options) do
+    cond do
+      not non_empty_option?(options, "request") ->
+        usage_result("--request is required (path to a candidate-invocation request JSON)")
+
+      not non_empty_option?(options, "mode") ->
+        usage_result("--mode is required (production|evaluation)")
+
+      options["mode"] not in ["production", "evaluation"] ->
+        usage_result("--mode must be one of: production|evaluation (got #{inspect(options["mode"])})")
+
+      true ->
+        :ok
+    end
+  end
+
+  defp required_command_options(:candidate_invocation_digest, _options), do: :ok
 
   defp required_command_options(_command, _options), do: :ok
 
