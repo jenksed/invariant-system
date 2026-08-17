@@ -8,14 +8,15 @@ export const FOCUSES: Focus[] = [
   'evidence',
   'artifacts',
   'raw',
-  'help'
+  'help',
+  'loop'
 ];
 
 export function renderWorkbench(model: WorkbenchModel, focus: Focus, width = 100): string {
   const safeWidth = Math.max(48, width);
   const body = panelLines(model, focus, safeWidth - 4);
   const header = ` TEMPER · ${model.repositoryName} · ${model.currentness.toUpperCase()} `;
-  const footer = ` [p]lan [u]run [a]uthority [e]vidence ar[t]ifacts [r]aw [?]help [esc]overview [q]uit `;
+  const footer = ` [p]lan [u]run [l]oop [a]uthority [e]vidence ar[t]ifacts [r]aw [?]help [esc]overview [q]uit `;
   const lines = [topBorder(header, safeWidth), ...body.map((line) => row(line, safeWidth))];
 
   while (lines.length < 20) lines.push(row('', safeWidth));
@@ -51,6 +52,8 @@ function panelLines(model: WorkbenchModel, focus: Focus, width: number): string[
       );
     case 'help':
       return helpPanel(model);
+    case 'loop':
+      return loopPanel(model, width);
   }
 }
 
@@ -198,6 +201,108 @@ function artifactsPanel(model: WorkbenchModel, width: number): string[] {
   ];
 }
 
+// M10 development-loop focus: project the M0 RunResultProjection in
+// operator-readable form. Each stage carries the bounded truth status
+// from the projection; missing stages render `n/a — <reason>` (never
+// inferred). Source commands surface the owning Kiln CLI invocation
+// that produced each artifact.
+function loopPanel(model: WorkbenchModel, width: number): string[] {
+  const proj = model.m0?.projection;
+  const plan = model.plan;
+
+  if (!proj) {
+    const reason =
+      model.m0?.projectionPath
+        ? `projection at ${model.m0.projectionPath} was rejected (see errors); see raw focus for details`
+        : 'no M0 RunResultProjection is available — run `mix kiln human-decide` to produce one';
+    return [' M0 DEVELOPMENT LOOP', '', ` ${na('M0 projection', model)} — ${reason}`];
+  }
+
+  const lines: string[] = [
+    ' M0 DEVELOPMENT LOOP',
+    '',
+    ...fieldLines(
+      'Run status',
+      proj.truth.run_status,
+      width,
+      `mix kiln human-decide` /* owning command for projection */
+    ),
+    ...fieldLines(
+      'Verification',
+      proj.truth.verification_status,
+      width,
+      `mix kiln verify-run`
+    ),
+    ...fieldLines(
+      'Review',
+      proj.truth.review_status === null || proj.truth.review_status === undefined
+        ? na('Review', model)
+        : proj.truth.review_status,
+      width,
+      `mix kiln review-propose`
+    ),
+    ...fieldLines(
+      'Human decision',
+      proj.truth.human_status,
+      width,
+      `mix kiln human-decide`
+    ),
+    '',
+    ' PROVENANCE — every stage binds a canonical artifact ref',
+    ...artifactRefLine('Plan', proj.plan_ref, width),
+    ...artifactRefLine('Implementer', proj.implementer_assignment_ref, width),
+    ...artifactRefLine('Reviewer', proj.reviewer_assignment_ref, width),
+    ...artifactRefLine('Patch', proj.patch_ref, width),
+    ...artifactRefLine('Patch decision', proj.patch_decision_ref, width),
+    ...artifactRefLine('Verification', proj.verification_ref, width),
+    ...artifactRefLine('Review', proj.review_ref, width, true),
+    ...artifactRefLine('Human decision', proj.human_decision_ref, width, true),
+    ...artifactRefLine('Run result', proj.run_result_ref, width)
+  ];
+
+  if (proj.truth.unknown_effects.length > 0) {
+    lines.push('');
+    lines.push(' UNKNOWN EFFECTS');
+    for (const id of proj.truth.unknown_effects) {
+      lines.push(`   - ${id}`);
+    }
+  }
+
+  if (model.m0?.projectionPath) {
+    lines.push('');
+    lines.push(` Source: ${model.m0.projectionPath}`);
+  }
+
+  if (plan) {
+    lines.push('');
+    lines.push(
+      ` Plan binding: ${plan.plan_id} (${plan.goal.title})`
+    );
+  }
+
+  if (model.errors.length) {
+    lines.push('');
+    lines.push(' INPUT GAPS');
+    for (const e of model.errors) {
+      lines.push(`   - ${e}`);
+    }
+  }
+
+  return lines;
+}
+
+function artifactRefLine(
+  label: string,
+  ref: { id: string; digest: string } | null,
+  width: number,
+  _optional = false
+): string[] {
+  if (ref === null) {
+    return fieldLines(label, `n/a — ${label.toLowerCase()} (not yet recorded)`, width);
+  }
+  return fieldLines(label, `${ref.id} (${ref.digest.slice(0, 16)}…)`, width);
+}
+
 function helpPanel(model: WorkbenchModel): string[] {
   return [
     ' HELP',
@@ -258,11 +363,23 @@ function field(label: string, value: string): string {
   return `   ${label.padEnd(18)} ${value}`;
 }
 
-function fieldLines(label: string, value: string, width: number): string[] {
+function fieldLines(
+  label: string,
+  value: string,
+  width: number,
+  sourceHint?: string
+): string[] {
   const prefix = `   ${label.padEnd(18)} `;
   const continuation = ' '.repeat(prefix.length);
   const available = Math.max(8, width - prefix.length);
-  return wrap(value, available).map((part, index) => `${index === 0 ? prefix : continuation}${part}`);
+  const baseLines = wrap(value, available).map(
+    (part, index) => `${index === 0 ? prefix : continuation}${part}`
+  );
+  if (sourceHint) {
+    const hintLines = wrap(`   source: ${sourceHint}`, width);
+    return [...baseLines, ...hintLines];
+  }
+  return baseLines;
 }
 
 function topBorder(title: string, width: number): string {
