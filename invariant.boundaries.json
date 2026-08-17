@@ -25,6 +25,10 @@
     "manifold": {
       "path": "products/manifold",
       "owns": ["intelligence selection", "allocation"],
+      "activated_surface": [
+        "products/manifold/src/selector.py",
+        "products/manifold/tests/test_selector.py"
+      ],
       "may_not": [
         "execute work",
         "mutate repositories",
@@ -53,7 +57,7 @@
   "checks": {
     "no_nested_git": true,
     "no_submodules": true,
-    "manifold_no_runtime": true,
+    "manifold_selection_only": true,
     "temper_no_sibling_source_coupling": true,
     "single_canonical_contracts": true
   }

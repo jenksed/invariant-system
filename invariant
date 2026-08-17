@@ -153,11 +153,47 @@ check_boundaries() {
     ok "no submodules"
   fi
 
-  # 3. Manifold is a boundary, not a runtime: no executable source.
-  if git ls-files products/manifold | grep -vq '\.md$'; then
-    bad "products/manifold contains non-documentation files (it must not become a runtime here)"
+  # 3. Manifold is a selection-only boundary. Activated surface (BT-01):
+  # `src/selector.py` + `tests/test_selector.py`. Every other tracked file
+  # under `products/manifold/` must be `*.md`. The selector source must be
+  # stdlib-only (no subprocess/socket/HTTP/asyncio/ctypes/os imports) and
+  # must not reach into sibling product source trees.
+  local manifold_files
+  manifold_files=$(git ls-files products/manifold 2>/dev/null || true)
+  if [[ -n "$manifold_files" ]]; then
+    # Allow only *.md, src/selector.py, tests/test_selector.py under products/manifold.
+    local bad_files=()
+    while IFS= read -r f; do
+      case "$f" in
+        *.md|products/manifold/src/selector.py|products/manifold/tests/test_selector.py) ;;
+        *) bad_files+=("$f") ;;
+      esac
+    done <<< "$manifold_files"
+    if (( ${#bad_files[@]} > 0 )); then
+      bad "products/manifold has files outside the activated selection surface: ${bad_files[*]}"
+    fi
+    # Activated source must not import subprocess/socket/urllib/requests/
+    # http.client/asyncio/multiprocessing/ctypes/os — selection is pure
+    # stdlib data in/out with no process/network/environment surface.
+    local src_test_glob='products/manifold/{src,tests}'
+    local bad_imports
+    bad_imports=$(rg -n 'subprocess|socket|urllib|requests|http\.client|asyncio|multiprocessing|ctypes|import\s+os\b' \
+      -g 'products/manifold/src/**' -g 'products/manifold/tests/**' \
+      products/manifold 2>/dev/null || true)
+    if [[ -n "$bad_imports" ]]; then
+      bad "products/manifold src/tests imports non-stdlib or process/network surface: $bad_imports"
+    fi
+    # Activated source must not reach into sibling product trees.
+    local bad_coupling
+    bad_coupling=$(rg -n 'products/(arsenal|loadout|kiln|temper)' \
+      -g 'products/manifold/src/**' -g 'products/manifold/tests/**' \
+      products/manifold 2>/dev/null || true)
+    if [[ -n "$bad_coupling" ]]; then
+      bad "products/manifold src/tests references sibling product trees: $bad_coupling"
+    fi
+    ok "manifold is selection-only (src/selector.py + tests)"
   else
-    ok "manifold is documentation-only"
+    ok "manifold is selection-only (no activated surface files yet)"
   fi
 
   # 4. Temper presents and operates; it must not reach into sibling product trees.
