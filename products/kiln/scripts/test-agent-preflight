@@ -476,4 +476,257 @@ expect_failure "$prepared_repo" work/p1-s1-t1-bad-width "invalid slice-ticket wi
 expect_failure "$prepared_repo" main "main"
 expect_failure "$prepared_repo" unknown/p0-w28 "unknown branch class"
 
+# ============================================================
+# Kiln M0 branch class regression coverage
+# ============================================================
+
+# M0 plans use the common 11-heading set, NOT the legacy ticket-specific
+# 3-heading set (Slice contribution / Security boundary / Demo contribution).
+write_m0_plan() {
+  local work_id=$1
+  local branch=$2
+  local status=$3
+  local path="docs/work/${work_id}-preflight-fixture.md"
+
+  {
+    printf '# %s: Preflight fixture\n\n' "$work_id"
+    printf '**Document type:** Implementation plan\n'
+    printf '**Status:** %s\n' "$status"
+    printf '**Parent slice:** None\n'
+    printf '**Branch:** `%s`\n' "$branch"
+    printf '**Depends on:** None\n\n'
+    printf '## Objective\nFixture only.\n'
+    printf '## Observed current state\nFixture only.\n'
+    printf '## Assumptions and unknowns\nFixture only.\n'
+    printf '## Requirements\nFixture only.\n'
+    printf '## Proposed changes\nFixture only.\n'
+    printf '## Expected files or components\nFixture only.\n'
+    printf '## Acceptance criteria\nFixture only.\n'
+    printf '## Deterministic verification\nFixture only.\n'
+    printf '## Required completion Evidence\nFixture only.\n'
+    printf '## Explicit exclusions\nFixture only.\n'
+    printf '## Completion record\nFixture only.\n'
+  } >"$path"
+}
+
+prepare_trusted_m0() {
+  local name=$1
+  local work_id=$2
+  local branch=$3
+  local status=$4
+  local state=$5
+  local owner=$6
+  local base_mode=$7
+  local digest_mode=$8
+  local authorized_at=$9
+  local scope=${10}
+  local order=${11:-canonical}
+  local base_sha plan digest
+
+  new_case "$name"
+  base_sha=$(git -C "$prepared_repo" rev-parse HEAD)
+  plan="docs/work/${work_id}-preflight-fixture.md"
+
+  (
+    cd "$prepared_repo"
+    write_m0_plan "$work_id" "$branch" "$status"
+    digest=$(sha256_file "$plan")
+    if [[ "$digest_mode" == "mismatch" ]]; then
+      digest=$(printf '0%.0s' {1..64})
+    fi
+    if [[ "$base_mode" == "malformed" ]]; then
+      base_sha=not-a-commit
+    fi
+    write_authorization "$work_id" "$state" "$owner" "$base_sha" "$digest" "$authorized_at" "$scope" "$order"
+    git add "$plan" "docs/authorizations/${work_id}.authorization"
+    git commit --quiet -m "Add trusted M0 authority fixture"
+    git update-ref refs/remotes/origin/main HEAD
+    git switch --quiet -c "$branch"
+    git commit --quiet --allow-empty -m "Begin M0 implementation after authority"
+  )
+}
+
+# 1. valid m0/kiln-01-... + valid KILN-M0-01 plan + trusted authorization → PASS
+prepare_trusted_m0 m0-valid KILN-M0-01 m0/kiln-01-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid valid 2026-08-08T12:00:00-04:00 "M0 fixture only"
+expect_success "$prepared_repo" m0/kiln-01-preflight-fixture "trusted M0 authorization"
+
+# 2. valid M0 branch but missing authorization → FAIL
+new_case m0-missing-auth
+(
+  cd "$prepared_repo"
+  branch=m0/kiln-02-preflight-fixture
+  work_id=KILN-M0-02
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  write_m0_plan "$work_id" "$branch" Accepted
+  git add "$plan"
+  git commit --quiet -m "Add M0 plan without authorization"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch"
+)
+expect_failure "$prepared_repo" m0/kiln-02-preflight-fixture "M0 branch without authorization" \
+  "implementation authorization is missing from implementation commit"
+
+# 3. authorization digest mismatch → FAIL
+prepare_trusted_m0 m0-digest KILN-M0-03 m0/kiln-03-preflight-fixture Accepted authorized \
+  "Joshua Jenks" valid mismatch 2026-08-08T12:00:00-04:00 "M0 digest fixture"
+expect_failure "$prepared_repo" m0/kiln-03-preflight-fixture "M0 authorization with stale plan digest" \
+  "plan_sha256 does not match"
+
+# 4. authorization work-ID mismatch → FAIL
+# Auth file is at the EXPECTED path (docs/authorizations/<branch_work_id>.authorization)
+# but its internal work_id field does not match the branch-extracted work_id.
+# This is the precise check that validate_authorization's record_work_id
+# comparison enforces.
+new_case m0-wrong-id
+(
+  cd "$prepared_repo"
+  branch=m0/kiln-04-preflight-fixture
+  work_id=KILN-M0-04
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  authorization="docs/authorizations/${work_id}.authorization"
+  base_sha=$(git rev-parse HEAD)
+  write_m0_plan "$work_id" "$branch" Accepted
+  digest=$(sha256_file "$plan")
+  # Write auth at the expected path with work_id field set to KILN-M0-99
+  # (mismatched against branch-extracted KILN-M0-04).
+  {
+    printf 'work_id=KILN-M0-99\n'
+    printf 'state=authorized\n'
+    printf 'owner=Joshua Jenks\n'
+    printf 'base_sha=%s\n' "$base_sha"
+    printf 'plan_sha256=%s\n' "$digest"
+    printf 'authorized_at=2026-08-08T12:00:00-04:00\n'
+    printf 'scope=M0 work-ID mismatch fixture (auth claims KILN-M0-99, branch is M0-04)\n'
+  } >"$authorization"
+  git add "$plan" "$authorization"
+  git commit --quiet -m "Add M0 fixture with authorization work_id mismatched against branch"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch"
+  git commit --quiet --allow-empty -m "Begin M0 implementation after mismatched work_id authority"
+)
+expect_failure "$prepared_repo" m0/kiln-04-preflight-fixture "M0 authorization with work-ID mismatch" \
+  "authorization work_id does not match"
+
+# 5. plan Branch: field mismatch → FAIL
+new_case m0-branch-mismatch
+(
+  cd "$prepared_repo"
+  branch_declared=m0/kiln-05-declared-branch
+  branch_implementation=m0/kiln-05-actual-branch
+  work_id=KILN-M0-05
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  base_sha=$(git rev-parse HEAD)
+  write_m0_plan "$work_id" "$branch_declared" Accepted
+  digest=$(sha256_file "$plan")
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$digest" \
+    2026-08-08T12:00:00-04:00 "M0 plan Branch field mismatch fixture"
+  git add "$plan" "docs/authorizations/${work_id}.authorization"
+  git commit --quiet -m "Add trusted M0 fixture with mismatched branch field"
+  git update-ref refs/remotes/origin/main HEAD
+  git switch --quiet -c "$branch_implementation"
+  git commit --quiet --allow-empty -m "M0 implementation branch with mismatched declared branch"
+)
+expect_failure "$prepared_repo" m0/kiln-05-actual-branch "M0 plan Branch field mismatch" \
+  "does not identify branch m0/kiln-05-actual-branch"
+
+# 6. authority existing only on the implementation branch → FAIL
+new_case m0-branch-issued
+(
+  cd "$prepared_repo"
+  branch=m0/kiln-06-preflight-fixture
+  work_id=KILN-M0-06
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  base_sha=$(git rev-parse HEAD)
+  git switch --quiet -c "$branch"
+  write_m0_plan "$work_id" "$branch" Accepted
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "M0 implementation-branch self-issue fixture"
+  git add "$plan" "docs/authorizations/${work_id}.authorization"
+  git commit --quiet -m "M0 self-issue implementation authority"
+)
+expect_failure "$prepared_repo" m0/kiln-06-preflight-fixture "M0 implementation-branch-created authority" \
+  "is not identical to trusted Repository authority"
+
+# 7. authority source not ancestral to implementation head → FAIL
+new_case m0-synthetic-merge
+(
+  cd "$prepared_repo"
+  base_sha=$(git rev-parse HEAD)
+  branch=m0/kiln-07-preflight-fixture
+  work_id=KILN-M0-07
+  plan="docs/work/${work_id}-preflight-fixture.md"
+  authorization="docs/authorizations/${work_id}.authorization"
+  write_m0_plan "$work_id" "$branch" Accepted
+  write_authorization "$work_id" authorized "Joshua Jenks" "$base_sha" "$(sha256_file "$plan")" \
+    2026-08-08T12:00:00-04:00 "M0 synthetic merge ancestry fixture"
+  git add "$plan" "$authorization"
+  git commit --quiet -m "Add trusted M0 authority fixture A"
+  authority_commit=$(git rev-parse HEAD)
+  git update-ref refs/remotes/origin/main "$authority_commit"
+
+  git switch --quiet --detach "$base_sha"
+  git switch --quiet -c "$branch"
+  mkdir -p docs/work docs/authorizations
+  git show "$authority_commit:$plan" >"$plan"
+  git show "$authority_commit:$authorization" >"$authorization"
+  git add "$plan" "$authorization"
+  git commit --quiet -m "Copy M0 authority blobs independently"
+  implementation_commit=$(git rev-parse HEAD)
+
+  merge_tree=$(git rev-parse "${implementation_commit}^{tree}")
+  merge_commit=$(printf 'Synthetic M0 pull-request merge\n' | \
+    git commit-tree "$merge_tree" -p "$authority_commit" -p "$implementation_commit")
+  git update-ref refs/heads/fixture-m0-authority "$authority_commit"
+  git update-ref refs/heads/fixture-m0-implementation "$implementation_commit"
+  git update-ref refs/heads/fixture-m0-merge "$merge_commit"
+  git switch --quiet --detach "$merge_commit"
+)
+authority_commit=$(git -C "$prepared_repo" rev-parse fixture-m0-authority)
+implementation_commit=$(git -C "$prepared_repo" rev-parse fixture-m0-implementation)
+merge_commit=$(git -C "$prepared_repo" rev-parse fixture-m0-merge)
+git -C "$prepared_repo" merge-base --is-ancestor "$authority_commit" "$merge_commit" ||
+  fail "synthetic M0 merge fixture does not make authority appear ancestral"
+expect_success_at_commit "$prepared_repo" m0/kiln-07-preflight-fixture "$merge_commit" \
+  "synthetic M0 merge state demonstrates the former false-positive path"
+expect_failure_at_commit "$prepared_repo" m0/kiln-07-preflight-fixture "$implementation_commit" \
+  "actual independent M0 implementation head behind a synthetic merge" \
+  "is not an ancestor of implementation commit"
+
+# 8. malformed M0 branch number/purpose → FAIL
+expect_failure "$prepared_repo" m0/kiln-1-preflight-fixture "m0 branch with one-digit work number" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/kiln-001-preflight-fixture "m0 branch with three-digit work number" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/kiln-99 "m0 branch with no purpose suffix" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/kiln-01-FOO "m0 branch with uppercase purpose (falls to m0/kiln-* elif)" \
+  "m0 branch 'm0/kiln-01-FOO' must match"
+
+# 9. m0/loadout-* or another non-Kiln M0 branch → FAIL
+expect_failure "$prepared_repo" m0/loadout-01-implement-change-plan "non-Kiln M0 namespace branch (loadout)" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/bench-01-role-qualification "non-Kiln M0 namespace branch (bench)" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/manifold-01-selector "non-Kiln M0 namespace branch (manifold)" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/temper-01-projection "non-Kiln M0 namespace branch (temper)" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/sys-01-governance "non-Kiln M0 namespace branch (sys)" \
+  "does not use an approved branch class"
+
+# 10. arbitrary m0/* branch → FAIL
+expect_failure "$prepared_repo" m0/foo "arbitrary m0/* branch" \
+  "does not use an approved branch class"
+expect_failure "$prepared_repo" m0/anything-here "arbitrary m0/* branch" \
+  "does not use an approved branch class"
+
+# 11. Existing legacy work/p... fixtures continue to behave identically.
+# (Covered by all prior tests in this file: valid, untracked, local-record,
+# branch-issued, arbitrary-owner, proposed, missing-record, digest mismatch,
+# revoked, malformed-base, wrong-order, invalid-time, whitespace-owner,
+# whitespace-scope, missing-heading, planning, planning identity mismatch,
+# invalid work/p..., main, unknown branch class. These all ran above and
+# continued to pass with the M0 grammar addition.)
+
 printf 'test-agent-preflight: pass\n'
