@@ -67,7 +67,8 @@ defmodule Kiln.M0PatchProposal do
     :base_state_digest,
     :operations,
     :patch_digest,
-    :metadata
+    :metadata,
+    :supersedes_patch_ref
   ]
 
   @type t :: %__MODULE__{
@@ -80,7 +81,8 @@ defmodule Kiln.M0PatchProposal do
           base_state_digest: String.t(),
           operations: [map()],
           patch_digest: String.t(),
-          metadata: map()
+          metadata: map(),
+          supersedes_patch_ref: map() | nil
         }
 
   @spec to_map(t()) :: map()

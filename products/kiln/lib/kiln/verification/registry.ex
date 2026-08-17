@@ -60,7 +60,14 @@ defmodule Kiln.Verification.Registry do
     "temper.build" => {"temper", "npm", ["run", "build"]},
     "temper.interactive-smoke" =>
       {"temper", "node",
-       ["--test", "dist/test/workbench.test.js", "--test-name-pattern", "interactive"]}
+       ["--test", "dist/test/workbench.test.js", "--test-name-pattern", "interactive"]},
+    # M11 E3 Case 5 — bounded deterministic verifier that always
+    # exits non-zero. Used by the E3 suite to drive the canonical
+    # verify-run boundary (Kiln.Verification.CommandHost.run/2) and
+    # observe the `result: :fail` classification. No new authority
+    # or network capability; spawn is no-shell via the C helper.
+    "m11.fail-verifier" =>
+      {"kiln", "python3", ["-c", "import sys; sys.exit(1)"]}
   }
 
   @spec validate(map(), String.t(), String.t()) :: {:ok, map()} | {:error, term()}

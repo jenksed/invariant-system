@@ -54,9 +54,10 @@ defmodule Kiln.PatchProposal do
         ) ::
           {:ok, PatchProposal.Proposal.t()}
           | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
-  def build(worker_output, operations, plan_ref, repository)
+  def build(worker_output, operations, plan_ref, repository, supersedes_patch_ref \\ nil)
       when not is_nil(worker_output) and is_list(operations) and
-             is_map(plan_ref) and is_binary(repository) do
+             is_map(plan_ref) and is_binary(repository) and
+             (is_nil(supersedes_patch_ref) or is_map(supersedes_patch_ref)) do
     with :ok <- enforce_path_limits(operations),
          :ok <- enforce_byte_limits(operations),
          :ok <- reject_disallowed_kinds(operations),
@@ -72,7 +73,8 @@ defmodule Kiln.PatchProposal do
         "base_state_digest" => worker_output.base_state_digest,
         "operations" => Enum.map(operations, &serialize_op/1),
         "patch_digest" => compute_patch_digest(worker_output, operations),
-        "metadata" => build_metadata(worker_output)
+        "metadata" => build_metadata(worker_output),
+        "supersedes_patch_ref" => supersedes_patch_ref
       }
 
       semantic = canonical_digest(Map.delete(body, "patch_id"))
@@ -88,7 +90,8 @@ defmodule Kiln.PatchProposal do
          base_state_digest: worker_output.base_state_digest,
          operations: body["operations"],
          patch_digest: body["patch_digest"],
-         metadata: body["metadata"]
+         metadata: body["metadata"],
+         supersedes_patch_ref: supersedes_patch_ref
        }}
     end
   end

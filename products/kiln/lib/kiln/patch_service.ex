@@ -58,7 +58,7 @@ defmodule Kiln.PatchService do
 
   Returns `{:ok, %Kiln.M0PatchDecision{}}` or a bounded error envelope.
   """
-  @spec decide(proposal :: Proposal.t(), decision_kind :: atom(), base_state_digest :: String.t()) ::
+  @spec decide(proposal :: M0PatchProposal.t(), decision_kind :: atom(), base_state_digest :: String.t()) ::
           {:ok, Decision.t()} | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
   def decide(proposal, decision_kind, base_state_digest)
       when not is_nil(proposal) and is_binary(base_state_digest) do
@@ -102,6 +102,18 @@ defmodule Kiln.PatchService do
            proposal: proposal
          }}
     end
+  end
+
+  @doc """
+  M11 N-10 (canonical): compute the canonical expected post-state
+  digest for a Proposal. Derives the same value `recover/3`
+  compares against the supplied observed state. Pure / deterministic
+  / no I/O. Schema-locked to the canonical `engineering-system/
+  patch-application-evidence/m0-v1` envelope.
+  """
+  @spec compute_post_state_digest(M0PatchProposal.t()) :: String.t()
+  def compute_post_state_digest(%M0PatchProposal{} = proposal) do
+    expected_post_state_digest(proposal)
   end
 
   @doc """

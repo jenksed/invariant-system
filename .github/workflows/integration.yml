@@ -52,3 +52,33 @@ jobs:
       # path: Loadout plan -> real Kiln supervision -> Temper rendering.
       - name: Run repository-recon golden path
         run: ./integration/scenarios/repository-recon/run.sh
+
+  # M11 E6 — wiring two of the three E6 jobs that are
+  # dependency-independent of E2. The third E6 job
+  # (implement-change-golden-path) is deferred until the E2
+  # implement-change scenario ships.
+  m0-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install jsonschema
+        run: pip install jsonschema
+      - name: Run M0 conformance
+        run: ./invariant test contracts
+
+  manifold-selector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Manifold selector tests + boundaries
+        run: |
+          ./invariant test manifold
+          ./invariant check boundaries

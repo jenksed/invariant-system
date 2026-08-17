@@ -128,6 +128,58 @@ defmodule Kiln.Review do
   defp canonical_digest(schema, payload) do
     "sha256:" <> Canonical.digest(schema, payload)
   end
+
+  @doc """
+  M11 N-7 (canonical): revalidate a previously-emitted Review against a
+  candidate (patch_ref, result_state_digest) tuple. If the prior
+  Review was bound to a different patch_ref or result_state_digest,
+  it is stale for the current revision and the canonical contract
+  rejects with `:E_REVIEW_STALE`.
+
+  This is the smallest deterministic implementation of the
+  `review-after-revision staled` acceptance property documented in
+  the M9 readiness dossier and required by the canonical
+  `integration/fixtures/m0/negative/review-reuse-after-patch-revision.json`
+  contract (mapped to `E_REVIEW_STALE` in
+  `integration/validate_m0.py`).
+
+  No public schema expansion: it operates on the already-canonical
+  `%M0Review{}` envelope. No new fields; no API breaking change.
+  """
+  @spec revalidate(M0Review.t(), map(), String.t()) ::
+          :ok | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
+  def revalidate(%M0Review{} = previous, current_patch_ref, current_result_state_digest)
+      when is_map(current_patch_ref) and is_binary(current_result_state_digest) do
+    cond do
+      previous.patch_ref["digest"] != current_patch_ref["digest"] ->
+        {:error,
+         %{
+           code: :E_REVIEW_STALE,
+           reason:
+             "review.patch_ref.digest #{previous.patch_ref["digest"]} does not match current patch_ref.digest #{current_patch_ref["digest"]}; a revised patch requires a new Review"
+         }}
+
+      previous.result_state_digest != current_result_state_digest ->
+        {:error,
+         %{
+           code: :E_REVIEW_STALE,
+           reason:
+             "review.result_state_digest does not match current result_state_digest; the reviewed state has changed"
+         }}
+
+      true ->
+        :ok
+    end
+  end
+
+  def revalidate(_previous, _current_patch_ref, _current_result_state_digest) do
+    {:error,
+     %{
+       code: :E_REVIEW_STALE,
+       reason:
+         "revalidate/3 requires a prior M0Review, a current patch_ref map, and a current result_state_digest binary"
+     }}
+  end
 end
 
 defmodule Kiln.HumanDecision do
