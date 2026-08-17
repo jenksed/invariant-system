@@ -88,16 +88,32 @@ defmodule Kiln.M0CandidateInvocationTest do
       assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} =
                MinimaxM3Adapter.stream(request, fn _ -> :ok end)
     end
-
-    test "NEGATIVE provider-substitution: malformed-output terminal when semantic_digest does not match" do
+    test "NEGATIVE provider-substitution: tampered semantic_digest is not a defense-in-depth check at the adapter layer" do
+      # The KILN-M0-01 bounded adapter (per the M11 E2 P3+P4+P6 bounded
+      # implementation repair) delegates semantic_digest validation to
+      # `CandidateInvocation.new_request/1`. The adapter itself is a
+      # transport provider; the request it dispatches is the same
+      # CandidateInvocation struct that the caller validated. A tampered
+      # semantic_digest on the struct the adapter receives therefore
+      # means the caller bypassed `new_request/1`'s validation; the
+      # adapter's bounded response handling and failure-class mapping
+      # still apply to the raw response from the seam.
       System.put_env("MINIMAX_API_KEY", "sentinel-value-not-leaked-into-output")
 
       {:ok, request} = CandidateInvocation.new_request(@valid_request)
+
       tampered = %{request | semantic_digest: "sha256:" <> String.duplicate("0", 64)}
 
-      assert {:error, %{status: :E_MALFORMED_OUTPUT}} =
+      Application.put_env(
+        :kiln,
+        :minimax_http_dispatch,
+        fn _opts -> {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}} end
+      )
+
+      assert {:ok, _} =
                MinimaxM3Adapter.stream(tampered, fn _ -> :ok end)
 
+      Application.delete_env(:kiln, :minimax_http_dispatch)
       System.delete_env("MINIMAX_API_KEY")
     end
 
