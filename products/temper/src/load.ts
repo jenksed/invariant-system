@@ -4,7 +4,9 @@ import path from 'node:path';
 import type {
   LoadoutPlan,
   LoadoutRunRecord,
+  M0ArtifactBundle,
   RunResultEnvelope,
+  RunResultProjection,
   SourceFact,
   WorkbenchModel
 } from './types.js';
@@ -12,10 +14,12 @@ import type {
 export interface LoadOptions {
   runPath?: string;
   planPath?: string;
+  m0ProjectionPath?: string;
 }
 
 const RESULT_SCHEMA = 'engineering-system/run-result-envelope/v0';
 const PLAN_SCHEMA = 'loadout/plan/v0';
+const M0_PROJECTION_SCHEMA = 'engineering-system/run-result-projection/m0-v1';
 
 export async function loadWorkbench(
   repositoryInput: string,
@@ -65,22 +69,89 @@ export async function loadWorkbench(
     errors.push('Plan missing: no readable source Plan is referenced by the latest Run.');
   }
 
+  // M0 RunResultProjection — discovered alongside the v0 Run record.
+  // Per M10 doctrine, projection is canonical truth, never inferred.
+  // `fixture_only: true` is rejected at this layer (operator must never
+  // be shown a fixture as if it were a real Run).
+  const m0ProjectionPath =
+    options.m0ProjectionPath ??
+    (runRecordPath
+      ? path.join(path.dirname(path.dirname(runRecordPath)), 'projections')
+      : undefined);
+  const m0 = await loadM0Bundle(m0ProjectionPath, errors);
+
   const { currentness, reason } = repositoryCurrentness(repository, result);
-  const sources = buildSources(repository, runRecordPath, planPath, result, plan);
+  const sources = buildSources(
+    repository,
+    runRecordPath,
+    planPath,
+    result,
+    plan,
+    m0
+  );
 
   return {
     repository,
     repositoryName: path.basename(repository),
     ...(runRecordPath ? { runRecordPath } : {}),
     ...(planPath ? { planPath } : {}),
+    ...(m0ProjectionPath ? { m0ProjectionPath } : {}),
     ...(runRecord ? { runRecord } : {}),
     ...(result ? { result } : {}),
     ...(plan ? { plan } : {}),
+    ...(m0.projection ? { m0 } : {}),
     currentness,
     currentnessReason: reason,
     errors,
     sources
   };
+}
+
+async function loadM0Bundle(
+  directory: string | undefined,
+  errors: string[]
+): Promise<M0ArtifactBundle> {
+  if (!directory) return {};
+  let names: string[] = [];
+  try {
+    names = await fs.readdir(directory);
+  } catch {
+    return {};
+  }
+  const candidates = names.filter((n) => n.endsWith('.json'));
+  if (candidates.length === 0) return {};
+
+  // Discover the most recent M0 projection; canonical name is
+  // `<projection_id>.json`; the schema field is the canonical
+  // identifier, not the filename.
+  let chosen: { path: string; mtimeMs: number } | undefined;
+  for (const name of candidates) {
+    const candidate = path.join(directory, name);
+    const stat = await fs.stat(candidate).catch(() => undefined);
+    if (!stat?.isFile()) continue;
+    if (!chosen || stat.mtimeMs > chosen.mtimeMs) {
+      chosen = { path: candidate, mtimeMs: stat.mtimeMs };
+    }
+  }
+  if (!chosen) return {};
+
+  const parsed = await readJson(chosen.path, 'M0 projection', errors);
+  if (!parsed) return { projectionPath: chosen.path };
+  if (!isRunResultProjection(parsed)) {
+    errors.push(
+      `M0 projection at ${chosen.path} is incompatible: expected schema=${M0_PROJECTION_SCHEMA}.`
+    );
+    return { projectionPath: chosen.path };
+  }
+  // Reject fixture-only projections at the load layer.
+  const meta = parsed.metadata as Record<string, unknown> | undefined;
+  if (meta?.fixture_only === true) {
+    errors.push(
+      `M0 projection at ${chosen.path} is marked fixture_only; Temper only presents real projections.`
+    );
+    return { projectionPath: chosen.path };
+  }
+  return { projectionPath: chosen.path, projection: parsed };
 }
 
 async function discoverLatestJson(directory: string): Promise<string | undefined> {
@@ -134,6 +205,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
+}
+
+function isArtifactRef(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.digest === 'string'
+  );
+}
+
 function normalizeRunRecord(value: unknown): LoadoutRunRecord | undefined {
   if (!isRecord(value)) return undefined;
   const result = isRecord(value.runResult) ? value.runResult : isRecord(value.result) ? value.result : undefined;
@@ -160,10 +243,6 @@ function normalizeRunRecord(value: unknown): LoadoutRunRecord | undefined {
     ...(sourcePlanPath ? { sourcePlanPath } : {}),
     raw: value
   };
-}
-
-function isStringArray(value: unknown): value is string[] {
-  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 function isRunResult(value: unknown): value is RunResultEnvelope {
@@ -221,6 +300,37 @@ function isPlan(value: unknown): value is LoadoutPlan {
   );
 }
 
+function isRunResultProjection(value: unknown): value is RunResultProjection {
+  if (!isRecord(value)) return false;
+  const truth = value.truth;
+  return (
+    value.schema === M0_PROJECTION_SCHEMA &&
+    typeof value.projection_id === 'string' &&
+    typeof value.semantic_digest === 'string' &&
+    isArtifactRef(value.plan_ref) &&
+    isArtifactRef(value.implementer_assignment_ref) &&
+    isArtifactRef(value.reviewer_assignment_ref) &&
+    isArtifactRef(value.patch_ref) &&
+    isArtifactRef(value.patch_decision_ref) &&
+    isArtifactRef(value.verification_ref) &&
+    (value.review_ref === null || isArtifactRef(value.review_ref)) &&
+    (value.human_decision_ref === null || isArtifactRef(value.human_decision_ref)) &&
+    isArtifactRef(value.run_result_ref) &&
+    isRecord(truth) &&
+    [
+      'completed',
+      'blocked',
+      'cancelled',
+      'failed',
+      'unknown'
+    ].includes(String(truth.run_status)) &&
+    ['PASS', 'FAIL', 'TIMEOUT', 'ERROR'].includes(String(truth.verification_status)) &&
+    ['APPROVE', 'REQUEST_REVISION', 'REJECT'].includes(String(truth.review_status)) &&
+    ['ACCEPT', 'REJECT', 'REQUEST_REVISION'].includes(String(truth.human_status)) &&
+    Array.isArray(truth.unknown_effects)
+  );
+}
+
 function repositoryCurrentness(
   repository: string,
   result: RunResultEnvelope | undefined
@@ -248,10 +358,12 @@ function buildSources(
   runRecordPath: string | undefined,
   planPath: string | undefined,
   result: RunResultEnvelope | undefined,
-  plan: LoadoutPlan | undefined
+  plan: LoadoutPlan | undefined,
+  m0: M0ArtifactBundle
 ): Record<string, SourceFact> {
   const runCommand = `npx loadout run --plan <plan-path> --repository ${repository} --execution kiln`;
   const planCommand = `npx loadout plan --goal "Understand this repository" --repository ${repository} --execution kiln`;
+  const m0Command = `mix kiln human-decide --plan <plan-ref> --patch <patch-ref> --result-state-digest <digest> --decision <kind> --out <projection-path>`;
   const sources: Record<string, SourceFact> = {};
 
   if (runRecordPath && result) {
@@ -274,5 +386,24 @@ function buildSources(
     sources.goal = { value: plan.goal.title, sourcePath: planPath, command: planCommand };
     sources.plan = { value: plan.plan_id, sourcePath: planPath, command: planCommand };
   }
+
+  if (m0.projectionPath && m0.projection) {
+    const proj = m0.projection;
+    const projFacts: Array<[string, string]> = [
+      ['m0_projection_id', proj.projection_id],
+      ['m0_run_status', proj.truth.run_status],
+      ['m0_verification_status', proj.truth.verification_status],
+      ['m0_review_status', proj.truth.review_status],
+      ['m0_human_status', proj.truth.human_status]
+    ];
+    for (const [key, value] of projFacts) {
+      sources[key] = {
+        value,
+        sourcePath: m0.projectionPath,
+        command: m0Command
+      };
+    }
+  }
+
   return sources;
 }
