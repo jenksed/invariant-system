@@ -20,6 +20,92 @@ one adapter identity usable in production and evaluation modes, expose the exact
 adapter implementation digest, provide the bounded CLI invocation surface Bench will
 consume, and repair the dead verification-registry registration (RISK B).
 
+## Observed current state
+At the M2 baseline (`9adcd1f`), the `Kiln.Conformance.Provider` behaviour, the
+`Kiln.Conformance.FirstMonth` constants, the `Kiln.Evidence` producer kinds, and
+the `Kiln.Journal.Entry` operation classes are present as durable substrate. The
+verification registry at `lib/kiln/verification/registry.ex` carries a dead
+`arsenal.wave6-benchmark` entry (RISK B). The CLI request parser carries
+`@supported_commands` for the P1-S01 surface but not for M0 Candidate Invocation.
+
+## Assumptions and unknowns
+- The MiniMax M3 runtime is reachable from the implementation environment at
+  network time (gated by `MINIMAX_API_KEY` presence-only per the authorization
+  scope; absence is a stop condition, never a fallback).
+- The OTP `:httpc` client is sufficient for streaming SSE; if proven otherwise,
+  STOP per the forbidden-paths list (do not add a new Mix dependency).
+- The `Kiln.Store.Canonical` rules and `Kiln.Journal.Entry` operation-class
+  reservation are unchanged across M0.
+
+## Requirements
+- Canonical Candidate Invocation contract for the MiniMax M3 runtime (one
+  adapter identity, production and evaluation modes).
+- Exact `implementation_digest/0` derived from source bytes (stable across BEAM
+  rebuilds unless source changes).
+- Bounded CLI surface: `:candidate_invocation_digest` and `:candidate_invocation`
+  commands following the existing `:supervise` pattern.
+- Verification registry RISK B repair with recurrence-prevention test.
+- `tests/kiln/m0_candidate_invocation_test.exs` covering schema conformance,
+  digest stability, and the three named negative tests
+  (runtime-unavailable, provider-substitution, secret-disclosure).
+- LANE-EVIDENCE.md at the lane branch root on completion.
+
+## Proposed changes
+See `## EXPECTED EDITS (exact)` below — E1 `Kiln.CandidateInvocation` (new), E2
+`Kiln.MinimaxM3Adapter` (new), E3 `lib/kiln/verification/registry.ex` (RISK B
+removal), E4 CLI surface additions, E5 tests.
+
+## Expected files or components
+- `products/kiln/lib/kiln/candidate_invocation.ex` (new)
+- `products/kiln/lib/kiln/minimax_m3_adapter.ex` (new)
+- `products/kiln/lib/kiln/verification/registry.ex` (RISK B edit only)
+- `products/kiln/test/kiln/m0_candidate_invocation_test.exs` (new)
+- `products/kiln/test/kiln/verification/registry_paths_test.exs` (new)
+- `products/kiln/lib/kiln/cli.ex`, `products/kiln/lib/kiln/cli/request.ex`,
+  `products/kiln/lib/kiln/cli/error_map.ex` (E4 wiring only)
+- `LANE-EVIDENCE.md` at the lane branch root (closeout)
+
+## Acceptance criteria
+- All five E1–E5 edits compile under `mix compile --warnings-as-errors`.
+- `mix test test/kiln/m0_candidate_invocation_test.exs test/kiln/verification/registry_paths_test.exs`
+  exits 0.
+- `./invariant test kiln` exits 0 (with `jsonschema` available per
+  SOURCE-PREFLIGHT).
+- `./invariant check boundaries` exits 0 (boundary unchanged from M2).
+- `agent-preflight` on `m0/kiln-01-candidate-invocation` exits 0 against the M3
+  branch head.
+- Adapter implementation digest is recorded in `LANE-EVIDENCE.md` for downstream
+  BENCH-M0-01 consumption.
+- RISK B entry is removed from `lib/kiln/verification/registry.ex`; no other
+  registry entry changes.
+- `LANE-EVIDENCE.md` is present at the lane branch root with `STATUS: ready-to-merge`.
+
+## Deterministic verification
+See `## TEST COMMANDS` below. All commands are network-independent; the
+candidate-invocation test suite uses a function-pointer/mocked `:httpc` wrapper.
+
+## Required completion Evidence
+- adapter implementation digest value (consumed by BENCH-M0-01)
+- Candidate Invocation conformance test log (positive + three negatives)
+- registry diff showing only the dead-entry removal
+- `./invariant test kiln` transcript
+- LANE-EVIDENCE.md at the lane branch root with status and per-test evidence
+
+## Explicit exclusions
+- Generic shell execution, generic provider infrastructure beyond the bounded
+  MiniMax M3 adapter, unrestricted network/repository authority, background
+  processing, automatic deletion, general agent-runtime expansion, unrelated
+  registry redesign, P1-S02-T01 substrate changes outside the RISK B removal,
+  P1-S02-T02 or later work, and any later M0 ticket scope (KILN-M0-02,
+  KILN-M0-03, or beyond). See `## FORBIDDEN PATHS / CHANGES` below for the
+  expanded list.
+
+## Completion record
+See `LANE-EVIDENCE.md` produced at the lane branch root on closeout.
+Status is one of: `ready-to-merge`, `stopped`, `abandoned`. The implementation
+authority is the active `products/kiln/docs/authorizations/KILN-M0-01.authorization`
+record on canonical `main`.
+
 ## START GATE
 SYS-M0-01 merged (M2). `contracts/m0/schemas/candidate-invocation.m0-v1.schema.json`
 present. Worktree based on `main` at M2.
