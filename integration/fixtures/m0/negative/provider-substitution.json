@@ -1,0 +1,6 @@
+{
+  "case": "provider-substitution",
+  "description": "Production invocation resolves a provider/model/adapter different from qualified Profile.",
+  "expected_error": "E_PROFILE_SUBSTITUTION",
+  "fixture_only": true
+}

@@ -1,0 +1,6 @@
+{
+  "case": "unsupported-binary",
+  "description": "Patch targets binary file.",
+  "expected_error": "E_PATCH_UNSUPPORTED_FILE_CLASS",
+  "fixture_only": true
+}

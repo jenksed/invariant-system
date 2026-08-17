@@ -1,0 +1,27 @@
+{
+  "derived_at": "2026-08-16T20:01:00Z",
+  "eligibility": "QUALIFIED",
+  "eligibility_id": "elg_c7ed75a5ad41fbcd8515ffefdccd120d",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "profile_ref": {
+    "digest": "sha256:e278055810586760007ded324d546ffd77eba7ff250e8696320f86793453a038",
+    "id": "prf_e278055810586760007ded324d546ffd"
+  },
+  "qualification_ref": {
+    "digest": "sha256:ab2e94ed410cd89d7bc78caf2683896b4a88272c676a3470b4bee572025f8c5a",
+    "id": "qlf_ab2e94ed410cd89d7bc78caf2683896b"
+  },
+  "role": "REVIEWER",
+  "schema": "engineering-system/eligibility-snapshot/m0-v1",
+  "semantic_digest": "sha256:c7ed75a5ad41fbcd8515ffefdccd120d8f020a2cd2285d2b1fbdadfe067de4ba",
+  "status_event_refs": [
+    {
+      "digest": "sha256:130bb71479f6d47f6aa3d083c64aea0cae10bbd725bbece4f3320cba63a06411",
+      "id": "qse_130bb71479f6d47f6aa3d083c64aea0c"
+    }
+  ],
+  "valid_until": "2026-08-23T20:00:00Z"
+}

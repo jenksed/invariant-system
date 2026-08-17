@@ -1,5 +1,8 @@
 # Simultaneous Launch Readiness
 
+> SUPERSEDED — see program/SUPERSESSION-NOTICE.md.
+> Preserved as provenance; not active authority for monorepo work.
+
 The program manager may recommend launch only when every required box is satisfied.
 
 ## Product and contract gate

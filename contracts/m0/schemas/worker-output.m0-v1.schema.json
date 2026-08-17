@@ -1,0 +1,83 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/worker-output/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assignment_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "attempt_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "output_kind": {
+      "const": "PATCH_CANDIDATE"
+    },
+    "parsed_candidate_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "profile_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "raw_completion_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "schema": {
+      "const": "engineering-system/worker-output/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "worker_output_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "worker_output_id",
+    "semantic_digest",
+    "attempt_ref",
+    "assignment_ref",
+    "profile_ref",
+    "output_kind",
+    "raw_completion_ref",
+    "parsed_candidate_digest"
+  ],
+  "type": "object"
+}

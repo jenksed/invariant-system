@@ -1,0 +1,145 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/run-result-projection/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "human_decision_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "implementer_assignment_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "patch_decision_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "patch_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "projection_id": {
+      "type": "string"
+    },
+    "review_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "reviewer_assignment_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "run_result_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "schema": {
+      "const": "engineering-system/run-result-projection/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "truth": {
+      "additionalProperties": false,
+      "properties": {
+        "human_status": {
+          "enum": [
+            "ACCEPT",
+            "REJECT",
+            "REQUEST_REVISION"
+          ]
+        },
+        "review_status": {
+          "enum": [
+            "APPROVE",
+            "REQUEST_REVISION",
+            "REJECT"
+          ]
+        },
+        "run_status": {
+          "enum": [
+            "completed",
+            "blocked",
+            "cancelled",
+            "failed",
+            "unknown"
+          ]
+        },
+        "unknown_effects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "verification_status": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "TIMEOUT",
+            "ERROR"
+          ]
+        }
+      },
+      "required": [
+        "run_status",
+        "verification_status",
+        "review_status",
+        "human_status",
+        "unknown_effects"
+      ],
+      "type": "object"
+    },
+    "verification_ref": {
+      "$ref": "#/$defs/artifactRef"
+    }
+  },
+  "required": [
+    "schema",
+    "projection_id",
+    "semantic_digest",
+    "run_result_ref",
+    "plan_ref",
+    "implementer_assignment_ref",
+    "patch_ref",
+    "patch_decision_ref",
+    "verification_ref",
+    "reviewer_assignment_ref",
+    "review_ref",
+    "human_decision_ref",
+    "truth"
+  ],
+  "type": "object"
+}

@@ -1,0 +1,6 @@
+{
+  "case": "path-escape",
+  "description": "Patch path escapes repository root.",
+  "expected_error": "E_PATCH_PATH_ESCAPE",
+  "fixture_only": true
+}

@@ -1,0 +1,92 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/verification-result/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "evidence_refs": {
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "patch_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "registered_verifier": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "result_state_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/verification-result/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "TIMEOUT",
+        "ERROR"
+      ]
+    },
+    "verification_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "verification_id",
+    "semantic_digest",
+    "plan_ref",
+    "patch_ref",
+    "result_state_digest",
+    "registered_verifier",
+    "status",
+    "evidence_refs"
+  ],
+  "type": "object"
+}

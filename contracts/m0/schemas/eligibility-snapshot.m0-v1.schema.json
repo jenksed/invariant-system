@@ -1,0 +1,98 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/eligibility-snapshot/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "derived_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "eligibility": {
+      "enum": [
+        "QUALIFIED",
+        "NOT_ELIGIBLE"
+      ]
+    },
+    "eligibility_id": {
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "profile_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "qualification_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "role": {
+      "enum": [
+        "IMPLEMENTER",
+        "REVIEWER"
+      ]
+    },
+    "schema": {
+      "const": "engineering-system/eligibility-snapshot/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "status_event_refs": {
+      "items": {
+        "$ref": "#/$defs/artifactRef"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "valid_until": {
+      "format": "date-time",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "eligibility_id",
+    "semantic_digest",
+    "profile_ref",
+    "role",
+    "qualification_ref",
+    "status_event_refs",
+    "derived_at",
+    "valid_until",
+    "eligibility"
+  ],
+  "type": "object"
+}

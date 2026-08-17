@@ -1,0 +1,24 @@
+{
+  "decision": "ACCEPT",
+  "human_decision_id": "hum_fb81f647a9a575dd97a598c9d346fa6d",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "patch_ref": {
+    "digest": "sha256:5d4a5e68e8e1b6a0be5eebf194e78da635168229d3a857291dbdf9551eb058b7",
+    "id": "pat_5d4a5e68e8e1b6a0be5eebf194e78da6"
+  },
+  "plan_ref": {
+    "digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118",
+    "id": "pln_48e474ac89fbe3d9498c83fb6d4254ba"
+  },
+  "recorded_at": "2026-08-16T20:15:00Z",
+  "result_state_digest": "sha256:5eedf3fa774f0dc44ba024cd71f91d13509e55111d7373dde2c464962715a5a5",
+  "review_ref": {
+    "digest": "sha256:bbd0d94ecb125f2caa587bd8ab4c33bbf9dc60540d17636ba2b883fb652cd3d3",
+    "id": "rev_bbd0d94ecb125f2caa587bd8ab4c33bb"
+  },
+  "schema": "engineering-system/human-decision/m0-v1",
+  "semantic_digest": "sha256:fb81f647a9a575dd97a598c9d346fa6d9c60c70da413134b3e218af83f448ad8"
+}

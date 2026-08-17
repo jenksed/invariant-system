@@ -1,0 +1,23 @@
+{
+  "assignment_id": "asg_25bf8224367a8c0d6ec4fc1d6584d8be",
+  "eligibility_ref": {
+    "digest": "sha256:c7ed75a5ad41fbcd8515ffefdccd120d8f020a2cd2285d2b1fbdadfe067de4ba",
+    "id": "elg_c7ed75a5ad41fbcd8515ffefdccd120d"
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "profile_ref": {
+    "digest": "sha256:e278055810586760007ded324d546ffd77eba7ff250e8696320f86793453a038",
+    "id": "prf_e278055810586760007ded324d546ffd"
+  },
+  "requirement_ref": {
+    "digest": "sha256:fa4d43ed807fd2c6885aab05b7610c2f4816fe9e154051cfed60cd458752165d",
+    "id": "req_fa4d43ed807fd2c6885aab05b7610c2f"
+  },
+  "role": "REVIEWER",
+  "schema": "engineering-system/intelligence-assignment/m0-v1",
+  "selection_rule": "FILTER_QUALIFIED_THEN_LEXICAL_PROFILE_DIGEST",
+  "semantic_digest": "sha256:25bf8224367a8c0d6ec4fc1d6584d8be1c8339efdf3db771d49b46060075f159"
+}

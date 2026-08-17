@@ -1,0 +1,6 @@
+{
+  "case": "authority-smuggling-requirement",
+  "description": "Requirement carries authority_grant field.",
+  "expected_error": "E_AUTHORITY_FIELD_FORBIDDEN",
+  "fixture_only": true
+}

@@ -1,0 +1,70 @@
+{
+  "authority_requests": [
+    {
+      "capability": "repository.read",
+      "scope": "bounded-plan-scope"
+    },
+    {
+      "capability": "patch.propose",
+      "scope": "bounded-plan-scope"
+    }
+  ],
+  "capability": {
+    "contract_version": "m0-v1",
+    "id": "software-change",
+    "method_provenance": [
+      "arsenal/software-change-implementer/m0-v1"
+    ]
+  },
+  "constraints": {
+    "must": [
+      "propose exact after-images",
+      "use registered verification"
+    ],
+    "must_not": [
+      "mutate before exact human approval",
+      "commit/push/merge"
+    ]
+  },
+  "context_refs": [
+    "artifact:engineering-system/execution-binding/m0-v1:sha256:93d1132ef251bf363d9a3d9e8d03284341b804c695bf61b94572ea4b223eaade"
+  ],
+  "created_at": "2026-08-16T20:02:00Z",
+  "goal": {
+    "success_conditions": [
+      "E_QUALIFICATION_NOT_CURRENT is produced",
+      "positive fixtures remain valid"
+    ],
+    "title": "Reject stale qualification in M0 conformance"
+  },
+  "producer": {
+    "product": "loadout",
+    "version": "m0-v1"
+  },
+  "project_state": {
+    "base_commit": "5dcb5d274350f9a23b0bb332c7ee20e81de66e28",
+    "repository": "jenksed/engineering-system",
+    "workspace_state_digest": "sha256:88ab445ed9bdc1fa8cd336cf6c3cd58d35d12864550f609ee496886c04f6c30a"
+  },
+  "proof_obligations": [
+    {
+      "id": "m0-stale-rejected",
+      "kind": "evidence",
+      "requirement": "registered M0 validator returns E_QUALIFICATION_NOT_CURRENT"
+    }
+  ],
+  "schema": "engineering-system/work-envelope/v0",
+  "scope": {
+    "excluded": [
+      ".git/**",
+      "binary files",
+      "symlinks",
+      "secrets"
+    ],
+    "included": [
+      "fixtures/m0/negative/qualification-stale-rejected.json",
+      "fixtures/m0/manifest.json"
+    ]
+  },
+  "work_id": "pass02-dogfood-stale-qualification-001"
+}

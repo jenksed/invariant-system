@@ -1,0 +1,29 @@
+{
+  "context_requirements": [
+    "plan",
+    "bounded target files",
+    "registered validator contract"
+  ],
+  "disclosure_class": "REMOTE_BY_EXPLICIT_MANIFEST",
+  "independence": {
+    "must_not_receive_implementer_transcript": true,
+    "must_use_separate_context_manifest": true
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "plan_ref": {
+    "digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118",
+    "id": "pln_48e474ac89fbe3d9498c83fb6d4254ba"
+  },
+  "required_capabilities": [
+    "bounded_repository_read",
+    "patch_proposal"
+  ],
+  "requirement_id": "req_073b253439da8ec5a3447d6ba998649c",
+  "role": "IMPLEMENTER",
+  "schema": "engineering-system/intelligence-requirement/m0-v1",
+  "semantic_digest": "sha256:073b253439da8ec5a3447d6ba998649cf52c9bfd643b05193c071f7081107411",
+  "task_kind": "SOFTWARE_CHANGE"
+}

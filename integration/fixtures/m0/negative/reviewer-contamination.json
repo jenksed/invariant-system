@@ -1,0 +1,6 @@
+{
+  "case": "reviewer-contamination",
+  "description": "Reviewer context includes Implementer transcript.",
+  "expected_error": "E_REVIEWER_CONTEXT_CONTAMINATED",
+  "fixture_only": true
+}

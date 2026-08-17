@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/intelligence-assignment/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assignment_id": {
+      "type": "string"
+    },
+    "eligibility_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "profile_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "requirement_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "role": {
+      "enum": [
+        "IMPLEMENTER",
+        "REVIEWER"
+      ]
+    },
+    "schema": {
+      "const": "engineering-system/intelligence-assignment/m0-v1"
+    },
+    "selection_rule": {
+      "const": "FILTER_QUALIFIED_THEN_LEXICAL_PROFILE_DIGEST"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "assignment_id",
+    "semantic_digest",
+    "requirement_ref",
+    "profile_ref",
+    "eligibility_ref",
+    "role",
+    "selection_rule"
+  ],
+  "type": "object"
+}

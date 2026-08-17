@@ -1,0 +1,33 @@
+{
+  "evidence_refs": [
+    {
+      "digest": "sha256:5ef9340754074771a8e9ed53c65599df198e12bf5bc3dfddb3e632f00e17ce63",
+      "id": "app_5ef9340754074771a8e9ed53c65599df"
+    },
+    {
+      "digest": "sha256:5815de2da12086a97b36e40dc27890e5d2147ab9a311767e874e8e742882c0fc",
+      "id": "fixture-evidence/m0-validator-pass"
+    }
+  ],
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "patch_ref": {
+    "digest": "sha256:5d4a5e68e8e1b6a0be5eebf194e78da635168229d3a857291dbdf9551eb058b7",
+    "id": "pat_5d4a5e68e8e1b6a0be5eebf194e78da6"
+  },
+  "plan_ref": {
+    "digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118",
+    "id": "pln_48e474ac89fbe3d9498c83fb6d4254ba"
+  },
+  "registered_verifier": {
+    "digest": "sha256:b7baa102592d86d394f95598f90e720afcd23a3d54574d43498f621bab8932d7",
+    "id": "engineering-system/m0-validator-v1"
+  },
+  "result_state_digest": "sha256:5eedf3fa774f0dc44ba024cd71f91d13509e55111d7373dde2c464962715a5a5",
+  "schema": "engineering-system/verification-result/m0-v1",
+  "semantic_digest": "sha256:ca3c60dcb20fa8cd04df7b8662d5183e7693ea2f2bd4b2b640973058d64038f7",
+  "status": "PASS",
+  "verification_id": "ver_ca3c60dcb20fa8cd04df7b8662d5183e"
+}

@@ -1,0 +1,197 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/intelligence-profile/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adapter": {
+      "additionalProperties": false,
+      "properties": {
+        "contract": {
+          "const": "engineering-system/candidate-invocation/m0-v1"
+        },
+        "implementation_digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "implementation_ref": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "contract",
+        "implementation_ref",
+        "implementation_digest"
+      ],
+      "type": "object"
+    },
+    "context_policy": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "model": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "const": "MiniMax-M3"
+        },
+        "immutable_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision_kind": {
+          "enum": [
+            "PROVIDER_ALIAS",
+            "IMMUTABLE_ARTIFACT"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "revision_kind",
+        "immutable_revision"
+      ],
+      "type": "object"
+    },
+    "profile_id": {
+      "type": "string"
+    },
+    "provider": {
+      "additionalProperties": false,
+      "properties": {
+        "api_family": {
+          "const": "openai-compatible-chat-completions"
+        },
+        "endpoint": {
+          "const": "https://api.minimax.io/v1/chat/completions"
+        },
+        "id": {
+          "const": "minimax"
+        },
+        "locality": {
+          "const": "REMOTE"
+        },
+        "provider_profile": {
+          "const": "minimax-m3-openai/v1"
+        },
+        "trust_boundary": {
+          "const": "REMOTE_PROVIDER"
+        }
+      },
+      "required": [
+        "id",
+        "provider_profile",
+        "api_family",
+        "endpoint",
+        "locality",
+        "trust_boundary"
+      ],
+      "type": "object"
+    },
+    "role": {
+      "enum": [
+        "IMPLEMENTER",
+        "REVIEWER"
+      ]
+    },
+    "role_package": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "runtime": {
+      "additionalProperties": false,
+      "properties": {
+        "credential_slot": {
+          "const": "MINIMAX_API_KEY"
+        },
+        "fallback": {
+          "const": "NONE"
+        },
+        "max_input_tokens": {
+          "const": 32000
+        },
+        "reasoning_split": {
+          "const": true
+        },
+        "service_tier": {
+          "const": "standard"
+        },
+        "stream": {
+          "const": true
+        }
+      },
+      "required": [
+        "stream",
+        "reasoning_split",
+        "service_tier",
+        "fallback",
+        "max_input_tokens",
+        "credential_slot"
+      ],
+      "type": "object"
+    },
+    "schema": {
+      "const": "engineering-system/intelligence-profile/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "system_config": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "tool_policy": {
+      "$ref": "#/$defs/artifactRef"
+    }
+  },
+  "required": [
+    "schema",
+    "profile_id",
+    "semantic_digest",
+    "role",
+    "provider",
+    "model",
+    "adapter",
+    "role_package",
+    "system_config",
+    "context_policy",
+    "tool_policy",
+    "runtime"
+  ],
+  "type": "object"
+}

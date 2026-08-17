@@ -1,0 +1,80 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/attempt/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "assignment_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "attempt_id": {
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "ordinal": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "reason": {
+      "enum": [
+        "INITIAL_EXECUTION",
+        "INFRASTRUCTURE_RETRY",
+        "ASSIGNMENT_REPLACEMENT",
+        "PATCH_REVISION"
+      ]
+    },
+    "run_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "schema": {
+      "const": "engineering-system/attempt/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "attempt_id",
+    "semantic_digest",
+    "run_ref",
+    "assignment_ref",
+    "ordinal",
+    "reason"
+  ],
+  "type": "object"
+}

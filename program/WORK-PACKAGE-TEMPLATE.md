@@ -3,9 +3,9 @@
 ## Identity
 
 - ID:
-- Repository:
-- Starting SHA:
-- Branch:
+- Owner domain:
+- Base condition (monorepo merge gate):
+- Branch (m0/<package>):
 - Contract versions:
 
 ## Objective
@@ -48,7 +48,7 @@ The dependency or product proof this unlocks.
 
 ## Stop conditions
 
-- HEAD mismatch
+- base drift vs current main
 - missing authority
 - contract incompatibility
 - required scope widening
@@ -56,7 +56,7 @@ The dependency or product proof this unlocks.
 
 ## Required closeout
 
-- start/end SHA;
+- base/merge commit (single Git root);
 - changed files;
 - verification evidence;
 - contract impact;

@@ -1,0 +1,19 @@
+{
+  "assignment_ref": {
+    "digest": "sha256:58353a808270d002a61728f3b532bae3e7505c500ad8c4b4663cd3286f3849e6",
+    "id": "asg_58353a808270d002a61728f3b532bae3"
+  },
+  "attempt_id": "att_c08eb040b13c48d265a6819cc6f221cb",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "ordinal": 1,
+  "reason": "INITIAL_EXECUTION",
+  "run_ref": {
+    "digest": "sha256:16cefe2839274cba642a48b2db5fa1431c587335153df1a3311e9144bf2bebe5",
+    "id": "rbd_16cefe2839274cba642a48b2db5fa143"
+  },
+  "schema": "engineering-system/attempt/m0-v1",
+  "semantic_digest": "sha256:c08eb040b13c48d265a6819cc6f221cbc883dee6390dccf1d8224c6e47a4fa3f"
+}

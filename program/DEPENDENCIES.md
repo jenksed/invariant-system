@@ -1,5 +1,8 @@
 # Cross-Repository Dependency Map
 
+> SUPERSEDED — see program/SUPERSESSION-NOTICE.md.
+> Preserved as provenance; not active authority for monorepo work.
+
 ## Launch dependency order
 
 1. [x] Accept Decision 0001.

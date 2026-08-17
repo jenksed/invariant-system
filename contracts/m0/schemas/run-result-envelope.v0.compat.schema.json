@@ -1,0 +1,145 @@
+{
+  "$id": "engineering-system/run-result-envelope/v0",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "acceptance_readiness": {
+      "additionalProperties": false,
+      "properties": {
+        "ready": {
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ready",
+        "reasons"
+      ],
+      "type": "object"
+    },
+    "authority": {
+      "additionalProperties": false,
+      "properties": {
+        "denied": {
+          "type": "array"
+        },
+        "granted": {
+          "type": "array"
+        },
+        "requested": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "requested",
+        "granted",
+        "denied"
+      ],
+      "type": "object"
+    },
+    "effects": {
+      "type": "array"
+    },
+    "evidence": {
+      "type": "array"
+    },
+    "final_state": {
+      "additionalProperties": false,
+      "properties": {
+        "commit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "workspace_state_digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "commit",
+        "workspace_state_digest"
+      ],
+      "type": "object"
+    },
+    "input_state": {
+      "additionalProperties": false,
+      "properties": {
+        "base_commit": {
+          "type": "string"
+        },
+        "workspace_state_digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "base_commit",
+        "workspace_state_digest"
+      ],
+      "type": "object"
+    },
+    "proof_obligations": {
+      "additionalProperties": false,
+      "properties": {
+        "invalidated": {
+          "type": "array"
+        },
+        "satisfied": {
+          "type": "array"
+        },
+        "unsatisfied": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "satisfied",
+        "unsatisfied",
+        "invalidated"
+      ],
+      "type": "object"
+    },
+    "recovery": {},
+    "run_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/run-result-envelope/v0"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "blocked",
+        "cancelled",
+        "failed",
+        "unknown"
+      ]
+    },
+    "unknowns": {
+      "type": "array"
+    },
+    "work_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "work_id",
+    "run_id",
+    "status",
+    "input_state",
+    "final_state",
+    "authority",
+    "effects",
+    "evidence",
+    "proof_obligations",
+    "unknowns",
+    "recovery",
+    "acceptance_readiness"
+  ],
+  "type": "object"
+}
