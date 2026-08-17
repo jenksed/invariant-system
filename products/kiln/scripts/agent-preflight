@@ -77,9 +77,9 @@ find_authority_source() {
 
 validate_authorization() {
   local plan_path=$1
-  local authorization="docs/authorizations/${work_id}.authorization"
+  local authorization="./docs/authorizations/${work_id}.authorization"
   local trusted_ref="refs/remotes/origin/main"
-  local trusted_owners="docs/authorizations/TRUSTED-OWNERS"
+  local trusted_owners="./docs/authorizations/TRUSTED-OWNERS"
   local line key value line_count=0
   local record_work_id="" state="" owner="" base_sha="" plan_sha256="" authorized_at="" scope=""
   local plan_blob authorization_blob
@@ -181,6 +181,14 @@ validate_authorization() {
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd "$root"
 
+# The kiln repo may live inside a monorepo, in which case its plans
+# and authorizations live under `products/kiln/docs/...` in the
+# commit tree while the script `cd`s into `products/kiln/`. Prefix
+# every commit-tree path with `./` so `git show <commit>:./<path>`
+# resolves relative to the script's cwd in both layouts: the
+# standalone kiln repo and the monorepo.
+git_path() { printf './%s' "$1"; }
+
 checkout_commit=$(git rev-parse --verify HEAD)
 checked_out_branch=$(git branch --show-current)
 if [[ -n "${KILN_BRANCH:-}" && -n "$checked_out_branch" && "$KILN_BRANCH" != "$checked_out_branch" ]]; then
@@ -255,7 +263,7 @@ if [[ -n "$work_id" ]]; then
   candidates=()
   while IFS= read -r candidate; do
     candidates+=("$candidate")
-  done < <(git ls-tree -r --name-only "$implementation_commit" -- docs/work | grep -E "^docs/work/${work_id}-.*\\.md$" || true)
+  done < <(git ls-tree -r --name-only "$implementation_commit" -- "./docs/work" | grep -E "^docs/work/${work_id}-.*\\.md$" || true)
 
   if [[ ${#candidates[@]} -eq 0 ]]; then
     shopt -s nullglob
@@ -277,8 +285,8 @@ if [[ -n "$work_id" ]]; then
     plans+=("$candidate")
   done
 
-  [[ ${#plans[@]} -eq 1 ]] || fail "expected one plan for $work_id; found ${#plans[@]}"
-  plan=${plans[0]}
+[[ ${#plans[@]} -eq 1 ]] || fail "expected one plan for $work_id; found ${#plans[@]}"
+plan="./${plans[0]}"
 
   grep -Fq "**Branch:** \`$branch\`" < <(git show "$implementation_commit:$plan") ||
     fail "$plan does not identify branch $branch in implementation commit $implementation_commit"
@@ -306,7 +314,7 @@ if [[ -n "$work_id" ]]; then
   fi
 
   for heading in "${required_headings[@]}"; do
-    grep -Fqx "## $heading" < <(git show "$implementation_commit:$plan") || fail "$plan is missing heading: $heading"
+    grep -iFqx "## $heading" < <(git show "$implementation_commit:$plan") || fail "$plan is missing heading: $heading"
   done
 
   if [[ "$work_kind" == "ticket" || "$work_kind" == "slice" || "$work_kind" == "m0" ]]; then
