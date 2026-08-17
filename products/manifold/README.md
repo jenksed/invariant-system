@@ -43,7 +43,11 @@ Manifold must not:
 
 ## Status
 
-Boundary only. No runtime implementation exists yet. Manifold becomes real
-when Invariant Development Loop v0 needs selection among more than one
-qualified intelligence configuration; until then this directory exists to
-keep selection semantics out of the other products.
+Activated selection-only runtime: `src/selector.py` + `tests/test_selector.py`;
+boundary enforced by `./invariant check boundaries`. The selector is
+stdlib-only data in/out — no process, network, environment, or sibling-product
+surface — and Manifold still owns no execution authority, mutation, qualification,
+or orchestration. Manifold continues to grow only when Invariant Development
+Loop v0 needs selection among more than one qualified intelligence
+configuration; the activated surface here is the minimal runtime allowed to
+support that bounded decision.

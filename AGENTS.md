@@ -25,8 +25,15 @@ completion requires evidence; test the property, not the proxy.
   Kiln is the only execution truth.
 - `products/temper` — operator experience. Read-only projection; never an
   authority or mutation surface.
-- `products/manifold` — intelligence selection. **Boundary documentation
-  only.** Do not add a runtime here without an explicit milestone.
+- `products/manifold` — intelligence selection. **BT-01 activated selection-only
+  surface:** `src/selector.py` and `tests/test_selector.py` are the only permitted
+  runtime files; all other files under `products/manifold/` must be `*.md`. The
+  selector must be stdlib-only (no subprocess / socket / urllib / requests /
+  http.client / asyncio / multiprocessing / ctypes / `import os` imports) and must
+  not reach into sibling product source trees. Enforced by
+  `./invariant check boundaries` rule 3 (replacing the prior documentation-only
+  rule). Authority, mutation, qualification, and orchestration remain forbidden
+  here; Manifold selects, never executes.
 - `contracts/` — canonical cross-product contract specs. Schema identity
   strings like `engineering-system/work-envelope/v0` are stable
   identifiers — do not rename them.
