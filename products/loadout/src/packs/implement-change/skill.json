@@ -1,0 +1,5 @@
+{
+  "id": "implement-change/execution-binding",
+  "qmrFixturePath": "fixtures/implement-change-method-record.v0.yaml",
+  "procedureEntry": "./run.ts"
+}

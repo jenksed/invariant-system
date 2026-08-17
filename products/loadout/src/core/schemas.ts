@@ -466,5 +466,100 @@ export const LoadoutPlanV1Schema = LoadoutPlanV0Schema.omit({
   verification_change: VerificationChangeV0Schema
 });
 export type LoadoutPlanV1 = z.infer<typeof LoadoutPlanV1Schema>;
-export const LoadoutPlanSchema = z.union([LoadoutPlanV0Schema, LoadoutPlanV1Schema]);
+
+/**
+ * M0 contract ref shape used by Loadout Plan v2 to bind to
+ * `engineering-system/...` M0 artifacts (Plan v1, Intelligence
+ * Requirement, Execution Binding). Mirrors the `$defs/artifactRef`
+ * declared by every m0-v1 schema under `contracts/m0/schemas/`.
+ */
+export const M0ArtifactRefSchema = z.object({
+  id: z.string().min(1),
+  digest: z.string().regex(/^sha256:[0-9a-f]{64}$/)
+});
+export type M0ArtifactRef = z.infer<typeof M0ArtifactRefSchema>;
+
+/**
+ * `engineering-system/intelligence-requirement/m0-v1` schema mirror.
+ * Loadout does NOT import the engineering-system repo; this is a
+ * byte-identical mirror of the canonical M0 schema (closed-shape,
+ * no authority-granting field representable). The mirror is verified
+ * against the canonical schema via the M0 conformance validator.
+ */
+export const M0IntelligenceRequirementRoleSchema = z.enum(['IMPLEMENTER', 'REVIEWER']);
+export type M0IntelligenceRequirementRole = z.infer<typeof M0IntelligenceRequirementRoleSchema>;
+
+export const M0IntelligenceRequirementDisclosureSchema = z.enum([
+  'REMOTE_BY_EXPLICIT_MANIFEST',
+  'LOCAL_ONLY'
+]);
+export type M0IntelligenceRequirementDisclosure = z.infer<
+  typeof M0IntelligenceRequirementDisclosureSchema
+>;
+
+export const M0IntelligenceRequirementSchema = z.object({
+  schema: z.literal('engineering-system/intelligence-requirement/m0-v1'),
+  requirement_id: z.string().min(1),
+  semantic_digest: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  plan_ref: M0ArtifactRefSchema,
+  role: M0IntelligenceRequirementRoleSchema,
+  task_kind: z.literal('SOFTWARE_CHANGE'),
+  required_capabilities: z.array(z.string()).min(1),
+  context_requirements: z.array(z.string()),
+  disclosure_class: M0IntelligenceRequirementDisclosureSchema,
+  independence: z.object({
+    must_not_receive_implementer_transcript: z.literal(true),
+    must_use_separate_context_manifest: z.literal(true),
+    must_differ_from_assignment_ref: M0ArtifactRefSchema.optional()
+  })
+});
+export type M0IntelligenceRequirement = z.infer<typeof M0IntelligenceRequirementSchema>;
+
+/**
+ * `engineering-system/execution-binding/m0-v1` schema mirror.
+ * Content-addressed artifact binding Plan + Intelligence Requirements +
+ + Kiln-side authority/disclosure/policy artifacts.
+ */
+export const M0ExecutionBindingSchema = z.object({
+  schema: z.literal('engineering-system/execution-binding/m0-v1'),
+  binding_id: z.string().min(1),
+  semantic_digest: z.string().regex(/^sha256:[0-9a-f]{64}$/),
+  plan_ref: M0ArtifactRefSchema,
+  requirement_ref: M0ArtifactRefSchema,
+  assignment_ref: M0ArtifactRefSchema.optional(),
+  profile_ref: M0ArtifactRefSchema,
+  eligibility_ref: M0ArtifactRefSchema,
+  disclosure_policy_ref: M0ArtifactRefSchema,
+  patch_policy_ref: M0ArtifactRefSchema,
+  contract_set_ref: M0ArtifactRefSchema
+});
+export type M0ExecutionBinding = z.infer<typeof M0ExecutionBindingSchema>;
+
+/**
+ * Plan v2 — the bounded change plan projection.
+ *
+ * Additive over v0 like v1; carries an `implement_change` ref block in
+ * place of `repository_recon` / `verification_change`. The block
+ * carries the M0 plan identity, the bounded Execution Binding, and the
+ * Implementer/Reviewer Intelligence Requirements. The Work Envelope
+ * is unchanged at the v0 contract level; this plan just adds M0
+ * references on top.
+ */
+export const LoadoutPlanV2Schema = LoadoutPlanV0Schema.omit({
+  schema: true,
+  repository_recon: true
+}).extend({
+  schema: z.literal('loadout/plan/v2'),
+  implement_change: z.object({
+    m0_plan_ref: M0ArtifactRefSchema,
+    m0_execution_binding: M0ExecutionBindingSchema,
+    m0_intelligence_requirements: z.array(M0IntelligenceRequirementSchema).min(1)
+  })
+});
+export type LoadoutPlanV2 = z.infer<typeof LoadoutPlanV2Schema>;
+export const LoadoutPlanSchema = z.union([
+  LoadoutPlanV0Schema,
+  LoadoutPlanV1Schema,
+  LoadoutPlanV2Schema
+]);
 export type LoadoutPlan = z.infer<typeof LoadoutPlanSchema>;

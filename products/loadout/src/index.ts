@@ -81,7 +81,8 @@ export {
   formatPlanText,
   computePlanId,
   computeWorkEnvelopeDigest,
-  canonicalize
+  canonicalize,
+  computeSemanticDigest
 } from './core/plan';
 export type {
   CompileLoadoutPlanArgs,
@@ -96,6 +97,20 @@ export {
   PlanStaleError,
   PlanProcedureBindingError
 } from './core/plan';
+
+export {
+  buildImplementerRequirement,
+  buildReviewerRequirement,
+  verifyIntelligenceRequirementDigest,
+  IntelligenceRequirementError
+} from './core/intelligence-requirement';
+
+export {
+  buildExecutionBinding,
+  executionBindingContextRef,
+  verifyExecutionBindingDigest,
+  ExecutionBindingError
+} from './core/execution-binding';
 
 export {
   resolveProcedure,
@@ -117,6 +132,7 @@ export type {
   LoadoutPlan,
   LoadoutPlanV0,
   LoadoutPlanV1,
+  LoadoutPlanV2,
   PlanCompatibilityV0,
   PlanMethodProvenanceV0,
   PlanProcedureBindingV0,
@@ -129,7 +145,12 @@ export type {
   UnknownV1,
   RepositoryStateObservationV1,
   VerificationChangeV0,
-  VerificationCommandV0
+  VerificationCommandV0,
+  M0ArtifactRef,
+  M0IntelligenceRequirement,
+  M0IntelligenceRequirementRole,
+  M0IntelligenceRequirementDisclosure,
+  M0ExecutionBinding
 } from './core/schemas';
 export { ReconResultV1Schema, ReconResultV2Schema, ReconResultSchema } from './core/schemas';
 
@@ -145,3 +166,11 @@ export type {
   Unknown as ReconUnknown,
   RepositoryStateObservation
 } from './packs/repository-recon/run';
+
+/**
+ * Programmatic entry point for the implement-change pack. The pack
+ * produces a content-addressed M0 Execution Binding and the two
+ * M0 Intelligence Requirements (IMPLEMENTER + REVIEWER).
+ */
+export { runImplementChange } from './packs/implement-change/run';
+export type { ImplementChangeArgs, ImplementChangeArtifacts } from './packs/implement-change/run';

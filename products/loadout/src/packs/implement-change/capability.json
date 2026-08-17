@@ -1,0 +1,23 @@
+{
+  "schema": "loadout/capability-contract/v0",
+  "id": "implement-change",
+  "contract_version": "0.1.0",
+  "goal_outcome": "implement-a-bounded-change",
+  "inputs": ["plan", "implementer-intent", "bounded-repository-state"],
+  "outputs": ["content-addressed-execution-binding", "intelligence-requirements"],
+  "effects": ["none-loadout-side"],
+  "evidence_expectations": [
+    "plan_ref, requirement_ref, profile_ref, eligibility_ref, and policy refs are content-addressed sha256 references",
+    "execution_binding.semantic_digest propagates into the Work Envelope context_refs",
+    "no authority-granting field is representable in the binding, the requirements, or the plan v2"
+  ],
+  "failure_shape": [
+    "blocked: a required content reference is missing or has stale digest",
+    "blocked: an authority-granting field was attempted (closed-schema rejection)",
+    "blocked: implementer and reviewer intelligence requirements share an assignment ref (self-review rejected)"
+  ],
+  "compatibility": {
+    "min_method_status": "experimental",
+    "accepted_contexts": ["local-git-repository"]
+  }
+}

@@ -27,6 +27,17 @@ export const GOAL_CATALOGUE: ReadonlyArray<Goal> = [
       'report READY only when every required obligation has durable satisfying Evidence'
     ],
     capabilityId: 'verify-change'
+  },
+  {
+    id: 'implement-a-bounded-change',
+    title: 'Implement a bounded change',
+    successConditions: [
+      'compile a content-addressed Plan v2 with M0 Execution Binding and Implementer/Reviewer Intelligence Requirements',
+      'embed the Execution Binding in the Work Envelope context_refs so Kiln can validate the identity',
+      'forbid authority smuggling in the Plan, Binding, and Requirements (closed-shape schemas)',
+      'report READY only when the Binding semantic_digest propagates into the Work Envelope digest'
+    ],
+    capabilityId: 'implement-change'
   }
 ];
 

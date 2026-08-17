@@ -1,0 +1,14 @@
+{
+  "id": "implement-change",
+  "version": "0.1.0",
+  "sourcePath": "src/packs/implement-change",
+  "capability": {
+    "id": "implement-change",
+    "contract_version": "0.1.0"
+  },
+  "skill": {
+    "id": "implement-change/execution-binding",
+    "qmr_fixture": "fixtures/implement-change-method-record.v0.yaml"
+  },
+  "description": "Implement a bounded change: produce a content-addressed M0 Execution Binding and Intelligence Requirements for an implement-change Plan."
+}

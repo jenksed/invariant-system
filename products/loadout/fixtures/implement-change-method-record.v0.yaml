@@ -1,0 +1,25 @@
+schema: engineering-system/qualified-method-record/v0
+method_id: implement-change-fixture-v0
+method_version: '0.1.0'
+status: experimental
+qualified_for:
+  outcome: implement-a-bounded-change
+  contexts:
+    - local-git-repository
+  exclusions: []
+inputs:
+  - bounded-plan-v2
+  - execution-binding
+outputs:
+  - intelligence-requirements
+procedure_ref: implement-change-fixture-v0
+evaluation:
+  evidence_refs: []
+  models: []
+  repositories: []
+  observed_strengths: []
+  observed_failures: []
+  confidence: '0.0'
+provenance:
+  record_digest: 'sha256:0000000000000000000000000000000000000000000000000000000000000000'
+  arsenal_commit: '0000000000000000000000000000000000000000000000000000000000000000'
