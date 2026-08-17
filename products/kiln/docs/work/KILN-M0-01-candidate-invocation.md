@@ -1,5 +1,13 @@
 # KILN-M0-01
 
+**Document type:** Implementation plan
+**Status:** Accepted (Pass-04 refined work package, byte-exact copy of program/recursive-planning/pass-04/planning/30-day/work-packages/KILN-M0-01.md)
+**Branch:** `m0/kiln-01-candidate-invocation`
+**Owner domain:** Kiln
+**Merge gate:** M3
+**Base condition (monorepo merge gate):** M1 (SYS-M0-00, `18f5c9e`) and M2 (SYS-M0-01, `73a62ef`) and M2-merge (`9adcd1f`) and governance commit (`587867c`) all merged on canonical `main` before this branch opens.
+**Contract versions:** `engineering-system/candidate-invocation/m0-v1` (M0 packet byte-exact, ratified at M2 under `contracts/m0/schemas/candidate-invocation.m0-v1.schema.json`).
+
 ## ID
 `KILN-M0-01`
 
