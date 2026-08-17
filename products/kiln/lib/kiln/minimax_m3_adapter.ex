@@ -236,19 +236,6 @@ defmodule Kiln.MinimaxM3Adapter do
     Application.get_env(:kiln, :minimax_http_dispatch, &:httpc.request/1)
   end
 
-  defp canonicalize_request(%CandidateInvocation{} = request) do
-    %{
-      invocation_id: request.invocation_id,
-      mode: Atom.to_string(request.mode),
-      profile_ref: request.profile_ref,
-      context_manifest_ref: request.context_manifest_ref,
-      tool_policy_ref: request.tool_policy_ref,
-      timeout_ms: request.timeout_ms,
-      output_contract: Atom.to_string(request.output_contract),
-      failure_classification: request.failure_classification
-    }
-  end
-
   defp read_source!(module) do
     rel =
       module
