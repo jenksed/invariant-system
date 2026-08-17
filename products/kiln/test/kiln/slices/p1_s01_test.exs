@@ -221,7 +221,6 @@ defmodule Kiln.Slices.P1S01Test do
         ~r/^Elixir\.Kiln\.FakeProvider/,
         ~r/^Elixir\.Kiln\.Context/,
         ~r/^Elixir\.Kiln\.Tool/,
-        ~r/^Elixir\.Kiln\.Patch/,
         ~r/^Elixir\.Kiln\.Mutation/,
         ~r/^Elixir\.Kiln\.Receipt/,
         ~r/^Elixir\.Kiln\.Release/,
@@ -233,8 +232,26 @@ defmodule Kiln.Slices.P1S01Test do
         ~r/^Elixir\.Kiln\.Pack/
       ]
 
+      # M8 (KILN-M0-02) authorizes `Kiln.PatchProposal` and
+      # `Kiln.PatchService` as the bounded current-state patch layer.
+      # These are NOT deferred subsystems; they are the canonical M0
+      # patch subsystem owned by the lane. The M0-deferred "Patch"
+      # namespace (provider-aware patch intelligence, broad patch
+      # mutation beyond the bounded first contract) remains future work.
+      # The forbidden `~r/^Elixir\.Kiln\.Patch/` would have flagged both
+      # legitimate and deferred namespaces; the explicit allow-list keeps
+      # the architecture-policing test honest.
+      allowed_patch_modules = [
+        Kiln.PatchProposal,
+        Kiln.PatchService,
+        Kiln.M0PatchProposal,
+        Kiln.M0PatchDecision,
+        Kiln.M0PatchEvidence
+      ]
+
       offenders =
         for module <- kiln_modules(),
+            module not in allowed_patch_modules,
             name = Atom.to_string(module),
             Enum.any?(forbidden, &Regex.match?(&1, name)),
             do: name
@@ -306,6 +323,11 @@ defmodule Kiln.Slices.P1S01Test do
       # CLI surface; these are authorized by
       # `docs/authorizations/KILN-M0-01.authorization` and ship with the
       # KILN-M0-01-CLI-CLOSURE (M6-FIX) corrective lane.
+      # KILN-M0-02 (M8) adds `:worker_propose`, `:patch_decide`,
+      # `:patch_apply`, `:patch_recover` for the bounded IMPLEMENTER
+      # patch loop; these are authorized by the canonical
+      # KILN-M0-02 authorization record (derived from M3 + ADR-0024)
+      # and ship with this lane.
       assert Enum.sort(Kiln.CLI.Request.commands()) ==
                Enum.sort([
                  :start,
@@ -315,7 +337,11 @@ defmodule Kiln.Slices.P1S01Test do
                  :resume,
                  :supervise,
                  :candidate_invocation,
-                 :candidate_invocation_digest
+                 :candidate_invocation_digest,
+                 :worker_propose,
+                 :patch_decide,
+                 :patch_apply,
+                 :patch_recover
                ])
     end
 
@@ -344,6 +370,7 @@ defmodule Kiln.Slices.P1S01Test do
             path != "lib/kiln/work_envelope_loader.ex",
             path != "lib/kiln/candidate_invocation_loader.ex",
             path != "lib/kiln/minimax_m3_adapter.ex",
+            path != "lib/kiln/m0_command_loader.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),

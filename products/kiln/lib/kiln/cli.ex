@@ -67,6 +67,10 @@ defmodule Kiln.CLI do
       :supervise -> run_supervise(request)
       :candidate_invocation -> run_candidate_invocation(request)
       :candidate_invocation_digest -> run_candidate_invocation_digest(request)
+      :worker_propose -> run_worker_propose(request)
+      :patch_decide -> run_patch_decide(request)
+      :patch_apply -> run_patch_apply(request)
+      :patch_recover -> run_patch_recover(request)
     end
   end
 
@@ -90,6 +94,325 @@ defmodule Kiln.CLI do
      Result.ok("candidate-invocation-digest",
        data: %{"adapter_implementation_digest" => digest}
      )}
+  end
+
+  # -- command: worker-propose --
+  #
+  # KILN-M0-02 E2/E5: bounded IMPLEMENTER attempt driven by an
+  # Intelligence Assignment. The CLI is the consumer-visible surface;
+  # Worker.validate_binding/3 enforces dispatch-time qualification
+  # revalidation. Worker.propose/5 emits the canonical Worker
+  # Output envelope; the CLI also writes the bounded after-image
+  # content blobs to the artifact store.
+  defp run_worker_propose(%Request{options: opts}) do
+    with {:ok, assignment} <- load_json(opts["assignment"], "assignment"),
+         {:ok, eligibility} <- load_json(opts["eligibility"], "eligibility"),
+         {:ok, request_attrs} <- load_json(opts["request"], "request"),
+         {:ok, plan_ref} <- load_plan_ref(opts["plan"]),
+         profile_digest <- assignment["profile_ref"]["digest"],
+         {:ok, profile} <- resolve_profile(profile_digest),
+         {:ok, output} <-
+           Kiln.Worker.propose(
+             assignment,
+             eligibility,
+             profile,
+             request_attrs,
+             opts["repository"] || "."
+           ) do
+      out_path = opts["out"] || default_out("worker_output.json")
+
+      File.write!(
+        out_path,
+        Jason.encode!(output_to_map(output))
+      )
+
+      {:ok,
+       Result.ok("worker-propose",
+         data: %{
+           "worker_output_id" => output.id,
+           "semantic_digest" => output.semantic_digest,
+           "parsed_candidate_digest" => output.parsed_candidate_digest,
+           "base_commit" => output.base_commit,
+           "base_state_digest" => output.base_state_digest,
+           "adapter_implementation_digest" => output.adapter_implementation_digest
+         },
+         next_actions:
+           navigation_actions("worker-propose") ++
+             [
+               Result.next_action(
+                 "patch-decide",
+                 "review the worker output and emit a patch decision"
+               )
+             ]
+       )}
+    else
+      {:error, %Result{} = result} -> {:error, result}
+      {:error, %{code: code, reason: reason}} when is_atom(code) ->
+        {:error,
+         Result.error("worker-propose", :denied,
+           errors: [Result.to_error(%{code: code, message: reason})]
+         )}
+
+      {:error, %Kiln.Store.Error{} = err} ->
+        {:error, error_result_tuple(%Request{command: :worker_propose}, err)}
+    end
+  end
+
+  # -- command: patch-decide --
+  #
+  # KILN-M0-02 E4: bounded human patch decision. The CLI is the
+  # human-decision source for M8; the Worker cannot pass --decision
+  # approve. `--decision` is bounded to APPROVE_EXACT_BYTES / REJECT /
+  # REQUEST_REVISION. Approval binds to the proposal's base_state_digest.
+  defp run_patch_decide(%Request{options: opts}) do
+    with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
+         {:ok, proposal} <- build_proposal_from_map(proposal_map),
+         decision_kind <- parse_decision_kind(opts["decision"]),
+         :ok <- validate_decision_kind(decision_kind),
+         {:ok, decision} <-
+           Kiln.PatchService.decide(proposal, decision_kind, proposal.base_state_digest) do
+      out_path = opts["out"] || default_out("patch_decision.json")
+
+      File.write!(
+        out_path,
+        Jason.encode!(decision_to_map(decision))
+      )
+
+      is_approve = decision.decision == "APPROVE_EXACT_BYTES"
+
+      {:ok,
+       Result.ok("patch-decide",
+         data: %{
+           "decision_id" => decision.id,
+           "semantic_digest" => decision.semantic_digest,
+           "decision" => decision.decision,
+           "patch_ref" => decision.patch_ref,
+           "base_state_digest" => decision.base_state_digest
+         },
+         next_actions:
+           if is_approve do
+             navigation_actions("patch-decide") ++
+               [
+                 Result.next_action(
+                   "patch-apply",
+                   "apply the approved exact bytes"
+                 )
+               ]
+           else
+             navigation_actions("patch-decide")
+           end
+       )}
+    else
+      {:error, %Result{} = result} -> {:error, result}
+      {:error, %{code: code, reason: reason}} when is_atom(code) ->
+        {:error,
+         Result.error("patch-decide", :denied,
+           errors: [Result.to_error(%{code: code, message: reason})]
+         )}
+    end
+  end
+
+  # -- command: patch-apply --
+  #
+  # KILN-M0-02 E4: apply the exact approved bytes after explicit
+  # APPROVE_EXACT_BYTES decision. Emits patch-application-evidence.
+  # Refuses REJECT / REQUEST_REVISION decisions with a bounded error.
+  defp run_patch_apply(%Request{options: opts}) do
+    with {:ok, decision_map} <- load_json(opts["decision"], "decision"),
+         {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
+         {:ok, operations_with_bytes} <- load_json(opts["operations"], "operations"),
+         {:ok, proposal} <- build_proposal_from_map(proposal_map),
+         {:ok, decision} <- build_decision_from_map(decision_map, proposal) do
+      case Kiln.PatchService.apply(proposal, decision, operations_with_bytes) do
+        {:ok, evidence} ->
+          out_path = opts["out"] || default_out("patch_application_evidence.json")
+          File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+
+          {:ok,
+           Result.ok("patch-apply",
+             data: %{
+               "application_id" => evidence.id,
+               "semantic_digest" => evidence.semantic_digest,
+               "patch_ref" => evidence.patch_ref,
+               "decision_ref" => evidence.decision_ref,
+               "pre_state_digest" => evidence.pre_state_digest,
+               "post_state_digest" => evidence.post_state_digest,
+               "effect" => evidence.effect
+             },
+             next_actions:
+               navigation_actions("patch-apply") ++
+                 [
+                   Result.next_action(
+                     "patch-recover",
+                     "if the run died between mutation and evidence, run recovery"
+                   )
+                 ]
+           )}
+
+        {:error, %{code: code, reason: reason}} when is_atom(code) ->
+          {:error,
+           Result.error("patch-apply", :failed,
+             errors: [Result.to_error(%{code: code, message: reason})]
+           )}
+      end
+    else
+      {:error, %Result{} = result} -> {:error, result}
+    end
+  end
+
+  # -- command: patch-recover --
+  #
+  # KILN-M0-02 E4: bounded recovery from a non-terminal M8 state.
+  # Refuses to repair an unknown repository state. Accepts a
+  # known post-state digest and re-emits the canonical evidence.
+  defp run_patch_recover(%Request{options: opts}) do
+    with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
+         {:ok, decision_map} <- load_json(opts["decision"], "decision"),
+         {:ok, proposal} <- build_proposal_from_map(proposal_map),
+         {:ok, decision} <- build_decision_from_map(decision_map, proposal) do
+      observed_digest = opts["observed-state-digest"]
+
+      if not is_binary(observed_digest) do
+        {:error, usage_result("--observed-state-digest is required")}
+      else
+        case Kiln.PatchService.recover(proposal, decision, observed_digest) do
+        {:ok, evidence} ->
+          out_path = opts["out"] || default_out("patch_recovery_evidence.json")
+          File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+
+          {:ok,
+           Result.ok("patch-recover",
+             data: %{
+               "application_id" => evidence.id,
+               "semantic_digest" => evidence.semantic_digest,
+               "effect" => evidence.effect,
+               "post_state_digest" => evidence.post_state_digest
+             },
+             next_actions: navigation_actions("patch-recover")
+           )}
+
+{:error, %{code: code, reason: reason}} when is_atom(code) ->
+           {:error,
+            Result.error("patch-recover", :failed,
+              errors: [Result.to_error(%{code: code, message: reason})]
+            )}
+        end
+      end
+    else
+      {:error, %Result{} = result} -> {:error, result}
+    end
+  end
+
+  # -- private helpers for M8 commands --
+
+  defp load_json(path, field) when is_binary(path) do
+    case Kiln.M0CommandLoader.load_json(path, field) do
+      {:ok, doc} -> {:ok, doc}
+      {:error, %{reason: reason}} -> {:error, usage_result(reason)}
+    end
+  end
+
+  defp load_json(nil, field) do
+    {:error, usage_result("--#{field} is required")}
+  end
+
+  defp load_plan_ref(nil), do: {:ok, %{"id" => "pln_default", "digest" => "sha256:" <> String.duplicate("0", 64)}}
+
+  defp load_plan_ref(path) when is_binary(path) do
+    load_json(path, "plan")
+  end
+
+  defp resolve_profile(digest) when is_binary(digest) do
+    impl = Application.get_env(:kiln, :worker_profile_resolver, &default_profile_resolve/1)
+    impl.(digest)
+  end
+
+  defp default_profile_resolve(digest) do
+    case Kiln.M0CommandLoader.resolve_profile(digest) do
+      {:ok, profile} -> {:ok, profile}
+      {:error, _} -> {:error, usage_result("profile not found by digest")}
+    end
+  end
+
+  defp return(value), do: {:ok, value}
+
+  defp build_proposal_from_map(%{"operations" => ops} = map) do
+    proposal = %Kiln.M0PatchProposal{
+      id: map["patch_id"] || "pp_recovered",
+      semantic_digest: map["semantic_digest"] || "sha256:" <> String.duplicate("0", 64),
+      plan_ref: map["plan_ref"] || %{"id" => "pln_recovered", "digest" => ""},
+      attempt_ref: map["attempt_ref"] || %{"id" => "att_recovered", "digest" => ""},
+      repository: map["repository"] || ".",
+      base_commit: map["base_commit"],
+      base_state_digest: map["base_state_digest"] || "",
+      operations: Enum.map(ops, &deserialize_op/1),
+      patch_digest: map["patch_digest"] || "",
+      metadata: map["metadata"] || %{}
+    }
+
+    {:ok, proposal}
+  end
+
+  defp build_proposal_from_map(_), do: {:error, usage_result("proposal JSON must contain operations")}
+
+  defp deserialize_op(map) do
+    %{
+      "op" => map["op"],
+      "path" => map["path"],
+      "before_digest" => map["before_digest"],
+      "after_image_digest" => map["after_image_digest"],
+      "mode" => map["mode"]
+    }
+  end
+
+  defp parse_decision_kind("APPROVE_EXACT_BYTES"), do: :approve
+  defp parse_decision_kind("approve"), do: :approve
+  defp parse_decision_kind("REJECT"), do: :reject
+  defp parse_decision_kind("reject"), do: :reject
+  defp parse_decision_kind("REQUEST_REVISION"), do: :revise
+  defp parse_decision_kind("revise"), do: :revise
+  defp parse_decision_kind(_), do: :unknown
+
+  defp validate_decision_kind(:unknown) do
+    {:error, usage_result("--decision must be one of: approve|reject|revise")}
+  end
+
+  defp validate_decision_kind(kind) when kind in [:approve, :reject, :revise], do: :ok
+
+  defp build_decision_from_map(%{"decision" => "APPROVE_EXACT_BYTES"} = map, proposal) do
+    decision = %Kiln.M0PatchDecision{
+      id: map["decision_id"] || "dec_recovered",
+      semantic_digest: map["semantic_digest"] || "",
+      patch_ref: map["patch_ref"] || %{"id" => proposal.id, "digest" => proposal.patch_digest},
+      base_state_digest: map["base_state_digest"] || proposal.base_state_digest,
+      decision: "APPROVE_EXACT_BYTES",
+      proposal: proposal
+    }
+
+    {:ok, decision}
+  end
+
+  defp build_decision_from_map(_, _),
+    do: {:error, usage_result("decision JSON must include decision: APPROVE_EXACT_BYTES")}
+
+  defp decision_to_map(%Kiln.M0PatchDecision{} = decision) do
+    Map.from_struct(decision)
+    |> Map.put(:proposal, nil)
+  end
+
+  defp evidence_to_map(%Kiln.M0PatchEvidence{} = evidence) do
+    Map.from_struct(evidence)
+  end
+
+  defp default_out(name), do: Path.join(System.tmp_dir!(), name)
+
+  defp output_to_map(%Kiln.M0WorkerOutput{} = output) do
+    Map.from_struct(output)
+    |> Map.update!(:completion_bytes, &Base.encode16(&1, case: :lower))
+  end
+
+  defp usage_result(message) do
+    Result.error("kiln", :denied, errors: [Result.to_error(message)], exit_code: 2)
   end
 
   # -- command: candidate-invocation --
@@ -1029,6 +1352,32 @@ defmodule Kiln.CLI do
     ]
   end
 
+  defp navigation_actions("worker-propose") do
+    [
+      Result.next_action("patch-decide", "review the worker output and emit a patch decision")
+    ]
+  end
+
+  defp navigation_actions("patch-decide") do
+    [
+      Result.next_action("patch-apply", "apply the approved exact bytes"),
+      Result.next_action("worker-propose", "produce a new worker output")
+    ]
+  end
+
+  defp navigation_actions("patch-apply") do
+    [
+      Result.next_action("patch-recover", "if the run died between mutation and evidence, run recovery"),
+      Result.next_action("status", "show the current projection")
+    ]
+  end
+
+  defp navigation_actions("patch-recover") do
+    [
+      Result.next_action("status", "show the current projection")
+    ]
+  end
+
   # The Workflow exposes `orphaned: true` when the persisted projection
   # carries a non-nil operation in a nonterminal state. The persisted
   # `run.state` does not change to "orphaned" until Restart rebuilds
@@ -1133,6 +1482,22 @@ defmodule Kiln.CLI do
 
   defp description_for(:supervise),
     do: "supervise one Repository Recon Work Envelope through Kiln.Supervision"
+
+  defp description_for(:worker_propose),
+    do:
+      "(M8) one bounded IMPLEMENTER attempt: validate Intelligence Assignment + qualification at dispatch, observe repository, emit canonical worker-output/m0-v1"
+
+  defp description_for(:patch_decide),
+    do:
+      "(M8) record an explicit canonical human patch decision (APPROVE_EXACT_BYTES / REJECT / REQUEST_REVISION) against the proposal"
+
+  defp description_for(:patch_apply),
+    do:
+      "(M8) apply the exact approved bytes after APPROVE_EXACT_BYTES and emit canonical patch-application-evidence/m0-v1"
+
+  defp description_for(:patch_recover),
+    do:
+      "(M8) recover a non-terminal M8 state when observed_state_digest matches expected post-state; refuse to repair an unknown repository state"
 
   # -- command: supervise --
   #

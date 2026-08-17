@@ -38,13 +38,24 @@ defmodule Kiln.CLI.Request do
     :resume,
     :supervise,
     :candidate_invocation,
-    :candidate_invocation_digest
+    :candidate_invocation_digest,
+    :worker_propose,
+    :patch_decide,
+    :patch_apply,
+    :patch_recover
   ]
 
   # The CLI accepts kebab-case command names on the command line; the
   # dispatch atom is snake_case. This explicit alias maps the two
   # forms for the KILN-M0-01 (E4) public consumer-visible surface.
-  @command_aliases %{"candidate-invocation" => :candidate_invocation, "candidate-invocation-digest" => :candidate_invocation_digest}
+  @command_aliases %{
+    "candidate-invocation" => :candidate_invocation,
+    "candidate-invocation-digest" => :candidate_invocation_digest,
+    "worker-propose" => :worker_propose,
+    "patch-decide" => :patch_decide,
+    "patch-apply" => :patch_apply,
+    "patch-recover" => :patch_recover
+  }
 
   @command_lookup Map.merge(Map.new(@supported_commands, &{Atom.to_string(&1), &1}), @command_aliases)
 
@@ -109,7 +120,11 @@ defmodule Kiln.CLI.Request do
     resume: [],
     supervise: ~w(work-envelope verification-change),
     candidate_invocation: ~w(request mode),
-    candidate_invocation_digest: []
+    candidate_invocation_digest: [],
+    worker_propose: ~w(assignment eligibility repository request plan out),
+    patch_decide: ~w(proposal decision out),
+    patch_apply: ~w(decision operations out),
+    patch_recover: ~w(proposal decision observed-state-digest out)
   }
 
   defp tokenize(argv) do
