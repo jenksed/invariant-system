@@ -341,7 +341,10 @@ defmodule Kiln.Slices.P1S01Test do
                  :worker_propose,
                  :patch_decide,
                  :patch_apply,
-                 :patch_recover
+                 :patch_recover,
+                 :verify_run,
+                 :review_propose,
+                 :human_decide
                ])
     end
 
