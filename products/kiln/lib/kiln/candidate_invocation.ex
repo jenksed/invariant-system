@@ -172,12 +172,20 @@ defmodule Kiln.CandidateInvocation do
     end
   end
 
+  # `String.to_existing_atom/1` rejects unallocated atoms; the M0 closed
+  # enums (mode: QUALIFICATION|PRODUCTION, output_contract:
+  # IMPLEMENTER_PATCH_PROPOSAL|REVIEW_VERDICT) are ratified by the
+  # schema, so we map them explicitly here instead of falling through to
+  # a generic atom lookup. This keeps the validation total without leaking
+  # new atoms into the VM, and lets the dispatch convert the bounded
+  # 3-tuple error into a structured Result.
+  defp to_atom_safe("PRODUCTION"), do: {:ok, :PRODUCTION}
+  defp to_atom_safe("QUALIFICATION"), do: {:ok, :QUALIFICATION}
+  defp to_atom_safe("IMPLEMENTER_PATCH_PROPOSAL"), do: {:ok, :IMPLEMENTER_PATCH_PROPOSAL}
+  defp to_atom_safe("REVIEW_VERDICT"), do: {:ok, :REVIEW_VERDICT}
+
   defp to_atom_safe(value) when is_binary(value) do
-    try do
-      {:ok, String.to_existing_atom(value)}
-    rescue
-      ArgumentError -> {:error, {:invalid_field, :mode_atom, value}}
-    end
+    {:error, {:invalid_field, :mode_atom, value}}
   end
 
   defp require_artifact_ref(map, key) do

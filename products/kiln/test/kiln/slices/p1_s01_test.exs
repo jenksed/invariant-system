@@ -243,6 +243,14 @@ defmodule Kiln.Slices.P1S01Test do
     end
 
     test "the provider and command-host boundaries are behaviours with no implementation" do
+      # M3 (KILN-M0-01) authorises exactly one Provider implementation
+      # — `Kiln.MinimaxM3Adapter` — via
+      # `docs/authorizations/KILN-M0-01.authorization`. CommandHost
+      # remains unused in M3. The bounded exclusions below are the only
+      # allow-list; any new implementor must land behind its own
+      # authorization record and be added here explicitly.
+      authorized_provider_implementors = [Kiln.MinimaxM3Adapter]
+
       for behaviour <- [Kiln.Conformance.Provider, Kiln.Conformance.CommandHost] do
         # The behaviour declares callbacks but exports no callable API beyond
         # `behaviour_info/1`, so it cannot execute anything.
@@ -259,8 +267,14 @@ defmodule Kiln.Slices.P1S01Test do
               behaviour in List.wrap(module.module_info(:attributes)[:behaviour])
           end)
 
-        assert implementors == [],
-               "#{inspect(behaviour)} has implementations: #{inspect(implementors)}"
+        if behaviour == Kiln.Conformance.Provider do
+          assert Enum.sort(implementors) == Enum.sort(authorized_provider_implementors),
+                 "#{inspect(behaviour)} has unexpected implementations: " <>
+                   "expected #{inspect(authorized_provider_implementors)}, got #{inspect(implementors)}"
+        else
+          assert implementors == [],
+                 "#{inspect(behaviour)} has implementations: #{inspect(implementors)}"
+        end
       end
     end
 
@@ -287,8 +301,22 @@ defmodule Kiln.Slices.P1S01Test do
       # KIL-W3 adds `:supervise` for the Wave 3 wedge; that command is
       # authorized by `docs/authorizations/KIL-W3.authorization` and is
       # the only command outside the P1-S01 surface.
+      # KILN-M0-01 (M3) adds `:candidate_invocation_digest` and
+      # `:candidate_invocation` for the bounded M0 Candidate Invocation
+      # CLI surface; these are authorized by
+      # `docs/authorizations/KILN-M0-01.authorization` and ship with the
+      # KILN-M0-01-CLI-CLOSURE (M6-FIX) corrective lane.
       assert Enum.sort(Kiln.CLI.Request.commands()) ==
-               Enum.sort([:start, :status, :inspect, :cancel, :resume, :supervise])
+               Enum.sort([
+                 :start,
+                 :status,
+                 :inspect,
+                 :cancel,
+                 :resume,
+                 :supervise,
+                 :candidate_invocation,
+                 :candidate_invocation_digest
+               ])
     end
 
     test "no P1-S01 runtime module reads Repository source content" do
@@ -301,12 +329,21 @@ defmodule Kiln.Slices.P1S01Test do
       # not source from the active Repository, and is covered by the
       # P3-W01 reconstruction tests. P4-W01 verification reads only the
       # exact bound patch and registered command output under its own gate.
+      # M3 (KILN-M0-01) adds two file-reads under explicit authorization:
+      #   - `Kiln.CandidateInvocationLoader` reads an operator-supplied
+      #     request JSON file (not Repository source).
+      #   - `Kiln.MinimaxM3Adapter` reads its own adapter source for the
+      #     bounded implementation digest (self-reference, not Repository).
+      # Both are bounded, non-Repository reads authorised by
+      # `docs/authorizations/KILN-M0-01.authorization`.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/store/migrations.ex",
             path != "lib/kiln/artifact/store.ex",
             path != "lib/kiln/repository_observation.ex",
             path != "lib/kiln/work_envelope_loader.ex",
+            path != "lib/kiln/candidate_invocation_loader.ex",
+            path != "lib/kiln/minimax_m3_adapter.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),

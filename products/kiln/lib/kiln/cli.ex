@@ -65,7 +65,151 @@ defmodule Kiln.CLI do
       :cancel -> run_writable(request, &dispatch_cancel/2)
       :resume -> run_readonly(request, &dispatch_resume/2)
       :supervise -> run_supervise(request)
+      :candidate_invocation -> run_candidate_invocation(request)
+      :candidate_invocation_digest -> run_candidate_invocation_digest(request)
     end
+  end
+
+  # -- command: candidate-invocation-digest --
+  #
+  # Pure computation. Returns the recorded adapter implementation digest
+  # through the standard CLI Result envelope. No Store, no Journal, no
+  # Workflow, no Provider, no Repository, no Patch, no Transcript.
+  # KILN-M0-01 (E4) public consumer-visible surface.
+
+  defp run_candidate_invocation_digest(%Request{} = request) do
+    request
+    |> dispatch_candidate_invocation_digest()
+    |> normalize_dispatch_result(request)
+  end
+
+  defp dispatch_candidate_invocation_digest(%Request{} = _request) do
+    digest = Kiln.MinimaxM3Adapter.implementation_digest()
+
+    {:ok,
+     Result.ok("candidate-invocation-digest",
+       data: %{"adapter_implementation_digest" => digest}
+     )}
+  end
+
+  # -- command: candidate-invocation --
+  #
+  # Reads the request file specified by --request, validates it against
+  # the canonical Candidate Invocation schema (P02-D013) without
+  # dispatching to the provider, and gates production mode on the
+  # presence of MINIMAX_API_KEY. The CLI surface is bounded:
+  #   - evaluation mode: schema-valid dispatch proof, no network,
+  #     no credential requirement;
+  #   - production mode: requires MINIMAX_API_KEY; absence is a bounded
+  #     :unavailable error mapped to exit 8 (per ErrorMap).
+  # The CLI never opens a Store, writes a Journal, or runs Workflow.
+  # KILN-M0-01 (E4) public consumer-visible surface; the live provider
+  # dispatch (if/when invoked by other tooling) routes through the
+  # adapter module directly, not through this CLI command.
+
+  defp run_candidate_invocation(%Request{} = request) do
+    request
+    |> dispatch_candidate_invocation()
+    |> normalize_dispatch_result(request)
+  end
+
+  defp dispatch_candidate_invocation(%Request{options: opts}) do
+    request_path = opts["request"]
+    mode = opts["mode"]
+
+    with {:ok, attrs} <- Kiln.CandidateInvocationLoader.load(request_path),
+         {:ok, %Kiln.CandidateInvocation{} = invocation} <-
+           Kiln.CandidateInvocation.new_request(attrs),
+         :ok <- gate_candidate_invocation_mode(mode) do
+      {:ok,
+       Result.ok("candidate-invocation",
+         data: %{
+           "schema_valid" => true,
+           "mode" => mode,
+           "invocation_id" => invocation.invocation_id,
+           "semantic_digest" => invocation.semantic_digest,
+           "adapter_implementation_digest" =>
+             Kiln.MinimaxM3Adapter.implementation_digest()
+         }
+       )}
+    else
+      {:error, %Result{} = result} ->
+        {:error, result}
+
+      {:error, %{result_kind: _} = loader_error} ->
+        {:error,
+         Result.error("candidate-invocation", :denied,
+           errors: [
+             Result.to_error(%{
+               code: :invalid_request,
+               message: loader_error.reason,
+               class: "invalid_request",
+               details: Map.delete(loader_error, :reason)
+             })
+           ]
+         )}
+
+      {:error, reason} ->
+        {:error,
+         Result.error("candidate-invocation", :denied,
+           errors: [Result.to_error(normalize_candidate_invocation_error(reason))]
+         )}
+    end
+  end
+
+  # `Kiln.CandidateInvocation.new_request/1` returns bounded 3-tuple and
+  # 2-tuple errors (e.g. `{:invalid_field, :mode_atom, "PRODUCTION"}`).
+  # The CLI error envelope expects a structured map; this pass converts
+  # the bounded shape into the canonical error map before handing it to
+  # `Result.to_error/1`. The two clauses are exhaustive over the
+  # validation helpers in `Kiln.CandidateInvocation`; if a new shape ever
+  # lands upstream, the dispatch's `{:error, reason}` pattern fail-fast
+  # surfaces it loudly rather than silently emitting a generic error.
+  defp normalize_candidate_invocation_error({:invalid_field, field, value}) do
+    %{
+      code: :invalid_field,
+      message: "invalid field #{inspect(field)}: #{inspect(value)}",
+      class: "invalid_request",
+      details: %{field: field, value: value}
+    }
+  end
+
+  defp normalize_candidate_invocation_error({:missing_field, field}) do
+    %{
+      code: :missing_field,
+      message: "missing field #{inspect(field)}",
+      class: "invalid_request",
+      details: %{field: field}
+    }
+  end
+
+  defp gate_candidate_invocation_mode("evaluation"), do: :ok
+
+  defp gate_candidate_invocation_mode("production") do
+    if System.get_env("MINIMAX_API_KEY") in [nil, ""] do
+      {:error,
+       Result.error("candidate-invocation", :blocked,
+         exit_code: 8,
+         errors: [
+           Result.to_error(%{
+             code: :unavailable,
+             message:
+               "production mode requires MINIMAX_API_KEY (presence-only, not value); CLI gates before any provider call"
+           })
+         ]
+       )}
+    else
+      :ok
+    end
+  end
+
+  defp gate_candidate_invocation_mode(other) do
+    {:error,
+     Result.error("candidate-invocation", :denied,
+       errors: [
+         Result.to_error("--mode must be one of: production|evaluation (got #{inspect(other)})")
+       ]
+     )}
   end
 
   defp run_writable(%Request{} = request, fun) do
