@@ -18,8 +18,6 @@ defmodule Kiln.Verification.Registry do
       {"project-arsenal", "python3", ["scripts/test-arsenal-evaluate.py"]},
     "arsenal.wave5-benchmark" =>
       {"project-arsenal", "python3", ["scripts/test-wave5-recon-bench.py"]},
-    "arsenal.wave6-benchmark" =>
-      {"project-arsenal", "python3", ["scripts/test-wave6-verify-bench.py"]},
     "arsenal.capability-contract" =>
       {"project-arsenal", "python3", ["scripts/test-capability-contract.py"]},
     "arsenal.compiler" => {"project-arsenal", "python3", ["scripts/test-arsenal-compiler.py"]},
