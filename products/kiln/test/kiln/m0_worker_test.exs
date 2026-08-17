@@ -95,20 +95,23 @@ defmodule Kiln.M0WorkerTest do
 
   describe "bounded operation (E2)" do
     test "build_bounded_completion is deterministic", %{profile: _profile} do
-      ci_attrs = %{
-        "invocation_id" => "inv_test_001",
-        "mode" => "PRODUCTION",
-        "profile_ref" => %{"id" => "prf_test", "digest" => "sha256:abc"},
-        "context_manifest_ref" => %{"id" => "ctx_test", "digest" => "sha256:def"},
-        "tool_policy_ref" => %{"id" => "tp_test", "digest" => "sha256:ghi"},
-        "timeout_ms" => 60_000,
-        "output_contract" => "IMPLEMENTER_PATCH_PROPOSAL"
+      # M11 E2 B-repair: `build_bounded_completion/1` now accepts the
+      # canonical `implementer-patch-proposal-input/v1` envelope
+      # (the bounded patch content the Worker is proposing) and
+      # serializes it. Same envelope → same bytes → same digest.
+      envelope = %{
+        "schema" => "engineering-system/implementer-patch-proposal-input/v1",
+        "operations" => [
+          %{
+            "op" => "add",
+            "path" => "README.md",
+            "after_image_bytes" => "# hi\n"
+          }
+        ]
       }
 
-      {:ok, ci_request} = Kiln.CandidateInvocation.new_request(ci_attrs)
-
-      assert {:ok, bytes_a, digest_a} = Worker.build_bounded_completion(ci_request)
-      assert {:ok, bytes_b, digest_b} = Worker.build_bounded_completion(ci_request)
+      assert {:ok, bytes_a, digest_a} = Worker.build_bounded_completion(envelope)
+      assert {:ok, bytes_b, digest_b} = Worker.build_bounded_completion(envelope)
 
       assert bytes_a == bytes_b
       assert digest_a == digest_b

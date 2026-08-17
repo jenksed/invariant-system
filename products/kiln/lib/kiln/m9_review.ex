@@ -387,6 +387,33 @@ defmodule Kiln.RunResultProjection do
     end
   end
 
+  # M11 E2 B-repair: convenience wrapper that accepts a single map
+  # (with either atom or string keys) and delegates to build/10. The
+  # M11 E2 scenario constructs the truth + refs as a single map;
+  # build/10 is the canonical 10-arg entry point and remains the
+  # authoritative surface — this wrapper is the bounded glue that
+  # lets the scenario call build(truth) without wiring every ref
+  # position manually.
+  @spec build(map()) :: {:ok, M0RunResultProjection.t()} | {:error, map()}
+  def build(refs) when is_map(refs) do
+    build(
+      fetch(refs, :plan_ref, "plan_ref"),
+      fetch(refs, :implementer_assignment_ref, "implementer_assignment_ref"),
+      fetch(refs, :reviewer_assignment_ref, "reviewer_assignment_ref"),
+      fetch(refs, :patch_ref, "patch_ref"),
+      fetch(refs, :patch_decision_ref, "patch_decision_ref"),
+      fetch(refs, :verification_ref, "verification_ref"),
+      fetch(refs, :review_ref, "review_ref"),
+      fetch(refs, :human_decision_ref, "human_decision_ref"),
+      fetch(refs, :run_result_ref, "run_result_ref"),
+      fetch(refs, :truth, "truth")
+    )
+  end
+
+  defp fetch(refs, atom_key, string_key) do
+    Map.get(refs, atom_key) || Map.get(refs, string_key)
+  end
+
   defp validate_truth(truth) do
     cond do
       truth["run_status"] not in @allowed_run_status ->
