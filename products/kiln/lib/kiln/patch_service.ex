@@ -35,7 +35,9 @@ defmodule Kiln.PatchService do
   """
 
   alias Kiln.M0PatchProposal
+  alias Kiln.PatchProposal, as: PatchProposalBuilder
   alias Kiln.Store.Canonical
+  alias Kiln.WorkerOutputStore
 
   @decision_schema "engineering-system/patch-decision/m0-v1"
   @evidence_schema "engineering-system/patch-application-evidence/m0-v1"
@@ -117,20 +119,118 @@ defmodule Kiln.PatchService do
   end
 
   @doc """
+  M11 E2 P5: bounded governed apply from immutable completion evidence.
+
+  Closes the canonical chain from an APPROVE_EXACT_BYTES Patch
+  Decision back to the original worker-supplied bytes through the
+  durable Artifact.Store. The bytes presented for mutation are
+  EXACTLY the bytes bound to the approved
+  `worker_output.raw_completion_ref.digest`, never a regenerated
+  equivalent.
+
+  Sequence:
+
+    1. `WorkerOutputStore.resolve/2` retrieves the immutable
+       completion bytes and verifies
+       `sha256(retrieved) == worker_output.raw_completion_ref.digest`.
+    2. `PatchProposal.decode_envelope/1` deterministically materializes
+       the bounded ops-with-bytes (text-only, no authority smuggling,
+       bounded by `FirstMonth.patch_limits/0`).
+    3. `PatchProposal.build_from_worker_output/4` rebuilds the
+       canonical PatchProposal from those ops-with-bytes; its
+       `semantic_digest` and `patch_digest` must equal the approved
+       proposal's.
+    4. `apply(proposal, decision, ops_with_bytes)` then verifies
+       preimage + afterimage digests, performs the bounded mutation,
+       re-verifies the postimage, and emits canonical evidence.
+
+  Fails closed at every step. Never accepts a path-bound mutation
+  the approved proposal didn't authorize.
+
+  Returns `{:ok, %Kiln.M0PatchEvidence{}}` or a bounded error.
+  """
+  @spec apply_with_completion_ref(
+          M0PatchProposal.t(),
+          Kiln.M0PatchDecision.t(),
+          Kiln.M0WorkerOutput.t(),
+          map()
+        ) ::
+          {:ok, Kiln.M0PatchEvidence.t()}
+          | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
+  def apply_with_completion_ref(proposal, decision, worker_output, store) do
+    with {:ok, completion_bytes} <-
+           WorkerOutputStore.resolve(store, worker_output.raw_completion_ref),
+         {:ok, ops_with_bytes} <- PatchProposalBuilder.decode_envelope(completion_bytes),
+         {:ok, rebuilt} <-
+           PatchProposalBuilder.build_from_worker_output(
+             worker_output,
+             ops_with_bytes,
+             proposal.plan_ref,
+             proposal.repository
+           ),
+         :ok <- assert_rebuild_matches_approved(proposal, rebuilt),
+         :ok <- check_approve_decision(decision) do
+      do_apply(proposal, decision, ops_with_bytes)
+    end
+  end
+
+  defp check_approve_decision(%{decision: "APPROVE_EXACT_BYTES"}), do: :ok
+
+  defp check_approve_decision(decision) do
+    {:error,
+     %{
+       code: :E_PATCH_DECISION_NOT_APPROVE,
+       reason:
+         "apply_with_completion_ref() requires an APPROVE_EXACT_BYTES decision; got #{inspect(decision.decision)}"
+     }}
+  end
+
+  defp assert_rebuild_matches_approved(%M0PatchProposal{} = approved, %M0PatchProposal{} = rebuilt) do
+    cond do
+      approved.semantic_digest != rebuilt.semantic_digest ->
+        {:error,
+         %{
+           code: :E_PATCH_REBUILT_SEMANTIC_MISMATCH,
+           reason:
+             "rebuilt semantic_digest #{rebuilt.semantic_digest} does not match approved #{approved.semantic_digest}; bytes bound to the approved proposal are not the bytes being applied"
+         }}
+
+      approved.patch_digest != rebuilt.patch_digest ->
+        {:error,
+         %{
+           code: :E_PATCH_REBUILT_PATCH_MISMATCH,
+           reason:
+             "rebuilt patch_digest #{rebuilt.patch_digest} does not match approved #{approved.patch_digest}; bytes bound to the approved proposal are not the bytes being applied"
+         }}
+
+      true ->
+        :ok
+    end
+  end
+
+  @doc """
   Apply the exact approved bytes from a Patch Proposal whose
   Decision is `APPROVE_EXACT_BYTES`.
 
   `operations_with_bytes` is the bounded operations list where
   `:content` carries the full UTF-8 text bytes. The function:
 
-    1. Verifies each op's preimage (current bytes digest == op.before_digest).
-       Failure → `:E_PATCH_BASE_MISMATCH`.
-    2. Computes post-state by applying the ops to a tmp working copy
-       of the repository state.
-    3. Emits the canonical `patch-application-evidence/m0-v1` envelope
-       with `effect: :EXACT_TARGET_STATE_OBSERVED` on success, or
-       `:PARTIAL_KNOWN_EFFECT` on partial application.
-    4. Never re-applies a patch that has already been applied.
+    1. Validates the proposal's `repository` is a real directory.
+       Failure → `:E_PATCH_REPOSITORY_INVALID`.
+    2. Verifies each op's preimage (current bytes digest == op.before_digest)
+       and afterimage (sha256(supplied :content) == op.after_image_digest).
+       Failure → `:E_PATCH_PREIMAGE_MISMATCH` or `:E_PATCH_AFTER_IMAGE_MISMATCH`.
+       Failures are fail-closed: zero mutation occurs.
+    3. Applies the exact approved bytes to the repository using the
+       bounded filesystem mutator; it NEVER performs fuzzy application,
+       silently adapted patches, or regenerated proposals.
+    4. Re-reads the postimage of every touched path and re-checks
+       sha256(disk) == sha256(supplied afterimage). Failure →
+       `:E_PATCH_POSTIMAGE_MISMATCH`.
+    5. Computes the canonical post-state digest from the proposal
+       (base_state_digest + operations manifest) and emits the
+       `engineering-system/patch-application-evidence/m0-v1` envelope
+       with `effect: :EXACT_TARGET_STATE_OBSERVED` on success.
 
   Returns `{:ok, %Kiln.M0PatchEvidence{}}` or a bounded error envelope.
   """
@@ -194,31 +294,250 @@ defmodule Kiln.PatchService do
   # -- private helpers --
 
   defp do_apply(proposal, decision, operations_with_bytes) do
-    case verify_preimages(proposal, operations_with_bytes) do
-      :ok ->
-        expected_post = expected_post_state_digest_from_bytes(proposal, operations_with_bytes)
+    repository = proposal.repository
 
-        evidence =
-          build_evidence(
-            proposal,
-            decision,
-            :TARGET_EFFECT_OBSERVED,
-            expected_post
-          )
+    with :ok <- validate_repository_root(repository),
+         :ok <- verify_preimage_digests(repository, operations_with_bytes) do
+      perform_mutation(repository, operations_with_bytes)
 
-        {:ok, evidence}
+      case verify_postimage(repository, operations_with_bytes) do
+        :ok ->
+          expected_post = expected_post_state_digest(proposal)
 
-      {:error, _} = err ->
-        err
+          evidence =
+            build_evidence(
+              proposal,
+              decision,
+              :EXACT_TARGET_STATE_OBSERVED,
+              expected_post
+            )
+
+          {:ok, evidence}
+
+        {:error, _} = err ->
+          err
+      end
     end
   end
 
-  defp verify_preimages(_proposal, operations_with_bytes) do
-    case Enum.find(operations_with_bytes, &(not match?({:ok, _}, {:ok, &1.before_digest}))) do
-      nil -> :ok
-      _op -> :ok
+  # M11 E2 P1-1 conformance repair: the approved repository root must
+  # exist as a directory before any bytes are read or written. Returning
+  # `:E_PATCH_REPOSITORY_INVALID` keeps apply() from silently writing
+  # through `.` or any relative path that would mutate the agent's CWD.
+  defp validate_repository_root(""), do: missing_repository_error()
+
+  defp validate_repository_root(repository) when is_binary(repository) do
+    case File.stat(repository) do
+      {:ok, %File.Stat{type: :directory}} ->
+        :ok
+
+      {:ok, %File.Stat{}} ->
+        {:error,
+         %{
+           code: :E_PATCH_REPOSITORY_INVALID,
+           reason:
+             "proposal.repository #{inspect(repository)} must be a directory, not a file/special"
+         }}
+
+      {:error, %File.Error{reason: :enoent}} ->
+        missing_repository_error()
+
+      {:error, reason} ->
+        {:error,
+         %{
+           code: :E_PATCH_REPOSITORY_INVALID,
+           reason:
+             "proposal.repository #{inspect(repository)} could not be stat-ed: #{inspect(reason)}"
+         }}
     end
   end
+
+  defp validate_repository_root(_), do: missing_repository_error()
+
+  defp missing_repository_error do
+    {:error,
+     %{
+       code: :E_PATCH_REPOSITORY_INVALID,
+       reason: "proposal.repository is required to be a real directory for apply()"
+     }}
+  end
+
+  # M11 E2 P1-2 conformance repair: every operation's digest contracts
+  # MUST be verified against real repository state and the supplied
+  # content bytes BEFORE any filesystem write. The prior implementation
+  # was a structural no-op; this repair closes the exact-byte mutation
+  # invariant required by the canonical M11 work package.
+  defp verify_preimage_digests(repository, operations_with_bytes) do
+    Enum.reduce_while(operations_with_bytes, :ok, fn op, :ok ->
+      case check_op_digests(repository, op) do
+        :ok -> {:cont, :ok}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
+  defp check_op_digests(repository, op) do
+    with :ok <- check_afterimage_digest(op),
+         :ok <- check_preimage_digest(repository, op) do
+      :ok
+    end
+  end
+
+  defp check_afterimage_digest(%{op: op, path: path, content: content, after_image_digest: after_digest})
+       when op in [:add, :replace] do
+    actual = sha256_hex(content || "")
+
+    if actual == after_digest do
+      :ok
+    else
+      {:error,
+       %{
+         code: :E_PATCH_AFTER_IMAGE_MISMATCH,
+         reason:
+           "sha256(supplied after-image bytes) = #{actual} does not match canonical op.after_image_digest = #{after_digest} for #{op} #{inspect(path)}"
+       }}
+    end
+  end
+
+  defp check_afterimage_digest(_op), do: :ok
+
+  defp check_preimage_digest(repository, %{op: op, path: path, before_digest: before_digest})
+       when op in [:replace, :delete] do
+    full = Path.join(repository, path)
+
+    case File.read(full) do
+      {:ok, on_disk} ->
+        actual = sha256_hex(on_disk)
+
+        if actual == before_digest do
+          :ok
+        else
+          {:error,
+           %{
+             code: :E_PATCH_PREIMAGE_MISMATCH,
+             reason:
+               "sha256(actual repository bytes at #{inspect(path)}) = #{actual} does not match canonical op.before_digest = #{before_digest}"
+           }}
+        end
+
+      {:error, %File.Error{reason: :enoent}} ->
+        {:error,
+         %{
+           code: :E_PATCH_PREIMAGE_MISMATCH,
+           reason:
+             "expected preimage at #{inspect(path)} (op.before_digest = #{before_digest}) is absent from repository"
+         }}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           code: :E_PATCH_PREIMAGE_MISMATCH,
+           reason:
+             "could not read preimage at #{inspect(path)}: #{inspect(reason)}"
+         }}
+    end
+  end
+
+  defp check_preimage_digest(_repository, _op), do: :ok
+
+  # M11 E2 P1-3: bounded filesystem mutator. Applies the bounded ops in
+  # order; safe relative-path joining; rejects parent-directory escapes;
+  # refuses to follow symlinks (path-traversal immunity on top of the
+  # path classification already enforced at proposal-build time).
+  defp perform_mutation(repository, operations_with_bytes) do
+    Enum.each(operations_with_bytes, fn op -> apply_one(repository, op) end)
+  end
+
+  defp apply_one(repository, %{op: :add, path: path, content: content}) do
+    write_op(repository, path, content || "")
+  end
+
+  defp apply_one(repository, %{op: :replace, path: path, content: content}) do
+    write_op(repository, path, content || "")
+  end
+
+  defp apply_one(repository, %{op: :delete, path: path}) do
+    full = safe_join(repository, path)
+
+    case File.rm(full) do
+      :ok -> :ok
+      {:error, %File.Error{reason: :enoent}} -> :ok
+      {:error, reason} -> raise "bounded delete failed for #{inspect(path)}: #{inspect(reason)}"
+    end
+  end
+
+  defp write_op(repository, path, content) do
+    full = safe_join(repository, path)
+    dir = Path.dirname(full)
+    File.mkdir_p!(dir)
+    File.write!(full, content)
+    :ok
+  end
+
+  # Bounded path join: reject parent-dir escapes and absolute paths
+  # (defense in depth on top of `PatchProposal.reject_disallowed_kinds/1`).
+  defp safe_join(repository, path)
+       when is_binary(repository) and is_binary(path) do
+    joined = Path.join(repository, path)
+
+    if String.starts_with?(path, "/") or String.contains?(path, "..") do
+      raise "patch service refuses to escape repository root via #{inspect(path)}"
+    end
+
+    case File.lstat(joined) do
+      {:ok, %File.Stat{type: :symlink}} ->
+        raise "patch service refuses to follow symlink at #{joined}"
+
+      _ ->
+        joined
+    end
+  end
+
+  # M11 E2 P1-4: postimage re-verification. After mutating the
+  # repository, every touched path's on-disk sha256 must equal the
+  # supplied after-image digest. This closes the
+  # "no mutation may occur if either condition fails" rule and
+  # explicitly defends against OS-level write-time surprises
+  # (interrupted write, sandbox drift).
+  defp verify_postimage(repository, operations_with_bytes) do
+    Enum.reduce_while(operations_with_bytes, :ok, fn op, :ok ->
+      case check_postimage(repository, op) do
+        :ok -> {:cont, :ok}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+  end
+
+  defp check_postimage(repository, %{op: op, path: path, after_image_digest: expected})
+       when op in [:add, :replace] do
+    full = safe_join(repository, path)
+
+    case File.read(full) do
+      {:ok, on_disk} ->
+        actual = sha256_hex(on_disk)
+
+        if actual == expected do
+          :ok
+        else
+          {:error,
+           %{
+             code: :E_PATCH_POSTIMAGE_MISMATCH,
+             reason:
+               "post-mutation sha256(#{inspect(path)}) = #{actual} does not match the bound after-image digest #{expected}; the filesystem write did not land the exact bytes"
+           }}
+        end
+
+      {:error, reason} ->
+        {:error,
+         %{
+           code: :E_PATCH_POSTIMAGE_MISMATCH,
+           reason:
+             "post-mutation read of #{inspect(path)} failed: #{inspect(reason)}"
+         }}
+    end
+  end
+
+  defp check_postimage(_repository, _op), do: :ok
 
   defp expected_post_state_digest(proposal) do
     # Canonical reconstruction: hash the canonical operations manifest.
@@ -232,16 +551,6 @@ defmodule Kiln.PatchService do
         "base_state_digest" => proposal.base_state_digest,
         "operations" => canon_ops
       })
-  end
-
-  defp expected_post_state_digest_from_bytes(_proposal, _operations_with_bytes) do
-    # For M8 the expected post digest is computed from the canonical
-    # operations manifest. The Patch Service does not re-read the
-    # bytes — they have already been content-addressed at proposal
-    # build time. We delegate to the proposal-only helper here.
-    # The caller has already verified preimages.
-    "sha256:" <>
-      (:crypto.hash(:sha256, "post") |> Base.encode16(case: :lower))
   end
 
   defp build_evidence(proposal, decision, effect, post_state_digest) do
@@ -278,6 +587,10 @@ defmodule Kiln.PatchService do
 
   defp canonical_digest(schema, payload) do
     "sha256:" <> Canonical.digest(schema, payload)
+  end
+
+  defp sha256_hex(bytes) when is_binary(bytes) do
+    "sha256:" <> (:crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower))
   end
 
   defp short_id do

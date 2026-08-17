@@ -204,40 +204,162 @@ defmodule Kiln.M0PatchTest do
   end
 
   describe "Patch Apply (E4)" do
-    test "APPROVE decision + valid ops emits canonical evidence" do
-      proposal = build_proposal!()
+    test "APPROVE decision + matching preimage/afterimage emits canonical evidence AND exactly rewrites the file" do
+      tmp = fresh_tmp!("apply_positive")
+
+      original = "# Original README\n"
+      replaced = "# Updated README\n"
+      before_digest = sha256_hex(original)
+      after_digest = sha256_hex(replaced)
+
+      File.write!(Path.join(tmp, "README.md"), original)
+
+      proposal =
+        build_proposal!(
+          operations: [
+            %{
+              op: :replace,
+              path: "README.md",
+              content: replaced,
+              before_digest: before_digest,
+              after_image_digest: after_digest
+            }
+          ],
+          repository: tmp
+        )
+
       {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
 
       ops_with_bytes = [
         %{
           op: :replace,
           path: "README.md",
-          content: "# Updated README\n",
-          before_digest: "sha256:" <> String.duplicate("0", 64),
-          after_image_digest: "sha256:" <> String.duplicate("a", 64)
+          content: replaced,
+          before_digest: before_digest,
+          after_image_digest: after_digest
         }
       ]
 
-      assert {:ok, %Evidence{} = evidence} =
+      assert {:ok, %Evidence{effect: "EXACT_TARGET_STATE_OBSERVED"} = evidence} =
                PatchService.apply(proposal, decision, ops_with_bytes)
 
-      assert evidence.effect in ["TARGET_EFFECT_OBSERVED", "EXACT_TARGET_STATE_OBSERVED"]
       assert evidence.pre_state_digest == proposal.base_state_digest
       assert evidence.patch_ref["id"] == proposal.id
       assert evidence.decision_ref["id"] == decision.id
+
+      assert File.read!(Path.join(tmp, "README.md")) == replaced
+      assert sha256_hex(File.read!(Path.join(tmp, "README.md"))) == after_digest
+    end
+
+    test "after-image digest mismatch rejects with zero repository mutation" do
+      tmp = fresh_tmp!("apply_after_mismatch")
+      original = "# Original\n"
+      replaced = "# Replaced\n"
+      before_digest = sha256_hex(original)
+      wrong_after = sha256_hex("WRONG bytes, NOT the supplied content")
+
+      File.write!(Path.join(tmp, "README.md"), original)
+
+      proposal =
+        build_proposal!(
+          operations: [
+            %{
+              op: :replace,
+              path: "README.md",
+              content: replaced,
+              before_digest: before_digest,
+              after_image_digest: wrong_after
+            }
+          ],
+          repository: tmp
+        )
+
+      {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
+
+      ops_with_bytes = [
+        %{
+          op: :replace,
+          path: "README.md",
+          content: replaced,
+          before_digest: before_digest,
+          after_image_digest: wrong_after
+        }
+      ]
+
+      assert {:error, %{code: :E_PATCH_AFTER_IMAGE_MISMATCH}} =
+               PatchService.apply(proposal, decision, ops_with_bytes)
+
+      assert File.read!(Path.join(tmp, "README.md")) == original
+    end
+
+    test "preimage digest mismatch rejects with zero repository mutation" do
+      tmp = fresh_tmp!("apply_preimage_mismatch")
+      original = "# Original\n"
+      replaced = "# Replaced\n"
+      wrong_preimage = sha256_hex("bits that aren't actually on disk")
+      after_digest = sha256_hex(replaced)
+
+      File.write!(Path.join(tmp, "README.md"), original)
+
+      proposal =
+        build_proposal!(
+          operations: [
+            %{
+              op: :replace,
+              path: "README.md",
+              content: replaced,
+              before_digest: wrong_preimage,
+              after_image_digest: after_digest
+            }
+          ],
+          repository: tmp
+        )
+
+      {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
+
+      ops_with_bytes = [
+        %{
+          op: :replace,
+          path: "README.md",
+          content: replaced,
+          before_digest: wrong_preimage,
+          after_image_digest: after_digest
+        }
+      ]
+
+      assert {:error, %{code: :E_PATCH_PREIMAGE_MISMATCH}} =
+               PatchService.apply(proposal, decision, ops_with_bytes)
+
+      assert File.read!(Path.join(tmp, "README.md")) == original
     end
 
     test "REJECT decision refuses apply" do
-      proposal = build_proposal!()
+      tmp = fresh_tmp!("apply_reject")
+      File.write!(Path.join(tmp, "README.md"), "# Whatever\n")
+
+      proposal =
+        build_proposal!(
+          operations: [
+            %{
+              op: :replace,
+              path: "README.md",
+              content: "# New\n",
+              before_digest: sha256_hex("# Whatever\n"),
+              after_image_digest: sha256_hex("# New\n")
+            }
+          ],
+          repository: tmp
+        )
+
       {:ok, decision} = PatchService.decide(proposal, :reject, proposal.base_state_digest)
 
       ops_with_bytes = [
         %{
           op: :replace,
           path: "README.md",
-          content: "# Updated README\n",
-          before_digest: "sha256:" <> String.duplicate("0", 64),
-          after_image_digest: "sha256:" <> String.duplicate("a", 64)
+          content: "# New\n",
+          before_digest: sha256_hex("# Whatever\n"),
+          after_image_digest: sha256_hex("# New\n")
         }
       ]
 
@@ -312,5 +434,22 @@ defmodule Kiln.M0PatchTest do
         "base_state_digest" => proposal.base_state_digest,
         "operations" => canon_ops
       })
+  end
+
+  # M11 E2 P1 helper: produce an isolated tmp directory for one test.
+  # Each call mints a fresh directory so per-test state cannot bleed.
+  defp fresh_tmp!(tag) do
+    short =
+      :crypto.strong_rand_bytes(8)
+      |> Base.encode16(case: :lower)
+
+    dir = Path.join(System.tmp_dir!(), "kiln_m11_#{tag}_#{short}")
+    File.rm_rf!(dir)
+    File.mkdir_p!(dir)
+    dir
+  end
+
+  defp sha256_hex(bytes) when is_binary(bytes) do
+    "sha256:" <> (:crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower))
   end
 end
