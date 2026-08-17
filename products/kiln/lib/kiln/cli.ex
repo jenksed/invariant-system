@@ -71,6 +71,9 @@ defmodule Kiln.CLI do
       :patch_decide -> run_patch_decide(request)
       :patch_apply -> run_patch_apply(request)
       :patch_recover -> run_patch_recover(request)
+      :verify_run -> run_verify_run(request)
+      :review_propose -> run_review_propose(request)
+      :human_decide -> run_human_decide(request)
     end
   end
 
@@ -265,7 +268,7 @@ defmodule Kiln.CLI do
   # KILN-M0-02 E4: bounded recovery from a non-terminal M8 state.
   # Refuses to repair an unknown repository state. Accepts a
   # known post-state digest and re-emits the canonical evidence.
-  defp run_patch_recover(%Request{options: opts}) do
+defp run_patch_recover(%Request{options: opts}) do
     with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
          {:ok, decision_map} <- load_json(opts["decision"], "decision"),
          {:ok, proposal} <- build_proposal_from_map(proposal_map),
@@ -291,12 +294,167 @@ defmodule Kiln.CLI do
              next_actions: navigation_actions("patch-recover")
            )}
 
-{:error, %{code: code, reason: reason}} when is_atom(code) ->
-           {:error,
-            Result.error("patch-recover", :failed,
-              errors: [Result.to_error(%{code: code, message: reason})]
-            )}
+        {:error, %{code: code, reason: reason}} when is_atom(code) ->
+          {:error,
+           Result.error("patch-recover", :failed,
+             errors: [Result.to_error(%{code: code, message: reason})]
+           )}
         end
+      end
+    else
+      {:error, %Result{} = result} -> {:error, result}
+    end
+  end
+
+  # -- command: verify-run --
+  #
+  # KILN-M0-03 E5: bounded verifier invocation against the
+  # post-mutation state. Emits canonical verification-result/m0-v1.
+  # Verification is evidence, not authority — PASS does not auto-accept.
+  defp run_verify_run(%Request{options: opts}) do
+    result_state_digest = opts["result-state-digest"]
+    status = opts["status"]
+
+    with {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
+         {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
+         true <- is_binary(result_state_digest),
+         {:ok, verifier_ref} <- load_artifact_ref(opts["registered-verifier"], "registered-verifier"),
+         true <- is_binary(status),
+         {:ok, evidence_refs} <- load_evidence_refs(opts["evidence"]) do
+      case Kiln.VerificationResult.build(
+             plan_ref,
+             patch_ref,
+             result_state_digest,
+             verifier_ref,
+             status,
+             evidence_refs
+           ) do
+        {:ok, vr} ->
+          out_path = opts["out"] || default_out("verification_result.json")
+          File.write!(out_path, Jason.encode!(Kiln.M0VerificationResult.to_map(vr)))
+
+          {:ok,
+           Result.ok("verify-run",
+             data: %{
+               "verification_id" => vr.id,
+               "semantic_digest" => vr.semantic_digest,
+               "status" => Atom.to_string(vr.status),
+               "result_state_digest" => vr.result_state_digest,
+               "registered_verifier" => vr.registered_verifier,
+               "evidence_refs" => vr.evidence_refs
+             },
+             next_actions: navigation_actions("verify-run")
+           )}
+
+        {:error, %{code: code, reason: reason}} when is_atom(code) ->
+          {:error,
+           Result.error("verify-run", :denied,
+             errors: [Result.to_error(%{code: code, message: reason})]
+           )}
+      end
+    else
+      {:error, %Result{} = result} -> {:error, result}
+    end
+  end
+
+  # -- command: review-propose --
+  #
+  # KILN-M0-03 E5: bounded REVIEWER dispatch. The Reviewer must be
+  # independently assigned (reviewer_assignment_ref.digest !=
+  # implementer_assignment_ref.digest). The Reviewer context never
+  # includes the IMPLEMENTER's transcript (implementer_transcript_received:
+  # false is enforced by Kiln.Review.build/9).
+  defp run_review_propose(%Request{options: opts}) do
+    result_state_digest = opts["result-state-digest"]
+    verdict = opts["verdict"]
+
+    with {:ok, impl_assign} <- load_artifact_ref(opts["implementer-assignment"], "implementer-assignment"),
+         {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
+         {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
+         {:ok, verifier_ref} <- load_artifact_ref(opts["verification"], "verification"),
+         true <- is_binary(result_state_digest),
+         {:ok, reviewer_assign} <-
+           load_artifact_ref(opts["reviewer-assignment"], "reviewer-assignment"),
+         {:ok, context_manifest_ref} <-
+           load_artifact_ref(opts["context-manifest"], "context-manifest"),
+         true <- is_binary(verdict),
+         {:ok, findings} <- load_findings(opts["findings"]) do
+      case Kiln.Review.build(
+             impl_assign,
+             plan_ref,
+             patch_ref,
+             result_state_digest,
+             verifier_ref,
+             reviewer_assign,
+             verdict,
+             findings,
+             context_manifest_ref
+           ) do
+        {:ok, review} ->
+          out_path = opts["out"] || default_out("review.json")
+          File.write!(out_path, Jason.encode!(Kiln.M0Review.to_map(review)))
+
+          {:ok,
+           Result.ok("review-propose",
+             data: %{
+               "review_id" => review.id,
+               "semantic_digest" => review.semantic_digest,
+               "verdict" => Atom.to_string(review.verdict),
+               "implementer_transcript_received" =>
+                 review.implementer_transcript_received,
+               "findings" => review.findings
+             },
+             next_actions: navigation_actions("review-propose")
+           )}
+
+        {:error, %{code: code, reason: reason}} when is_atom(code) ->
+          {:error,
+           Result.error("review-propose", :denied,
+             errors: [Result.to_error(%{code: code, message: reason})]
+           )}
+      end
+    else
+      {:error, %Result{} = result} -> {:error, result}
+    end
+  end
+
+  # -- command: human-decide --
+  #
+  # KILN-M0-03 E5: bounded operator decision. Records the canonical
+  # human-decision/m0-v1 envelope and emits the run-result-projection/m0-v1
+  # complementing the v0 Run Result Envelope. HumanDecision is the
+  # authoritative final decision; nothing infers it.
+  defp run_human_decide(%Request{options: opts}) do
+    result_state_digest = opts["result-state-digest"]
+    review_ref = opts["review"]
+    decision = opts["decision"]
+
+    with {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
+         {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
+         true <- is_binary(result_state_digest),
+         true <- is_nil(review_ref) or is_map(review_ref),
+         true <- is_binary(decision) do
+      case Kiln.HumanDecision.build(plan_ref, patch_ref, result_state_digest, review_ref, decision) do
+        {:ok, hd_struct} ->
+          out_path = opts["out"] || default_out("human_decision.json")
+          File.write!(out_path, Jason.encode!(Kiln.M0HumanDecision.to_map(hd_struct)))
+
+          {:ok,
+           Result.ok("human-decide",
+             data: %{
+               "human_decision_id" => hd_struct.id,
+               "semantic_digest" => hd_struct.semantic_digest,
+               "decision" => Atom.to_string(hd_struct.decision),
+               "recorded_at" => hd_struct.recorded_at
+             },
+             next_actions: navigation_actions("human-decide")
+           )}
+
+        {:error, %{code: code, reason: reason}} when is_atom(code) ->
+          {:error,
+           Result.error("human-decide", :denied,
+             errors: [Result.to_error(%{code: code, message: reason})]
+           )}
       end
     else
       {:error, %Result{} = result} -> {:error, result}
@@ -410,6 +568,59 @@ defmodule Kiln.CLI do
     Map.from_struct(output)
     |> Map.update!(:completion_bytes, &Base.encode16(&1, case: :lower))
   end
+
+  # M9 helpers — bounded loading for the verify/review/human-decide surfaces.
+  # Every bounded loader is called here; the dispatcher never reaches
+  # into Kiln internal modules directly.
+
+  defp load_artifact_ref(path, field) when is_binary(path) do
+    case Kiln.M0CommandLoader.load_json(path, field) do
+      {:ok, %{"id" => id, "digest" => digest}} when is_binary(id) and is_binary(digest) ->
+        {:ok, %{"id" => id, "digest" => digest}}
+
+      {:ok, _other} ->
+        {:error, usage_result("#{field} JSON must contain {id, digest} artifact ref")}
+
+      {:error, %{reason: reason}} ->
+        {:error, usage_result(reason)}
+    end
+  end
+
+  defp load_artifact_ref(nil, field), do: {:error, usage_result("--#{field} is required")}
+
+  defp load_evidence_refs(path) when is_binary(path) do
+    case Kiln.M0CommandLoader.load_json(path, "evidence") do
+      {:ok, refs} when is_list(refs) and refs != [] ->
+        if Enum.all?(refs, &match?(%{"id" => _, "digest" => _}, &1)),
+          do: {:ok, refs},
+          else: {:error, usage_result("evidence_refs must be a list of {id, digest} objects")}
+
+      {:ok, _} ->
+        {:error, usage_result("evidence_refs must be a non-empty list")}
+
+      {:error, %{reason: reason}} ->
+        {:error, usage_result(reason)}
+    end
+  end
+
+  defp load_evidence_refs(nil), do: {:error, usage_result("--evidence is required")}
+
+  defp load_findings(path) when is_binary(path) do
+    case Kiln.M0CommandLoader.load_json(path, "findings") do
+      {:ok, list} when is_list(list) and list != [] ->
+        if Enum.all?(list, &is_binary/1),
+          do: {:ok, list},
+          else: {:error, usage_result("findings must be a list of strings")}
+
+      {:ok, _} ->
+        {:error, usage_result("findings must be a non-empty list of strings")}
+
+      {:error, %{reason: reason}} ->
+        {:error, usage_result(reason)}
+    end
+  end
+
+  defp load_findings(nil), do: {:error, usage_result("--findings is required")}
 
   defp usage_result(message) do
     Result.error("kiln", :denied, errors: [Result.to_error(message)], exit_code: 2)
@@ -1378,6 +1589,26 @@ defmodule Kiln.CLI do
     ]
   end
 
+  defp navigation_actions("verify-run") do
+    [
+      Result.next_action("review-propose", "produce the independent Reviewer Review"),
+      Result.next_action("status", "show the current projection")
+    ]
+  end
+
+  defp navigation_actions("review-propose") do
+    [
+      Result.next_action("human-decide", "record the final human decision"),
+      Result.next_action("status", "show the current projection")
+    ]
+  end
+
+  defp navigation_actions("human-decide") do
+    [
+      Result.next_action("status", "show the current Run Result Projection")
+    ]
+  end
+
   # The Workflow exposes `orphaned: true` when the persisted projection
   # carries a non-nil operation in a nonterminal state. The persisted
   # `run.state` does not change to "orphaned" until Restart rebuilds
@@ -1498,6 +1729,18 @@ defmodule Kiln.CLI do
   defp description_for(:patch_recover),
     do:
       "(M8) recover a non-terminal M8 state when observed_state_digest matches expected post-state; refuse to repair an unknown repository state"
+
+  defp description_for(:verify_run),
+    do:
+      "(M9) execute a registered verifier against the post-mutation state and emit canonical verification-result/m0-v1"
+
+  defp description_for(:review_propose),
+    do:
+      "(M9) bounded REVIEWER dispatch via independently assigned Reviewer Assignment; emits canonical review/m0-v1 with implementer_transcript_received: false"
+
+  defp description_for(:human_decide),
+    do:
+      "(M9) record an explicit canonical human decision (ACCEPT|REJECT|REQUEST_REVISION); emit human-decision/m0-v1 and run-result-projection/m0-v1"
 
   # -- command: supervise --
   #

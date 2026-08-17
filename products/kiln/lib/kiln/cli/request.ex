@@ -42,7 +42,10 @@ defmodule Kiln.CLI.Request do
     :worker_propose,
     :patch_decide,
     :patch_apply,
-    :patch_recover
+    :patch_recover,
+    :verify_run,
+    :review_propose,
+    :human_decide
   ]
 
   # The CLI accepts kebab-case command names on the command line; the
@@ -54,7 +57,10 @@ defmodule Kiln.CLI.Request do
     "worker-propose" => :worker_propose,
     "patch-decide" => :patch_decide,
     "patch-apply" => :patch_apply,
-    "patch-recover" => :patch_recover
+    "patch-recover" => :patch_recover,
+    "verify-run" => :verify_run,
+    "review-propose" => :review_propose,
+    "human-decide" => :human_decide
   }
 
   @command_lookup Map.merge(Map.new(@supported_commands, &{Atom.to_string(&1), &1}), @command_aliases)
@@ -124,7 +130,10 @@ defmodule Kiln.CLI.Request do
     worker_propose: ~w(assignment eligibility repository request plan out),
     patch_decide: ~w(proposal decision out),
     patch_apply: ~w(decision operations out),
-    patch_recover: ~w(proposal decision observed-state-digest out)
+    patch_recover: ~w(proposal decision observed-state-digest out),
+    verify_run: ~w(plan patch result-state-digest registered-verifier status evidence out),
+    review_propose: ~w(implementer-assignment plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
+    human_decide: ~w(plan patch result-state-digest review decision out)
   }
 
   defp tokenize(argv) do
