@@ -82,3 +82,49 @@ jobs:
         run: |
           ./invariant test manifold
           ./invariant check boundaries
+
+  # M11 E6 — complete the third required job. The
+  # implement-change-golden-path proves the bounded M0 governed chain
+  # end-to-end (publish → build → decide → apply_with_completion_ref)
+  # via a deterministic fake profile. No live network. No credentials.
+  # No MINIMAX_API_KEY in the environment. Mutations are confined to
+  # the runner's mktemp + a real bounded kiln_home.
+  implement-change-golden-path:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # No live provider; deterministic fake path only.
+      KILN_PROVIDER: deterministic_fake
+      # Belt-and-suspenders: explicitly unset any residual key.
+      MINIMAX_API_KEY: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.10.0
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.4"
+          elixir-version: "1.20.2"
+
+      - run: mix deps.get
+        working-directory: products/kiln
+
+      - run: mix deps.get
+        working-directory: products/loadout
+
+      - name: Run implement-change golden path
+        run: ./integration/scenarios/implement-change/run.sh
+
+      - name: Upload bounded-scenario evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: implement-change-scenario-evidence
+          path: |
+            integration/scenarios/implement-change/proof-repo/.git/HEAD
+          if-no-files-found: ignore
+          retention-days: 14
