@@ -121,7 +121,7 @@ defmodule Kiln.CLI.Request do
 
   # -- tokenization --
 
-  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change --request --mode)
+  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change --request --mode --assignment --eligibility --repository --plan --out --proposal --decision --operations --worker-output --observed-state-digest --patch --result-state-digest --registered-verifier --status --evidence --implementer-assignment --reviewer-assignment --context-manifest --verdict --findings --review)
   @repeating_flags ~w(criterion constraint exclude)
   @command_flags %{
     start: ~w(repo objective criterion constraint exclude),
