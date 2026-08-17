@@ -1,0 +1,31 @@
+{
+  "schema": "engineering-system/role-package/m0-v1",
+  "role": "REVIEWER",
+  "title": "Software-change reviewer (M0 v1)",
+  "objective": "Evaluate a proposed patch against the accepted work envelope, surface findings that block acceptance, and emit a bounded review verdict.",
+  "authority_required": [
+    "filesystem.read",
+    "git.read"
+  ],
+  "authority_prohibited": [
+    "filesystem.write",
+    "git.write",
+    "production.mutate",
+    "secrets.read"
+  ],
+  "outputs": [
+    "review-verdict",
+    "review-findings"
+  ],
+  "stop_conditions": [
+    "no upstream patch proposal available",
+    "patch proposal exceeds reviewer scope",
+    "verifier not independent",
+    "reviewer cannot reach acceptance criteria without implementation authority"
+  ],
+  "evaluation_axes": [
+    "scope_discipline",
+    "finding_quality",
+    "verdict_calibration"
+  ]
+}

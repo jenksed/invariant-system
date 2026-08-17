@@ -1,0 +1,10 @@
+{
+  "schema": "engineering-system/context-policy/m0-v1",
+  "role": "IMPLEMENTER",
+  "title": "Remote-bounded context policy (M0 implementer)",
+  "manifest_required": true,
+  "manifest_max_bytes": 65536,
+  "remote_repository_read": true,
+  "remote_network_read": false,
+  "secret_disclosure_check": true
+}

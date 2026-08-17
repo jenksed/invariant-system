@@ -1,0 +1,48 @@
+{
+  "adapter": {
+    "contract": "engineering-system/candidate-invocation/m0-v1",
+    "implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+    "implementation_ref": "kiln://minimax-m3-adapter"
+  },
+  "context_policy": {
+    "digest": "sha256:ef16fa74e7f7dec00288712e363e4c901b24b2b8afd3dc4936a26c01e9e8cf44",
+    "id": "reviewer-independent-m0-v1"
+  },
+  "model": {
+    "id": "MiniMax-M3",
+    "immutable_revision": null,
+    "revision_kind": "PROVIDER_ALIAS"
+  },
+  "profile_id": "prf_833961bc9f4c37fb7d6d85353f3decc92dc08943f84d69cf0df6ba015a3339bc",
+  "provider": {
+    "api_family": "openai-compatible-chat-completions",
+    "endpoint": "https://api.minimax.io/v1/chat/completions",
+    "id": "minimax",
+    "locality": "REMOTE",
+    "provider_profile": "minimax-m3-openai/v1",
+    "trust_boundary": "REMOTE_PROVIDER"
+  },
+  "role": "REVIEWER",
+  "role_package": {
+    "digest": "sha256:e9f24ca1fe3d6e9530685af060f1651d71f1a4554e0903b16d96e6a4ea57e658",
+    "id": "reviewer-m0-v1"
+  },
+  "runtime": {
+    "credential_slot": "MINIMAX_API_KEY",
+    "fallback": "NONE",
+    "max_input_tokens": 32000,
+    "reasoning_split": true,
+    "service_tier": "standard",
+    "stream": true
+  },
+  "schema": "engineering-system/intelligence-profile/m0-v1",
+  "semantic_digest": "sha256:0eb495a8b7592d2b2ed8d0653c7ada5916876dc8db58dd2a2d7a996b4a2803f8",
+  "system_config": {
+    "digest": "sha256:7306aa62756f1570527567bd1581f5dd02bcecf72941cad84420da9db672ed0c",
+    "id": "reviewer-m0-v1"
+  },
+  "tool_policy": {
+    "digest": "sha256:b95f582c9148faa3f78306d68b61d108189efa4c156e7a7fd380ddf3302c787f",
+    "id": "reviewer-readonly-m0-v1"
+  }
+}
