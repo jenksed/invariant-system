@@ -105,7 +105,7 @@ check_structure() {
   note() { printf '%s\n' "$*"; }
   bad() { printf 'FAIL: %s\n' "$1"; rc=1; }
 
-  [[ -d .git ]] || bad "no .git at monorepo root"
+  [[ -e .git ]] || bad "no .git at monorepo root"
   [[ -x ./invariant ]] || note "warn: ./invariant is not executable"
   for f in README.md AGENTS.md invariant.boundaries.json; do
     [[ -f "$f" ]] || bad "missing root file: $f"
