@@ -71,6 +71,7 @@ defmodule Kiln.CLI do
       :worker_propose -> run_worker_propose(request)
       :patch_decide -> run_patch_decide(request)
       :patch_apply -> run_patch_apply(request)
+      :patch_apply_governed -> run_patch_apply_governed(request)
       :patch_recover -> run_patch_recover(request)
       :verify_run -> run_verify_run(request)
       :review_propose -> run_review_propose(request)
@@ -102,19 +103,38 @@ defmodule Kiln.CLI do
 
   # -- command: worker-propose --
   #
-  # KILN-M0-02 E2/E5: bounded IMPLEMENTER attempt driven by an
-  # Intelligence Assignment. The CLI is the consumer-visible surface;
-  # Worker.validate_binding/3 enforces dispatch-time qualification
-  # revalidation. Worker.propose/5 emits the canonical Worker
-  # Output envelope; the CLI also writes the bounded after-image
-  # content blobs to the artifact store.
-  defp run_worker_propose(%Request{options: opts}) do
+  # KILN-M0-02 E2/E5 + M11 E2 P2: bounded IMPLEMENTER attempt driven
+  # by an Intelligence Assignment. The CLI is the consumer-visible
+  # surface; Worker.validate_binding/3 enforces dispatch-time
+  # qualification revalidation. Worker.propose/5 emits the canonical
+  # Worker Output envelope; the CLI also persists the bounded
+  # completion bytes to the canonical Artifact.Store and rewires
+  # raw_completion_ref to the durable Artifact identity.
+  defp run_worker_propose(%Request{} = request) do
+    case Runtime.open(request.kiln_home, :write) do
+      {:ok, :ready} ->
+        try do
+          dispatch_worker_propose(request)
+        after
+          Runtime.stop()
+        end
+
+      {:absent} ->
+        {:error, absent_result(request)}
+
+      {:blocked, state, _error} ->
+        {:error, blocked_result(request, state)}
+    end
+  end
+
+  defp dispatch_worker_propose(%Request{options: opts} = request) do
     with {:ok, assignment} <- load_json(opts["assignment"], "assignment"),
          {:ok, eligibility} <- load_json(opts["eligibility"], "eligibility"),
          {:ok, request_attrs} <- load_json(opts["request"], "request"),
          {:ok, plan_ref} <- load_plan_ref(opts["plan"]),
          profile_digest <- assignment["profile_ref"]["digest"],
          {:ok, profile} <- resolve_profile(profile_digest),
+         {:ok, store} <- ready_store(request),
          {:ok, output} <-
            Kiln.Worker.propose(
              assignment,
@@ -122,23 +142,26 @@ defmodule Kiln.CLI do
              profile,
              request_attrs,
              opts["repository"] || "."
-           ) do
+           ),
+         {:ok, status, rewired} <- Kiln.WorkerOutputStore.publish(store, output) do
       out_path = opts["out"] || default_out("worker_output.json")
 
       File.write!(
         out_path,
-        Jason.encode!(output_to_map(output))
+        Jason.encode!(output_to_map(rewired))
       )
 
       {:ok,
        Result.ok("worker-propose",
          data: %{
-           "worker_output_id" => output.id,
-           "semantic_digest" => output.semantic_digest,
-           "parsed_candidate_digest" => output.parsed_candidate_digest,
-           "base_commit" => output.base_commit,
-           "base_state_digest" => output.base_state_digest,
-           "adapter_implementation_digest" => output.adapter_implementation_digest
+           "worker_output_id" => rewired.id,
+           "semantic_digest" => rewired.semantic_digest,
+           "raw_completion_ref" => rewired.raw_completion_ref,
+           "raw_completion_status" => Atom.to_string(status),
+           "parsed_candidate_digest" => rewired.parsed_candidate_digest,
+           "base_commit" => rewired.base_commit,
+           "base_state_digest" => rewired.base_state_digest,
+           "adapter_implementation_digest" => rewired.adapter_implementation_digest
          },
          next_actions:
            navigation_actions("worker-propose") ++
@@ -306,6 +329,114 @@ defp run_patch_recover(%Request{options: opts}) do
       {:error, %Result{} = result} -> {:error, result}
     end
   end
+
+  # -- command: patch-apply-governed --
+  #
+  # M11 E2 (Phases 5+6): bounded governed apply from immutable
+  # completion evidence. The CLI opens the canonical Artifact Store
+  # (via `Runtime.open`), re-materializes the worker-supplied bytes
+  # from the durable Artifact, verifies the rebuilt digest matches
+  # the approved Patch, then delegates to `PatchService.apply/3` for
+  # the bounded real-disk mutation. The bytes applied are EXACTLY the
+  # bytes bound to the approved worker_output.raw_completion_ref.
+  defp run_patch_apply_governed(%Request{} = request) do
+    case Runtime.open(request.kiln_home, :read) do
+      {:ok, :ready} ->
+        try do
+          dispatch_patch_apply_governed(request)
+        after
+          Runtime.stop()
+        end
+
+      {:absent} ->
+        {:error, absent_result(request)}
+
+      {:blocked, state, _error} ->
+        {:error, blocked_result(request, state)}
+    end
+  end
+
+  defp dispatch_patch_apply_governed(%Request{options: opts} = request) do
+    with {:ok, proposal_map} <- load_json(opts["proposal"], "proposal"),
+         {:ok, proposal} <- build_proposal_from_map(proposal_map),
+         {:ok, decision_map} <- load_json(opts["decision"], "decision"),
+         {:ok, decision} <- build_decision_from_map(decision_map, proposal),
+         {:ok, wo_map} <- load_json(opts["worker-output"], "worker-output"),
+         {:ok, worker_output} <- build_worker_output_from_map(wo_map),
+         {:ok, store} <- ready_store(request),
+         {:ok, evidence} <-
+           Kiln.PatchService.apply_with_completion_ref(
+             proposal,
+             decision,
+             worker_output,
+             store
+           ) do
+      out_path = opts["out"] || default_out("patch_application_evidence.json")
+
+      File.write!(out_path, Jason.encode!(evidence_to_map(evidence)))
+
+      {:ok,
+       Result.ok("patch-apply-governed",
+         data: %{
+           "application_id" => evidence.id,
+           "semantic_digest" => evidence.semantic_digest,
+           "patch_ref" => evidence.patch_ref,
+           "decision_ref" => evidence.decision_ref,
+           "pre_state_digest" => evidence.pre_state_digest,
+           "post_state_digest" => evidence.post_state_digest,
+           "effect" => evidence.effect
+         },
+         next_actions: navigation_actions("patch-apply-governed")
+       )}
+    else
+      {:error, %Result{} = result} -> {:error, result}
+
+      {:error, %{code: code, reason: reason}} when is_atom(code) ->
+        {:error,
+         Result.error("patch-apply-governed", :failed,
+           errors: [Result.to_error(%{code: code, message: reason})]
+         )}
+
+      {:error, %Kiln.Store.Error{} = err} ->
+        {:error, error_result_tuple(%Request{command: :patch_apply_governed}, err)}
+    end
+  end
+
+  defp build_worker_output_from_map(%{
+         "worker_output_id" => id,
+         "semantic_digest" => semantic,
+         "attempt_ref" => attempt_ref,
+         "assignment_ref" => assignment_ref,
+         "profile_ref" => profile_ref,
+         "raw_completion_ref" => raw_completion_ref,
+         "parsed_candidate_digest" => parsed,
+         "base_state_digest" => base_state_digest
+       } = map)
+       when is_binary(id) and is_binary(semantic) and is_map(raw_completion_ref) do
+    {:ok,
+     %Kiln.M0WorkerOutput{
+       id: id,
+       semantic_digest: semantic,
+       attempt_ref: attempt_ref,
+       assignment_ref: assignment_ref,
+       profile_ref: profile_ref,
+       output_kind: map["output_kind"] || "PATCH_CANDIDATE",
+       raw_completion_ref: raw_completion_ref,
+       parsed_candidate_digest: parsed,
+       completion_bytes: decode_hex_bytes(map["completion_bytes"]),
+       base_commit: map["base_commit"],
+       base_state_digest: base_state_digest,
+       adapter_implementation_digest:
+         map["adapter_implementation_digest"] || "sha256:" <> String.duplicate("0", 64)
+     }}
+  end
+
+  defp build_worker_output_from_map(_),
+    do: {:error, usage_result("worker-output JSON must carry raw_completion_ref + bounded identity fields")}
+
+  defp decode_hex_bytes(nil), do: ""
+  defp decode_hex_bytes(""), do: ""
+  defp decode_hex_bytes(value) when is_binary(value), do: Base.decode16!(value, case: :lower)
 
   # -- command: verify-run --
   #
