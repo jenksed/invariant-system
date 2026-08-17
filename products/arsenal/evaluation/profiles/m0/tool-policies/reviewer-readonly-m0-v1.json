@@ -1,0 +1,20 @@
+{
+  "schema": "engineering-system/tool-policy/m0-v1",
+  "role": "REVIEWER",
+  "title": "Read-only workspace tool policy (M0 reviewer)",
+  "allow": [
+    "workspace.read",
+    "git.read",
+    "git.diff"
+  ],
+  "deny": [
+    "workspace.write",
+    "git.write",
+    "git.apply-patch",
+    "network.read",
+    "network.write",
+    "secrets.read",
+    "production.mutate",
+    "filesystem.external"
+  ]
+}

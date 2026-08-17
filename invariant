@@ -243,7 +243,9 @@ test_arsenal() {
   python3 scripts/test-arsenal-graph.py
   python3 scripts/test-arsenal-knowledge.py
   python3 scripts/test-arsenal-trust.py
-  python3 scripts/test-arsenal-qualification.py)
+  python3 scripts/test-arsenal-qualification.py
+  python3 scripts/test-m0-role-qualification.py
+  python3 scripts/test-m0-qualification-currentness.py)
 }
 
 test_loadout() {

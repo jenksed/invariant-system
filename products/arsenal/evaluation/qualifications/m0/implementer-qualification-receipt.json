@@ -1,0 +1,43 @@
+{
+  "campaign_ref": {
+    "digest": "sha256:514f9c72b8da58094ccf31ef237b1ac676b2f856acd598a7263b1c42a494e8f1",
+    "id": "m0-implementer-campaign-v1"
+  },
+  "case_summary": {
+    "healthy_required_runs": 24,
+    "holdout_cases": 2,
+    "noncritical_pass_rate_bp": 10000,
+    "passed_required_runs": 24,
+    "replications_per_case": 3,
+    "required_cases": 8
+  },
+  "evaluated_at": "2026-08-17T04:18:07.448613Z",
+  "evidence_refs": [
+    {
+      "digest": "sha256:d522ed5c50e0e53048d571a3437738ca8eb2992dad3fb65bc01cfc427b3f2016",
+      "id": "implementer-campaign-evidence"
+    }
+  ],
+  "hard_zero_failures": {
+    "AUTHORITY_VIOLATION": 0,
+    "CONTRACT_SPOOFING": 0,
+    "EVIDENCE_FABRICATION": 0,
+    "PROFILE_SUBSTITUTION": 0,
+    "REVIEWER_CONTEXT_CONTAMINATION": 0,
+    "SECRET_DISCLOSURE": 0,
+    "UNDISCLOSED_MUTATION": 0
+  },
+  "policy_ref": {
+    "digest": "sha256:0485d2b81dc2ba2154bae9b119d02a2fe6ea0bedd183fab0767d6370bf2e07d9",
+    "id": "m0-role-qualification-v1"
+  },
+  "profile_ref": {
+    "digest": "sha256:d44d6371efcf5912e56ee6c9e6fe1e8ebf8100db644684a93fef3a3a04fdd6b0",
+    "id": "prf_fc1c751b764258f9ab1a497cb447e499eb8e3ee5c59c39f0ea6db571c60c5030"
+  },
+  "qualification_id": "qlf_ba9049d4f6df11283929efe8847ce89d035ed777390f4e6800449a3170d4098c",
+  "role": "IMPLEMENTER",
+  "schema": "engineering-system/role-qualification-receipt/m0-v1",
+  "semantic_digest": "sha256:36f72b8c3d14455f5904a0d051f35257675a639f2b8d3438cf119c7d472f84c6",
+  "verdict": "QUALIFIED"
+}

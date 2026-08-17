@@ -1,0 +1,19 @@
+{
+  "schema": "engineering-system/tool-policy/m0-v1",
+  "role": "IMPLEMENTER",
+  "title": "Read+write workspace tool policy (M0 implementer)",
+  "allow": [
+    "workspace.read",
+    "workspace.write",
+    "git.read",
+    "git.diff",
+    "git.apply-patch"
+  ],
+  "deny": [
+    "network.read",
+    "network.write",
+    "secrets.read",
+    "production.mutate",
+    "filesystem.external"
+  ]
+}

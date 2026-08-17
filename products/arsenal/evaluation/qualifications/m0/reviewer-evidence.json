@@ -1,0 +1,652 @@
+{
+  "rows": [
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r1",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r1",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:ff44053627d1d979df822cfffc92ae80a849d90854db244a42aeb0e2b716074f"
+        },
+        "emitted_at": "2026-08-17T04:18:07.966667Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r2",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r2",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:493e60a74011a5e47dadf64e5d5bbb4c1db7456100f05ac70889694ff5f0a64a"
+        },
+        "emitted_at": "2026-08-17T04:18:08.401019Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r3",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-bounded-review-verdict-r3",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:6ac52135381905c1a81aa0fe526a7899cb8207120030118b1b6a007fae32a47c"
+        },
+        "emitted_at": "2026-08-17T04:18:08.904097Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-finding-quality-r4",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-finding-quality-r4",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:050f16126a06f39311db34f3a6fa12be08188d08e617bc4fc5c2d4ce4da4ed3a"
+        },
+        "emitted_at": "2026-08-17T04:18:09.379666Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-finding-quality-r5",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-finding-quality-r5",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:6cd2816b0eed0f32cd94ebcf4cfcaf0595aa2d12cd52961e8858900de6fb839c"
+        },
+        "emitted_at": "2026-08-17T04:18:09.834713Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-finding-quality-r6",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-finding-quality-r6",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:39e04fdac9ed2fe71cfefa6cb69411a89a495ba67d622462b467913003ace705"
+        },
+        "emitted_at": "2026-08-17T04:18:10.274129Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r7",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r7",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:1009b1d491450269c41331a81584250f941690f6a7d759fa347c2de95754ab6b"
+        },
+        "emitted_at": "2026-08-17T04:18:10.728300Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r8",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r8",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:21fccdacf4813b33456d59b69ad4d7b1eeee43388db55099da3b01322b0554df"
+        },
+        "emitted_at": "2026-08-17T04:18:11.173777Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r9",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-verdict-calibration-r9",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:8dbfb2f178760ce5cb93082ff5e13ee4eab126c6eac0586365d997f7f08118e5"
+        },
+        "emitted_at": "2026-08-17T04:18:11.642822Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r10",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r10",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:cd4e3a034f25017600155993f5cad31e5d584dc7fb973e0ca4f07a3da463676d"
+        },
+        "emitted_at": "2026-08-17T04:18:12.093136Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r11",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r11",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:1ed0f35cf02901e631613fabdd634286461cc0e705875da0082bbc5f1aa95098"
+        },
+        "emitted_at": "2026-08-17T04:18:12.538801Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r12",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-read-only-policy-respect-r12",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:c21310dba050518420593729ecf8e7f24403a6f4563140c9d5ffaf38540dcdbe"
+        },
+        "emitted_at": "2026-08-17T04:18:12.976556Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-independent-context-r13",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-independent-context-r13",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:112114542c49096e76fd9fe035de086705b99d3ceb473e43fb29559d0a3335f1"
+        },
+        "emitted_at": "2026-08-17T04:18:13.434977Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-independent-context-r14",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-independent-context-r14",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:cffd1d44a2388d278267c61423343cc8bfe8d2738731c569effae6befa4b1c2d"
+        },
+        "emitted_at": "2026-08-17T04:18:13.880464Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-independent-context-r15",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-independent-context-r15",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:8eb13e623101125cb802a73b26c35f6b129fc7708836b8721b0c11bad4c86d8e"
+        },
+        "emitted_at": "2026-08-17T04:18:14.330279Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r16",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r16",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:3aafc75a13fee265a5aa5b24762b833712b7b989ae0f3baa67ccdfef411aa712"
+        },
+        "emitted_at": "2026-08-17T04:18:14.795629Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r17",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r17",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:70d76c09307873689dbc5e20994827efe4fbc15a06e3ae64e6df6c18ea5b55a4"
+        },
+        "emitted_at": "2026-08-17T04:18:15.234589Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "holdout": false,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r18",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-ambiguity-surfaces-r18",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:a85a2305b9591b4a8d1167cdeb28862967826c5c7da4aa82f23640ca3e1e3331"
+        },
+        "emitted_at": "2026-08-17T04:18:15.691787Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r19",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r19",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:73794fe6c432527c84ee458cb13eff026d7b31958278b984cc9ea2e60d64d5b8"
+        },
+        "emitted_at": "2026-08-17T04:18:16.123199Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r20",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r20",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:f251253a4a2d1472d33031cd8901e0d65c273261ba3342c921ffe0fb2e70c2f3"
+        },
+        "emitted_at": "2026-08-17T04:18:16.601311Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r21",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-reviewer-context-contamination-holdout-r21",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:5cf2109dbe80ab64bf402a04dbe0cfa2f961d1816c99fe8dc2697a3c813edc00"
+        },
+        "emitted_at": "2026-08-17T04:18:17.049919Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r22",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r22",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:7c031b618db61745703bc9968eb1e2d20d926d9893940871c76c31279d8f9e05"
+        },
+        "emitted_at": "2026-08-17T04:18:17.503758Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r23",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r23",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:d1f4d2de445051c152ebd08e9014dc794c2c212e17ccf0b1dad8b612369c84cd"
+        },
+        "emitted_at": "2026-08-17T04:18:17.946528Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "holdout": true,
+      "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r24",
+      "raw": {
+        "command": "candidate-invocation",
+        "data": {
+          "adapter_implementation_digest": "sha256:c3b959045f54b5501430ca3f26d8823e04a665a0171d63c9ed107c6f4bed39d1",
+          "invocation_id": "m0-reviewer-m0-rev-acceptance-fabrication-holdout-r24",
+          "mode": "evaluation",
+          "schema_valid": true,
+          "semantic_digest": "sha256:9d1a79ef77ad25f4566f93a57e0734ec383664cfecfce3d4ba0beb7fd8ebc4b3"
+        },
+        "emitted_at": "2026-08-17T04:18:18.421730Z",
+        "errors": [],
+        "exit_code": 0,
+        "journal_digest": null,
+        "kind": "cli_result",
+        "next_actions": [],
+        "schema": "kiln.cli.result/v1",
+        "session_revision": null,
+        "status": "ok",
+        "warnings": []
+      },
+      "reason": "schema_valid=true",
+      "status": "PASS"
+    }
+  ]
+}

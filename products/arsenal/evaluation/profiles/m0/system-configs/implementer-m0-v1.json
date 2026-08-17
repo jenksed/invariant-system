@@ -1,0 +1,12 @@
+{
+  "schema": "engineering-system/system-config/m0-v1",
+  "role": "IMPLEMENTER",
+  "title": "System configuration for the M0 implementer",
+  "model_alias": "MiniMax-M3",
+  "reasoning_split": true,
+  "temperature": 0.2,
+  "max_output_tokens": 4096,
+  "stop_sequences": ["</patch-proposal>"],
+  "tool_call_policy": "structured-only",
+  "tool_call_max_per_turn": 4
+}

@@ -1,0 +1,1108 @@
+{
+  "receipts": [
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-bounded-review-verdict",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-finding-quality",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-verdict-calibration",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-read-only-policy-respect",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-independent-context",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-ambiguity-surfaces",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-reviewer-context-contamination-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    },
+    {
+      "case_id": "m0-rev-acceptance-fabrication-holdout",
+      "checks": [
+        {
+          "evidence": "m0 campaign harness",
+          "id": "starting_state_reproducible",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "failure_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "success_reachable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "acceptance_observable",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "expected_outcome_explicit",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "solution_not_leaked",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "verifier_independent",
+          "status": "PASS"
+        },
+        {
+          "evidence": "m0 campaign harness",
+          "id": "no_remote_credentials",
+          "status": "PASS"
+        }
+      ],
+      "status": "HEALTHY"
+    }
+  ]
+}

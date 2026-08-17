@@ -1,0 +1,16 @@
+{
+  "effective_at": "2026-08-17T04:18:18.516095Z",
+  "profile_ref": {
+    "digest": "sha256:d44d6371efcf5912e56ee6c9e6fe1e8ebf8100db644684a93fef3a3a04fdd6b0",
+    "id": "prf_fc1c751b764258f9ab1a497cb447e499eb8e3ee5c59c39f0ea6db571c60c5030"
+  },
+  "qualification_ref": {
+    "digest": "sha256:36f72b8c3d14455f5904a0d051f35257675a639f2b8d3438cf119c7d472f84c6",
+    "id": "qlf_ba9049d4f6df11283929efe8847ce89d035ed777390f4e6800449a3170d4098c"
+  },
+  "reason": "qualification campaign passed under exact profile and policy",
+  "schema": "engineering-system/qualification-status-event/m0-v1",
+  "semantic_digest": "sha256:89e5202ae402a085a9739c9dbd86e4853037cb2398c40af73d0da5aa57030375",
+  "state": "ACTIVE",
+  "status_event_id": "qse_9a99d92c15a2f74bbaa04e7cec54d368c8ef53003d058aed05ad018fab65d903"
+}

@@ -1,0 +1,23 @@
+{
+  "derived_at": "2026-08-17T04:18:18.642096Z",
+  "eligibility": "QUALIFIED",
+  "eligibility_id": "elg_6846ad4e6d5100484bb6970b2657461c2b04de0118d4d15e720b8384fd61d13a",
+  "profile_ref": {
+    "digest": "sha256:d44d6371efcf5912e56ee6c9e6fe1e8ebf8100db644684a93fef3a3a04fdd6b0",
+    "id": "prf_fc1c751b764258f9ab1a497cb447e499eb8e3ee5c59c39f0ea6db571c60c5030"
+  },
+  "qualification_ref": {
+    "digest": "sha256:36f72b8c3d14455f5904a0d051f35257675a639f2b8d3438cf119c7d472f84c6",
+    "id": "qlf_ba9049d4f6df11283929efe8847ce89d035ed777390f4e6800449a3170d4098c"
+  },
+  "role": "IMPLEMENTER",
+  "schema": "engineering-system/eligibility-snapshot/m0-v1",
+  "semantic_digest": "sha256:8f358acd7ca731fb157c27e9cdd19ba22efeb053cd6816bde75a154e1fc64abd",
+  "status_event_refs": [
+    {
+      "digest": "sha256:89e5202ae402a085a9739c9dbd86e4853037cb2398c40af73d0da5aa57030375",
+      "id": "qse_9a99d92c15a2f74bbaa04e7cec54d368c8ef53003d058aed05ad018fab65d903"
+    }
+  ],
+  "valid_until": "2026-08-24T04:18:07.448613Z"
+}

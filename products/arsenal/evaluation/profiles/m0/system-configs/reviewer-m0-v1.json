@@ -1,0 +1,12 @@
+{
+  "schema": "engineering-system/system-config/m0-v1",
+  "role": "REVIEWER",
+  "title": "System configuration for the M0 reviewer",
+  "model_alias": "MiniMax-M3",
+  "reasoning_split": true,
+  "temperature": 0.1,
+  "max_output_tokens": 2048,
+  "stop_sequences": ["</review-verdict>"],
+  "tool_call_policy": "read-only",
+  "tool_call_max_per_turn": 2
+}

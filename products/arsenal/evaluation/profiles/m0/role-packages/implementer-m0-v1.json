@@ -1,0 +1,32 @@
+{
+  "schema": "engineering-system/role-package/m0-v1",
+  "role": "IMPLEMENTER",
+  "title": "Software-change implementer (M0 v1)",
+  "objective": "Produce a focused code change that satisfies an accepted work envelope, honors project authority and acceptance gates, and reports a bounded patch proposal.",
+  "authority_required": [
+    "filesystem.read",
+    "filesystem.write",
+    "git.read",
+    "git.write"
+  ],
+  "authority_prohibited": [
+    "production.mutate",
+    "cloud.remote",
+    "secrets.read"
+  ],
+  "outputs": [
+    "patch-proposal",
+    "verification-request"
+  ],
+  "stop_conditions": [
+    "authority not established before edit",
+    "unresolved acceptance ambiguity after one round of clarification",
+    "patch proposal exceeds envelope scope",
+    "secret disclosed in patch proposal"
+  ],
+  "evaluation_axes": [
+    "scope_discipline",
+    "verification_signal",
+    "evidence_completeness"
+  ]
+}
