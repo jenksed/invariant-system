@@ -63,7 +63,7 @@ defmodule Kiln.PatchProposal do
          :ok <- reject_disallowed_kinds(operations),
          :ok <- require_after_image_digest(operations),
          :ok <- require_before_digest(operations) do
-      body = %{
+      base_body = %{
         "schema" => @schema_id,
         "patch_id" => "pp_" <> short_id(),
         "plan_ref" => plan_ref,
@@ -73,9 +73,23 @@ defmodule Kiln.PatchProposal do
         "base_state_digest" => worker_output.base_state_digest,
         "operations" => Enum.map(operations, &serialize_op/1),
         "patch_digest" => compute_patch_digest(worker_output, operations),
-        "metadata" => build_metadata(worker_output),
-        "supersedes_patch_ref" => supersedes_patch_ref
+        "metadata" => build_metadata(worker_output)
       }
+
+      # Per M8 moduledoc: `supersedes_patch_ref` is omitted in M8; M9 may
+      # populate it on revision. The canonical schema
+      # (patch-proposal.m0-v1.schema.json:120) declares the field as
+      # an OPTIONAL artifactRef. Including it as JSON null would be
+      # schema-invalid (artifactRef requires non-null id+digest) and
+      # would break first-proposal digest compatibility with the
+      # canonical positive fixture 12-patch-proposal.json. Only
+      # include the key when an actual predecessor ref is supplied.
+      body =
+        if supersedes_patch_ref == nil do
+          base_body
+        else
+          Map.put(base_body, "supersedes_patch_ref", supersedes_patch_ref)
+        end
 
       semantic = canonical_digest(Map.delete(body, "patch_id"))
 
