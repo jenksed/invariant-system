@@ -1,0 +1,20 @@
+{
+  "effective_at": "2026-08-16T20:00:00Z",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "profile_ref": {
+    "digest": "sha256:d6121dc5ccd65086c707955e5c3e35a669391ca4d008482a280022e74e6815a1",
+    "id": "prf_d6121dc5ccd65086c707955e5c3e35a6"
+  },
+  "qualification_ref": {
+    "digest": "sha256:83ea8041fbeba586fd42adf1e0c138702a0936e86fcea39bd398b8f773532bbe",
+    "id": "qlf_83ea8041fbeba586fd42adf1e0c13870"
+  },
+  "reason": "qualification campaign passed under exact profile and policy",
+  "schema": "engineering-system/qualification-status-event/m0-v1",
+  "semantic_digest": "sha256:c3e47a0663c47f4d47ebeda40a2ba3a1ff5f9883acbdedf28ad6fa2fb5eb8cca",
+  "state": "ACTIVE",
+  "status_event_id": "qse_c3e47a0663c47f4d47ebeda40a2ba3a1"
+}

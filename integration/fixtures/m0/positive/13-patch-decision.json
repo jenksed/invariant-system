@@ -1,0 +1,15 @@
+{
+  "base_state_digest": "sha256:88ab445ed9bdc1fa8cd336cf6c3cd58d35d12864550f609ee496886c04f6c30a",
+  "decision": "APPROVE_EXACT_BYTES",
+  "decision_id": "dec_dbd59834f38b5227bd61cd49eb7ffd3e",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "patch_ref": {
+    "digest": "sha256:5d4a5e68e8e1b6a0be5eebf194e78da635168229d3a857291dbdf9551eb058b7",
+    "id": "pat_5d4a5e68e8e1b6a0be5eebf194e78da6"
+  },
+  "schema": "engineering-system/patch-decision/m0-v1",
+  "semantic_digest": "sha256:dbd59834f38b5227bd61cd49eb7ffd3e7075f65f4504d800c5e3c35e4be2a35d"
+}

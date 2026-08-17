@@ -1,0 +1,137 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/patch-proposal/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "base_commit": {
+      "pattern": "^[0-9a-f]{40}$",
+      "type": "string"
+    },
+    "base_state_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "operations": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "after_image_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "before_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mode": {
+            "enum": [
+              "100644",
+              null
+            ]
+          },
+          "op": {
+            "enum": [
+              "add",
+              "replace",
+              "delete"
+            ]
+          },
+          "path": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "op",
+          "path",
+          "before_digest",
+          "after_image_digest"
+        ],
+        "type": "object"
+      },
+      "maxItems": 32,
+      "minItems": 1,
+      "type": "array"
+    },
+    "patch_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "patch_id": {
+      "type": "string"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "repository": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/patch-proposal/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "supersedes_patch_ref": {
+      "$ref": "#/$defs/artifactRef"
+    }
+  },
+  "required": [
+    "schema",
+    "patch_id",
+    "semantic_digest",
+    "plan_ref",
+    "attempt_ref",
+    "repository",
+    "base_commit",
+    "base_state_digest",
+    "operations",
+    "patch_digest"
+  ],
+  "type": "object"
+}

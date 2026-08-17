@@ -1,0 +1,161 @@
+{
+  "package": "M0",
+  "entries": [
+    {
+      "path": "integration/fixtures/m0/positive/01-plan.json",
+      "sha256": "15e67edc0cabc6ca5eb80be3b7c77c635054542ebb79d1d304b17ad7bd8eaaa9"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/02-implementer-requirement.json",
+      "sha256": "6114a72befaa807a7d84998f15d57d64068b597e3dea8eefa7f26cb51d5c4970"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/03-implementer-profile.json",
+      "sha256": "2fd0274332e005e0b686c7c565347277ccd99c9c0023db761bae6717ee83d46b"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/04-implementer-qualification-receipt.json",
+      "sha256": "7f333e23840b401d64fe035aa58aefd2f01ed99d41b090255dc9e3fb7cc9e736"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/05-implementer-status-event.json",
+      "sha256": "8e54da69f160a525c264114eae59dca54e69aa9d081de166b7d8850f022e81ac"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/06-implementer-eligibility.json",
+      "sha256": "3171bbe7e183219b3bc3c252c1774d379c6f202312513dafd48c4a4f9531377a"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/07-implementer-assignment.json",
+      "sha256": "b2b76b6b74910a721fb4b79657588aaf1c8c7eff3c49be0fc6edcfb02790d543"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/08-execution-binding.json",
+      "sha256": "e304cfe0adcb6525e5178be66f39d776cffeaaa2bf0498cb12adee094a544130"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/09-work-envelope-v0.json",
+      "sha256": "d0cedcb8e31e091f4b32222f273f85918974e5d30619e290bc0c03c5ad265b89"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/10-run-binding.json",
+      "sha256": "95c283c15c33396501dd3315bdf2c8a7c9b5ebd1ab73947c2834ebc6166903bf"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/11-attempt.json",
+      "sha256": "e5f29c7becbbc85c2e23f4448d7ded351aa8b722c08d8dc68b5160da4681ea10"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/11a-worker-output.json",
+      "sha256": "979180911be412432a91499217443bfc2aa894c9d76e7b056b7737dde4744ac0"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/12-patch-proposal.json",
+      "sha256": "5e2c683800e499bae0b84907185ef43c3733d7cbc25057475f1e8adcd1a36c8f"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/13-patch-decision.json",
+      "sha256": "c3c00d1d8be524aae9861de7637599c58a1f97aedde3784ae3944c0e60966992"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/14-patch-application-evidence.json",
+      "sha256": "d73011d2f124ebe30f1804aedd3ec9068a0f115728b0d4fa868d717bd3435979"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/15-verification-result.json",
+      "sha256": "ba1a6f9b0d519c12251f679d4b6f8dd57803ac3ed9fee26517d433fdc585367a"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/16-reviewer-requirement.json",
+      "sha256": "f15f2034783092c5dbf7cb8a1a6957f6554d2350e7d4821fe7567cd677259479"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/17-reviewer-profile.json",
+      "sha256": "b8306190da8440cc9f984244cdac843079f619b557f101354ef9cf5209706b30"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/18-reviewer-qualification-receipt.json",
+      "sha256": "6be8af0db5a702720032303014530981a296cb77283f45b063f3375e0571aa2e"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/19-reviewer-status-event.json",
+      "sha256": "be4b7f93c840b031427a6ee0b2bfb4a4cf9e7dfa675f418f05daa82a909de579"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/20-reviewer-eligibility.json",
+      "sha256": "80bd40c0a5350a9ed5baab82e1d20db1707e934478b1dd0554241ddcf400f233"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/21-reviewer-assignment.json",
+      "sha256": "34c8f6b130f82edf1a88a3525d2eb2b0b1aaacf76d5d456831db4d4f953b4b67"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/22-review.json",
+      "sha256": "dc5d77ec0c8c57d29e8d21ae79b51b15815af8e005db98d637082b9757effccb"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/23-human-decision.json",
+      "sha256": "8dc417c9aeb90ef8e8681baaeb604fbe234f61263f576b3b69cbabba2d4b1121"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/24-run-result-envelope-v0.json",
+      "sha256": "2ce1d9213d021fe03c10dc5f0424bfcbb5c137113e8ae8be86ac9d4b3d9a3ac4"
+    },
+    {
+      "path": "integration/fixtures/m0/positive/25-run-result-projection.json",
+      "sha256": "c18c7901fe270946cac716e78b07f03aeec8676505390594a904bec3169f95d5"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/authority-smuggling-assignment.json",
+      "sha256": "22d6dd2fe4c874b8df1a4990776dcd8bb401214f844d07d612300086ea2253b2"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/authority-smuggling-requirement.json",
+      "sha256": "31c2011fd49cb8687fff5ddb2468a262198fc1389f769a5e32594bb45f8ec6d1"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/partial-unknown-effect.json",
+      "sha256": "35ed721983580cbd9de3c9414287e8cc0e965e8b15c715e18f0d0f58bfdfa9cd"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/path-escape.json",
+      "sha256": "280ec98767a1ed72521c81f2217f5adedb59594cf83fc048aa6384cb1752f1bf"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/profile-assignment-mismatch.json",
+      "sha256": "c24913f1a854988f6265636c49728cd7da74f8bf74e0bffa66a7fec316e32e9d"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/provider-substitution.json",
+      "sha256": "2538378196746729f253f67e8c6a5234a354d5f4bc0aba6b6c4e91b616362ff9"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/review-reuse-after-patch-revision.json",
+      "sha256": "da72acfeb3d877b6a409447c0575761d1e3276a996cf6a89bd4378e6168ebfe8"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/reviewer-contamination.json",
+      "sha256": "cda45995f754330cbed173e0d2e4fffe9a87cfe22f354662e6e114e86bb9a7c0"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/runtime-unavailable.json",
+      "sha256": "9e54acf91e606f676d59d538e62c26afb11f459c95006d4c05c2e5043478ba00"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/secret-disclosure.json",
+      "sha256": "33a2b786772a9f746d60077a44d8302a6430c8918419547bc37a2b26aa420060"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/stale-base.json",
+      "sha256": "3eb52e9869c527d27fe925d1c58ac93d07b18734142b708748fe38361a8fc883"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/unqualified-assignment.json",
+      "sha256": "f84f2341d457f2a891dd89572e89b1f2db2a800ddcadb9091e42804c566fb1f7"
+    },
+    {
+      "path": "integration/fixtures/m0/negative/unsupported-binary.json",
+      "sha256": "24cc23f15d23c096948efc0145dde22a31ab384e12e2eb174186e8b9c13fbdb9"
+    }
+  ]
+}

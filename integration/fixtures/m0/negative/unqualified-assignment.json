@@ -1,0 +1,6 @@
+{
+  "case": "unqualified-assignment",
+  "description": "Assignment references eligibility=NOT_ELIGIBLE.",
+  "expected_error": "E_PROFILE_NOT_QUALIFIED",
+  "fixture_only": true
+}

@@ -1,0 +1,71 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/run-binding/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "execution_binding_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "run_binding_id": {
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/run-binding/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "work_id": {
+      "type": "string"
+    },
+    "work_request_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "run_binding_id",
+    "semantic_digest",
+    "work_id",
+    "work_request_digest",
+    "execution_binding_ref"
+  ],
+  "type": "object"
+}

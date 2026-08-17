@@ -1,0 +1,6 @@
+{
+  "case": "runtime-unavailable",
+  "description": "Qualified profile is not live executable; no substitution/reassignment occurs automatically.",
+  "expected_error": "E_RUNTIME_UNAVAILABLE",
+  "fixture_only": true
+}

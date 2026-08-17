@@ -1,0 +1,6 @@
+{
+  "case": "stale-base",
+  "description": "Patch base state differs from current repository observation.",
+  "expected_error": "E_PATCH_BASE_MISMATCH",
+  "fixture_only": true
+}

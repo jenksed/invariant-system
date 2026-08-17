@@ -1,5 +1,8 @@
 # Coordination Overview
 
+> SUPERSEDED — see program/SUPERSESSION-NOTICE.md.
+> Preserved as provenance; not active authority for monorepo work.
+
 This document explains how the engineering-system repository coordinates the
 product vision across the three product repositories. It is the architectural
 companion to README.md for anyone who needs to understand how the four

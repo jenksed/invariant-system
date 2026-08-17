@@ -1,0 +1,117 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/intelligence-requirement/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "context_requirements": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "disclosure_class": {
+      "enum": [
+        "REMOTE_BY_EXPLICIT_MANIFEST",
+        "LOCAL_ONLY"
+      ]
+    },
+    "independence": {
+      "additionalProperties": false,
+      "properties": {
+        "must_differ_from_assignment_ref": {
+          "$ref": "#/$defs/artifactRef"
+        },
+        "must_not_receive_implementer_transcript": {
+          "const": true,
+          "type": "boolean"
+        },
+        "must_use_separate_context_manifest": {
+          "const": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "must_not_receive_implementer_transcript",
+        "must_use_separate_context_manifest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "required_capabilities": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "requirement_id": {
+      "type": "string"
+    },
+    "role": {
+      "enum": [
+        "IMPLEMENTER",
+        "REVIEWER"
+      ]
+    },
+    "schema": {
+      "const": "engineering-system/intelligence-requirement/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "task_kind": {
+      "const": "SOFTWARE_CHANGE"
+    }
+  },
+  "required": [
+    "schema",
+    "requirement_id",
+    "semantic_digest",
+    "plan_ref",
+    "role",
+    "task_kind",
+    "required_capabilities",
+    "context_requirements",
+    "disclosure_class",
+    "independence"
+  ],
+  "type": "object"
+}

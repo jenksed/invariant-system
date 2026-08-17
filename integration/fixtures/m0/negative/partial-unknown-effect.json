@@ -1,0 +1,6 @@
+{
+  "case": "partial-unknown-effect",
+  "description": "Crash leaves bytes not matching known before/after digests; retry denied pending reconciliation.",
+  "expected_error": "E_MUTATION_UNKNOWN_EFFECT",
+  "fixture_only": true
+}

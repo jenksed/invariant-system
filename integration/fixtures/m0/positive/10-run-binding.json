@@ -1,0 +1,15 @@
+{
+  "execution_binding_ref": {
+    "digest": "sha256:93d1132ef251bf363d9a3d9e8d03284341b804c695bf61b94572ea4b223eaade",
+    "id": "bnd_93d1132ef251bf363d9a3d9e8d032843"
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "run_binding_id": "rbd_16cefe2839274cba642a48b2db5fa143",
+  "schema": "engineering-system/run-binding/m0-v1",
+  "semantic_digest": "sha256:16cefe2839274cba642a48b2db5fa1431c587335153df1a3311e9144bf2bebe5",
+  "work_id": "pass02-dogfood-stale-qualification-001",
+  "work_request_digest": "sha256:aa9f0bd3774dbca8241201c378a2277da3762f2ce11a2c8b81bef8f4e3154f4f"
+}

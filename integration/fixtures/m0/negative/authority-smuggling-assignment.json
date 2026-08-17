@@ -1,0 +1,6 @@
+{
+  "case": "authority-smuggling-assignment",
+  "description": "Assignment carries authority_grant field.",
+  "expected_error": "E_AUTHORITY_FIELD_FORBIDDEN",
+  "fixture_only": true
+}

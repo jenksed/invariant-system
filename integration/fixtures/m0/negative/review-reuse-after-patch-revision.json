@@ -1,0 +1,6 @@
+{
+  "case": "review-reuse-after-patch-revision",
+  "description": "A review of superseded patch is presented for revised patch.",
+  "expected_error": "E_REVIEW_STALE",
+  "fixture_only": true
+}

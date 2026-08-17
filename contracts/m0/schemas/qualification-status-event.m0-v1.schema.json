@@ -1,0 +1,85 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/qualification-status-event/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "effective_at": {
+      "format": "date-time",
+      "type": "string"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "profile_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "qualification_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "reason": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/qualification-status-event/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "state": {
+      "enum": [
+        "ACTIVE",
+        "STALE",
+        "SUPERSEDED",
+        "INVALIDATED"
+      ]
+    },
+    "status_event_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "status_event_id",
+    "semantic_digest",
+    "profile_ref",
+    "qualification_ref",
+    "effective_at",
+    "state",
+    "reason"
+  ],
+  "type": "object"
+}

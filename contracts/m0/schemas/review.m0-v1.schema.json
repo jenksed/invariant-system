@@ -1,0 +1,102 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/review/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "context_manifest_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "findings": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "implementer_transcript_received": {
+      "const": false,
+      "type": "boolean"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "patch_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "plan_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "result_state_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "review_id": {
+      "type": "string"
+    },
+    "reviewer_assignment_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "schema": {
+      "const": "engineering-system/review/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "verdict": {
+      "enum": [
+        "APPROVE",
+        "REQUEST_REVISION",
+        "REJECT"
+      ]
+    },
+    "verification_ref": {
+      "$ref": "#/$defs/artifactRef"
+    }
+  },
+  "required": [
+    "schema",
+    "review_id",
+    "semantic_digest",
+    "reviewer_assignment_ref",
+    "plan_ref",
+    "patch_ref",
+    "verification_ref",
+    "result_state_digest",
+    "context_manifest_ref",
+    "verdict",
+    "findings"
+  ],
+  "type": "object"
+}

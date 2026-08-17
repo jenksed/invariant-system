@@ -1,5 +1,8 @@
 # Current Program State
 
+> SUPERSEDED — see program/SUPERSESSION-NOTICE.md.
+> Preserved as provenance; not active authority for monorepo work.
+
 **Observed:** 2026-08-12  
 **Status:** Static gates complete; final launch authorization on HOLD
 

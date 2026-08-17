@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "artifactRef": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "id": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "metadata": {
+      "additionalProperties": false,
+      "properties": {
+        "fixture_only": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    }
+  },
+  "$id": "engineering-system/patch-application-evidence/m0-v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "application_id": {
+      "type": "string"
+    },
+    "decision_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "effect": {
+      "enum": [
+        "NO_EFFECT_OBSERVED",
+        "TARGET_EFFECT_OBSERVED",
+        "PARTIAL_KNOWN_EFFECT",
+        "UNKNOWN_EFFECT",
+        "EXACT_TARGET_STATE_OBSERVED"
+      ]
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "patch_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "post_state_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "pre_state_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "schema": {
+      "const": "engineering-system/patch-application-evidence/m0-v1"
+    },
+    "semantic_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "application_id",
+    "semantic_digest",
+    "patch_ref",
+    "decision_ref",
+    "pre_state_digest",
+    "post_state_digest",
+    "effect"
+  ],
+  "type": "object"
+}

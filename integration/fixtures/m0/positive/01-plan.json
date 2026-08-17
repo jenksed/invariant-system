@@ -1,0 +1,43 @@
+{
+  "acceptance_criteria": [
+    "validator rejects stale eligibility with E_QUALIFICATION_NOT_CURRENT",
+    "positive M0 conformance remains green"
+  ],
+  "authority_requests": [
+    "repository.read",
+    "patch.propose",
+    "verification.run"
+  ],
+  "disclosure_boundary": "REMOTE_DISCLOSURE_ALLOWED_BY_MANIFEST",
+  "goal": {
+    "detail": "Add a negative fixture proving a stale profile cannot be assigned.",
+    "title": "Reject stale qualification in M0 conformance"
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "plan_id": "pln_48e474ac89fbe3d9498c83fb6d4254ba",
+  "proof_obligations": [
+    "registered M0 validator rejects the stale fixture with the exact code",
+    "all positive fixtures remain valid"
+  ],
+  "safety_boundary": [
+    "no direct Worker mutation",
+    "no git commit/push/merge",
+    "text files only"
+  ],
+  "schema": "engineering-system/plan/m0-v1",
+  "scope": {
+    "excluded": [
+      "runtime provider implementation",
+      "deployment",
+      "binary files"
+    ],
+    "included": [
+      "fixtures/m0/negative/qualification-stale-rejected.json",
+      "fixtures/m0/manifest.json"
+    ]
+  },
+  "semantic_digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118"
+}

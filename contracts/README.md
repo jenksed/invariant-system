@@ -10,6 +10,7 @@ implementations.
 | Run Result Envelope v0 | [run-result-envelope.v0.md](run-result-envelope.v0.md) | [integration/fixtures/run-result-envelope.v0.yaml](../integration/fixtures/run-result-envelope.v0.yaml) |
 | Qualified Method Record v0 | [qualified-method-record.v0.md](qualified-method-record.v0.md) | [integration/fixtures/qualified-method-record.v0.yaml](../integration/fixtures/qualified-method-record.v0.yaml) |
 | Learning Observation v0 | [learning-observation.v0.md](learning-observation.v0.md) | [integration/fixtures/learning-observation.v0.yaml](../integration/fixtures/learning-observation.v0.yaml) |
+| M0 Contract Packet (Pass-02 frozen, byte-exact) | [m0/README.md](m0/README.md) | [integration/fixtures/m0/](../integration/fixtures/m0/) (26 positive + 13 of 14 negative; `stale-qualification.json` reserved for `SYS-M0-03`) |
 
 ## Provenance
 

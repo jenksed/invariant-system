@@ -1,0 +1,37 @@
+{
+  "attempt_ref": {
+    "digest": "sha256:c08eb040b13c48d265a6819cc6f221cbc883dee6390dccf1d8224c6e47a4fa3f",
+    "id": "att_c08eb040b13c48d265a6819cc6f221cb"
+  },
+  "base_commit": "5dcb5d274350f9a23b0bb332c7ee20e81de66e28",
+  "base_state_digest": "sha256:88ab445ed9bdc1fa8cd336cf6c3cd58d35d12864550f609ee496886c04f6c30a",
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "operations": [
+    {
+      "after_image_digest": "sha256:b3eb15b0910b950799fac6791efa0c10273f1e07d86a3bae837846327cd45efd",
+      "before_digest": null,
+      "mode": "100644",
+      "op": "add",
+      "path": "fixtures/m0/negative/qualification-stale-rejected.json"
+    },
+    {
+      "after_image_digest": "sha256:d4f9eb985589abc9f86edf12a170d22287cfee55cdc11ae53d9eeb05c3857f4b",
+      "before_digest": null,
+      "mode": "100644",
+      "op": "add",
+      "path": "fixtures/m0/manifest.json"
+    }
+  ],
+  "patch_digest": "sha256:162b2b5c27d65e01f84493d0c1732038befc7a0b77c93ea0d257e86aa8a6da1c",
+  "patch_id": "pat_5d4a5e68e8e1b6a0be5eebf194e78da6",
+  "plan_ref": {
+    "digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118",
+    "id": "pln_48e474ac89fbe3d9498c83fb6d4254ba"
+  },
+  "repository": "jenksed/engineering-system",
+  "schema": "engineering-system/patch-proposal/m0-v1",
+  "semantic_digest": "sha256:5d4a5e68e8e1b6a0be5eebf194e78da635168229d3a857291dbdf9551eb058b7"
+}

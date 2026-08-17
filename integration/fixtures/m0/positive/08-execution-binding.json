@@ -1,0 +1,41 @@
+{
+  "assignment_ref": {
+    "digest": "sha256:58353a808270d002a61728f3b532bae3e7505c500ad8c4b4663cd3286f3849e6",
+    "id": "asg_58353a808270d002a61728f3b532bae3"
+  },
+  "binding_id": "bnd_93d1132ef251bf363d9a3d9e8d032843",
+  "contract_set_ref": {
+    "digest": "sha256:8058f5d6e67cf153a8ac9570070ece4324b5dcbd02d77f3dd4065f04db047c2c",
+    "id": "m0-contract-set/v1"
+  },
+  "disclosure_policy_ref": {
+    "digest": "sha256:454fe001688b502221a087a3dfd392723db99f353ce8d2cb0efe946334febde2",
+    "id": "context-disclosure-policy/m0-v1"
+  },
+  "eligibility_ref": {
+    "digest": "sha256:56f3dc1ba2742d244e6ed911f3ef3e6fda2a2aa630b5ac214c4db155ba411225",
+    "id": "elg_56f3dc1ba2742d244e6ed911f3ef3e6f"
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; not production qualification or provider evidence."
+  },
+  "patch_policy_ref": {
+    "digest": "sha256:e8319c9e996275dd81eaa4416d80eb340da32828878a830f8832dd348c92094c",
+    "id": "patch-mutation-contract/m0-v1"
+  },
+  "plan_ref": {
+    "digest": "sha256:48e474ac89fbe3d9498c83fb6d4254ba41677246fcbcc6f0be352bc25c852118",
+    "id": "pln_48e474ac89fbe3d9498c83fb6d4254ba"
+  },
+  "profile_ref": {
+    "digest": "sha256:d6121dc5ccd65086c707955e5c3e35a669391ca4d008482a280022e74e6815a1",
+    "id": "prf_d6121dc5ccd65086c707955e5c3e35a6"
+  },
+  "requirement_ref": {
+    "digest": "sha256:073b253439da8ec5a3447d6ba998649cf52c9bfd643b05193c071f7081107411",
+    "id": "req_073b253439da8ec5a3447d6ba998649c"
+  },
+  "schema": "engineering-system/execution-binding/m0-v1",
+  "semantic_digest": "sha256:93d1132ef251bf363d9a3d9e8d03284341b804c695bf61b94572ea4b223eaade"
+}

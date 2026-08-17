@@ -1,0 +1,54 @@
+{
+  "acceptance_readiness": {
+    "ready": true,
+    "reasons": [
+      "registered verification passed",
+      "independent review approved"
+    ]
+  },
+  "authority": {
+    "denied": [],
+    "granted": [
+      "repository.read",
+      "patch.propose",
+      "patch.apply.exact",
+      "verification.run"
+    ],
+    "requested": [
+      "repository.read",
+      "patch.propose"
+    ]
+  },
+  "effects": [
+    {
+      "kind": "patch_application",
+      "patch_digest": "sha256:162b2b5c27d65e01f84493d0c1732038befc7a0b77c93ea0d257e86aa8a6da1c",
+      "state": "known"
+    }
+  ],
+  "evidence": [
+    "sha256:ca3c60dcb20fa8cd04df7b8662d5183e7693ea2f2bd4b2b640973058d64038f7",
+    "sha256:bbd0d94ecb125f2caa587bd8ab4c33bbf9dc60540d17636ba2b883fb652cd3d3"
+  ],
+  "final_state": {
+    "commit": "5dcb5d274350f9a23b0bb332c7ee20e81de66e28",
+    "workspace_state_digest": "sha256:5eedf3fa774f0dc44ba024cd71f91d13509e55111d7373dde2c464962715a5a5"
+  },
+  "input_state": {
+    "base_commit": "5dcb5d274350f9a23b0bb332c7ee20e81de66e28",
+    "workspace_state_digest": "sha256:88ab445ed9bdc1fa8cd336cf6c3cd58d35d12864550f609ee496886c04f6c30a"
+  },
+  "proof_obligations": {
+    "invalidated": [],
+    "satisfied": [
+      "m0-stale-rejected"
+    ],
+    "unsatisfied": []
+  },
+  "recovery": null,
+  "run_id": "run_00112233445566778899aabbccddeeff",
+  "schema": "engineering-system/run-result-envelope/v0",
+  "status": "completed",
+  "unknowns": [],
+  "work_id": "pass02-dogfood-stale-qualification-001"
+}

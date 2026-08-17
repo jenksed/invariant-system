@@ -1,0 +1,6 @@
+{
+  "case": "profile-assignment-mismatch",
+  "description": "Assignment projection attempts provider/model substitution relative to profile_ref.",
+  "expected_error": "E_PROFILE_REF_MISMATCH",
+  "fixture_only": true
+}

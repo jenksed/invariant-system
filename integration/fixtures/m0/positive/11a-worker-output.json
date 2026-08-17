@@ -1,0 +1,27 @@
+{
+  "assignment_ref": {
+    "digest": "sha256:58353a808270d002a61728f3b532bae3e7505c500ad8c4b4663cd3286f3849e6",
+    "id": "asg_58353a808270d002a61728f3b532bae3"
+  },
+  "attempt_ref": {
+    "digest": "sha256:c08eb040b13c48d265a6819cc6f221cbc883dee6390dccf1d8224c6e47a4fa3f",
+    "id": "att_c08eb040b13c48d265a6819cc6f221cb"
+  },
+  "metadata": {
+    "fixture_only": true,
+    "note": "Planning/conformance fixture; raw completion is not mutation authority."
+  },
+  "output_kind": "PATCH_CANDIDATE",
+  "parsed_candidate_digest": "sha256:d552f21cc0c650bc074f005a5678e4e64fd9a9c1faa67250fe55bd142df05644",
+  "profile_ref": {
+    "digest": "sha256:d6121dc5ccd65086c707955e5c3e35a669391ca4d008482a280022e74e6815a1",
+    "id": "prf_d6121dc5ccd65086c707955e5c3e35a6"
+  },
+  "raw_completion_ref": {
+    "digest": "sha256:c74c98bf9429fde0be513e1e653a5015bb02cca775de9c048a9ce76becea4325",
+    "id": "fixture-raw-completion-001"
+  },
+  "schema": "engineering-system/worker-output/m0-v1",
+  "semantic_digest": "sha256:5eec663ab123e1c0cff9f3bcd45bd6641329345e1f269b04d1f38681dbc05fd1",
+  "worker_output_id": "wrk_5eec663ab123e1c0cff9f3bcd45bd664"
+}
