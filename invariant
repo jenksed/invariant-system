@@ -282,21 +282,40 @@ test_manifold() {
   (cd products/manifold && python3 tests/test_selector.py)
 }
 
+test_contracts() {
+  if ! python3 -c 'import jsonschema' 2>/dev/null; then
+    fail "test_contracts requires python3 jsonschema (pip install jsonschema)"
+  fi
+  python3 integration/validate_m0.py
+  python3 -c "
+import json
+with open('integration/fixtures/m0/MANIFEST.json') as f:
+    m = json.load(f)
+entries = m['entries']
+assert len(entries) >= 14, f'MANIFEST must cover at least 14 negative cases; got {len(entries)}'
+for e in entries:
+    assert e['path'].startswith('integration/fixtures/m0/')
+    assert len(e['sha256']) == 64
+print(f'MANIFEST ok: {len(entries)} entries')
+"
+}
+
 cmd_test() {
   local target=${1:-all}
   case "$target" in
-    arsenal|loadout|kiln|temper|manifold|integration) "test_$target" ;;
+    arsenal|loadout|kiln|temper|manifold|integration|contracts) "test_$target" ;;
     all)
       test_arsenal
       test_loadout
       test_kiln
       test_temper
       test_manifold
+      test_contracts
       test_integration
       say ""
       say "invariant test: all products passed"
       ;;
-    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|manifold|integration)" ;;
+    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|manifold|integration|contracts)" ;;
   esac
 }
 

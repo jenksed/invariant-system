@@ -1,0 +1,6 @@
+{
+  "case": "stale-qualification",
+  "description": "Qualification receipt is historical evidence but currentness is STALE.",
+  "expected_error": "E_QUALIFICATION_NOT_CURRENT",
+  "fixture_only": true
+}
