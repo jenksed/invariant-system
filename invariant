@@ -278,20 +278,25 @@ test_integration() {
   ./integration/scenarios/repository-recon/run.sh
 }
 
+test_manifold() {
+  (cd products/manifold && python3 tests/test_selector.py)
+}
+
 cmd_test() {
   local target=${1:-all}
   case "$target" in
-    arsenal|loadout|kiln|temper|integration) "test_$target" ;;
+    arsenal|loadout|kiln|temper|manifold|integration) "test_$target" ;;
     all)
       test_arsenal
       test_loadout
       test_kiln
       test_temper
+      test_manifold
       test_integration
       say ""
       say "invariant test: all products passed"
       ;;
-    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|integration)" ;;
+    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|manifold|integration)" ;;
   esac
 }
 
