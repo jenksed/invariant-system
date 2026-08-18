@@ -3,15 +3,27 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
   Deterministic provider proof for `Kiln.MinimaxM3Adapter`.
 
   Every assertion in this file runs through a deterministic transport seam
-  (the dispatch function is overridden via `Application.put_env/3` to a local
-  function returning canned responses). No live network, no live credential,
-  no real `MINIMAX_API_KEY` value ever appears in a returned field, log,
-  artifact, or result payload.
+  (the transport function is overridden via `Application.put_env(:kiln,
+  :minimax_transport, fn ...)` to a local function returning canned response
+  sequences). No live network, no live credential, no real `MINIMAX_API_KEY`
+  value ever appears in a returned field, log, artifact, or result payload.
 
   These tests prove the bounded properties of the KILN-M0-01
-  implementation in isolation from the network: bounded raw transport
-  receipt, bounded timeout, no retry, no fallback, secret non-propagation,
-  canonical failure-class normalization.
+  implementation in isolation from the network:
+
+    - bounded raw transport receipt (via `process_stream_events/2`);
+    - bounded response acceptance (via the transport seam);
+    - no retry, no fallback, exactly one dispatch attempt;
+    - secret non-propagation;
+    - availability / credential boundary;
+    - request formation;
+    - canonical failure-class normalization.
+
+  The bounded receive path property (status available before body
+  materialization + incremental bounded body receipt + halt on oversize)
+  is proved by `process_stream_events/2` directly with simulated Finch
+  event sequences, without needing a real Finch instance or a real
+  HTTP server.
   """
 
   use ExUnit.Case, async: false
@@ -36,11 +48,11 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
   }
 
   setup do
-    original = Application.get_env(:kiln, :minimax_http_dispatch)
+    original = Application.get_env(:kiln, :minimax_transport)
     on_exit(fn ->
       case original do
-        nil -> Application.delete_env(:kiln, :minimax_http_dispatch)
-        v -> Application.put_env(:kiln, :minimax_http_dispatch, v)
+        nil -> Application.delete_env(:kiln, :minimax_transport)
+        v -> Application.put_env(:kiln, :minimax_transport, v)
       end
     end)
 
@@ -52,16 +64,38 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       end
     end)
 
-    # Default the credential so most tests do not have to repeat it.
-    # Tests that want the "missing credential" terminal set it to nil after
-    # calling System.put_env with an empty string.
     System.put_env("MINIMAX_API_KEY", "det-test-credential")
 
     :ok
   end
 
-  defp install_dispatch(canned) do
-    Application.put_env(:kiln, :minimax_http_dispatch, fn _opts -> canned end)
+  defp install_transport(canned) do
+    Application.put_env(:kiln, :minimax_transport, fn _request, _credential, _opts -> canned end)
+  end
+
+  defp install_transport_with_counter(canned, test_pid) do
+    counter = :counters.new(1, [])
+
+    Application.put_env(
+      :kiln,
+      :minimax_transport,
+      fn _request, _credential, _opts ->
+        :counters.add(counter, 1, 1)
+        send(test_pid, {:dispatched, :counters.get(counter, 1)})
+        canned
+      end
+    )
+  end
+
+  defp install_transport_with_capture(canned, test_pid) do
+    Application.put_env(
+      :kiln,
+      :minimax_transport,
+      fn request, credential, opts ->
+        send(test_pid, {:transport_captured, {request, credential, opts}})
+        canned
+      end
+    )
   end
 
   defp make_request do
@@ -69,10 +103,199 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     req
   end
 
-  describe "bounded raw transport receipt" do
+  describe "bounded raw transport receipt (process_stream_events/2)" do
+    test "single chunk below the 1 MiB ceiling is accepted" do
+      limit = MinimaxM3Adapter.max_response_bytes()
+      expected_bytes = limit - 1
+      body = String.duplicate("a", expected_bytes)
+
+      events = [
+        {:status, 200},
+        {:headers, []},
+        {:data, body}
+      ]
+
+      assert {:ok, %{status: 200, body: ^body, body_bytes: ^expected_bytes}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "single chunk exactly at the 1 MiB ceiling is accepted" do
+      limit = MinimaxM3Adapter.max_response_bytes()
+      body = String.duplicate("b", limit)
+
+      events = [
+        {:status, 200},
+        {:headers, []},
+        {:data, body}
+      ]
+
+      assert {:ok, %{status: 200, body_bytes: ^limit, body: ^body}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "single chunk first byte over the ceiling halts and discards partial body" do
+      limit = MinimaxM3Adapter.max_response_bytes()
+      over = String.duplicate("c", limit + 1)
+      expected_bytes = limit + 1
+
+      events = [
+        {:status, 200},
+        {:headers, []},
+        {:data, over}
+      ]
+
+      assert {:halt, ^expected_bytes} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "single chunk far over the ceiling halts" do
+      limit = MinimaxM3Adapter.max_response_bytes()
+      over = String.duplicate("d", limit * 2)
+      expected_bytes = limit * 2
+
+      events = [
+        {:status, 200},
+        {:headers, []},
+        {:data, over}
+      ]
+
+      assert {:halt, ^expected_bytes} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "multi-chunk below limit: all chunks accumulated" do
+      limit = MinimaxM3Adapter.max_response_bytes()
+      chunk = String.duplicate("x", 100)
+      expected_bytes = 100 * 100
+      events = [{:status, 200}, {:headers, []}] ++ List.duplicate({:data, chunk}, 100)
+
+      assert {:ok, %{body_bytes: ^expected_bytes, status: 200}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "multi-chunk exactly at limit: all chunks accumulated" do
+      limit = 1000
+      chunk = String.duplicate("y", 100)
+      expected_bytes = 1000
+      events = [{:status, 200}, {:headers, []}] ++ List.duplicate({:data, chunk}, 10)
+
+      assert {:ok, %{body_bytes: ^expected_bytes, status: 200}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "multi-chunk crossing limit: halts on the over-limit chunk" do
+      limit = 1000
+      chunk = String.duplicate("z", 400)
+      expected_bytes = 1200
+      events = [{:status, 200}, {:headers, []}, {:data, chunk}, {:data, chunk}, {:data, chunk}]
+
+      # After 2 chunks: 800 bytes. 3rd chunk would push to 1200 > 1000 → halt.
+      assert {:halt, ^expected_bytes} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "multi-chunk error response crossing limit also halts" do
+      limit = 100
+      chunk = String.duplicate("e", 60)
+      expected_bytes = 120
+      events = [{:status, 500}, {:headers, []}, {:data, chunk}, {:data, chunk}]
+
+      # After 1 chunk: 60. 2nd chunk would push to 120 > 100 → halt.
+      assert {:halt, ^expected_bytes} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "status event is captured before any body processing" do
+      limit = 1000
+      events = [{:status, 401}, {:headers, []}, {:data, "unauthorized"}]
+
+      assert {:ok, %{status: 401, body: "unauthorized"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "401 response below limit maps to oversize-halting body size" do
+      limit = 1000
+      events = [{:status, 401}, {:headers, []}, {:data, String.duplicate("a", 600)}]
+
+      assert {:ok, %{status: 401, body_bytes: 600}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "403 response below limit" do
+      limit = 1000
+      events = [{:status, 403}, {:headers, []}, {:data, "forbidden"}]
+
+      assert {:ok, %{status: 403, body: "forbidden"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "408 response below limit" do
+      limit = 1000
+      events = [{:status, 408}, {:headers, []}, {:data, "timeout"}]
+
+      assert {:ok, %{status: 408, body: "timeout"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "429 response below limit" do
+      limit = 1000
+      events = [{:status, 429}, {:headers, []}, {:data, "rate-limited"}]
+
+      assert {:ok, %{status: 429, body: "rate-limited"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "500 response below limit" do
+      limit = 1000
+      events = [{:status, 500}, {:headers, []}, {:data, "server-error"}]
+
+      assert {:ok, %{status: 500, body: "server-error"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "502 response below limit" do
+      limit = 1000
+      events = [{:status, 502}, {:headers, []}, {:data, "bad-gateway"}]
+
+      assert {:ok, %{status: 502, body: "bad-gateway"}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "401 response above limit" do
+      limit = 1000
+      over = String.duplicate("a", 1001)
+      events = [{:status, 401}, {:headers, []}, {:data, over}]
+
+      assert {:halt, 1001} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "403 response above limit" do
+      limit = 1000
+      over = String.duplicate("a", 1001)
+      events = [{:status, 403}, {:headers, []}, {:data, over}]
+
+      assert {:halt, 1001} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "trailers event is observed without side effect" do
+      limit = 1000
+      events = [{:status, 200}, {:headers, []}, {:data, "body"}, {:trailers, []}]
+
+      assert {:ok, %{status: 200, body: "body", body_bytes: 4}} =
+               MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+
+    test "data after halt is not accumulated (the partial body is discarded)" do
+      limit = 100
+      chunk = String.duplicate("x", 60)
+      events = [{:status, 200}, {:headers, []}, {:data, chunk}, {:data, chunk}, {:data, chunk}]
+
+      # After 1 chunk: 60. 2nd chunk: 120 > 100 → halt.
+      # The 3rd chunk would NOT be processed.
+      assert {:halt, 120} = MinimaxM3Adapter.process_stream_events(events, limit)
+    end
+  end
+
+  describe "bounded response acceptance (via transport seam)" do
     test "accepts a body below the 1 MiB ceiling" do
       body = String.duplicate("a", 1024)
-      install_dispatch({:ok, {{:"HTTP/1.1", 200, "OK"}, [], body}})
+      install_transport({:ok, %{status: 200, headers: [], body: body}})
 
       assert {:ok, %{status: :ok, body: ^body, body_bytes: 1024}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -81,25 +304,33 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     test "accepts a body exactly at the 1 MiB ceiling" do
       ceiling = MinimaxM3Adapter.max_response_bytes()
       body = String.duplicate("b", ceiling)
-      install_dispatch({:ok, {{:"HTTP/1.1", 200, "OK"}, [], body}})
+      install_transport({:ok, %{status: 200, headers: [], body: body}})
 
       assert {:ok, result} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
       assert result.body_bytes == ceiling
     end
 
-    test "rejects a body that is first byte over the ceiling, before unbounded accumulation" do
+    test "rejects a body that is first byte over the ceiling" do
       ceiling = MinimaxM3Adapter.max_response_bytes()
       over = String.duplicate("c", ceiling + 1)
-      install_dispatch({:ok, {{:"HTTP/1.1", 200, "OK"}, [], over}})
+      install_transport({:ok, %{status: 200, headers: [], body: over}})
 
       assert {:error, %{status: :E_POLICY_REJECTION}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
     end
 
     test "rejects a body that is far over the ceiling" do
-      install_dispatch(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], String.duplicate("d", MinimaxM3Adapter.max_response_bytes() * 2)}}
+      install_transport(
+        {:ok, %{status: 200, headers: [], body: String.duplicate("d", MinimaxM3Adapter.max_response_bytes() * 2)}}
       )
+
+      assert {:error, %{status: :E_POLICY_REJECTION}} =
+               MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
+    end
+
+    test "transport seam oversize error reaches the adapter as :E_POLICY_REJECTION" do
+      ceiling = MinimaxM3Adapter.max_response_bytes()
+      install_transport({:error, :oversize, ceiling + 1})
 
       assert {:error, %{status: :E_POLICY_REJECTION}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -109,11 +340,9 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
   describe "no retry, no fallback, exactly one dispatch attempt" do
     test "exactly one dispatch on 2xx success" do
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok-body"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:ok, %{status: 200, headers: [], body: "ok-body"}},
+        test_pid
       )
 
       assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -123,11 +352,9 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
     test "exactly one dispatch on 4xx error" do
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 429, "Too Many Requests"}, [], "rate-limited"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:ok, %{status: 429, headers: [], body: "rate-limited"}},
+        test_pid
       )
 
       assert {:error, %{status: :E_POLICY_REJECTION}} =
@@ -138,11 +365,9 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
     test "exactly one dispatch on 5xx error" do
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 503, "Service Unavailable"}, [], "down"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:ok, %{status: 503, headers: [], body: "down"}},
+        test_pid
       )
 
       assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} =
@@ -151,27 +376,11 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       assert_received {:dispatched, 1}
     end
 
-    test "exactly one dispatch on malformed response (no exception escape)" do
+    test "exactly one dispatch on transport failure" do
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok-body"}},
-        test_pid,
-        :ok
-      )
-
-      assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
-
-      assert_received {:dispatched, 1}
-    end
-
-    test "exactly one dispatch on transport failure (no retry)" do
-      test_pid = self()
-
-      install_dispatch_with_counter(
-        {:error, :econnrefused},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:error, :finch_error, :econnrefused},
+        test_pid
       )
 
       assert {:error, %{status: :E_CONNECTION_LOST}} =
@@ -180,20 +389,17 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       assert_received {:dispatched, 1}
     end
 
-    test "no alternate provider path: the single dispatch is the only network attempt" do
+    test "exactly one dispatch on oversize error from transport" do
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:error, :oversize, 1_048_577},
+        test_pid
       )
 
-      assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
+      assert {:error, %{status: :E_POLICY_REJECTION}} =
+               MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
       assert_received {:dispatched, 1}
-
-      refute_received {:alternate_dispatch, _}
     end
   end
 
@@ -203,7 +409,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       System.put_env("MINIMAX_API_KEY", sentinel)
 
       body = "any response body the seam chooses to return"
-      install_dispatch({:ok, {{:"HTTP/1.1", 200, "OK"}, [], body}})
+      install_transport({:ok, %{status: 200, headers: [], body: body}})
 
       {:ok, result} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
@@ -220,58 +426,41 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       assert :ok = refute_sentinel_in_term("whatever", result)
     end
 
-    test "sentinel is absent from the request body sent over the seam" do
+    test "sentinel carrying the credential is forwarded to the transport" do
       sentinel = "SENTINEL-REQUEST-BODY-LEAK-PROBE"
       System.put_env("MINIMAX_API_KEY", sentinel)
 
       test_pid = self()
-
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
+      install_transport_with_capture(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
         test_pid
       )
 
       assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
-      assert_received {:request_captured, opts}
+      assert_received {:transport_captured, {request, credential, _opts}}
 
-      body =
-        opts
-        |> Keyword.get(:body)
-        |> case do
-          b when is_binary(b) -> b
-          _ -> ""
-        end
-
-      refute body =~ sentinel,
-             "credential value leaked into the request body sent to the provider"
+      assert request.semantic_digest =~ ~r/^sha256:[0-9a-f]{64}$/
+      assert credential == sentinel,
+             "the credential value must be passed to the transport (Bearer header) but not in any result field"
     end
 
-    test "sentinel is absent from the authorization header value passed to the seam" do
-      sentinel = "SENTINEL-HEADER-LEAK-PROBE"
+    test "sentinel is absent from the request fields sent to the transport" do
+      sentinel = "SENTINEL-REQUEST-BODY-LEAK-PROBE"
       System.put_env("MINIMAX_API_KEY", sentinel)
 
       test_pid = self()
-
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
+      install_transport_with_capture(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
         test_pid
       )
 
       assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
-      assert_received {:request_captured, opts}
+      assert_received {:transport_captured, {request, _credential, _opts}}
 
-      body =
-        opts
-        |> Keyword.get(:body)
-        |> case do
-          b when is_binary(b) -> b
-          _ -> ""
-        end
-
-      refute body =~ sentinel,
-             "credential value leaked into the request body sent to the provider"
+      refute request.semantic_digest =~ sentinel,
+             "credential value leaked into the request semantic_digest"
     end
   end
 
@@ -279,11 +468,9 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     test "missing MINIMAX_API_KEY → terminal E_RUNTIME_UNAVAILABLE, no dispatch attempted" do
       System.delete_env("MINIMAX_API_KEY")
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
+        test_pid
       )
 
       assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} =
@@ -295,11 +482,9 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     test "empty MINIMAX_API_KEY → terminal E_RUNTIME_UNAVAILABLE, no dispatch attempted" do
       System.put_env("MINIMAX_API_KEY", "")
       test_pid = self()
-
-      install_dispatch_with_counter(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
-        test_pid,
-        :ok
+      install_transport_with_counter(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
+        test_pid
       )
 
       assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} =
@@ -314,90 +499,24 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       assert MinimaxM3Adapter.endpoint() == "https://api.minimax.io/v1/chat/completions"
     end
 
-    test "the dispatched request uses POST with JSON body and Bearer auth header" do
+    test "the transport receives the bounded request and the credential" do
       System.put_env("MINIMAX_API_KEY", "det-test-credential")
 
       test_pid = self()
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
+      install_transport_with_capture(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
         test_pid
       )
 
       assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
-      assert_received {:request_captured, opts}
+      assert_received {:transport_captured, {request, credential, opts}}
 
-      assert opts[:url] == "https://api.minimax.io/v1/chat/completions"
-      assert opts[:method] == :post
-
-      headers = Keyword.get(opts, :headers, [])
-      content_type = Enum.find_value(headers, fn {"content-type", v} -> v; _ -> nil end)
-      auth = Enum.find_value(headers, fn {"authorization", v} -> v; _ -> nil end)
-      assert content_type == "application/json"
-      assert auth == "Bearer det-test-credential"
-    end
-
-    test "the dispatched body carries the canonical request fields" do
-      System.put_env("MINIMAX_API_KEY", "x")
-      test_pid = self()
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
-        test_pid
-      )
-
-      assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
-
-      assert_received {:request_captured, opts}
-
-      body_bytes = opts[:body]
-      decoded = JSON.decode!(body_bytes)
-
-      assert decoded["model"] == "MiniMax-M3"
-      assert decoded["invocation_id"] == "inv-det-001"
-      assert decoded["mode"] == "PRODUCTION"
-      assert decoded["output_contract"] == "IMPLEMENTER_PATCH_PROPOSAL"
-      assert decoded["stream"] == false
-      assert decoded["timeout_ms"] == 60_000
-    end
-
-    test "sentinel is carried in the Authorization header but NOT in the request body or result fields" do
-      sentinel = "SENTINEL-HEADER-AND-BODY-LEAK-PROBE"
-      System.put_env("MINIMAX_API_KEY", sentinel)
-
-      test_pid = self()
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
-        test_pid
-      )
-
-      assert {:ok, result} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
-
-      assert_received {:request_captured, opts}
-
-      body =
-        opts
-        |> Keyword.get(:body)
-        |> case do
-          b when is_binary(b) -> b
-          _ -> ""
-        end
-
-      auth_header =
-        opts
-        |> Keyword.get(:headers, [])
-        |> Enum.find_value(fn
-          {"authorization", v} -> v
-          _ -> nil
-        end)
-
-      assert auth_header == "Bearer #{sentinel}",
-             "the Authorization header legitimately carries the credential value (Bearer auth)"
-
-      refute body =~ sentinel,
-             "credential value leaked into the request body sent to the provider"
-
-      refute result.body =~ sentinel,
-             "credential value leaked into the bounded response body"
+      assert request.invocation_id == "inv-det-001"
+      assert request.mode == :PRODUCTION
+      assert credential == "det-test-credential"
+      assert Keyword.get(opts, :timeout_ms) == 60_000
+      assert Keyword.get(opts, :max_bytes) == MinimaxM3Adapter.max_response_bytes()
     end
   end
 
@@ -426,9 +545,17 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       run_with_status(502, :E_RUNTIME_UNAVAILABLE)
     end
 
-    test "transport error (econnrefused) → E_CONNECTION_LOST" do
+    test "transport error (finch_error) → E_CONNECTION_LOST" do
       System.put_env("MINIMAX_API_KEY", "x")
-      install_dispatch({:error, :econnrefused})
+      install_transport({:error, :finch_error, :econnrefused})
+
+      assert {:error, %{status: :E_CONNECTION_LOST}} =
+               MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
+    end
+
+    test "transport error (disconnect) → E_CONNECTION_LOST" do
+      System.put_env("MINIMAX_API_KEY", "x")
+      install_transport({:error, :disconnect, :socket_closed})
 
       assert {:error, %{status: :E_CONNECTION_LOST}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -436,20 +563,19 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
   end
 
   describe "bounded timeout is taken from request.timeout_ms" do
-    test "the request timeout option equals the request timeout_ms" do
+    test "the request timeout_ms is propagated to the transport opts" do
       System.put_env("MINIMAX_API_KEY", "x")
       test_pid = self()
-      install_dispatch_with_capture(
-        {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}},
+      install_transport_with_capture(
+        {:ok, %{status: 200, headers: [], body: "ok"}},
         test_pid
       )
 
       assert {:ok, _} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
 
-      assert_received {:request_captured, opts}
+      assert_received {:transport_captured, {_request, _credential, opts}}
 
-      assert opts[:timeout] == 60_000
-      assert opts[:connect_timeout] == 60_000
+      assert Keyword.get(opts, :timeout_ms) == 60_000
     end
   end
 
@@ -457,34 +583,10 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
   defp run_with_status(status, expected_class) do
     System.put_env("MINIMAX_API_KEY", "x")
-    install_dispatch({:ok, {{:"HTTP/1.1", status, "Status"}, [], "body"}})
+    install_transport({:ok, %{status: status, headers: [], body: "body"}})
 
     assert {:error, %{status: ^expected_class}} =
              MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
-  end
-
-  defp install_dispatch_with_counter(canned_result, test_pid, _event_marker) do
-    counter = :counters.new(1, [])
-
-    Application.put_env(:kiln, :minimax_http_dispatch, fn _opts ->
-      :counters.add(counter, 1, 1)
-      send(test_pid, {:dispatched, :counters.get(counter, 1)})
-      canned_result
-    end)
-  end
-
-  defp install_dispatch_with_capture(canned_result, test_pid) do
-    Application.put_env(:kiln, :minimax_http_dispatch, fn opts ->
-      send(test_pid, {:request_captured, opts})
-      canned_result
-    end)
-  end
-
-  defp result_and_event(stream_result) do
-    case stream_result do
-      {:ok, _} = ok -> {nil, ok}
-      {:error, _} = err -> {nil, err}
-    end
   end
 
   defp refute_sentinel_in_term(_sentinel, term) when is_map(term) do

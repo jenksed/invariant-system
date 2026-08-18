@@ -106,20 +106,32 @@ defmodule Kiln.M0CandidateInvocationTest do
 
       Application.put_env(
         :kiln,
-        :minimax_http_dispatch,
-        fn _opts -> {:ok, {{:"HTTP/1.1", 200, "OK"}, [], "ok"}} end
+        :minimax_transport,
+        fn _request, _credential, _opts ->
+          {:ok, %{status: 200, headers: [], body: "ok"}}
+        end
       )
 
       assert {:ok, _} =
                MinimaxM3Adapter.stream(tampered, fn _ -> :ok end)
 
-      Application.delete_env(:kiln, :minimax_http_dispatch)
+      Application.delete_env(:kiln, :minimax_transport)
       System.delete_env("MINIMAX_API_KEY")
     end
 
     test "NEGATIVE secret-disclosure: credential value does not appear in any result field" do
       sentinel = "SENTINEL-CREDENTIAL-VALUE-NEVER-IN-RESULT"
       System.put_env("MINIMAX_API_KEY", sentinel)
+
+      # Install a deterministic transport seam that returns a canned 401
+      # response without touching the real network.
+      Application.put_env(
+        :kiln,
+        :minimax_transport,
+        fn _request, _credential, _opts ->
+          {:ok, %{status: 401, headers: [], body: "unauthorized"}}
+        end
+      )
 
       {:ok, request} = CandidateInvocation.new_request(@valid_request)
       {:error, result} = MinimaxM3Adapter.stream(request, fn _ -> :ok end)
@@ -131,6 +143,7 @@ defmodule Kiln.M0CandidateInvocationTest do
         end
       end
 
+      Application.delete_env(:kiln, :minimax_transport)
       System.delete_env("MINIMAX_API_KEY")
     end
 

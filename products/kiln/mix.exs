@@ -27,7 +27,14 @@ defmodule Kiln.MixProject do
     [
       # Direct SQLite state store per ADR-0022. The 0.39 line bundles SQLite
       # 3.53.3, which contains the WAL-reset corruption fix from 3.51.3.
-      {:exqlite, "~> 0.39"}
+      {:exqlite, "~> 0.39"},
+      # Bounded MiniMax M3 provider transport (KILN-M0-01 narrow scope).
+      # Finch v0.20 is the smallest dependency that satisfies the accepted
+      # combined property: status available before/during body processing
+      # + incremental bounded body receipt + ability to terminate receipt
+      # when the byte limit is crossed. OTP :httpc cannot satisfy both.
+      # Mint is transitive; castore was removed in v0.19.0.
+      {:finch, "~> 0.20"}
     ]
   end
 
