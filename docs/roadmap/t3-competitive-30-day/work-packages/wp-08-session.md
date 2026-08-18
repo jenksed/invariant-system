@@ -1,0 +1,61 @@
+# WP-08 — Persistent Session State (Week 2)
+
+- **ID:** WP-08
+- **Title:** Implement bounded Session persistence across daemon restarts
+- **Objective:** Bounded Session machinery that persists authoritative observable state and survives daemon restart + client reconnect
+- **Owner/product:** Kiln
+- **Authoritative inputs:** Pathfinder WP-04 workspace/recovery decision; Kiln existing bounded machinery (apply + evidence); M12-C artifact model
+- **Dependencies:** WP-07 (daemon must exist); WP-04 (decided)
+- **Parallel-safety:** NO (depends on WP-07)
+- **Scope:**
+  - Implement `Kiln.Session` bounded GenServer (per-session state)
+  - Implement `Kiln.SessionStore` bounded persistence (Ecto + SQLite)
+  - Implement bounded migrations for Session schema
+  - Implement `Kiln.RecoveryClassifier` (bounded error envelope: same_pre | stale_pre | effect_unknown | replay_rejected)
+  - Implement restart reconciliation: read Session artifacts; reconcile against authoritative observable state; bounded apply resumes
+  - Implement bounded cancel/supersede flow
+  - Implement E_MUTATION_UNKNOWN_EFFECT (NEW bounded error class)
+- **Non-goals:**
+  - Cross-host Session coordination (deferred; single-host for September)
+  - Hidden-ref checkpoint model (T3-style; not needed)
+- **Authority boundaries:**
+  - Kiln Session owns authoritative bounded state for the session
+  - Restart reconciliation never blind-replays
+  - Recovery classification is bounded (no invented success)
+- **Files/surfaces likely affected:**
+  - `products/kiln/lib/kiln/session.ex` (NEW)
+  - `products/kiln/lib/kiln/session_store.ex` (NEW — Ecto + bounded migrations)
+  - `products/kiln/lib/kiln/recovery_classifier.ex` (NEW)
+  - `products/kiln/priv/repo/migrations/` (NEW — Ecto migrations)
+  - `products/kiln/test/kiln/m12_b_recovery_test.exs` (extend with 2 remaining sub-properties)
+- **Acceptance property:**
+  - A bounded Session survives daemon restart; bounded state restored from authoritative observable state
+  - Recovery never blind-replays; E_MUTATION_UNKNOWN_EFFECT is the bounded error class for uncertain effect
+  - Bounded M12-A composed golden path runs across daemon restart without losing bounded state
+- **Required positive evidence:**
+  - 5 distinct bounded tasks survive daemon restart (preserved state)
+  - 3 restart scenarios (before-mutation, mid-mutation, post-mutation) all classify correctly
+  - 2 stale-state scenarios (pre-state diverges) bounded apply fails closed; operator can recover
+- **Required negative evidence:**
+  - Restart does NOT blind-replay bounded mutations
+  - Stale base after restart fails closed (E_PATCH_PREIMAGE_MISMATCH)
+  - Missing artifact fails closed; bounded recovery flow
+- **Validation commands:**
+  - `mix test test/kiln/m12_b_recovery_test.exs` (4/4 PROVEN after this WP)
+  - `mix test test/kiln/m0_candidate_invocation_test.exs` (regression)
+  - `mix test test/kiln/m11_e4_*` (regression)
+- **Failure/recovery requirements:**
+  - Bounded Session restored from canonical store
+  - E_MUTATION_UNKNOWN_EFFECT returned for uncertain effect
+  - Operator reconcile flow (no auto-blind-replay)
+- **Stop conditions:**
+  - Session persistence Ecto migrations applied
+  - Bounded restart reconciliation works for all 5 scenarios
+  - M12-B recovery test 4/4 PROVEN
+  - M12-A composed golden path runs across restart
+- **Expected output/report:**
+  - Kiln Session machinery committed
+  - Ecto migrations committed
+  - E_MUTATION_UNKNOWN_EFFECT bounded error class committed
+  - Bounded restart tests committed
+  - `LANE-EVIDENCE-M12-SESSION.md` with bounded proof

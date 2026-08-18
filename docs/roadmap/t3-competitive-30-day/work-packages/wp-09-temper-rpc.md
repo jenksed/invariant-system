@@ -1,0 +1,62 @@
+# WP-09 — Temper Client/Server RPC + Activity Stream (Week 2)
+
+- **ID:** WP-09
+- **Title:** Connect Temper to Kiln daemon over bounded RPC + activity stream
+- **Objective:** Real bounded engineering task observable from Temper end-to-end
+- **Owner/product:** Temper + Kiln
+- **Authoritative inputs:** Pathfinder WP-02 service boundary; M12-D Temper operator contract; existing Temper CLI render; existing Kiln bounded dispatch
+- **Dependencies:** WP-07 (daemon); WP-02 (decided)
+- **Parallel-safety:** NO (depends on WP-07)
+- **Scope:**
+  - Implement `TemperClient` (Node + TypeScript) connecting to Kiln daemon over HTTP + WebSocket
+  - Implement bounded RPC methods (per `client-server-boundary.md`)
+  - Implement bounded activity stream subscription
+  - Implement bounded reconnect with session token
+  - Implement bounded render of bounded state into Temper UI
+  - Replace CLI-snapshot with persistent operator surface (still CLI-capable but with bounded live mode)
+- **Non-goals:**
+  - Custom editor UX (Zed covers it)
+  - Mobile clients (deferred; desktop is September scope)
+- **Authority boundaries:**
+  - Temper never owns authority; UI is bounded projection
+  - All bounded operations go through Kiln daemon (no client-side authority)
+  - Bounded reconnect restores canonical state (no client-side cached authority)
+- **Files/surfaces likely affected:**
+  - `products/temper/src/client.ts` (NEW — RPC client)
+  - `products/temper/src/stream.ts` (NEW — activity stream subscription)
+  - `products/temper/src/render.ts` (extend for live bounded state)
+  - `products/temper/src/types.ts` (extend for RPC types)
+  - `products/temper/src/cli.ts` (extend for `--live` mode)
+  - `integration/scenarios/temper-rpc/run.sh` (NEW — end-to-end test)
+- **Acceptance property:**
+  - A real repository engineering task (open repo → bounded plan → bounded
+    dispatch → bounded apply → bounded verify → bounded review → bounded
+    HumanDecision) is observable from Temper end-to-end via the daemon
+- **Required positive evidence:**
+  - 5 distinct bounded tasks completed end-to-end via Temper
+  - Activity stream shows bounded events as they occur
+  - Reconnect restores canonical state
+- **Required negative evidence:**
+  - Temper disconnect does NOT corrupt bounded state
+  - Unauthorized RPC rejected with bounded error envelope
+  - Operator cannot bypass bounded approval via UI
+- **Validation commands:**
+  - `node products/temper/dist/src/cli.js /tmp/m11_e4_live_representation --snapshot`
+    produces bounded snapshot from daemon (not local)
+  - `node products/temper/dist/src/cli.js /tmp/m11_e4_live_representation --live`
+    shows bounded activity stream
+  - End-to-end: start daemon, run Temper, observe bounded task
+- **Failure/recovery requirements:**
+  - Daemon restart → Temper reconnect restores bounded state
+  - Token compromise → bounded revocation + bounded UI re-auth
+  - Network failure → bounded retry; bounded session token preserves state
+- **Stop conditions:**
+  - Temper client connects to daemon over HTTP + WS
+  - 5 bounded tasks observable end-to-end from Temper
+  - Reconnect scenarios pass (before, mid, post-mutation)
+  - M12-D operator contract surfaces are all wired
+- **Expected output/report:**
+  - Temper client + bounded RPC methods committed
+  - Activity stream subscription committed
+  - End-to-end scenario committed
+  - `LANE-EVIDENCE-M12-TEMPER-RPC.md` with bounded proof
