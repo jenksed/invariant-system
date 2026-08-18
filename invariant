@@ -8,6 +8,9 @@
 #   ./invariant check boundaries       deterministic architecture-boundary checks
 #   ./invariant test [product]         canonical validation (default: all)
 #       products: arsenal loadout kiln temper integration
+#   ./invariant docs check             documentation metadata/link/source checks
+#   ./invariant docs build             build static documentation HTML
+#   ./invariant docs dev               run local documentation development server
 #
 # Root commands delegate to each product's own canonical commands; nothing
 # here reimplements product logic.
@@ -73,8 +76,8 @@ cmd_doctor() {
   check_tool git "required"
   check_tool gh "GitHub operations"
   check_tool python3 "arsenal tooling"
-  check_tool node "loadout/temper"
-  check_tool npm "loadout/temper"
+  check_tool node "loadout/temper/docs"
+  check_tool npm "loadout/temper/docs"
   check_tool mix "kiln"
   check_tool cc "kiln command-host helper, exqlite"
   check_tool vale "kiln prose lint (scripts/check)"
@@ -117,12 +120,10 @@ check_structure() {
     [[ -d "$d" ]] || bad "missing directory: $d"
   done
 
-  # Exactly one active Git root: no nested .git anywhere below root.
   local nested
   nested=$(find . -mindepth 2 -name .git -not -path './.git/*' 2>/dev/null | head -5)
   [[ -z "$nested" ]] || bad "nested Git roots found: $nested"
 
-  # No submodules / gitlinks for core products.
   if git ls-files -s | awk '$1==160000' | grep -q .; then
     bad "gitlinks (submodules) present in index"
   fi
@@ -139,35 +140,30 @@ check_boundaries() {
   python3 -c 'import json,sys; json.load(open("invariant.boundaries.json"))' \
     || fail "invariant.boundaries.json is not valid JSON"
 
-  # 1. No nested Git roots.
   if [[ -z "$(find . -mindepth 2 -name .git -not -path './.git/*' 2>/dev/null)" ]]; then
     ok "single Git root"
   else
     bad "nested .git directories found"
   fi
 
-  # 2. No submodules.
   if git ls-files -s | awk '$1==160000' | grep -q .; then
     bad "gitlinks present (submodules are not used for core products)"
   else
     ok "no submodules"
   fi
 
-  # 3. Manifold is a boundary, not a runtime: no executable source.
   if git ls-files products/manifold | grep -vq '\.md$'; then
     bad "products/manifold contains non-documentation files (it must not become a runtime here)"
   else
     ok "manifold is documentation-only"
   fi
 
-  # 4. Temper presents and operates; it must not reach into sibling product trees.
   if rg -q 'products/(arsenal|loadout|kiln|manifold)|\.\./\.\./(arsenal|loadout|kiln)' products/temper/src 2>/dev/null; then
     bad "temper src references sibling product trees"
   else
     ok "temper has no sibling-product source coupling"
   fi
 
-  # 5. Canonical contracts live exactly once, at contracts/.
   local c count
   for c in work-envelope.v0.md run-result-envelope.v0.md qualified-method-record.v0.md learning-observation.v0.md; do
     count=$(git ls-files | grep -c "/$c\|^$c" || true)
@@ -257,6 +253,24 @@ cmd_test() {
   esac
 }
 
+cmd_docs() {
+  local action=${1:-check}
+  case "$action" in
+    check)
+      python3 docs-site/scripts/check_docs.py
+      ;;
+    build)
+      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm ci"
+      (cd docs-site && npm run build)
+      ;;
+    dev)
+      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm ci"
+      (cd docs-site && npm run start)
+      ;;
+    *) fail "unknown docs action: $action (expected: check|build|dev)" ;;
+  esac
+}
+
 main() {
   local cmd=${1:-help}
   shift || true
@@ -273,8 +287,9 @@ main() {
       fi
       ;;
     test)    cmd_test "$@" ;;
+    docs)    cmd_docs "$@" ;;
     help|--help|-h)
-      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       ;;
     *) fail "unknown command: $cmd (try: ./invariant help)" ;;
   esac
