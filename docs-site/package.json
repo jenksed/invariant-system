@@ -1,6 +1,7 @@
 {
   "name": "invariant-docs",
   "version": "0.1.0",
+  "description": "Static documentation presentation layer for canonical Invariant Markdown.",
   "private": true,
   "scripts": {
     "check": "python3 scripts/check_docs.py",
