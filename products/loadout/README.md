@@ -1,81 +1,102 @@
 # Loadout
 
-Loadout is the human-facing capability environment for agent-assisted work.
+Loadout is Invariant's human-facing capability and planning environment.
 
-Users begin with a Goal—understand a repository, review a pull request, investigate a problem, research a topic—and Loadout resolves the Capabilities, Skills, configuration, and connectors needed to attempt it.
+Users start with a Goal — understand a repository, verify a change, investigate a problem — and Loadout resolves supported Capabilities and configuration, produces a Plan, compiles the canonical Work Envelope, and runs against either a deterministic simulated boundary or the real Kiln supervision boundary.
 
-> **Loadout puts useful intelligence in your hands.**
+Loadout prepares work. It does **not** grant runtime authority and does not become durable execution truth.
 
-## Product position
+## Position in Invariant
 
-- [Project Arsenal](https://github.com/jenksed/project-arsenal) discovers and qualifies better methods.
-- **Loadout** turns supported methods into stable user-level Capabilities and product experiences.
-- [Kiln](https://github.com/jenksed/kiln) authorizes and records execution, effects, evidence, recovery, and acceptance readiness.
-- [Engineering System](https://github.com/jenksed/engineering-system) holds cross-product decisions, contracts, and integration fixtures.
-
-Loadout is the normal front door, but it does not grant runtime authority and it does not replace Kiln's direct API/CLI surface.
-
-## First slice
-
-The first product proof is intentionally narrow:
-
-> **Software Engineering Pack → Repository Recon → "Understand this repository."**
-
-It must prove a stable Capability contract, local/reversible packaging, progressive disclosure, Work Envelope compilation, and truthful presentation through a deterministic fake Kiln boundary before broader packs or real integration are added.
-
-## LOD-01 status
-
-`LOD-01` (this branch, `agent/lod-01-repository-recon`) implements the vertical slice. All boundary artifacts are v0 fixtures; there is **no real Kiln enforcement** in this slice. Every Result view, evidence item, and authority decision is labeled `simulated: true`.
-
-See `docs/architecture/LOD-01.md` for the architecture note and `docs/architecture/topology.md` for the object map.
-
-## Quickstart
-
-From a clean checkout:
-
-```bash
-npm ci
-bash scripts/install.sh   # installs deps and the bundled pack into .loadout/
-bash scripts/run.sh       # runs the SIMULATED Repository Recon pipeline
-bash scripts/remove.sh    # removes the pack (workspace stays; pack dir is gone)
+```text
+Arsenal / Bench   reusable methods + qualification evidence
+        │
+        ▼
+Loadout           Goal → Capability → Plan → Work Envelope
+        │
+        ▼
+Kiln              authority → execution/effects → evidence → Run Result
+        │
+        ▼
+Temper            operator projection
 ```
 
-Equivalent direct CLI use:
+Manifold is the documented future selection/allocation boundary and has no runtime today.
+
+The canonical monorepo is `jenksed/invariant-system`; cross-product contracts live at `../../contracts/` and integration scenarios at `../../integration/`.
+
+## Current capabilities
+
+Loadout currently includes:
+
+- CLI and minimal web UI;
+- capability catalog/install/inspect/remove flows;
+- `repository-recon` and `verify-change` work;
+- Plan and Work Envelope compilation;
+- deterministic simulated execution;
+- a real fail-closed Kiln driver;
+- Run records consumed by Temper.
+
+## Repository Recon: real cross-product path
+
+From the monorepo root:
+
+```bash
+./invariant test integration
+```
+
+The integration scenario at `../../integration/scenarios/repository-recon/run.sh` creates a real temporary Git repository, compiles a Loadout Plan for `execution=kiln`, sends the Work Envelope through the real Kiln supervisor, validates the canonical Run Result Envelope, rejects simulated labeling on that path, and renders the result through Temper.
+
+The current automated runner covers the golden path. It does not prove the complete historical Wave 3 restart/negative/dogfood matrix.
+
+## Direct CLI use
+
+From `products/loadout` after `npm ci` / build as required:
 
 ```bash
 npx loadout catalog
-npx loadout install repository-recon --repository .
-npx loadout inspect repository-recon --repository .
-npx loadout run --goal "Understand this repository" --repository .
-npx loadout remove repository-recon --repository .
+npx loadout install repository-recon --repository /path/to/repository
+npx loadout inspect repository-recon --repository /path/to/repository
+npx loadout plan --goal "Understand this repository" --repository /path/to/repository --execution kiln
 ```
 
-Power users can swap the underlying QMR fixture without changing the Capability contract:
+Simulation remains available for deterministic product behavior where a real Kiln boundary is not the property under test.
 
-```bash
-npx loadout swap repository-recon --skill fixtures/qualified-method-record.v0.alt.yaml
-```
+## Real Kiln boundary
 
-The basic-user path is a small static page served by `npx loadout web`.
+`src/core/kiln-driver.ts`:
+
+- spawns an exact argv without a shell;
+- writes the Work Envelope to a temporary file;
+- validates `engineering-system/run-result-envelope/v0`;
+- fails closed when Kiln is unavailable, returns malformed output, exits unsuccessfully, or labels a supposedly real result as simulated;
+- only allows the Repository Recon procedure to run when Kiln's authority result grants the requested capability.
+
+That boundary is stronger evidence than the historical LOD-01 README text that described a simulated-only slice.
 
 ## Verification
 
-From a clean checkout, with pinned dependencies:
+Canonical product gate:
 
 ```bash
-bash scripts/verify.sh
+npm run ci
 ```
 
-That runs `git diff --check`, `npm ci`, format check, lint, typecheck, tests, contract/fixture validation, production build, and the basic install/run/remove flow.
+From the monorepo root:
 
-## Constraints honored
+```bash
+./invariant test loadout
+```
 
-- Only files under `loadout/` are mutated.
-- `arsenal/`, `kiln/`, and `engineering-system/` are not touched.
-- No `.claude/`, `.agents/`, `.codex/`, or homunculus/ECC output from stale PR #2 is added.
-- No secrets or user repository contents are committed as fixtures.
-- The deterministic fake Kiln boundary labels every output as simulated.
+## Ownership boundary
 
-## Status
+Loadout owns capabilities, goals, planning, and Work Envelope preparation.
 
-LOD-01 vertical slice implemented; verification runnable from a clean checkout. Awaiting review on PR opened from `agent/lod-01-repository-recon`.
+It must not:
+
+- grant Kiln runtime authority;
+- become the canonical execution/effect ledger;
+- fabricate Kiln evidence;
+- absorb Manifold selection semantics merely because selection becomes convenient.
+
+See `../../docs/products/loadout/index.md` and `../../docs/architecture/product-boundaries.md` for the system-level view.
