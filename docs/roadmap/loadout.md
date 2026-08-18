@@ -5,7 +5,7 @@ status: planned
 verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
 source_paths:
   - products/loadout/src/
-  - products/loadout/test/
+  - products/loadout/tests/
   - contracts/work-envelope.v0.md
   - integration/scenarios/repository-recon/
 audience:
