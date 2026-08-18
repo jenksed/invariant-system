@@ -271,7 +271,7 @@ cmd_docs() {
       (cd docs-site && npm run build)
       ;;
     dev)
-      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm run start"
+      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm ci"
       (cd docs-site && npm run start)
       ;;
     *) fail "unknown docs action: $action (expected: check|build|dev)" ;;
@@ -296,7 +296,7 @@ main() {
     test)    cmd_test "$@" ;;
     docs)    cmd_docs "$@" ;;
     help|--help|-h)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\{//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       ;;
     *) fail "unknown command: $cmd (try: ./invariant help)" ;;
   esac
