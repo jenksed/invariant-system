@@ -1,4 +1,5 @@
 defmodule Kiln.OperationLifecycle do
+# E4 bounded dogfood change.
   @moduledoc """
   Single authoritative vocabulary for the externally observable state of an
   external operation.
