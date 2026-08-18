@@ -62,6 +62,22 @@ defmodule Kiln.MinimaxM3Adapter do
   @spec endpoint() :: String.t()
   def endpoint, do: @endpoint
 
+  @doc """
+  The endpoint the production transport actually dispatches to.
+
+  Defaults to `endpoint/0`. Override via
+  `Application.put_env(:kiln, :minimax_endpoint, url)` for tests
+  (e.g., loopback integration tests). The override is the same
+  endpoint used by the actual `Finch.stream_while/5` dispatch.
+
+  Note: the override is the runtime endpoint, not a credential. The
+  credential resolution path is unchanged.
+  """
+  @spec transport_endpoint() :: String.t()
+  def transport_endpoint do
+    Application.get_env(:kiln, :minimax_endpoint, @endpoint)
+  end
+
   @doc "The bounded raw transport receipt ceiling. Deliberately distinct from `Kiln.Artifact.max_byte_size/0`."
   @spec max_response_bytes() :: pos_integer()
   def max_response_bytes, do: @max_response_bytes
@@ -226,7 +242,7 @@ defmodule Kiln.MinimaxM3Adapter do
     finch_request =
       Finch.build(
         :post,
-        @endpoint,
+        transport_endpoint(),
         [
           {"authorization", "Bearer " <> credential},
           {"content-type", "application/json"},

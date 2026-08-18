@@ -18,6 +18,13 @@ defmodule Kiln.Application do
   # adapter. The adapter uses a single endpoint and never retries, so a
   # single connection per pool is sufficient. Disable in tests where
   # the deterministic transport seam is used instead.
+  #
+  # HTTP/1 is explicitly pinned because the bounded-receive pattern
+  # (Finch.stream_while/5 returning {:halt, acc} on oversize) depends on
+  # HTTP/1's connection-level back-pressure to terminate the provider's
+  # stream. On HTTP/2, the same return value cancels the stream but does
+  # NOT close the connection, leaving the bounded-receive property
+  # unproven. Protocol hardening is documented in the M11 E4 audit.
   defp children do
     base =
       case Application.get_env(:kiln, :state_path) do
@@ -27,7 +34,14 @@ defmodule Kiln.Application do
 
     base ++
       [
-        {Finch, name: Kiln.MinimaxFinch, pools: %{default: [size: 1]}}
+        {Finch,
+         name: Kiln.MinimaxFinch,
+         pools: %{
+           default: [
+             size: 1,
+             protocols: [:http1]
+           ]
+         }}
       ]
   end
 end
