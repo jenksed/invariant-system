@@ -15,6 +15,12 @@
   --ifm-code-font-size: 0.9rem;
   --invariant-rule: rgba(22, 31, 52, 0.12);
   --invariant-grid: rgba(49, 94, 239, 0.045);
+  --invariant-status-current: #0f7b5c;
+  --invariant-status-partial: #a26200;
+  --invariant-status-experimental: #7b4db4;
+  --invariant-status-planned: #315eef;
+  --invariant-status-frontier: #7a4b67;
+  --invariant-status-historical: #667085;
 }
 
 [data-theme='dark'] {
@@ -30,6 +36,12 @@
   --ifm-font-color-base: #e8ecf5;
   --invariant-rule: rgba(220, 227, 241, 0.13);
   --invariant-grid: rgba(127, 156, 255, 0.045);
+  --invariant-status-current: #62d2ab;
+  --invariant-status-partial: #f0b35f;
+  --invariant-status-experimental: #c7a1ff;
+  --invariant-status-planned: #8ba4ff;
+  --invariant-status-frontier: #d29bbd;
+  --invariant-status-historical: #aeb6c5;
 }
 
 html {
@@ -66,6 +78,73 @@ body {
 
 .menu__link--active {
   font-weight: 700;
+}
+
+.invariant-truth-banner {
+  --invariant-status-accent: var(--ifm-color-primary);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.8rem;
+  max-width: 900px;
+  margin: 0 0 1.4rem;
+  padding: 0.62rem 0.78rem;
+  border: 1px solid var(--invariant-rule);
+  border-left: 3px solid var(--invariant-status-accent);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--invariant-status-accent) 5%, var(--ifm-background-surface-color));
+  font-size: 0.78rem;
+}
+
+.invariant-truth-banner[data-status='current'] {
+  --invariant-status-accent: var(--invariant-status-current);
+}
+
+.invariant-truth-banner[data-status='partial'] {
+  --invariant-status-accent: var(--invariant-status-partial);
+}
+
+.invariant-truth-banner[data-status='experimental'] {
+  --invariant-status-accent: var(--invariant-status-experimental);
+}
+
+.invariant-truth-banner[data-status='planned'] {
+  --invariant-status-accent: var(--invariant-status-planned);
+}
+
+.invariant-truth-banner[data-status='frontier'] {
+  --invariant-status-accent: var(--invariant-status-frontier);
+}
+
+.invariant-truth-banner[data-status='historical'] {
+  --invariant-status-accent: var(--invariant-status-historical);
+}
+
+.invariant-truth-banner__label {
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-size: 0.66rem;
+  font-weight: 700;
+  opacity: 0.66;
+}
+
+.invariant-truth-banner__status {
+  color: var(--invariant-status-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+}
+
+.invariant-truth-banner__commit {
+  margin-left: auto;
+  opacity: 0.72;
+}
+
+.invariant-truth-banner__commit code {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0;
 }
 
 .theme-doc-markdown {
@@ -137,6 +216,11 @@ body {
 @media (max-width: 996px) {
   body {
     background-size: 22px 22px;
+  }
+
+  .invariant-truth-banner__commit {
+    width: 100%;
+    margin-left: 0;
   }
 
   .theme-doc-markdown > h1:first-child {
