@@ -440,6 +440,17 @@ defmodule Kiln.MinimaxM3Adapter do
   # canonical envelope structure the model must produce. Validation
   # is authoritative at `Kiln.PatchProposal.decode_envelope/1`; this
   # schema is provider-facing guidance only.
+  #
+  # M11 E4 representation-repair: the per-operation post-image is emitted
+  # by the model as a line-array (`after_image_lines`) plus a trailing-newline
+  # flag (`final_newline`) rather than as a single escaped string. The
+  # adapter deterministically translates this provider-private representation
+  # into the canonical `after_image_bytes` bytes form inside
+  # `translate_envelope_to_canonical/1` BEFORE returning envelope bytes to
+  # the bounded dispatch. The downstream canonical envelope contract
+  # (engineering-system/implementer-patch-proposal-input/v1) continues to
+  # carry `after_image_bytes` only; `after_image_lines` and `final_newline`
+  # are provider-private and never leak.
   defp build_canonical_tools do
     [
       %{
@@ -449,7 +460,17 @@ defmodule Kiln.MinimaxM3Adapter do
           description:
             "Emit the canonical Kiln patch-proposal envelope. " <>
               "Arguments must be a JSON object with schema=" <>
-              @canonical_envelope_schema_id <> " and a non-empty operations array.",
+              @canonical_envelope_schema_id <>
+              " and a non-empty operations array. For each operation, " <>
+              "emit the post-image as `after_image_lines` (a JSON array of " <>
+              "strings, one entry per source line; the literal characters " <>
+              "inside each string ARE that line's exact bytes — DO NOT " <>
+              "escape `\\n` or `\\t` inside the array entries, they mean " <>
+              "literal backslash + n / backslash + t characters, NOT " <>
+              "newlines or tabs) plus `final_newline` (boolean: emit a " <>
+              "trailing newline byte after the joined lines?). The " <>
+              "adapter joins lines with `\\n` and appends the optional " <>
+              "trailing newline to produce the canonical bytes.",
           parameters: %{
             type: "object",
             properties: %{
@@ -470,18 +491,31 @@ defmodule Kiln.MinimaxM3Adapter do
                     path: %{
                       type: "string"
                     },
-                    after_image_bytes: %{
-                      type: "string"
-                    },
                     expected_before_digest: %{
                       type: "string"
                     },
                     mode: %{
                       type: "string",
                       const: "100644"
+                    },
+                    after_image_lines: %{
+                      type: "array",
+                      items: %{"type" => "string"},
+                      minItems: 1,
+                      description:
+                        "Provider-private line-array. Each entry is the " <>
+                          "EXACT bytes of one source line. Do NOT escape " <>
+                          "\\n or \\t inside entries (they mean literal " <>
+                          "characters). Empty lines are valid."
+                    },
+                    final_newline: %{
+                      type: "boolean",
+                      description:
+                        "Whether to emit a trailing newline byte after " <>
+                          "the joined lines. Default true."
                     }
                   },
-                  required: ["op", "path"]
+                  required: ["op", "path", "after_image_lines"]
                 }
               }
             },
@@ -566,13 +600,26 @@ defmodule Kiln.MinimaxM3Adapter do
   defp validate_arguments(args) when is_binary(args) do
     case safe_json_decode(args, :arguments_not_json) do
       {:ok, decoded} when is_map(decoded) ->
-        # Return the original arguments bytes. The provider delivered
-        # a JSON string that parses to a canonical envelope. We do NOT
-        # re-encode, because re-encoding would strip the canonical
-        # trailing newline that `Worker.canonical_envelope_bytes/1`
-        # produces, breaking byte-level isomorphism with the
-        # deterministic-fake path.
-        {:ok, args}
+        # If the provider emitted canonical `after_image_bytes` (no
+        # provider-private representation), preserve the original
+        # argument bytes verbatim to keep byte-level isomorphism with
+        # `Worker.canonical_envelope_bytes/1`'s output (which includes a
+        # trailing newline). Re-encoding via `JSON.encode!/1` would
+        # strip that trailing newline and break isomorphism.
+        if envelope_uses_only_canonical_bytes?(decoded) do
+          {:ok, args}
+        else
+          # M11 E4 representation-repair: the provider emitted the
+          # provider-private line-array representation, so we
+          # deterministically translate it to canonical bytes and
+          # append the canonical trailing newline. Then the
+          # pre-approval Elixir-parseability gate runs.
+          with {:ok, canonical} <- translate_envelope_to_canonical(decoded),
+               :ok <- validate_envelope_post_images_parseable(canonical) do
+            encoded = JSON.encode!(canonical) <> "\n"
+            {:ok, encoded}
+          end
+        end
 
       {:ok, _not_map} ->
         {:error, %{code: :E_MALFORMED_OUTPUT, reason: :arguments_not_object}}
@@ -583,6 +630,165 @@ defmodule Kiln.MinimaxM3Adapter do
   end
 
   defp validate_arguments(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_arguments}}
+
+  defp envelope_uses_only_canonical_bytes?(envelope) when is_map(envelope) do
+    ops =
+      Map.get(envelope, "operations") || Map.get(envelope, :operations) || []
+
+    Enum.all?(ops, fn op when is_map(op) ->
+      has_canonical_representation?(op) and not has_provider_representation?(op)
+    end)
+  end
+
+  # Translate the provider-private line-array representation to canonical
+  # `after_image_bytes`. Idempotent: if the provider already produced
+  # `after_image_bytes`, the operation is returned unchanged.
+  defp translate_envelope_to_canonical(envelope) when is_map(envelope) do
+    ops_in = Map.get(envelope, "operations") || Map.get(envelope, :operations) || []
+
+    case Enum.reduce_while(ops_in, {:ok, []}, fn op, {:ok, acc} ->
+           case translate_operation_to_canonical(op) do
+             {:ok, translated} -> {:cont, {:ok, [translated | acc]}}
+             {:error, _} = err -> {:halt, err}
+           end
+         end) do
+      {:ok, translated_ops} ->
+        {:ok, Map.put(envelope, "operations", Enum.reverse(translated_ops))}
+
+      err ->
+        err
+    end
+  end
+
+  defp translate_envelope_to_canonical(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :envelope_not_object}}
+
+  defp translate_operation_to_canonical(op) when is_map(op) do
+    cond do
+      has_provider_representation?(op) ->
+        translate_lines_to_bytes(op)
+
+      has_canonical_representation?(op) ->
+        # Provider already produced canonical bytes — pass through unchanged.
+        {:ok, op}
+
+      true ->
+        # Neither provider-private nor canonical representation present.
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_post_image_representation}}
+    end
+  end
+
+  defp translate_operation_to_canonical(_),
+    do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :operation_not_object}}
+
+  defp has_provider_representation?(op) do
+    Map.has_key?(op, "after_image_lines") or Map.has_key?(op, :after_image_lines)
+  end
+
+  defp has_canonical_representation?(op) do
+    Map.has_key?(op, "after_image_bytes") or Map.has_key?(op, :after_image_bytes)
+  end
+
+  defp translate_lines_to_bytes(op) do
+    case extract_lines_and_final_newline(op) do
+      {:ok, lines, final_newline} ->
+        content = Enum.join(lines, "\n")
+        after_image_bytes = if final_newline, do: content <> "\n", else: content
+
+        op
+        |> drop_keys(["after_image_lines", "final_newline", :after_image_lines, :final_newline])
+        |> Map.put("after_image_bytes", after_image_bytes)
+        |> Map.put(:after_image_bytes, after_image_bytes)
+        |> case do
+          translated -> {:ok, translated}
+        end
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp extract_lines_and_final_newline(op) do
+    lines_raw =
+      Map.get(op, "after_image_lines") || Map.get(op, :after_image_lines)
+
+    cond do
+      lines_raw == nil ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_after_image_lines}}
+
+      is_list(lines_raw) and length(lines_raw) >= 1 ->
+        lines =
+          Enum.map(lines_raw, fn
+            l when is_binary(l) -> l
+            _ -> :invalid
+          end)
+
+        if Enum.any?(lines, &(&1 == :invalid)) do
+          {:error, %{code: :E_MALFORMED_OUTPUT, reason: :after_image_lines_not_strings}}
+        else
+          final_newline =
+            case Map.fetch(op, "final_newline") do
+              {:ok, v} when is_boolean(v) -> v
+              {:ok, _} -> true
+              :error ->
+                case Map.fetch(op, :final_newline) do
+                  {:ok, v} when is_boolean(v) -> v
+                  {:ok, _} -> true
+                  :error -> true
+                end
+            end
+
+          {:ok, lines, final_newline}
+        end
+
+      true ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :after_image_lines_not_array}}
+    end
+  end
+
+  defp drop_keys(map, keys) do
+    Enum.reduce(keys, map, fn k, acc ->
+      case Map.pop(acc, k) do
+        {_, rest} -> rest
+      end
+    end)
+  end
+
+  # Pre-approval content-validity gate: every operation's canonical
+  # `after_image_bytes` must be parseable as Elixir. A model that emits
+  # malformed bytes (e.g., a JSON-escaping bug producing literal `\n`
+  # sequences) cannot produce a viable PatchProposal for an Elixir
+  # target. This is candidate admissibility, not execution verification —
+  # the existing registered verifier still runs post-apply.
+  defp validate_envelope_post_images_parseable(envelope) do
+    ops =
+      Map.get(envelope, "operations") || Map.get(envelope, :operations) || []
+
+    Enum.reduce_while(ops, :ok, fn op, :ok ->
+      after_image_bytes =
+        Map.get(op, "after_image_bytes") || Map.get(op, :after_image_bytes) || ""
+
+      if elixir_parseable?(after_image_bytes) do
+        {:cont, :ok}
+      else
+        {:halt,
+         {:error,
+          %{
+            code: :E_PROVIDER_REPRESENTATION_INVALID,
+            reason:
+              "post-image is not parseable as Elixir; refusing to emit candidate for governed approval"
+          }}}
+      end
+    end)
+  end
+
+  defp elixir_parseable?(bytes) when is_binary(bytes) do
+    case Code.string_to_quoted(bytes) do
+      {:ok, _ast} -> true
+      {:error, _} -> false
+    end
+  end
+
+  defp elixir_parseable?(_), do: false
 
   defp safe_json_decode(binary, reason) do
     case JSON.decode(binary) do

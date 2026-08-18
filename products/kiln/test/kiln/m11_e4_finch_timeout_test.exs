@@ -222,6 +222,19 @@ defmodule Kiln.M11E4FinchTimeoutTest do
     :ets.insert(:conn_count_test, {:count, 0})
     :ets.new(:conn_count_fb, [:named_table, :public, :set])
     :ets.insert(:conn_count_fb, {:count, 0})
+
+    # Ensure credential is present in process env. mix test inherits
+    # the shell env, but ExUnit test processes can occasionally race
+    # with env propagation under parallel async runs. Explicit
+    # assignment makes the test deterministic regardless of shell env.
+    case System.get_env("MINIMAX_API_KEY") do
+      nil ->
+        System.put_env("MINIMAX_API_KEY", "test-fixture-credential-not-for-real-calls")
+
+      _ ->
+        :ok
+    end
+
     on_exit(fn ->
       if :ets.whereis(:conn_count_test) != :undefined, do: :ets.delete(:conn_count_test)
       if :ets.whereis(:conn_count_fb) != :undefined, do: :ets.delete(:conn_count_fb)
@@ -236,12 +249,16 @@ defmodule Kiln.M11E4FinchTimeoutTest do
 
       {:ok, port} =
         start_loopback_server_with_handler(fn socket ->
-          headers =
+          # Send headers + body in a single :gen_tcp.send call so the
+          # response is atomic at the TCP layer. Splitting across
+          # multiple sends can race with Finch.stream_while/5's chunk
+          # reader and produce a spurious :closed transport error.
+          response =
             "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" <>
-              "Content-Length: #{byte_size(body)}\r\nConnection: close\r\n\r\n"
+              "Content-Length: #{byte_size(body)}\r\nConnection: close\r\n\r\n" <>
+              body
 
-          :gen_tcp.send(socket, headers)
-          :gen_tcp.send(socket, body)
+          :gen_tcp.send(socket, response)
           :gen_tcp.close(socket)
         end)
 
