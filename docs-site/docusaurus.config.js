@@ -22,6 +22,11 @@ const config = {
           breadcrumbs: true,
           showLastUpdateAuthor: false,
           showLastUpdateTime: false,
+          // Docusaurus excludes underscore-prefixed directories by default.
+          // docs/_meta is canonical Invariant documentation, so override that
+          // default and exclude only the legacy migration source that links
+          // outside this docs plugin. Its current synthesis lives in history/.
+          exclude: ['MONOREPO-MIGRATION.md'],
         },
         blog: false,
         pages: false,
