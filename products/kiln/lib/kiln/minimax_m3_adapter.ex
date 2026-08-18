@@ -58,6 +58,14 @@ defmodule Kiln.MinimaxM3Adapter do
   @finch_name Kiln.MinimaxFinch
   @default_timeout_ms 60_000
 
+  # The single canonical-emission function the model is forced to call.
+  # Its `arguments` field is a JSON string carrying the canonical
+  # `engineering-system/implementer-patch-proposal-input/v1` envelope.
+  # The host does NOT execute this function — it decodes the arguments
+  # and passes them to `Kiln.PatchProposal.decode_envelope/1`.
+  @canonical_function_name "kiln_emit_candidate_envelope"
+  @canonical_envelope_schema_id "engineering-system/implementer-patch-proposal-input/v1"
+
   @doc "Single endpoint URL (read-only). Not a credential."
   @spec endpoint() :: String.t()
   def endpoint, do: @endpoint
@@ -150,15 +158,23 @@ defmodule Kiln.MinimaxM3Adapter do
 
     case safe_transport(transport_dispatch(), request, credential, opts) do
       {:ok, %{status: status, body: body, headers: _headers}} when status in 200..299 ->
-        case enforce_bounded_receipt(body) do
-          :ok ->
-            event_callback.(%{
-              status: :ok,
-              body: body,
-              request_digest: request.semantic_digest
-            })
+        with :ok <- enforce_bounded_receipt(body),
+             {:ok, envelope_bytes} <- decode_provider_response_wrapper(body) do
+          event_callback.(%{
+            status: :ok,
+            body: envelope_bytes,
+            request_digest: request.semantic_digest
+          })
 
-            {:ok, bounded_success_result(request, body, status, _headers)}
+          {:ok, bounded_success_result(request, envelope_bytes, status, _headers)}
+        else
+          {:error, %{code: :E_MALFORMED_OUTPUT} = malformed} ->
+            # The body was within bounds but the wrapper structure or
+            # tool_call was invalid. Normalize to a terminal canonical
+            # failure class so the upstream sees a uniform error shape.
+            {:error,
+             CandidateInvocation.terminal_result(:E_MALFORMED_OUTPUT)
+             |> Map.put(:details, malformed)}
 
           {:error, _} = err ->
             err
@@ -383,8 +399,196 @@ defmodule Kiln.MinimaxM3Adapter do
       tool_policy_ref: request.tool_policy_ref,
       timeout_ms: request.timeout_ms,
       output_contract: Atom.to_string(request.output_contract),
-      stream: false
+      stream: false,
+      messages: build_bounded_messages(request),
+      tools: build_canonical_tools(),
+      tool_choice: "required"
     })
+  end
+
+  # Construct the bounded model-facing context as a single user message.
+  # The model reads this message to understand what bounded artifact to
+  # produce via the canonical-emission function call. The context is
+  # bounded: it carries only the dispatch identity, output contract,
+  # and context manifest reference — no credential, no evidence, no
+  # mutation authority.
+  defp build_bounded_messages(request) do
+    [
+      %{
+        role: "user",
+        content: bounded_context_text(request)
+      }
+    ]
+  end
+
+  defp bounded_context_text(request) do
+    """
+    Bounded dispatch context.
+
+    You are operating inside a bounded Kiln dispatch. Produce a single
+    canonical envelope by calling the function #{@canonical_function_name}.
+    Do not include any other text, reasoning, or function calls.
+
+    output_contract: #{Atom.to_string(request.output_contract)}
+    envelope_schema: #{@canonical_envelope_schema_id}
+    invocation_id: #{request.invocation_id}
+    context_manifest_ref: #{inspect(request.context_manifest_ref)}
+    """
+  end
+
+  # Exactly one canonical-emission function. The schema describes the
+  # canonical envelope structure the model must produce. Validation
+  # is authoritative at `Kiln.PatchProposal.decode_envelope/1`; this
+  # schema is provider-facing guidance only.
+  defp build_canonical_tools do
+    [
+      %{
+        type: "function",
+        function: %{
+          name: @canonical_function_name,
+          description:
+            "Emit the canonical Kiln patch-proposal envelope. " <>
+              "Arguments must be a JSON object with schema=" <>
+              @canonical_envelope_schema_id <> " and a non-empty operations array.",
+          parameters: %{
+            type: "object",
+            properties: %{
+              schema: %{
+                type: "string",
+                const: @canonical_envelope_schema_id
+              },
+              operations: %{
+                type: "array",
+                minItems: 1,
+                items: %{
+                  type: "object",
+                  properties: %{
+                    op: %{
+                      type: "string",
+                      enum: ["add", "replace", "delete"]
+                    },
+                    path: %{
+                      type: "string"
+                    },
+                    after_image_bytes: %{
+                      type: "string"
+                    },
+                    expected_before_digest: %{
+                      type: "string"
+                    },
+                    mode: %{
+                      type: "string",
+                      const: "100644"
+                    }
+                  },
+                  required: ["op", "path"]
+                }
+              }
+            },
+            required: ["schema", "operations"]
+          }
+        }
+      }
+    ]
+  end
+
+  @doc """
+  Decode a bounded MiniMax response wrapper into the canonical envelope bytes.
+
+  Validates:
+    - body parses as JSON
+    - `choices` is a non-empty list with exactly one element
+    - `choices[0].message.tool_calls` is a non-empty list with exactly one element
+    - `tool_calls[0].type` equals `"function"`
+    - `tool_calls[0].function.name` equals the canonical function name
+    - `tool_calls[0].function.arguments` is a JSON string
+
+  Returns:
+    `{:ok, envelope_bytes}` on success — `envelope_bytes` are the decoded
+    canonical envelope as a JSON-encoded binary, ready for
+    `Kiln.PatchProposal.decode_envelope/1`.
+    `{:error, %{code: atom(), reason: atom()}}` on any validation failure.
+  """
+  @spec decode_provider_response_wrapper(binary()) ::
+          {:ok, binary()} | {:error, map()}
+  def decode_provider_response_wrapper(body) when is_binary(body) do
+    with {:ok, parsed} <- safe_json_decode(body, :wrapper_not_json) do
+      validate_wrapper_structure(parsed)
+    end
+  end
+
+  defp validate_wrapper_structure(%{"choices" => choices}) when is_list(choices) do
+    case choices do
+      [single] ->
+        validate_single_choice(single)
+
+      [] ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :empty_choices}}
+
+      _multiple ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :multiple_choices}}
+    end
+  end
+
+  defp validate_wrapper_structure(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_choices}}
+
+  defp validate_single_choice(%{"message" => message}) when is_map(message) do
+    case Map.get(message, "tool_calls") do
+      [single] ->
+        validate_single_tool_call(single)
+
+      [] ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :empty_tool_calls}}
+
+      nil ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_tool_calls}}
+
+      _multiple ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :multiple_tool_calls}}
+    end
+  end
+
+  defp validate_single_choice(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_message}}
+
+  defp validate_single_tool_call(%{"type" => "function", "function" => function})
+       when is_map(function) do
+    case Map.get(function, "name") do
+      @canonical_function_name ->
+        validate_arguments(Map.get(function, "arguments"))
+
+      _other ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :unknown_function_name}}
+    end
+  end
+
+  defp validate_single_tool_call(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :wrong_tool_type}}
+
+  defp validate_arguments(args) when is_binary(args) do
+    case safe_json_decode(args, :arguments_not_json) do
+      {:ok, decoded} when is_map(decoded) ->
+        # Return the original arguments bytes. The provider delivered
+        # a JSON string that parses to a canonical envelope. We do NOT
+        # re-encode, because re-encoding would strip the canonical
+        # trailing newline that `Worker.canonical_envelope_bytes/1`
+        # produces, breaking byte-level isomorphism with the
+        # deterministic-fake path.
+        {:ok, args}
+
+      {:ok, _not_map} ->
+        {:error, %{code: :E_MALFORMED_OUTPUT, reason: :arguments_not_object}}
+
+      {:error, _} = err ->
+        err
+    end
+  end
+
+  defp validate_arguments(_), do: {:error, %{code: :E_MALFORMED_OUTPUT, reason: :missing_arguments}}
+
+  defp safe_json_decode(binary, reason) do
+    case JSON.decode(binary) do
+      {:ok, parsed} -> {:ok, parsed}
+      {:error, _} -> {:error, %{code: :E_MALFORMED_OUTPUT, reason: reason}}
+    end
   end
 
   defp fetch_credential do

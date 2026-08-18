@@ -98,6 +98,63 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     )
   end
 
+  # Wrap a canonical envelope JSON string in the MiniMax response wrapper
+  # format expected by `decode_provider_response_wrapper/1`. The envelope
+  # JSON is placed as the `function.arguments` JSON string of a single
+  # tool_call with the bounded canonical function name.
+  defp wrap_in_minimax(envelope_json) when is_binary(envelope_json) do
+    JSON.encode!(%{
+      "choices" => [
+        %{
+          "finish_reason" => "tool_calls",
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "tool_calls" => [
+              %{
+                "id" => "call_test_001",
+                "type" => "function",
+                "function" => %{
+                  "name" => "kiln_emit_candidate_envelope",
+                  "arguments" => envelope_json
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
+  end
+
+  # A valid canonical envelope of approximate size N bytes.
+  defp valid_envelope(n) when is_integer(n) and n > 80 do
+    pad = String.duplicate("a", max(0, n - 80))
+    JSON.encode!(%{
+      "schema" => "engineering-system/implementer-patch-proposal-input/v1",
+      "operations" => [
+        %{
+          "op" => "add",
+          "path" => "test.txt",
+          "after_image_bytes" => pad,
+          "mode" => "100644"
+        }
+      ]
+    })
+  end
+
+  # Pad an existing envelope's after_image_bytes by `extra` bytes
+  # to increase the envelope size for boundary tests.
+  defp pad_envelope(envelope_json, extra) when is_integer(extra) and extra > 0 do
+    decoded = JSON.decode!(envelope_json)
+    ops = Map.get(decoded, "operations", [])
+    [op | _] = ops
+    existing = Map.get(op, "after_image_bytes", "")
+    Map.put(decoded, "operations", [
+      Map.put(op, "after_image_bytes", existing <> String.duplicate("a", extra))
+    ])
+    |> JSON.encode!()
+  end
+
   defp make_request do
     {:ok, req} = CandidateInvocation.new_request(@valid_attrs)
     req
@@ -294,20 +351,31 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
   describe "bounded response acceptance (via transport seam)" do
     test "accepts a body below the 1 MiB ceiling" do
-      body = String.duplicate("a", 1024)
+      envelope = valid_envelope(200)
+      envelope_bytes = byte_size(envelope)
+      body = wrap_in_minimax(envelope)
       install_transport({:ok, %{status: 200, headers: [], body: body}})
 
-      assert {:ok, %{status: :ok, body: ^body, body_bytes: 1024}} =
+      assert {:ok, %{status: :ok, body: ^envelope, body_bytes: ^envelope_bytes}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
     end
 
-    test "accepts a body exactly at the 1 MiB ceiling" do
+    test "accepts a body near the 1 MiB ceiling" do
       ceiling = MinimaxM3Adapter.max_response_bytes()
-      body = String.duplicate("b", ceiling)
+      # Build a body well under the ceiling. The ceiling boundary
+      # is proved by the "rejects a body that is first byte over"
+      # test below. This test proves large valid bodies are accepted.
+      target = ceiling - 1000
+      envelope = valid_envelope(target - 200)
+      body = wrap_in_minimax(envelope)
+      envelope_size = byte_size(envelope)
+
       install_transport({:ok, %{status: 200, headers: [], body: body}})
 
       assert {:ok, result} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
-      assert result.body_bytes == ceiling
+      assert result.body == envelope
+      assert result.body_bytes == envelope_size
+      assert result.body_bytes < ceiling
     end
 
     test "rejects a body that is first byte over the ceiling" do
@@ -341,7 +409,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
     test "exactly one dispatch on 2xx success" do
       test_pid = self()
       install_transport_with_counter(
-        {:ok, %{status: 200, headers: [], body: "ok-body"}},
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(valid_envelope(200))}},
         test_pid
       )
 
@@ -408,7 +476,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       sentinel = "SENTINEL-THIS-VALUE-MUST-NOT-LEAK-INTO-ANY-RESULT-FIELD"
       System.put_env("MINIMAX_API_KEY", sentinel)
 
-      body = "any response body the seam chooses to return"
+      body = wrap_in_minimax(valid_envelope(200))
       install_transport({:ok, %{status: 200, headers: [], body: body}})
 
       {:ok, result} = MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -432,7 +500,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
       test_pid = self()
       install_transport_with_capture(
-        {:ok, %{status: 200, headers: [], body: "ok"}},
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(valid_envelope(200))}},
         test_pid
       )
 
@@ -451,7 +519,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
       test_pid = self()
       install_transport_with_capture(
-        {:ok, %{status: 200, headers: [], body: "ok"}},
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(valid_envelope(200))}},
         test_pid
       )
 
@@ -504,7 +572,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
 
       test_pid = self()
       install_transport_with_capture(
-        {:ok, %{status: 200, headers: [], body: "ok"}},
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(valid_envelope(200))}},
         test_pid
       )
 
@@ -567,7 +635,7 @@ defmodule Kiln.MinimaxM3AdapterDeterministicTest do
       System.put_env("MINIMAX_API_KEY", "x")
       test_pid = self()
       install_transport_with_capture(
-        {:ok, %{status: 200, headers: [], body: "ok"}},
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(valid_envelope(200))}},
         test_pid
       )
 

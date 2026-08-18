@@ -22,6 +22,82 @@ defmodule Kiln.M11E4FinchLoopbackTest do
 
   alias Kiln.MinimaxM3Adapter
 
+  # MiniMax chat-completion wrapper extractor overhead: the wrapper
+  # JSON.encode! size minus the `function.arguments` JSON-string size,
+  # for a fixed canonical wrapper structure (constant across all envelope
+  # sizes since ASCII letters in the argument are not JSON-escaped).
+  @wrapper_overhead 229
+
+  # Wrap a canonical envelope JSON string in the MiniMax chat-completion
+  # response wrapper format expected by `decode_provider_response_wrapper/1`.
+  defp wrap_in_minimax(envelope_json) when is_binary(envelope_json) do
+    JSON.encode!(%{
+      "choices" => [
+        %{
+          "finish_reason" => "tool_calls",
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "tool_calls" => [
+              %{
+                "id" => "call_test_001",
+                "type" => "function",
+                "function" => %{
+                  "name" => "kiln_emit_candidate_envelope",
+                  "arguments" => envelope_json
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
+  end
+
+  # Build a canonical envelope JSON string of exactly `target_size` bytes
+  # by padding the single operation's `after_image_bytes` field with ASCII
+  # letters (which JSON does not escape). The base envelope is 152 bytes.
+  defp valid_envelope(target_size) when is_integer(target_size) and target_size >= 0 do
+    base = minimal_envelope()
+    base_size = byte_size(base)
+
+    if target_size <= base_size do
+      base
+    else
+      pad_envelope(base, target_size - base_size)
+    end
+  end
+
+  defp minimal_envelope do
+    JSON.encode!(%{
+      "schema" => "engineering-system/implementer-patch-proposal-input/v1",
+      "operations" => [
+        %{
+          "op" => "add",
+          "path" => "test.txt",
+          "after_image_bytes" => "",
+          "mode" => "100644"
+        }
+      ]
+    })
+  end
+
+  defp pad_envelope(envelope_json, extra) when is_integer(extra) and extra >= 0 do
+    if extra == 0 do
+      envelope_json
+    else
+      decoded = JSON.decode!(envelope_json)
+      ops = Map.get(decoded, "operations", [])
+      [op | _] = ops
+      existing = Map.get(op, "after_image_bytes", "")
+      decoded
+      |> Map.put("operations", [
+        Map.put(op, "after_image_bytes", existing <> String.duplicate("a", extra))
+      ])
+      |> JSON.encode!()
+    end
+  end
+
   defp start_loopback_server do
     {:ok, listener} =
       :gen_tcp.listen(0, [
@@ -156,8 +232,10 @@ defmodule Kiln.M11E4FinchLoopbackTest do
 
   describe "actual Finch production path bounded behavior on loopback" do
     test "HTTP/1 connection accepts a small body and returns the bounded bytes" do
+      envelope = valid_envelope(1024)
+      body = wrap_in_minimax(envelope)
+
       {:ok, port} = start_loopback_server_with_handler(fn socket ->
-        body = String.duplicate("a", 1024)
         headers =
           "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" <>
             "Content-Length: #{byte_size(body)}\r\nConnection: close\r\n\r\n"
@@ -265,7 +343,8 @@ defmodule Kiln.M11E4FinchLoopbackTest do
   describe "P1 — bounded receive on loopback (PROVIDER_STREAM_ACCUMULATION_BOUND)" do
     test "limit-1 body completes successfully" do
       ceiling = MinimaxM3Adapter.max_response_bytes()
-      body = String.duplicate("a", ceiling - 1)
+      envelope = valid_envelope(ceiling - 1 - @wrapper_overhead)
+      body = wrap_in_minimax(envelope)
 
       {:ok, port} = start_loopback_server_with_handler(fn socket ->
         headers =
@@ -279,7 +358,7 @@ defmodule Kiln.M11E4FinchLoopbackTest do
 
       Application.put_env(:kiln, :minimax_endpoint, "http://127.0.0.1:#{port}")
 
-      expected_bytes = ceiling - 1
+      expected_bytes = byte_size(envelope)
 
       assert {:ok, %{status: :ok, body_bytes: ^expected_bytes}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
@@ -287,7 +366,8 @@ defmodule Kiln.M11E4FinchLoopbackTest do
 
     test "body exactly at limit completes successfully" do
       ceiling = MinimaxM3Adapter.max_response_bytes()
-      body = String.duplicate("b", ceiling)
+      envelope = valid_envelope(ceiling - @wrapper_overhead)
+      body = wrap_in_minimax(envelope)
 
       {:ok, port} = start_loopback_server_with_handler(fn socket ->
         headers =
@@ -301,7 +381,9 @@ defmodule Kiln.M11E4FinchLoopbackTest do
 
       Application.put_env(:kiln, :minimax_endpoint, "http://127.0.0.1:#{port}")
 
-      assert {:ok, %{status: :ok, body_bytes: ^ceiling}} =
+      expected_bytes = byte_size(envelope)
+
+      assert {:ok, %{status: :ok, body_bytes: ^expected_bytes}} =
                MinimaxM3Adapter.stream(make_request(), fn _ -> :ok end)
     end
 
@@ -398,8 +480,10 @@ defmodule Kiln.M11E4FinchLoopbackTest do
     test "exactly one dispatch attempt per stream/2 call (no retry)" do
       test_pid = self()
 
+      envelope = valid_envelope(1024)
+      body = wrap_in_minimax(envelope)
+
       {:ok, port} = start_loopback_server_with_counter(fn _socket ->
-        body = String.duplicate("a", 1024)
         headers =
           "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n" <>
             "Content-Length: #{byte_size(body)}\r\nConnection: close\r\n\r\n"
