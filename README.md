@@ -215,8 +215,10 @@ Loadout request / plan
 → independent review
 → explicit human decision
 → truthful Temper projection
-→ learning observation back toward Arsenal / Bench
+→ reviewed learning observation back toward Arsenal
 ```
+
+Bench only becomes involved when a later controlled evaluation or qualification step is explicitly justified; a Learning Observation is not qualification evidence by itself.
 
 The dependency-aware roadmap lives under [`docs/roadmap/`](docs/roadmap/). It separates **NOW**, **NEXT**, **LATER**, and **FRONTIER** and records acceptance properties instead of calendar promises.
 
