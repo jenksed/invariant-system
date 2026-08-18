@@ -89,6 +89,8 @@ defmodule Kiln.M11E4ProviderComposedTest do
   setup do
     original_mode = Application.get_env(:kiln, :worker_provider_mode)
     original_transport = Application.get_env(:kiln, :minimax_transport)
+    original_allowed = Application.get_env(:kiln, :provider_network_allowed_capabilities)
+    original_denied = Application.get_env(:kiln, :provider_network_denied_capabilities)
     original_key = System.get_env("MINIMAX_API_KEY")
 
     on_exit(fn ->
@@ -102,6 +104,16 @@ defmodule Kiln.M11E4ProviderComposedTest do
         v -> Application.put_env(:kiln, :minimax_transport, v)
       end
 
+      case original_allowed do
+        nil -> Application.delete_env(:kiln, :provider_network_allowed_capabilities)
+        v -> Application.put_env(:kiln, :provider_network_allowed_capabilities, v)
+      end
+
+      case original_denied do
+        nil -> Application.delete_env(:kiln, :provider_network_denied_capabilities)
+        v -> Application.put_env(:kiln, :provider_network_denied_capabilities, v)
+      end
+
       case original_key do
         nil -> System.delete_env("MINIMAX_API_KEY")
         v -> System.put_env("MINIMAX_API_KEY", v)
@@ -109,6 +121,15 @@ defmodule Kiln.M11E4ProviderComposedTest do
     end)
 
     System.put_env("MINIMAX_API_KEY", "det-test-credential")
+    # Tests in this module install the deterministic transport seam and
+    # explicitly grant the provider.network capability so the runtime
+    # admission sequence (mode + credential + authority) succeeds.
+    Application.put_env(
+      :kiln,
+      :provider_network_allowed_capabilities,
+      ["provider.network"]
+    )
+    Application.put_env(:kiln, :provider_network_denied_capabilities, [])
     :ok
   end
 

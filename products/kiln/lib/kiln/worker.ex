@@ -19,6 +19,7 @@ defmodule Kiln.Worker do
   Architecture: Kiln.M0 (KILN-M0-02, lane M8).
   """
 
+  alias Kiln.Authority
   alias Kiln.CandidateInvocation
   alias Kiln.MinimaxM3Adapter
   alias Kiln.RepositoryObservation
@@ -28,6 +29,9 @@ defmodule Kiln.Worker do
   @schema_id "engineering-system/worker-output/m0-v1"
   @output_kind "PATCH_CANDIDATE"
   @production_mode "PRODUCTION"
+
+  @provider_network_capability "provider.network"
+  @provider_network_scope "model.invoke:MiniMax-M3"
 
   @doc "Canonical schema id for the Worker Output envelope."
   @spec schema_id() :: String.t()
@@ -138,7 +142,16 @@ defmodule Kiln.Worker do
          # (default) keeps the historical deterministic E2 path green;
          # `:real_provider` exercises the real bounded MiniMax adapter
          # behind the deterministic transport seam.
-         {:ok, completion_bytes, parsed_digest} <- build_completion(ci_request, request_attrs) do
+         #
+         # The provider-backed path ALSO requires an explicit
+         # `Authority.decide/1` grant for the `provider.network` capability
+         # (see `check_provider_network_authority/2`). The default is
+         # **denied**; tests must explicitly grant this capability via
+         # `Application.put_env(:kiln, :provider_network_allowed_capabilities, ["provider.network"])`.
+         # Live network execution is therefore impossible without
+         # explicit owner authorization.
+         {:ok, completion_bytes, parsed_digest} <-
+           build_completion(ci_request, request_attrs, observation, observation.current_commit) do
       raw_completion_ref = %{
         "id" => "raw_" <> short_id(),
         "digest" => sha256_hex(completion_bytes)
@@ -209,14 +222,25 @@ defmodule Kiln.Worker do
   bounded error tuple. The completion bytes in the real-provider path
   are the provider's bounded response body (validated as a canonical
   `implementer-patch-proposal-input/v1` envelope by `PatchProposal.decode_envelope/1`).
+
+  The `observation` and `base_commit` are required for the
+  provider-backed path so that the `provider.network` capability
+  check against `Authority.decide/1` is bound to the observed
+  repository state at dispatch time.
   """
-  @spec build_completion(CandidateInvocation.t(), map()) ::
+  @spec build_completion(CandidateInvocation.t(), map(), RepositoryObservation.t(), String.t()) ::
           {:ok, binary(), String.t()}
           | {:error, term()}
-  def build_completion(%CandidateInvocation{} = ci_request, request_attrs) when is_map(request_attrs) do
+  def build_completion(
+        %CandidateInvocation{} = ci_request,
+        request_attrs,
+        %RepositoryObservation{} = observation,
+        base_commit
+      )
+      when is_map(request_attrs) and is_binary(base_commit) do
     case worker_provider_mode() do
       :real_provider ->
-        build_provider_completion(ci_request)
+        build_provider_completion(ci_request, observation, base_commit)
 
       _ ->
         build_bounded_completion(request_attrs)
@@ -224,11 +248,23 @@ defmodule Kiln.Worker do
   end
 
   @doc """
-  Provider-backed completion path. Calls `MinimaxM3Adapter.stream/2`
-  with the canonical CandidateInvocation, validates the bounded provider
-  body as an `implementer-patch-proposal-input/v1` envelope via
-  `PatchProposal.decode_envelope/1`, and returns the bounded bytes plus
-  their digest.
+  Provider-backed completion path.
+
+  The runtime admission sequence is:
+    1. worker_provider_mode = :real_provider (selection)
+    2. MINIMAX_API_KEY present (credential)
+    3. `Authority.decide/1` grants `provider.network` (execution authority)
+
+  All three must be true. The default production values deny steps
+  1 (deterministic-fake) and 3 (no capability grant); therefore
+  live network execution is impossible without explicit owner
+  authorization.
+
+  Once admission passes, calls `MinimaxM3Adapter.stream/2` with the
+  canonical CandidateInvocation, validates the bounded provider body
+  as an `implementer-patch-proposal-input/v1` envelope via
+  `PatchProposal.decode_envelope/1`, and returns the bounded bytes
+  plus their digest.
 
   The provider does NOT gain:
     - mutation authority;
@@ -236,27 +272,101 @@ defmodule Kiln.Worker do
     - HumanDecision authority;
     - repository authority;
     - verification authority.
-
-  The Worker completes; a separate Patch Proposal builder and Patch
-  Service apply the approved bytes only.
   """
-  @spec build_provider_completion(CandidateInvocation.t()) ::
+  @spec build_provider_completion(CandidateInvocation.t(), RepositoryObservation.t(), String.t()) ::
           {:ok, binary(), String.t()}
           | {:error, term()}
-  def build_provider_completion(%CandidateInvocation{} = ci_request) do
-    case MinimaxM3Adapter.stream(ci_request, fn _ -> :ok end) do
-      {:ok, %{status: :ok, body: body}} ->
-        case Kiln.PatchProposal.decode_envelope(body) do
-          {:ok, _ops} ->
-            {:ok, body, sha256_hex(body)}
+  def build_provider_completion(
+        %CandidateInvocation{} = ci_request,
+        %RepositoryObservation{} = observation,
+        base_commit
+      )
+      when is_binary(base_commit) do
+    with :ok <- check_provider_network_authority(observation, base_commit) do
+      case MinimaxM3Adapter.stream(ci_request, fn _ -> :ok end) do
+        {:ok, %{status: :ok, body: body}} ->
+          case Kiln.PatchProposal.decode_envelope(body) do
+            {:ok, _ops} ->
+              {:ok, body, sha256_hex(body)}
 
-          {:error, _} = err ->
-            err
-        end
+            {:error, _} = err ->
+              err
+          end
 
-      {:error, _} = err ->
-        err
+        {:error, _} = err ->
+          err
+      end
     end
+  end
+
+  @doc """
+  Owner-controlled execution authority gate for the provider-backed
+  path. Returns `:ok` only when an explicit `Authority.decide/1`
+  grant is present for the `provider.network` capability on the
+  observed repository.
+
+  The default production values are:
+      allowed_capabilities: []
+      denied_capabilities:  ["provider.network"]
+
+  These default values result in a `:denied` decision, making
+  live network execution impossible without explicit owner
+  authorization. Tests that install the deterministic transport
+  seam must explicitly grant the capability:
+
+      Application.put_env(
+        :kiln, :provider_network_allowed_capabilities, ["provider.network"]
+      )
+
+  The scope is bound to the observed repository (the actual
+  dispatch target) so that the standard `Authority.decide/1`
+  scope-mismatch check is satisfied.
+  """
+  @spec check_provider_network_authority(RepositoryObservation.t(), String.t()) ::
+          :ok | {:error, term()}
+  def check_provider_network_authority(
+        %RepositoryObservation{} = observation,
+        base_commit
+      )
+      when is_binary(base_commit) do
+    attempt =
+      Authority.decide(
+        work_id: "wok-provider-network",
+        run_id: "run_provider_network",
+        requested_capability: @provider_network_capability,
+        # Bind the scope to the observed repository so the standard
+        # Authority.decide/1 scope-mismatch check is satisfied.
+        requested_scope: observation.repository,
+        observation: observation,
+        base_commit: base_commit,
+        decision_id: "dec_" <> short_id(),
+        now: DateTime.utc_now() |> DateTime.to_iso8601(),
+        allowed_capabilities: provider_network_allowed_capabilities(),
+        denied_capabilities: provider_network_denied_capabilities()
+      )
+
+    case attempt do
+      {:ok, %Authority{result: :granted}} ->
+        :ok
+
+      {:ok, %Authority{result: :denied, reason_code: reason}} ->
+        {:error, {:provider_network_authority_denied, reason}}
+
+      {:error, %Error{} = err} ->
+        {:error, err}
+    end
+  end
+
+  @doc "The set of authority capabilities the provider network is allowed to use. Loaded from `Application.get_env/2`; defaults to `[]`."
+  @spec provider_network_allowed_capabilities() :: [String.t()]
+  def provider_network_allowed_capabilities do
+    Application.get_env(:kiln, :provider_network_allowed_capabilities, [])
+  end
+
+  @doc "The set of authority capabilities the provider network is explicitly denied. Loaded from `Application.get_env/2`; defaults to `[provider.network]`."
+  @spec provider_network_denied_capabilities() :: [String.t()]
+  def provider_network_denied_capabilities do
+    Application.get_env(:kiln, :provider_network_denied_capabilities, ["provider.network"])
   end
 
   @doc """
