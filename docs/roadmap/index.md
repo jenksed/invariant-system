@@ -64,7 +64,7 @@ flowchart LR
 | DL0-3 Verification binding | Kiln | prove required checks ran against the exact accepted state | DL0-2; current registered verification | required verification is registry-bound, state-bound, and cannot be replaced by arbitrary shell success | command/evidence artifacts + negative stale-state cases | `partial`; registered verification exists, full change-loop binding remains to prove |
 | DL0-4 Independent review | Arsenal method + Kiln runtime evidence | challenge implementation without letting implementer self-grade | DL0-3; reviewer independence semantics; no Manifold requirement unless selection is genuinely needed | reviewer receives bounded independent context and cannot fabricate acceptance | review artifact/evidence + independence proof + falsification cases | `planned`; exact reviewer-selection/representation boundary unresolved |
 | DL0-5 Human decision | Kiln-owned durable truth, surfaced by Temper | record accept/revise without moving authority into UI | DL0-4; decision schema/state owner | human decision is explicit, durable, attributable, and cannot be inferred from passing tests | decision record + projection tests + denial/absence cases | `planned`; operator action surface must not make Temper canonical authority |
-| DL0-6 Learning observation | Arsenal / Bench consumer | preserve useful outcome evidence without laundering one run into broad efficacy | DL0-5; Learning Observation contract | runtime observation retains scope/provenance and does not auto-promote capability/model lifecycle | contract fixture + consumer validation | `planned` |
+| DL0-6 Learning observation | Arsenal consumer | preserve useful outcome evidence without laundering one run into broad efficacy | DL0-5; Learning Observation contract | a reviewed Loadout/Kiln observation retains scope/provenance and enters Arsenal without becoming a Claim, qualification, or policy automatically | contract fixture + producer/consumer validation + no-auto-promotion negative case | `planned`; Bench involvement requires later explicit evaluation/qualification work rather than direct promotion |
 | DL0-7 Whole-loop acceptance | Invariant integration | prove the property through public boundaries | DL0-1 through DL0-6 | one real code change traverses public boundaries, fails closed, survives required restart/review checks, and ends with explicit human decision | clean end-to-end scenario + negative matrix + exact commit/state receipts | `planned` |
 
 ## Parallel-safe vs dependency-sensitive work
@@ -100,14 +100,13 @@ After Development Loop v0 has accepted evidence:
 
 Explicitly not committed implementation:
 
-- deep Manifold allocation/routing policies beyond the minimal selection need;
-- nested/concurrent agent organizations;
-- remote execution and multi-machine orchestration;
-- repository quality memory derived from large longitudinal evidence sets;
-- broad third-party capability marketplaces;
+- deeper Manifold allocation/routing policies beyond the first demonstrated selection need;
+- larger nested/concurrent run organizations beyond Kiln's accepted bounded child-run sequence;
+- longitudinal repository-quality memory derived from accumulated reviewed evidence;
+- broader third-party capability and qualification ecosystems;
 - organization-scale policy/signing/attestation surfaces.
 
-Those directions may be useful. They are not reasons to widen the next acceptance slice.
+These are directions, not commitments. They are not reasons to widen the next acceptance slice.
 
 ## Product roadmaps
 
