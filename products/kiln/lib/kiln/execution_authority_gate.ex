@@ -24,8 +24,10 @@ defmodule Kiln.ExecutionAuthorityGate do
     - the authorization record file is missing;
     - the authorization record exists but `state != "authorized"` (e.g.,
       `state=proposed` is not yet authorized);
-    - the recorded `base_sha` does not match the runtime's observed
-      current commit;
+    - the recorded `base_sha` is not an ancestor of (or equal to) the
+      runtime's observed current commit, per the accepted Invariant
+      authorization model (see `docs/authorizations/README.md` and
+      `scripts/agent-preflight`);
     - the recorded `work_id` does not match the expected `KILN-M0-01-E4`;
     - the recorded `scope` does not name the `provider.network`
       capability;
@@ -58,11 +60,16 @@ defmodule Kiln.ExecutionAuthorityGate do
   Read and verify the recorded provider network authorization.
 
   Required bindings:
-    * `expected_base_sha` — the runtime observed HEAD commit (must equal
-      the recorded `base_sha`).
+    * `expected_base_sha` — the runtime observed HEAD commit. The
+      recorded `base_sha` must be an ancestor of (or equal to) this
+      commit. Per the accepted Invariant authorization model
+      (see `docs/authorizations/README.md` and `scripts/agent-preflight`),
+      implementation commits are expected to descend from the decision
+      base, not be byte-equal to it. The check uses
+      `git merge-base --is-ancestor`, run in `observation.repository`.
     * `observation` — the `%Kiln.RepositoryObservation{}` captured at
       the dispatch site; used to bind the authority check to the
-      observed repository state.
+      observed repository state and to anchor the git invocation.
 
   Returns `{:ok, %{...}}` with the verified record on success.
   Returns `{:error, reason}` on any failure mode.
@@ -76,7 +83,7 @@ defmodule Kiln.ExecutionAuthorityGate do
     with {:ok, record} <- read_authorization_record(),
          :ok <- check_state_authorized(record),
          :ok <- check_work_id(record),
-         :ok <- check_base_sha(record, expected_base_sha),
+         :ok <- check_base_sha(record, expected_base_sha, observation.repository),
          :ok <- check_scope_capability(record),
          :ok <- check_scope_endpoint(record),
          :ok <- check_scope_observation(record, observation) do
@@ -190,15 +197,41 @@ defmodule Kiln.ExecutionAuthorityGate do
     end
   end
 
-  defp check_base_sha(record, expected_base_sha) do
-    case Map.get(record, "base_sha") do
-      ^expected_base_sha ->
-        :ok
+  defp check_base_sha(record, expected_base_sha, repository_root) do
+    recorded_base_sha = Map.get(record, "base_sha")
 
-      other ->
-        {:error, {:base_sha_mismatch, expected: expected_base_sha, actual: other}}
+    if is_ancestor_or_equal?(recorded_base_sha, expected_base_sha, repository_root) do
+      :ok
+    else
+      {:error, {:base_sha_mismatch, expected: expected_base_sha, actual: recorded_base_sha}}
     end
   end
+
+  # Per the accepted Invariant authorization model (see
+  # products/kiln/docs/authorizations/README.md and
+  # products/kiln/scripts/agent-preflight), the recorded base_sha must
+  # be an ancestor of (or equal to) the runtime observed HEAD. We use
+  # `git merge-base --is-ancestor` — the same primitive the preflight
+  # script uses — which exits 0 when `$1` is an ancestor of `$2`.
+  # Any other outcome (non-zero exit, malformed SHA, missing git,
+  # missing repository) is treated as a non-ancestor and fails closed.
+  defp is_ancestor_or_equal?(ancestor, descendant, repository_root)
+       when is_binary(ancestor) and is_binary(descendant) and is_binary(repository_root) and
+              byte_size(ancestor) == 40 and byte_size(descendant) == 40 do
+    case System.cmd(
+           "git",
+           ["merge-base", "--is-ancestor", ancestor, descendant],
+           cd: repository_root,
+           stderr_to_stdout: true
+         ) do
+      {_, 0} -> true
+      _ -> false
+    end
+  catch
+    _kind, _reason -> false
+  end
+
+  defp is_ancestor_or_equal?(_ancestor, _descendant, _repository_root), do: false
 
   defp check_scope_capability(record) do
     scope = Map.get(record, "scope") || ""
