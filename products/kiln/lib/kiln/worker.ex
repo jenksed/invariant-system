@@ -130,14 +130,15 @@ defmodule Kiln.Worker do
          {:ok, observation} <- observe_repository(repository_root),
          {:ok, attrs} <- merge_dispatch_attrs(profile, eligibility, request_attrs),
          {:ok, ci_request} <- CandidateInvocation.new_request(attrs),
-         # M11 E2 B-repair: the bounded completion IS the
-         # `implementer-patch-proposal-input/v1` envelope that the
-         # caller supplied via `--request`. `build_bounded_completion/1`
-         # validates + serializes the envelope and returns the digest
-         # that binds the Candidate Invocation metadata to the
-         # envelope content. The CI struct is only used for the
-         # digest binding; it does NOT synthesize the completion.
-         {:ok, completion_bytes, parsed_digest} <- build_bounded_completion(request_attrs) do
+         # M11 E2 B-repair + KILN-M0-01 integration: the bounded completion is
+         # either the deterministic-fake envelope (the historical M11 E2 path)
+         # or the bounded MiniMax M3 provider's completion (the new
+         # provider-backed path). The selection is controlled by the
+         # `:worker_provider_mode` application env: `:deterministic_fake`
+         # (default) keeps the historical deterministic E2 path green;
+         # `:real_provider` exercises the real bounded MiniMax adapter
+         # behind the deterministic transport seam.
+         {:ok, completion_bytes, parsed_digest} <- build_completion(ci_request, request_attrs) do
       raw_completion_ref = %{
         "id" => "raw_" <> short_id(),
         "digest" => sha256_hex(completion_bytes)
@@ -177,6 +178,84 @@ defmodule Kiln.Worker do
          base_state_digest: observation.repository_state_digest,
          adapter_implementation_digest: MinimaxM3Adapter.implementation_digest()
        }}
+    end
+  end
+
+  @doc """
+  Provider-mode selection boundary. The default is `:deterministic_fake`
+  which preserves the accepted M11 E2 deterministic path. Setting
+  `:worker_provider_mode` to `:real_provider` exercises the bounded
+  MiniMax M3 adapter via the deterministic transport seam for tests,
+  or the actual Finch transport in production.
+
+  This is the ONLY decision the Worker makes about provider selection.
+  The Worker does not select providers; the runtime/operator configures
+  the mode before dispatch.
+  """
+  @spec worker_provider_mode() :: :deterministic_fake | :real_provider
+  def worker_provider_mode do
+    case Application.get_env(:kiln, :worker_provider_mode, :deterministic_fake) do
+      :real_provider -> :real_provider
+      _ -> :deterministic_fake
+    end
+  end
+
+  @doc """
+  Build the bounded completion. Selects between:
+    - the deterministic-fake completion (historical M11 E2 path);
+    - the bounded real-provider completion (KILN-M0-01 integration).
+
+  Returns `{:ok, completion_bytes, parsed_digest}` on success, or a
+  bounded error tuple. The completion bytes in the real-provider path
+  are the provider's bounded response body (validated as a canonical
+  `implementer-patch-proposal-input/v1` envelope by `PatchProposal.decode_envelope/1`).
+  """
+  @spec build_completion(CandidateInvocation.t(), map()) ::
+          {:ok, binary(), String.t()}
+          | {:error, term()}
+  def build_completion(%CandidateInvocation{} = ci_request, request_attrs) when is_map(request_attrs) do
+    case worker_provider_mode() do
+      :real_provider ->
+        build_provider_completion(ci_request)
+
+      _ ->
+        build_bounded_completion(request_attrs)
+    end
+  end
+
+  @doc """
+  Provider-backed completion path. Calls `MinimaxM3Adapter.stream/2`
+  with the canonical CandidateInvocation, validates the bounded provider
+  body as an `implementer-patch-proposal-input/v1` envelope via
+  `PatchProposal.decode_envelope/1`, and returns the bounded bytes plus
+  their digest.
+
+  The provider does NOT gain:
+    - mutation authority;
+    - patch approval authority;
+    - HumanDecision authority;
+    - repository authority;
+    - verification authority.
+
+  The Worker completes; a separate Patch Proposal builder and Patch
+  Service apply the approved bytes only.
+  """
+  @spec build_provider_completion(CandidateInvocation.t()) ::
+          {:ok, binary(), String.t()}
+          | {:error, term()}
+  def build_provider_completion(%CandidateInvocation{} = ci_request) do
+    case MinimaxM3Adapter.stream(ci_request, fn _ -> :ok end) do
+      {:ok, %{status: :ok, body: body}} ->
+        case Kiln.PatchProposal.decode_envelope(body) do
+          {:ok, _ops} ->
+            {:ok, body, sha256_hex(body)}
+
+          {:error, _} = err ->
+            err
+        end
+
+      {:error, _} = err ->
+        err
     end
   end
 
