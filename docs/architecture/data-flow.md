@@ -19,10 +19,13 @@ flowchart LR
     Arsenal[Arsenal / Bench] -->|Qualified Method Record| Loadout[Loadout]
     Loadout -->|Work Envelope| Kiln[Kiln]
     Kiln -->|Run Result Envelope| Temper[Temper]
-    Kiln -. learning observation .-> Arsenal
+    Loadout -. Learning Observation .-> Arsenal
+    Kiln -. Learning Observation .-> Arsenal
 ```
 
 The canonical contract documents live at the repository root. Products keep language-specific adapters and types but must not create competing canonical semantics.
+
+The experimental Learning Observation v0 contract names **Loadout or Kiln** as producers through an explicit reviewed projection and **Arsenal** as the consumer. An observation is not qualification evidence by itself and has no automatic path into Kiln enforcement.
 
 ## Current real path
 
