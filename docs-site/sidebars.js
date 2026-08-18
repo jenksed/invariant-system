@@ -1,0 +1,128 @@
+const sidebars = {
+  docsSidebar: [
+    'index',
+    'status',
+    {
+      type: 'category',
+      label: 'Getting started',
+      collapsed: false,
+      items: [
+        'getting-started/index',
+        'getting-started/prerequisites',
+        'getting-started/setup',
+        'getting-started/first-run',
+        'getting-started/repository-recon',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Concepts',
+      items: [
+        'concepts/index',
+        'concepts/doctrine',
+        'concepts/authority',
+        'concepts/evidence',
+        'concepts/completion',
+        'concepts/context',
+        'concepts/qualification',
+        'concepts/glossary',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Architecture',
+      items: [
+        'architecture/index',
+        'architecture/system-map',
+        'architecture/product-boundaries',
+        'architecture/data-flow',
+        'architecture/contracts',
+        'architecture/authority-flow',
+        'architecture/evidence-flow',
+        'architecture/execution-model',
+        'architecture/provenance-and-history',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Products',
+      items: [
+        'products/index',
+        'products/arsenal/index',
+        'products/bench/index',
+        'products/loadout/index',
+        'products/kiln/index',
+        'products/temper/index',
+        'products/manifold/index',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Workflows',
+      items: [
+        'workflows/index',
+        'workflows/repository-recon',
+        'workflows/planning-to-execution',
+        'workflows/verification-and-review',
+        'workflows/development-loop',
+        'workflows/recovery',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Operations',
+      items: [
+        'operations/index',
+        'operations/cli',
+        'operations/doctor',
+        'operations/testing',
+        'operations/troubleshooting',
+        'operations/repository-state',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Development',
+      items: [
+        'development/index',
+        'development/repository-layout',
+        'development/architecture-boundaries',
+        'development/contracts',
+        'development/testing',
+        'development/documentation',
+        'development/contributing',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Reference',
+      items: [
+        'reference/index',
+        'reference/commands',
+        'reference/contracts',
+        'reference/status-model',
+        'reference/terminology',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Roadmap',
+      items: [
+        'roadmap/index',
+        'roadmap/system',
+        'roadmap/arsenal',
+        'roadmap/loadout',
+        'roadmap/kiln',
+        'roadmap/temper',
+        'roadmap/manifold',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'History',
+      items: ['history/index', 'history/monorepo-migration'],
+    },
+  ],
+};
+
+module.exports = sidebars;
