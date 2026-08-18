@@ -30,6 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Record repository baseline
+        run: |
+          git status --short
+          git branch --show-current
+          git rev-parse HEAD
+          git log --oneline -15
+          ./invariant status
+          ./invariant doctor || true
       - name: Root structural checks
         run: |
           ./invariant check
