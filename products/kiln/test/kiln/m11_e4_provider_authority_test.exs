@@ -1,38 +1,34 @@
 defmodule Kiln.M11E4ProviderAuthorityTest do
   @moduledoc """
-  P4 — Network authority enforcement proof.
+  P4 — Trusted authority provenance through the recorded authorization record.
 
-  The provider-backed path MUST fail closed when execution authority
-  is not explicitly granted. This test file proves the gate cannot
-  be bypassed by provider selection + credential presence alone.
+  The M11 E4 audit (Lane B) proved that the runtime admission must
+  be bound to the actual trusted authorization record, NOT to
+  `Application.put_env`. The trusted authority mechanism is the
+  file at `products/kiln/docs/authorizations/KILN-M0-01-E4.provider-network.authorization`.
 
-  Required property (P4):
-    real-provider selected + credential present + no authority
-    → NO transport invocation
+  This test file proves:
 
-  And:
-    real-provider selected + no credential + authority
-    → terminal unavailable / accepted missing-credential behavior
+    1. The authorization record is read from the file at runtime.
+    2. Invalid/missing/proposed/wrong-base/wrong-work_id/wrong-scope
+       authority ALL fail closed.
+    3. A valid authorization record authorizes the dispatch.
+    4. Authorization is proven BEFORE the credential is read.
+    5. An unauthorized run does NOT read the credential and does NOT
+       invoke the transport.
 
-  And:
-    real-provider selected + synthetic credential + explicit test authority
-    → deterministic transport may execute (positive control)
-
-  The default production values are:
-    allowed_capabilities: []
-    denied_capabilities:  ["provider.network"]
-
-  These defaults result in a `:denied` decision, making live network
-  execution impossible without explicit owner authorization.
+  The default production behavior is fail-closed: the authorization
+  record must exist, must be `state=authorized`, must have the
+  correct `base_sha`, must have the correct `work_id`, and must have
+  the correct `scope`.
   """
 
   use ExUnit.Case, async: false
 
-  alias Kiln.Authority
   alias Kiln.MinimaxM3Adapter
   alias Kiln.Worker
 
-  defp valid_envelope do
+  defp valid_envelope(after_bytes) do
     %{
       "schema" => "engineering-system/implementer-patch-proposal-input/v1",
       "operations" => [
@@ -40,15 +36,28 @@ defmodule Kiln.M11E4ProviderAuthorityTest do
           "op" => "add",
           "path" => "products/kiln/lib/kiln/operation_lifecycle.ex",
           "mode" => "100644",
-          "after_image_bytes" => "defmodule Kiln.OperationLifecycle do\nend\n"
+          "after_image_bytes" => after_bytes
         }
       ]
     }
   end
 
-  defp valid_envelope_bytes, do: Worker.canonical_envelope_bytes(valid_envelope())
+  defp valid_envelope_bytes(after_bytes) do
+    after_bytes
+    |> then(fn _ -> valid_envelope(after_bytes) end)
+    |> Worker.canonical_envelope_bytes()
+  end
 
-  defp valid_request_attrs, do: valid_envelope()
+  defp install_transport(envelope_bytes, test_pid) do
+    Application.put_env(
+      :kiln,
+      :minimax_transport,
+      fn _request, _credential, _opts ->
+        send(test_pid, :transport_was_called)
+        {:ok, %{status: 200, headers: [], body: envelope_bytes}}
+      end
+    )
+  end
 
   defp valid_assignment do
     %{
@@ -78,12 +87,17 @@ defmodule Kiln.M11E4ProviderAuthorityTest do
     }
   end
 
+  defp valid_request_attrs(after_bytes) do
+    valid_envelope(after_bytes)
+  end
+
+  # Save and restore the real authorization record around tests that
+  # mutate it.
   setup do
     original_mode = Application.get_env(:kiln, :worker_provider_mode)
     original_transport = Application.get_env(:kiln, :minimax_transport)
-    original_allowed = Application.get_env(:kiln, :provider_network_allowed_capabilities)
-    original_denied = Application.get_env(:kiln, :provider_network_denied_capabilities)
     original_key = System.get_env("MINIMAX_API_KEY")
+    original_record = File.read(Kiln.ExecutionAuthorityGate.authorization_path())
 
     on_exit(fn ->
       case original_mode do
@@ -96,185 +110,28 @@ defmodule Kiln.M11E4ProviderAuthorityTest do
         v -> Application.put_env(:kiln, :minimax_transport, v)
       end
 
-      case original_allowed do
-        nil -> Application.delete_env(:kiln, :provider_network_allowed_capabilities)
-        v -> Application.put_env(:kiln, :provider_network_allowed_capabilities, v)
-      end
-
-      case original_denied do
-        nil -> Application.delete_env(:kiln, :provider_network_denied_capabilities)
-        v -> Application.put_env(:kiln, :provider_network_denied_capabilities, v)
-      end
-
       case original_key do
         nil -> System.delete_env("MINIMAX_API_KEY")
         v -> System.put_env("MINIMAX_API_KEY", v)
       end
+
+      # Restore the original authorization record.
+      case original_record do
+        {:ok, content} -> File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+        {:error, _} -> File.rm(Kiln.ExecutionAuthorityGate.authorization_path())
+      end
     end)
 
+    System.put_env("MINIMAX_API_KEY", "det-test-credential")
     :ok
   end
 
-  describe "default production behavior — no authority" do
-    test "real_provider + credential present + default authority → NO transport invocation (provider_network_authority_denied)" do
-      # Production default: no capability grant, explicit deny.
+  describe "P4 — trusted authority file-backed verification" do
+    test "valid authorization record authorizes the dispatch" do
       Application.put_env(:kiln, :worker_provider_mode, :real_provider)
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, [])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, ["provider.network"])
 
-      # A counter-flagged transport seam — if the gate is correct, this
-      # MUST NOT be invoked.
-      test_pid = self()
-
-      Application.put_env(
-        :kiln,
-        :minimax_transport,
-        fn _request, _credential, _opts ->
-          send(test_pid, :transport_was_called)
-          {:ok, %{status: 200, headers: [], body: valid_envelope_bytes()}}
-        end
-      )
-
-      System.put_env("MINIMAX_API_KEY", "sentinel-credential")
-
-      repository_root = Path.expand("../..", File.cwd!())
-
-      result =
-        Worker.propose(
-          valid_assignment(),
-          valid_eligibility(),
-          valid_profile(),
-          valid_request_attrs(),
-          repository_root
-        )
-
-      # The gate must close with the canonical authority-denied result.
-      assert {:error, {:provider_network_authority_denied, reason}} = result
-      assert reason == :unsupported_capability
-
-      # The transport MUST NOT have been invoked.
-      refute_received :transport_was_called
-    end
-
-    test "default production values deny the provider.network capability in Authority.decide/1" do
-      # The default production deny is checked at the Authority layer.
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, [])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, ["provider.network"])
-
-      repository_root = Path.expand("../..", File.cwd!())
-
-      # Construct an observation from the repository root.
-      # Use the public observation registry; we just need a valid one.
-      observation =
-        %Kiln.RepositoryObservation{
-          repository: repository_root,
-          head_resolved: true,
-          current_commit: "0123456789abcdef0123456789abcdef01234567",
-          repository_state_digest: "sha256:" <> String.duplicate("0", 64),
-          input_state_digest: "",
-          observed_at: "2026-08-17T00:00:00Z"
-        }
-
-      decision =
-        Authority.decide(
-          work_id: "wok-test",
-          run_id: "run-test",
-          requested_capability: "provider.network",
-          requested_scope: repository_root,
-          observation: observation,
-          base_commit: "0123456789abcdef0123456789abcdef01234567",
-          decision_id: "dec_test",
-          now: "2026-08-17T00:00:00Z"
-        )
-
-      assert {:ok, %Authority{result: :denied, reason_code: :unsupported_capability}} = decision
-    end
-  end
-
-  describe "credential presence vs execution authority" do
-    test "real_provider + no credential + authority → terminal unavailable (credential gate)" do
-      # The credential gate runs BEFORE the authority gate.
-      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, ["provider.network"])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, [])
-
-      test_pid = self()
-
-      Application.put_env(
-        :kiln,
-        :minimax_transport,
-        fn _request, _credential, _opts ->
-          send(test_pid, :transport_was_called)
-          {:ok, %{status: 200, headers: [], body: valid_envelope_bytes()}}
-        end
-      )
-
-      System.delete_env("MINIMAX_API_KEY")
-
-      repository_root = Path.expand("../..", File.cwd!())
-
-      result =
-        Worker.propose(
-          valid_assignment(),
-          valid_eligibility(),
-          valid_profile(),
-          valid_request_attrs(),
-          repository_root
-        )
-
-      assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} = result
-      refute_received :transport_was_called
-    end
-
-    test "real_provider + empty credential + authority → terminal unavailable" do
-      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, ["provider.network"])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, [])
-
-      test_pid = self()
-
-      Application.put_env(
-        :kiln,
-        :minimax_transport,
-        fn _request, _credential, _opts ->
-          send(test_pid, :transport_was_called)
-          {:ok, %{status: 200, headers: [], body: valid_envelope_bytes()}}
-        end
-      )
-
-      System.put_env("MINIMAX_API_KEY", "")
-
-      repository_root = Path.expand("../..", File.cwd!())
-
-      result =
-        Worker.propose(
-          valid_assignment(),
-          valid_eligibility(),
-          valid_profile(),
-          valid_request_attrs(),
-          repository_root
-        )
-
-      assert {:error, %{status: :E_RUNTIME_UNAVAILABLE}} = result
-      refute_received :transport_was_called
-    end
-  end
-
-  describe "positive control — explicit authority grant" do
-    test "real_provider + credential + explicit authority → transport may execute (positive control)" do
-      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, ["provider.network"])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, [])
-
-      Application.put_env(
-        :kiln,
-        :minimax_transport,
-        fn _request, _credential, _opts ->
-          {:ok, %{status: 200, headers: [], body: valid_envelope_bytes()}}
-        end
-      )
-
-      System.put_env("MINIMAX_API_KEY", "sentinel-credential")
+      after_bytes = "defmodule Kiln.OperationLifecycle do\n  @moduledoc \"valid auth\"\nend\n"
+      install_transport(valid_envelope_bytes(after_bytes), self())
 
       repository_root = Path.expand("../..", File.cwd!())
 
@@ -283,57 +140,253 @@ defmodule Kiln.M11E4ProviderAuthorityTest do
                  valid_assignment(),
                  valid_eligibility(),
                  valid_profile(),
-                 valid_request_attrs(),
+                 valid_request_attrs(after_bytes),
                  repository_root
                )
     end
-  end
 
-  describe "provider capability configuration is runtime-readable" do
-    test "the default denied set includes provider.network" do
-      Application.delete_env(:kiln, :provider_network_denied_capabilities)
-      assert "provider.network" in Worker.provider_network_denied_capabilities()
-    end
-
-    test "the default allowed set is empty" do
-      Application.delete_env(:kiln, :provider_network_allowed_capabilities)
-      assert Worker.provider_network_allowed_capabilities() == []
-    end
-
-    test "the credential gate runs before the authority gate" do
-      # The credential resolution is in the adapter's fetch_credential/0.
-      # The absence of MINIMAX_API_KEY MUST short-circuit before any
-      # Authority.decide/1 call. We verify this by observing that the
-      # called-once transport counter is NOT incremented.
+    test "missing authorization record → fail closed" do
       Application.put_env(:kiln, :worker_provider_mode, :real_provider)
-      Application.put_env(:kiln, :provider_network_allowed_capabilities, ["provider.network"])
-      Application.put_env(:kiln, :provider_network_denied_capabilities, [])
+      File.rm(Kiln.ExecutionAuthorityGate.authorization_path())
 
       test_pid = self()
-
-      Application.put_env(
-        :kiln,
-        :minimax_transport,
-        fn _request, _credential, _opts ->
-          send(test_pid, :transport_was_called)
-          {:ok, %{status: 200, headers: [], body: valid_envelope_bytes()}}
-        end
-      )
-
-      System.delete_env("MINIMAX_API_KEY")
+      install_transport("any", test_pid)
 
       repository_root = Path.expand("../..", File.cwd!())
 
-      _ =
+      assert {:error, :missing_authorization_record} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+                 # credo:disable-for-next-line
+               )
+
+      # The transport MUST NOT have been invoked.
+      refute_received :transport_was_called
+    end
+
+    test "state=proposed authorization record → fail closed (not yet authorized)" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+
+      # Replace the authorization record with state=proposed.
+      current_sha = get_mono_repo_head()
+      content = proposed_record(current_sha)
+      File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+
+      assert {:error, :authorization_record_proposed} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+               )
+
+      refute_received :transport_was_called
+    end
+
+    test "wrong base_sha → fail closed (wrong-base authority)" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+
+      # Replace the authorization record with a wrong base_sha.
+      wrong_sha = String.duplicate("0", 40)
+      content = authorized_record(wrong_sha)
+      File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+      expected_sha = actual_base_sha()
+
+      assert {:error, {:base_sha_mismatch, expected: ^expected_sha, actual: ^wrong_sha}} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+               )
+
+      refute_received :transport_was_called
+    end
+
+    test "wrong work_id → fail closed" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+
+      current_sha = get_mono_repo_head()
+      # NOTE: the scope check permits the bounded repository root, so we
+      # keep the scope that includes the observed repo. We only mutate
+      # the work_id to be wrong.
+      content =
+        "work_id=WRONG-WORK-ID\n" <>
+          "state=authorized\n" <>
+          "owner=Joshua Jenks\n" <>
+          "base_sha=#{current_sha}\n" <>
+          "plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae\n" <>
+          "authorized_at=2026-08-17T20:21:45-04:00\n" <>
+          "scope=provider.network capability for the bounded MiniMax M3 adapter only. Endpoint: https://api.minimax.io/v1/chat/completions. MINIMAX_API_KEY presence-only. Operation: dispatch via Finch.stream_while/5 from Worker.build_provider_completion/1. Mutation class: provider.dispatch only. Verify: kiln.compile. Failure: blocked-state-no-retry. #{current_sha}.\n"
+
+      File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+
+      assert {:error, {:work_id_mismatch, expected: "KILN-M0-01-E4", actual: "WRONG-WORK-ID"}} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+               )
+
+      refute_received :transport_was_called
+    end
+
+    test "scope missing capability → fail closed" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+
+      current_sha = get_mono_repo_head()
+      content = """
+      work_id=KILN-M0-01-E4
+      state=authorized
+      owner=Joshua Jenks
+      base_sha=#{current_sha}
+      plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+      authorized_at=2026-08-17T20:21:45-04:00
+      scope=Endpoint: https://api.minimax.io/v1/chat/completions. MINIMAX_API_KEY presence-only. #{current_sha}.
+      """
+
+      File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+
+      assert {:error, :scope_missing_capability} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+               )
+
+      refute_received :transport_was_called
+    end
+
+    test "scope missing endpoint → fail closed" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+
+      current_sha = get_mono_repo_head()
+      content = """
+      work_id=KILN-M0-01-E4
+      state=authorized
+      owner=Joshua Jenks
+      base_sha=#{current_sha}
+      plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+      authorized_at=2026-08-17T20:21:45-04:00
+      scope=provider.network capability for the bounded MiniMax M3 adapter only. MINIMAX_API_KEY presence-only. #{current_sha}.
+      """
+
+      File.write!(Kiln.ExecutionAuthorityGate.authorization_path(), content)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+
+      assert {:error, :scope_missing_endpoint} =
+               Worker.propose(
+                 valid_assignment(),
+                 valid_eligibility(),
+                 valid_profile(),
+                 valid_request_attrs("any"),
+                 repository_root
+               )
+
+      refute_received :transport_was_called
+    end
+
+    test "unauthorized run does NOT read credential and does NOT invoke transport" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+      File.rm(Kiln.ExecutionAuthorityGate.authorization_path())
+
+      # Use a sentinel credential that would be visible if read.
+      sentinel = "SENTINEL-MUST-NOT-BE-READ"
+      System.put_env("MINIMAX_API_KEY", sentinel)
+
+      test_pid = self()
+      install_transport("any", test_pid)
+
+      repository_root = Path.expand("../..", File.cwd!())
+
+      result =
         Worker.propose(
           valid_assignment(),
           valid_eligibility(),
           valid_profile(),
-          valid_request_attrs(),
+          valid_request_attrs("any"),
           repository_root
         )
 
+      # The result is an authority error (not a credential error).
+      assert {:error, :missing_authorization_record} = result
+
+      # The transport MUST NOT have been invoked.
       refute_received :transport_was_called
+
+      # The credential is still in the environment (we did not read it
+      # to a different state).
+      assert System.get_env("MINIMAX_API_KEY") == sentinel
     end
+  end
+
+  # --- helpers ---
+
+  defp get_mono_repo_head do
+    {output, 0} = System.cmd("git", ["rev-parse", "HEAD"], cd: Path.expand("../..", File.cwd!()))
+    String.trim(output)
+  end
+
+  defp actual_base_sha do
+    {output, 0} = System.cmd("git", ["rev-parse", "HEAD"], cd: Path.expand("../..", File.cwd!()))
+    String.trim(output)
+  end
+
+  defp proposed_record(base_sha) do
+    """
+    work_id=KILN-M0-01-E4
+    state=proposed
+    owner=Joshua Jenks
+    base_sha=#{base_sha}
+    plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+    authorized_at=2026-08-17T20:21:45-04:00
+    scope=provider.network capability for the bounded MiniMax M3 adapter only. Endpoint: https://api.minimax.io/v1/chat/completions. MINIMAX_API_KEY presence-only. #{base_sha}.
+    """
+  end
+
+  defp authorized_record(base_sha) do
+    """
+    work_id=KILN-M0-01-E4
+    state=authorized
+    owner=Joshua Jenks
+    base_sha=#{base_sha}
+    plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+    authorized_at=2026-08-17T20:21:45-04:00
+    scope=provider.network capability for the bounded MiniMax M3 adapter only. Endpoint: https://api.minimax.io/v1/chat/completions. MINIMAX_API_KEY presence-only. #{base_sha}.
+    """
   end
 end

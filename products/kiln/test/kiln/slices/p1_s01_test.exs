@@ -373,6 +373,11 @@ defmodule Kiln.Slices.P1S01Test do
       # `Kiln.PatchService`'s File.read calls are the bounded exact-byte
       # preimage/postimage observations of the M8/M11 authorized patch
       # loop (KILN-M0-02 / ADR-0024), not general Repository source reads.
+      # M11 E4 adds `Kiln.ExecutionAuthorityGate` which reads the
+      # authorization record file at
+      # `products/kiln/docs/authorizations/KILN-M0-01-E4.provider-network.authorization`
+      # (NOT Repository source) under the M11 E4 authorization. This is
+      # the owner-authorized network authority gate, not a Repository read.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/store/migrations.ex",
@@ -383,6 +388,7 @@ defmodule Kiln.Slices.P1S01Test do
             path != "lib/kiln/minimax_m3_adapter.ex",
             path != "lib/kiln/m0_command_loader.ex",
             path != "lib/kiln/patch_service.ex",
+            path != "lib/kiln/execution_authority_gate.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),

@@ -19,9 +19,9 @@ defmodule Kiln.Worker do
   Architecture: Kiln.M0 (KILN-M0-02, lane M8).
   """
 
-  alias Kiln.Authority
   alias Kiln.CandidateInvocation
   alias Kiln.MinimaxM3Adapter
+  alias Kiln.ExecutionAuthorityGate
   alias Kiln.RepositoryObservation
   alias Kiln.Store.Canonical
   alias Kiln.Store.Error
@@ -29,9 +29,6 @@ defmodule Kiln.Worker do
   @schema_id "engineering-system/worker-output/m0-v1"
   @output_kind "PATCH_CANDIDATE"
   @production_mode "PRODUCTION"
-
-  @provider_network_capability "provider.network"
-  @provider_network_scope "model.invoke:MiniMax-M3"
 
   @doc "Canonical schema id for the Worker Output envelope."
   @spec schema_id() :: String.t()
@@ -252,13 +249,16 @@ defmodule Kiln.Worker do
 
   The runtime admission sequence is:
     1. worker_provider_mode = :real_provider (selection)
-    2. MINIMAX_API_KEY present (credential)
-    3. `Authority.decide/1` grants `provider.network` (execution authority)
+    2. trusted owner authorization verified (Kiln.ExecutionAuthorityGate)
+    3. MINIMAX_API_KEY present (credential — fetched ONLY after authority)
+    4. dispatch
 
-  All three must be true. The default production values deny steps
-  1 (deterministic-fake) and 3 (no capability grant); therefore
-  live network execution is impossible without explicit owner
-  authorization.
+  All four must hold. The credential is **never read** unless the
+  owner authorization has been verified first. The authorization
+  itself is bound to the recorded authorization record file
+  (`products/kiln/docs/authorizations/KILN-M0-01-E4.provider-network.authorization`),
+  not to `Application.put_env`. See `Kiln.ExecutionAuthorityGate` for the
+  fail-closed failure modes.
 
   Once admission passes, calls `MinimaxM3Adapter.stream/2` with the
   canonical CandidateInvocation, validates the bounded provider body
@@ -282,7 +282,16 @@ defmodule Kiln.Worker do
         base_commit
       )
       when is_binary(base_commit) do
-    with :ok <- check_provider_network_authority(observation, base_commit) do
+    # Step 1: verify the trusted owner authorization. If absent,
+    # missing, proposed, wrong-base, or wrong-work_id, the runtime
+    # fails closed BEFORE the credential is read.
+    with {:ok, _authorization_record} <-
+           Kiln.ExecutionAuthorityGate.verify_provider_network_authorization(
+             base_commit,
+             observation
+           ) do
+      # Step 2: dispatch (which internally fetches the credential
+      # and then dispatches via the bounded Finch transport).
       case MinimaxM3Adapter.stream(ci_request, fn _ -> :ok end) do
         {:ok, %{status: :ok, body: body}} ->
           case Kiln.PatchProposal.decode_envelope(body) do
@@ -329,44 +338,10 @@ defmodule Kiln.Worker do
         base_commit
       )
       when is_binary(base_commit) do
-    attempt =
-      Authority.decide(
-        work_id: "wok-provider-network",
-        run_id: "run_provider_network",
-        requested_capability: @provider_network_capability,
-        # Bind the scope to the observed repository so the standard
-        # Authority.decide/1 scope-mismatch check is satisfied.
-        requested_scope: observation.repository,
-        observation: observation,
-        base_commit: base_commit,
-        decision_id: "dec_" <> short_id(),
-        now: DateTime.utc_now() |> DateTime.to_iso8601(),
-        allowed_capabilities: provider_network_allowed_capabilities(),
-        denied_capabilities: provider_network_denied_capabilities()
-      )
-
-    case attempt do
-      {:ok, %Authority{result: :granted}} ->
-        :ok
-
-      {:ok, %Authority{result: :denied, reason_code: reason}} ->
-        {:error, {:provider_network_authority_denied, reason}}
-
-      {:error, %Error{} = err} ->
-        {:error, err}
-    end
-  end
-
-  @doc "The set of authority capabilities the provider network is allowed to use. Loaded from `Application.get_env/2`; defaults to `[]`."
-  @spec provider_network_allowed_capabilities() :: [String.t()]
-  def provider_network_allowed_capabilities do
-    Application.get_env(:kiln, :provider_network_allowed_capabilities, [])
-  end
-
-  @doc "The set of authority capabilities the provider network is explicitly denied. Loaded from `Application.get_env/2`; defaults to `[provider.network]`."
-  @spec provider_network_denied_capabilities() :: [String.t()]
-  def provider_network_denied_capabilities do
-    Application.get_env(:kiln, :provider_network_denied_capabilities, ["provider.network"])
+    Kiln.ExecutionAuthorityGate.verify_provider_network_authorization(
+      base_commit,
+      observation
+    )
   end
 
   @doc """
