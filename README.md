@@ -54,7 +54,7 @@ Run it from one checkout:
 
 The executable scenario lives at [`integration/scenarios/repository-recon/run.sh`](integration/scenarios/repository-recon/run.sh). It asserts that the result uses `engineering-system/run-result-envelope/v0` and is **not** simulated.
 
-Newer engineering branches/worktrees may contain later accepted work. The documentation only upgrades a current capability claim after that implementation and its evidence basis are reconciled into the repository state being documented.
+Newer engineering branches/worktrees may contain later accepted work. Documentation upgrades a current capability claim only after that implementation and its evidence basis are reconciled into the repository state being documented.
 
 ## The system at a glance
 
@@ -66,7 +66,7 @@ flowchart LR
     L[Loadout\ngoals + plans]
     M[Manifold\nselection boundary]
     K[Kiln\nauthority + execution truth]
-    T[Temper\noperator projection / control surface]
+    T[Temper\noperator projection\nplanned control surface]
 
     A --> B
     B -. qualification evidence .-> M
@@ -75,11 +75,11 @@ flowchart LR
     M -. selection cannot expand authority .-> K
     K -->|Run/Session truth + evidence| T
     T --> H
-    T -. governed action request .-> K
+    T -. planned governed request .-> K
     K -. observations .-> A
 ```
 
-Not every edge above is necessarily automated on the same repository state. Product/status docs distinguish current behavior from architectural direction.
+Not every edge above is automated on the same repository state. Product/status docs distinguish current behavior from accepted direction.
 
 ## Product boundaries
 
@@ -90,9 +90,9 @@ Not every edge above is necessarily automated on the same repository state. Prod
 | **Loadout** | goals, capabilities, planning, Work Envelope preparation | durable execution truth or authority grantor |
 | **Manifold** | intelligence selection/allocation semantics | executor, mutator, qualifier, authority grantor, generic workflow engine |
 | **Kiln** | authority, execution/effects, artifacts/evidence, registered verification, acceptance truth | model qualification/R&D owner |
-| **Temper** | operator experience, truthful projection, governed action initiation | canonical workflow state, execution truth, mutation authority |
+| **Temper** | operator experience, truthful projection | canonical workflow state, execution truth, mutation authority |
 
-Architectural ownership is enforced by [`invariant.boundaries.json`](invariant.boundaries.json). Bench is not a peer repository or `products/bench`; it lives at [`products/arsenal/evaluation/`](products/arsenal/evaluation/).
+Architectural ownership is enforced by [`invariant.boundaries.json`](invariant.boundaries.json). The Workbench roadmap plans richer Temper control-surface behavior, including initiating requests that Kiln must authorize and execute; that planned behavior is not current Temper ownership. Bench is not a peer repository or `products/bench`; it lives at [`products/arsenal/evaluation/`](products/arsenal/evaluation/).
 
 ## Inspect the repository
 
@@ -130,7 +130,7 @@ projection ≠ source of truth
 roadmap    ≠ authorization
 ```
 
-A useful method can live in Arsenal. Bench can produce evidence that a configuration is qualified for a role. Loadout can prepare work. Manifold may select among qualified intelligence. None of those facts grants repository mutation authority. Kiln owns runtime authorization and durable execution truth. Temper may show that truth and initiate governed actions; it does not create the authority behind them. Human decisions remain explicit where the workflow requires them.
+A useful method can live in Arsenal. Bench can produce evidence that a configuration is qualified for a role. Loadout can prepare work. Manifold may select among qualified intelligence. None of those facts grants repository mutation authority. Kiln owns runtime authorization and durable execution truth. Temper can show that truth. The Workbench roadmap may let Temper initiate governed requests, but Kiln still owns the authority and resulting canonical state. Human decisions remain explicit where the workflow requires them.
 
 Read [`docs/concepts/authority.md`](docs/concepts/authority.md), [`docs/concepts/evidence.md`](docs/concepts/evidence.md), and [`docs/architecture/product-boundaries.md`](docs/architecture/product-boundaries.md) for the deeper model.
 

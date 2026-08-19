@@ -2,7 +2,7 @@
 title: Temper Roadmap
 description: Turn Temper into the project workbench and remote operator surface without moving canonical execution authority out of Kiln.
 status: planned
-verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
+verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
 source_paths:
   - products/temper/README.md
   - products/temper/src/
@@ -18,6 +18,8 @@ audience:
 ## Evidence-backed baseline
 
 The branch's current documented evidence supports truthful read-only projection of real Plan/Run Result facts. Newer active engineering work must be reconciled before this page upgrades current capability claims.
+
+The canonical boundary currently assigns Temper `operator experience` and `projection`. Everything below that adds action initiation is planned control-surface behavior until implementation, contract, and boundary evidence establish otherwise.
 
 ## NEXT — Workbench Alpha
 
@@ -43,7 +45,9 @@ The command should discover/identify the current project and open a project-cent
 
 ### Governed actions
 
-Temper may initiate an action. It must delegate the authoritative operation to Kiln (or another explicitly owning component), then project the resulting canonical state. A UI event is not the durable decision record.
+Planned behavior: Temper may initiate an action request. It must delegate the authoritative operation to Kiln (or another explicitly owning component), then project the resulting canonical state. A UI event is not the durable decision record.
+
+This does not add `governed action initiation` to Temper's current `owns` boundary. If implementing the Workbench genuinely requires that architectural ownership to change, freeze that decision explicitly before dependent implementation.
 
 ### Zed handoff
 

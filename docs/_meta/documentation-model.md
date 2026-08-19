@@ -2,7 +2,7 @@
 title: Documentation Model
 description: Status vocabulary, metadata, source-basis rules, process role, and maintenance policy for Invariant documentation.
 status: current
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
 source_paths:
   - AGENTS.md
   - invariant.boundaries.json
@@ -33,7 +33,7 @@ Major pages use this frontmatter shape:
 title: Kiln
 description: Durable execution truth for Invariant.
 status: current
-verified_at_commit: <sha>
+verified_at_commit: <40-character commit SHA>
 source_paths:
   - products/kiln/...
   - contracts/...
@@ -43,7 +43,32 @@ audience:
 ---
 ```
 
-`verified_at_commit` identifies the repository state against which the page was last checked. It does not mean every line beneath every `source_path` was executed at that commit.
+`verified_at_commit` identifies the repository state against which the page's claims were last deliberately checked. It is a **review basis**, not a page-creation timestamp, acceptance record, or statement that every `source_path` was executed at that commit.
+
+A page authored later may legitimately describe an earlier repository state, but the basis must be explicit and resolvable. When a page is materially re-audited against a newer state, advance the field to that reviewed state rather than retaining an unrelated inherited SHA.
+
+For implementation/status pages, the field should identify the state whose implementation/evidence supports the current claim. For normative/process/roadmap pages, it identifies the boundary/contract/repository state against which the rule or direction was checked. It never converts planned direction into implementation evidence.
+
+## What documentation validation proves
+
+Documentation source checks are structural evidence. They may validate metadata shape, allowed status values, resolvable commit identities, current-tree source paths, and local links.
+
+They do **not** by themselves prove:
+
+- that a behavioral claim was executed at `verified_at_commit`;
+- that every `source_path` existed at that historical commit;
+- that a page is semantically consistent with all contracts/boundaries;
+- that current implementation still matches an older reviewed basis;
+- that evidence has been accepted by the responsible human authority.
+
+Therefore:
+
+```text
+green docs CI
+≠ semantic freshness proof
+```
+
+Semantic review still compares consequential claims against implementation, executable evidence, canonical contracts, `invariant.boundaries.json`, applicable `AGENTS.md`, and accepted decisions.
 
 ## Status vocabulary
 
@@ -76,19 +101,19 @@ Implementation, executable evidence, and normative contracts are strongest for c
 
 The [engineering process](../development/engineering-process.md) and [traceability reference](../reference/traceability.md) connect work packages to contracts, exact state, evidence, review, human decision, and documentation reconciliation.
 
-The docs may therefore block a confident completion claim by exposing a missing contract, stale state basis, absent evidence, or unresolved authority decision. The docs do **not** execute the work or decide acceptance themselves.
+The docs may expose a missing contract, stale state basis, absent evidence, or unresolved authority decision. The docs do **not** execute the work or decide acceptance themselves.
 
 ## Working-state discipline
 
-Active local/worktree reports may be more recent than the documented branch. Treat them as reported working state until their source, tests, evidence, and accepted candidate state are inspectable from the repository context being documented.
+Active local/worktree reports may be more recent than the documented branch. Treat them as reported working state until their source, tests, evidence, accepted candidate state, and human decision are inspectable from the repository context being documented.
 
 Do not strengthen `current` status merely because a milestone report says a lane is complete. Reconcile the evidence first.
 
 ## Ownership language
 
-Use “owns” for architectural responsibility encoded in `invariant.boundaries.json` or current contracts. Use “currently implements” for code. Use “is planned to” for roadmap direction.
+Use “owns” only for architectural responsibility encoded in `invariant.boundaries.json` or a current accepted contract. Use “currently implements” for code. Use “is planned to” for roadmap direction.
 
-A product may expose a control surface without owning the authority behind the action. In particular, Temper may initiate a governed action while Kiln remains the mutation/execution authority.
+A roadmap may plan a control surface that initiates an operation without assigning current ownership of the authority behind that operation. Temper's Workbench direction is the current example: planned governed request initiation remains separate from Kiln's execution/mutation authority and from Temper's current ownership entry.
 
 ## Historical references
 

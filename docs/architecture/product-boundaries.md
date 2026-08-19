@@ -2,7 +2,7 @@
 title: Product Boundaries
 description: What each Invariant product owns and what it is forbidden to absorb.
 status: current
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
 source_paths:
   - invariant.boundaries.json
   - AGENTS.md
@@ -12,7 +12,7 @@ audience:
 
 # Product Boundaries
 
-The authoritative summary is machine-readable in `invariant.boundaries.json`.
+The authoritative summary is machine-readable in `invariant.boundaries.json`. This table intentionally mirrors that current ownership model rather than promoting roadmap behavior into present ownership.
 
 | Area | Owns | Must not become |
 | --- | --- | --- |
@@ -21,11 +21,13 @@ The authoritative summary is machine-readable in `invariant.boundaries.json`.
 | Loadout | capabilities, goals, planning, Work Envelope preparation | durable execution truth; authority grantor |
 | Manifold | intelligence selection, allocation | executor; mutator; qualifier; authority grantor; generic workflow engine |
 | Kiln | authority, execution, effects, artifacts, evidence, registered verification, acceptance truth | R&D intelligence owner; model qualification system |
-| Temper | operator experience, projection, governed action initiation | canonical workflow state; execution truth; mutation authority; second execution path |
+| Temper | operator experience, projection | canonical authority; execution truth; mutation authority |
 
-## Control surface is not authority
+## Planned control surface is not current ownership
 
-A Temper button, command, TUI action, or remote request may initiate a governed operation. That does not make Temper the owner of the operation. The action must cross the owning boundary, where Kiln validates authority/state and records the resulting truth.
+The Workbench roadmap plans for Temper buttons, commands, TUI actions, or remote requests to initiate governed operations. That is **planned control-surface behavior**, not an additional current ownership claim.
+
+When implemented, a Temper action must cross the owning boundary. Kiln validates authority/state and records resulting canonical truth. If implementation requires changing the canonical ownership model, freeze that architecture decision explicitly before dependent work proceeds; do not edit `invariant.boundaries.json` merely to make roadmap prose appear consistent.
 
 The same distinction applies to editor integration: handing source editing/context to Zed or another editor does not transfer Kiln execution authority.
 

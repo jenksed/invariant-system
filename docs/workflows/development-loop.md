@@ -1,8 +1,8 @@
 ---
 title: Governed Engineering Loop
-description: Normative change process connecting intent, contracts, bounded implementation, evidence, independent review, human decision, and documentation reconciliation.
+description: Normative change process connecting intent, contracts, bounded implementation, evidence, independent review, human decision, promotion, and documentation reconciliation.
 status: current
-verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
+verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
 source_paths:
   - AGENTS.md
   - invariant.boundaries.json
@@ -44,11 +44,27 @@ flowchart LR
 | Recon → acceptance | Current state, ownership, and relevant prior evidence are identified. |
 | Acceptance → contract freeze | The intended property is explicit enough to distinguish proof from proxy. |
 | Contract freeze → implementation | Shared contracts/decisions consumed by implementation are resolved or explicitly bounded. |
-| Implementation → verification | Candidate state is immutable/identifiable and the relevant checks target that state. |
+| Implementation → verification | Candidate state is immutable/identifiable and relevant checks target that state. |
 | Verification → review | Evidence artifacts are available with scope and limitations; implementer narrative is not the only source. |
-| Review → human decision | Material defects/uncertainty are classified; reviewer did not silently become acceptance authority. |
+| Review → human decision | Review is independent where required, bound to the exact candidate, and material defects/uncertainty are classified. |
 | Human decision → promotion | The authorized state and exact decision are recorded; rejected/revise states cannot be promoted as complete. |
-| Promotion → docs reconciliation | Current docs, status, roadmap, and historical records reflect the new truth without rewriting history. |
+| Promotion → docs reconciliation | Current docs, status, roadmap, and historical records reflect the new truth without rewriting history or rebinding product evidence to a later docs-only SHA. |
+
+## Independent review
+
+Where the work contract requires independence:
+
+```text
+IMPLEMENTER != INDEPENDENT_REVIEWER
+```
+
+The reviewer is read-only against the candidate. The reviewer reports demonstrated defects, speculative concerns, and unproven properties separately. If the implementer repairs anything, the candidate changes and the reviewer must re-check the new candidate.
+
+Review approval does not equal human acceptance unless that authority relationship is explicitly defined. Do not infer it from workflow convenience.
+
+## Acceptance-sensitive documentation
+
+Documentation may be consumed before promotion without entering the evidence-bound worktree's history. When the current candidate is not yet explicitly accepted, prefer an exact-SHA detached documentation worktree and keep `HUMAN_DECISION = PENDING` unless an authoritative decision record says otherwise.
 
 ## Visibility requirement
 
@@ -58,10 +74,11 @@ Every consequential lane should expose enough [traceability](../reference/tracea
 what property?
 which owner/authority?
 which contract?
-which exact state?
+which exact product candidate?
 which evidence?
-which independent challenge?
+which independent reviewer and reviewed SHA?
 which human decision?
+which promotion/integration identity?
 which documentation/status changed because of it?
 ```
 
