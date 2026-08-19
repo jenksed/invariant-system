@@ -1,8 +1,8 @@
 ---
 title: Post-WP-09 Product Direction
 description: Accepted near-term product direction for Temper Workbench, durable operator recovery, and distributed Kiln authority.
-status: planned
-verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
+status: current
+verified_at_commit: 755696052cd3b122de906ab9690dfaf6811efeb6
 source_paths:
   - invariant.boundaries.json
   - docs/architecture/product-boundaries.md

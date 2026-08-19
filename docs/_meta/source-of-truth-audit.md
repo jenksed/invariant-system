@@ -2,7 +2,7 @@
 title: Source of Truth Audit
 description: Reconciliation of current Invariant repository truth, dated planning material, and historical provenance.
 status: current
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 755696052cd3b122de906ab9690dfaf6811efeb6
 source_paths:
   - README.md
   - AGENTS.md

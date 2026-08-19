@@ -60,3 +60,17 @@
   - Activity stream subscription committed
   - End-to-end scenario committed
   - `LANE-EVIDENCE-M12-TEMPER-RPC.md` with bounded proof
+
+---
+
+## Acceptance status
+
+```text
+STATUS = ACCEPTED
+HUMAN_DECISION = ACCEPT
+ACCEPTED_CANDIDATE_SHA = 755696052cd3b122de906ab9690dfaf6811efeb6
+```
+
+Owner gates green (25/25, 90/90, 1031/1031, 33/33); Lane 5 PASS; Lane 6 APPROVE; Owner HumanDecision ACCEPT.
+
+See [WP-09 closeout](wp-09-closeout.md) for the authoritative closeout record: evidence identities, defect history (Repair-11 through Repair-14), non-blocking Lane-6 followups, and successor-state pointers.

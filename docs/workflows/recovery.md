@@ -2,7 +2,7 @@
 title: Recovery
 description: Effect recovery, Session reconstruction, operator reconnect, and why uncertainty must survive interruption.
 status: partial
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 755696052cd3b122de906ab9690dfaf6811efeb6
 source_paths:
   - products/kiln/README.md
   - products/kiln/lib/

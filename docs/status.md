@@ -2,7 +2,7 @@
 title: Current System Status
 description: Evidence-backed maturity matrix for the Invariant system.
 status: current
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 755696052cd3b122de906ab9690dfaf6811efeb6
 source_paths:
   - invariant.boundaries.json
   - MIGRATION-REPORT.md
@@ -69,3 +69,7 @@ Use [Engineering traceability](reference/traceability.md) to connect the accepta
 ## When this page is stale
 
 Treat this page as suspect when the repository state in front of you has moved materially beyond `verified_at_commit`. Re-check implementation, tests, contracts, accepted evidence, and recent history before strengthening any status.
+
+## Accepted work packages on this verified state
+
+- **WP-09** — Temper client/server RPC + activity stream. Status: ACCEPTED at candidate `755696052cd3b122de906ab9690dfaf6811efeb6`. Owner gates green (25/25, 90/90, 1031/1031, 33/33); Lane 5 PASS; Lane 6 APPROVE; Owner HumanDecision ACCEPT. Live reconnect evidence crosses the real Cowboy 2.18 WebSocket boundary (Repair-14 regression test confirms). See [WP-09 closeout](roadmap/t3-competitive-30-day/work-packages/wp-09-closeout.md) for evidence identities, defect history, and post-acceptance followups.
