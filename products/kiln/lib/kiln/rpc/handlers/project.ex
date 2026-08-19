@@ -41,7 +41,6 @@ defmodule Kiln.RPC.Handlers.Project do
   """
 
   alias Kiln.Restart
-  alias Kiln.Store
 
   @doc "Dispatch a Project-family method."
   @spec handle(String.t(), map(), keyword()) ::
@@ -75,7 +74,7 @@ defmodule Kiln.RPC.Handlers.Project do
     with {:ok, path} <- require_string(params, "path"),
          :ok <- validate_path(path),
          {:ok, kiln_home} <- derive_kiln_home(path),
-         {:ok, _pid} <- ensure_store_or_return(kiln_home),
+         :ok <- require_store_registered(),
          {:ok, reconstruction} <- safe_reconstruct() do
       {:ok,
        %{
@@ -131,33 +130,24 @@ defmodule Kiln.RPC.Handlers.Project do
     {:ok, home}
   end
 
-  defp ensure_store_or_return(kiln_home) do
+  # The bounded Store connection is owned by the daemon supervisor
+  # (started via `mix invariant serve --state-path …` per WP-08 Lane 1).
+  # The RPC layer MUST treat Store registration as a precondition. If
+  # the Store is not registered, we return E_STORE_UNAVAILABLE — the
+  # operator restarts the daemon with the correct --state-path. We
+  # never start a second Store from inside an RPC handler because
+  # that would create a parallel authoritative surface and violate
+  # the bounded single-writer assumption.
+  defp require_store_registered do
     if Process.whereis(Kiln.Store.Connection) do
-      {:ok, :already_running}
+      :ok
     else
-      state_path = Path.join(kiln_home, "state.sqlite3")
-
-      if File.regular?(state_path) do
-        case Store.start_link(
-               path: state_path,
-               name: Kiln.Store.Connection,
-               store_id: "rpc_project_#{System.unique_integer([:positive])}"
-             ) do
-          {:ok, pid} -> {:ok, pid}
-          {:error, reason} -> {:error, store_unavailable(reason)}
-        end
-      else
-        {:error,
-         %{
-           code: :E_STORE_UNAVAILABLE,
-           reason: "Kiln.Store.Connection not registered; start the daemon with --state-path=#{kiln_home}"
-         }}
-      end
+      {:error,
+       %{
+         code: :E_STORE_UNAVAILABLE,
+         reason: "Kiln.Store.Connection not registered; restart daemon with --state-path=<dir>"
+       }}
     end
-  end
-
-  defp store_unavailable(reason) do
-    %{code: :E_STORE_UNAVAILABLE, reason: inspect(reason)}
   end
 
   # Wraps `Kiln.Restart.reconstruct/1` against the bounded Store
