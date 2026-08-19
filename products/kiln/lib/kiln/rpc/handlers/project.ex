@@ -40,7 +40,7 @@ defmodule Kiln.RPC.Handlers.Project do
     E_PROJECT_NOT_FOUND, E_STORE_UNAVAILABLE — this module
   """
 
-  alias Kiln.Domain.{Error, as: DomainError}
+  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.Restart
   alias Kiln.Store
 

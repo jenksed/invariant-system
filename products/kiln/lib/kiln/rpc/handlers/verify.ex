@@ -37,7 +37,7 @@ defmodule Kiln.RPC.Handlers.Verify do
     E_STORE_UNAVAILABLE, E_VERIFICATION_BUILD_FAILED
   """
 
-  alias Kiln.Domain.{Error, as: DomainError}
+  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.M0VerificationResult
 
   @required_param_keys [

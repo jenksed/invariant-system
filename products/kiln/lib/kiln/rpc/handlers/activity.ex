@@ -80,8 +80,8 @@ defmodule Kiln.RPC.Handlers.Activity do
 
   defp coerce_integer(nil, _field, default), do: {:ok, default}
 
-  defp coerce_integer(value, field, _default) when is_integer(value) and value >= 0 do
-    {:ok, value}
+  defp coerce_integer(_value, field, _default) when is_integer(_value) and _value >= 0 do
+    {:ok, _value}
   end
 
   defp coerce_integer(_, field, _default) do

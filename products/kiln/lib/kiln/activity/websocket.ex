@@ -75,7 +75,7 @@ defmodule Kiln.Activity.WebSocket do
       {:ok, %{"type" => "ping"}} ->
         {:reply, {:text, Jason.encode!(%{"type" => "pong"})}, state}
 
-      {:ok, other} ->
+      {:ok, _other} ->
         {:reply, {:text, encode_error(:E_INVALID_FIELD, "first frame must be activity.subscribe")}, state}
 
       {:error, _} ->
