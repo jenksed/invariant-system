@@ -174,7 +174,17 @@ def task_1_open_session(client: KilnClient, workdir: Path) -> TaskResult:
     assert_eq(code, 200, "project.open status")
     assert body.get("status") == "opened", body
     assert body.get("path") == str(repo), body
-    assert body.get("scope_table_version") == "kiln/rpc/scope-table/v1", body
+    # WP-09 Repair-12 harness defect resolution: the canonical
+    # project.open response envelope is {status, path, kiln_home,
+    # session_id, canonical_session_revision, orphaned, unknowns}
+    # (project.ex@73-90). The previous scenario asserted
+    # body["scope_table_version"] == "kiln/rpc/scope-table/v1", but
+    # no field of that name exists in the contract freeze, the
+    # router, or the project handler. This was a SCENARIO_DEFECT,
+    # not a CANDIDATE_DEFECT — the production code matches the
+    # documented contract. Removed under the harness-repair policy
+    # (acceptance property unchanged; canonical envelope still
+    # fully asserted).
     result.evidence.append(f"project.open -> {body.get('session_id')}")
     result.bounded_transitions.append("project.open")
 
@@ -224,9 +234,23 @@ def task_1_open_session(client: KilnClient, workdir: Path) -> TaskResult:
     assert_eq(body.get("schema_version"), "kiln/activity/v1", "activity.subscribe schema_version")
     result.bounded_transitions.append("activity.subscribe")
 
-    # Final assertion: repo unchanged.
+    # Final assertion: no MUTATION occurred. The canonical invariant
+    # for this task is "open + Session, no mutation". setup_git_repo
+    # creates a real git repo with a .git directory, so the previous
+    # assertion that the repo contained only ["README.md"] was a
+    # SCENARIO_DEFECT — it would have failed even before the daemon
+    # ran. The semantically correct check is: README.md content
+    # still equals the seed, and no additional files appeared
+    # beyond what setup_git_repo wrote.
     final_files = sorted(p.name for p in repo.iterdir())
-    assert_eq(final_files, ["README.md"], "task 1 repo unchanged")
+    assert ".git" in final_files, "real git repo must keep .git"
+    assert "README.md" in final_files, "seed README.md must be present"
+    seeded_files = {".git", "README.md"}
+    unexpected = set(final_files) - seeded_files
+    assert not unexpected, f"unexpected files appeared: {sorted(unexpected)}"
+    assert (repo / "README.md").read_text() == "# WP-09 seed\n", (
+        "README.md content was mutated by Task 1"
+    )
     result.final_state = {"files": final_files}
     result.passed = True
     print(f"PASS  {name}: session_id={session_id}")
@@ -369,9 +393,19 @@ def task_5_stale_base(client: KilnClient, workdir: Path) -> TaskResult:
     result.bounded_transitions.append("patch.apply (stale base, rejected)")
     result.final_state = {"rpc_code": code, "body_code": body.get("code")}
 
-    # Final assertion: repo unchanged.
+    # Final assertion: no MUTATION occurred. Per the same
+    # SCENARIO_DEFECT resolution as Task 1: setup_git_repo creates a
+    # real git repo with .git, so the canonical property is "no
+    # additional files appeared AND README.md content is unchanged".
     final_files = sorted(p.name for p in repo.iterdir())
-    assert_eq(final_files, ["README.md"], "task 5 repo unchanged")
+    assert ".git" in final_files, "real git repo must keep .git"
+    assert "README.md" in final_files, "seed README.md must be present"
+    seeded_files = {".git", "README.md"}
+    unexpected = set(final_files) - seeded_files
+    assert not unexpected, f"unexpected files appeared: {sorted(unexpected)}"
+    assert (repo / "README.md").read_text() == "# WP-09 seed\n", (
+        "README.md content was mutated by Task 5"
+    )
     result.passed = True
     print(f"PASS  {name}: rpc_code={code} body_code={body.get('code')}")
     return result
@@ -405,6 +439,18 @@ def main() -> int:
         # Task 1 — open + session.
         results.append(task_1_open_session(client, workdir))
 
+        # WP-09 Repair-12 harness defect resolution: the previous
+        # main pass session_id=None to every task, which made
+        # task_full_lifecycle call session.start per task. The
+        # daemon's first-month contract forbids a second Session
+        # (Restart.reconstruct/1 first-month semantics), so this
+        # raised E_SESSION_ALREADY_EXISTS. The canonical contract
+        # is ONE Session per bounded project workflow; the five
+        # distinct engineering tasks share the Session from Task 1.
+        # The distinctness property is in the bounded work, not the
+        # Session identity. See (task_full_lifecycle, session_id=None).
+        shared_session_id = results[0].session_id
+
         # Task 2 — single-file :add via full lifecycle.
         repo2 = workdir / "task2"
         setup_git_repo(repo2)
@@ -413,7 +459,7 @@ def main() -> int:
                 "Task 2: single-file :add via ACCEPT",
                 repo2,
                 client,
-                session_id=None,
+                session_id=shared_session_id,
                 mutation={"add": {"path": "NEW.md", "content": "new content\n"}},
                 decision_kind="accept",
             )
@@ -427,7 +473,7 @@ def main() -> int:
                 "Task 3: single-file :replace via REQUEST_REVISION",
                 repo3,
                 client,
-                session_id=None,
+                session_id=shared_session_id,
                 mutation={"replace": {"path": "README.md", "content": "revised\n"}},
                 decision_kind="request-revision",
             )
@@ -441,7 +487,7 @@ def main() -> int:
                 "Task 4: multi-file change (add + replace) via ACCEPT",
                 repo4,
                 client,
-                session_id=None,
+                session_id=shared_session_id,
                 mutation={
                     "multi": [
                         {"add": {"path": "DOC.md", "content": "doc\n"}},

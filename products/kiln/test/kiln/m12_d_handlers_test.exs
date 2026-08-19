@@ -158,6 +158,55 @@ defmodule Kiln.M12DHandlersTest do
     assert body["projects"] == []
   end
 
+  # -- WP-09 Repair-13: patch.apply error envelope integrity --
+  #
+  # The Lane-5 acceptance scenario surfaced a CANDIDATE_DEFECT at
+  # `products/kiln/lib/kiln/rpc/handlers/patch.ex` normalize_store_error:
+  # the function returned `{:error, map}` (a tuple), and the caller
+  # wrapped it again as `{:error, normalize_store_error(reason)}`,
+  # producing a double tuple `{:error, {:error, %{...}}}` that propagated
+  # into the bounded error envelope's `reason` field. Jason.Encoder
+  # then crashed with Protocol.UndefinedError: protocol Jason.Encoder
+  # not implemented for Tuple, and the response body was empty (HTTP 500).
+  #
+  # The runtime regression test asserts that a patch.apply that triggers
+  # a journal error returns a properly-shaped JSON error envelope
+  # (not empty body, HTTP 400 instead of HTTP 500).
+  describe "patch.apply error envelope (Repair-13)" do
+    test "patch.apply with a malformed session_id returns a JSON error envelope, not empty body",
+         %{operate_token: tok} do
+      # A bounded request that triggers the journal reducer's
+      # :missing_session_start path. The Store reducer raises
+      # :invalid_entry; the patch handler's normalize_store_error must
+      # return a bounded MAP (not a tuple), so the response body is a
+      # proper JSON error envelope.
+      conn =
+        post_rpc(tok, %{
+          method: "patch.apply",
+          params: %{
+            "proposal" => %{"id" => "pp_bogus", "digest" => @fingerprint},
+            "decision" => %{"decision" => "APPROVE_EXACT_BYTES"},
+            "operations_with_bytes" => [],
+            "session_id" => "ses_does_not_exist",
+            "run_id" => "run_does_not_exist",
+            "operation_id" => "opn_does_not_exist",
+            "subject_id" => "test",
+            "actor_id" => "test",
+            "idempotency_key" => "idem_test",
+            "request_digest" => @fingerprint
+          }
+        })
+
+      body = Jason.decode!(conn.resp_body)
+      assert is_map(body), "patch.apply must return a JSON error envelope, got: #{inspect(conn.resp_body)}"
+      assert is_binary(body["code"]) and body["code"] != "",
+             "code must be a non-empty string, got: #{inspect(body["code"])}"
+      assert is_binary(body["reason"]) and body["reason"] != "",
+             "reason must be a non-empty string (not a tuple), got: #{inspect(body["reason"])}"
+      refute conn.status == 500, "patch.apply must not crash with HTTP 500"
+    end
+  end
+
   # -- WP-09 Repair-12: project.open path contract regression --
   #
   # The Lane-5 acceptance scenario surfaced a CANDIDATE_DEFECT at

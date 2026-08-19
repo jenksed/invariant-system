@@ -410,16 +410,33 @@ defmodule Kiln.RPC.Handlers.Patch do
 
   # -- error normalization --
 
+  # WP-09 Repair-13: normalize_store_error now returns a single MAP,
+  # NOT a `{:error, map}` tuple. The previous implementation returned
+  # a tuple, and the caller wrapped it again as `{:error, normalize_store_error(reason)}`,
+  # producing a double tuple `{:error, {:error, %{...}}}` that propagated
+  # into the bounded error envelope's `reason` field. Jason.Encoder
+  # then crashed with Protocol.UndefinedError: protocol Jason.Encoder
+  # not implemented for Tuple, and the response body was empty
+  # (HTTP 500). The handler spec is
+  # `{:ok, term()} | {:error, %{required(:code) => atom()}}` — the
+  # caller wraps the map into a tuple, normalize_store_error owns
+  # only the map shape.
+  #
+  # The second clause also accepts `:reason` (not `:message`) because
+  # the canonical journal error envelope uses `:reason`, not the
+  # `:message` field from Domain.Error. When the journal returns
+  # `%{code: :invalid_entry, reason: "...", details: %{...}}`,
+  # this clause now matches it and preserves the original error.
   defp normalize_store_error(%DomainError{code: code, message: message, details: details}) do
-    {:error, %{code: code, reason: message, details: details}}
+    %{code: code, reason: message, details: details}
   end
 
-  defp normalize_store_error(%{code: code, message: message} = error) do
-    {:error, %{code: code, reason: message, details: Map.get(error, :details, %{})}}
+  defp normalize_store_error(%{code: code, reason: message} = error) do
+    %{code: code, reason: message, details: Map.get(error, :details, %{})}
   end
 
   defp normalize_store_error(reason) do
-    {:error, %{code: :E_JOURNAL_COMMIT_FAILED, reason: inspect(reason)}}
+    %{code: :E_JOURNAL_COMMIT_FAILED, reason: inspect(reason)}
   end
 
   # -- validators --
