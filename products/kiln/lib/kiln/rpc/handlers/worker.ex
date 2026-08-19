@@ -88,11 +88,6 @@ defmodule Kiln.RPC.Handlers.Worker do
            "adapter_implementation_digest" => wo.adapter_implementation_digest
          }}
 
-      {:ok, other} ->
-        # Worker.propose/5 always returns {:ok, M0WorkerOutput.t()}; this
-        # branch is defensive against future signature drift.
-        {:ok, %{"result" => other}}
-
       {:error, %DomainError{code: code, message: message}} ->
         {:error, %{code: code, reason: message}}
 

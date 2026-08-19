@@ -8,14 +8,13 @@ defmodule Kiln.RPC.Handlers.Project do
   WorkbenchModel-shape projection:
 
       %{
-        "status"             => "opened",
-        "path"               => path,
-        "kiln_home"          => kiln_home,
-        "session_id"         => session_id | nil,
-        "canonical_session_revision" => integer | nil,
-        "orphaned"           => boolean | nil,
-        "unknowns"           => [String.t()] | nil,
-        "scope_table_version"=> "kiln/rpc/scope-table/v1"
+        status: "opened",
+        path: path,
+        kiln_home: kiln_home,
+        session_id: session_id | nil,
+        canonical_session_revision: integer | nil,
+        orphaned: boolean | nil,
+        unknowns: [term()] | nil
       }
 
   Per the WP-09 contract freeze (§2, §9):
@@ -27,7 +26,7 @@ defmodule Kiln.RPC.Handlers.Project do
   * `project.open` is the only acceptance-required "open repo" path.
     It validates `path`, ensures the bounded Store is started, and
     returns canonical state for the active session (if any) by calling
-    `Kiln.Workflow.query_session/1`.
+    `Kiln.Restart.reconstruct/1` on the bounded Store connection.
 
   Scope (router.ex scope table):
     project.list → orchestration:read
@@ -37,10 +36,10 @@ defmodule Kiln.RPC.Handlers.Project do
     E_BODY_READ_FAILED, E_MALFORMED_REQUEST — service.ex
     E_SCOPE_INSUFFICIENT, E_UNKNOWN_METHOD, E_NOT_IMPLEMENTED — router.ex
     E_MISSING_FIELDS, E_INVALID_FIELD, E_PROJECT_INVALID_PATH,
-    E_PROJECT_NOT_FOUND, E_STORE_UNAVAILABLE — this module
+    E_PROJECT_NOT_FOUND, E_STORE_UNAVAILABLE, E_MULTIPLE_SESSIONS,
+    E_JOURNAL_BLOCKED — this module
   """
 
-  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.Restart
   alias Kiln.Store
 
@@ -76,17 +75,17 @@ defmodule Kiln.RPC.Handlers.Project do
     with {:ok, path} <- require_string(params, "path"),
          :ok <- validate_path(path),
          {:ok, kiln_home} <- derive_kiln_home(path),
-         :ok <- ensure_store_or_return(kiln_home),
-         {:ok, reconstruction} <- safe_reconstruct(kiln_home) do
+         {:ok, _pid} <- ensure_store_or_return(kiln_home),
+         {:ok, reconstruction} <- safe_reconstruct() do
       {:ok,
        %{
          status: "opened",
          path: path,
          kiln_home: kiln_home,
-         session_id: reconstruction[:session_id],
-         canonical_session_revision: reconstruction[:revision],
-         orphaned: reconstruction[:orphaned],
-         unknowns: reconstruction[:unknowns]
+         session_id: Map.get(reconstruction, :session_id),
+         canonical_session_revision: Map.get(reconstruction, :session_revision),
+         orphaned: Map.get(reconstruction, :orphaned),
+         unknowns: Map.get(reconstruction, :unknowns, [])
        }}
     end
   end
@@ -134,7 +133,7 @@ defmodule Kiln.RPC.Handlers.Project do
 
   defp ensure_store_or_return(kiln_home) do
     if Process.whereis(Kiln.Store.Connection) do
-      :ok
+      {:ok, :already_running}
     else
       state_path = Path.join(kiln_home, "state.sqlite3")
 
@@ -144,7 +143,7 @@ defmodule Kiln.RPC.Handlers.Project do
                name: Kiln.Store.Connection,
                store_id: "rpc_project_#{System.unique_integer([:positive])}"
              ) do
-          {:ok, _pid} -> :ok
+          {:ok, pid} -> {:ok, pid}
           {:error, reason} -> {:error, store_unavailable(reason)}
         end
       else
@@ -161,41 +160,60 @@ defmodule Kiln.RPC.Handlers.Project do
     %{code: :E_STORE_UNAVAILABLE, reason: inspect(reason)}
   end
 
-  # Wraps `Kiln.Restart.reconstruct/1` so a missing journal returns
-  # `:empty` (canonical, not an error) and a corrupt journal returns
-  # the bounded error envelope. `:multiple_sessions` is reported as
-  # canonical state (Temper decides how to render).
-  defp safe_reconstruct(_kiln_home) do
-    case Restart.reconstruct(:project_open) do
-      :empty ->
-        {:ok, %{session_id: nil, revision: nil, orphaned: nil, unknowns: []}}
+  # Wraps `Kiln.Restart.reconstruct/1` against the bounded Store
+  # connection. Per the @spec at lib/kiln/restart.ex:38-42, the return
+  # shape is exactly one of:
+  #
+  #   {:ok, :empty}
+  #   {:ok, %{session_id, session_revision, orphaned, projection, ...}}
+  #   {:error, %{code: :multiple_sessions, detail: %{count, sessions}}}
+  #   {:error, %{session_id, block}}   # journal blocked
+  #
+  # We translate each into the bounded WorkbenchModel-shape projection
+  # Temper renders. We do NOT invent fields.
+  defp safe_reconstruct do
+    conn = Process.whereis(Kiln.Store.Connection)
 
-      {:ok, reconstruction} when is_map(reconstruction) ->
-        {:ok,
-         %{
-           session_id: Map.get(reconstruction, :session_id),
-           revision: Map.get(reconstruction, :revision),
-           orphaned: Map.get(reconstruction, :orphaned),
-           unknowns: Map.get(reconstruction, :unknowns, [])
-         }}
+    if is_nil(conn) do
+      {:error, %{code: :E_STORE_UNAVAILABLE, reason: "Kiln.Store.Connection not registered"}}
+    else
+      case Restart.reconstruct(conn) do
+        {:ok, :empty} ->
+          {:ok, %{session_id: nil, session_revision: nil, orphaned: nil, unknowns: []}}
 
-      {:error, %DomainError{code: code, message: message}} ->
-        {:error, %{code: code, reason: message}}
+        {:ok, reconstruction} when is_map(reconstruction) ->
+          unknowns =
+            case Map.get(reconstruction, :projection) do
+              %{} = proj -> Map.get(proj, "unknowns", [])
+              _ -> []
+            end
 
-      {:error, %{code: _} = err} ->
-        {:error, err}
+          {:ok,
+           %{
+             session_id: Map.get(reconstruction, :session_id),
+             session_revision: Map.get(reconstruction, :session_revision),
+             orphaned: Map.get(reconstruction, :orphaned),
+             unknowns: unknowns
+           }}
 
-      {:error, reason} ->
-        {:error, %{code: :E_DISPATCH_FAILED, reason: inspect(reason)}}
+        {:error, %{code: :multiple_sessions} = err} ->
+          # Multiple durable Sessions in the journal — surface as a
+          # bounded error rather than inventing a canonical projection.
+          {:error, Map.put(err, :reason, "multiple durable sessions in journal")}
 
-      :multiple_sessions ->
-        {:ok,
-         %{
-           session_id: nil,
-           revision: nil,
-           orphaned: nil,
-           unknowns: ["multiple_sessions_in_journal"]
-         }}
+        {:error, %{session_id: sid, block: block}} ->
+          # Journal was incomplete or corrupt; reconstruction blocked.
+          {:error,
+           %{
+             code: :E_JOURNAL_BLOCKED,
+             reason: "journal blocked during reconstruction",
+             session_id: sid,
+             block: block
+           }}
+
+        {:error, %{code: _} = err} ->
+          {:error, err}
+      end
     end
   end
 end

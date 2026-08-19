@@ -40,7 +40,6 @@ defmodule Kiln.RPC.Handlers.Review do
     E_REVIEWER_CONTEXT_CONTAMINATED, E_REVIEW_BUILD_FAILED
   """
 
-  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.Review
 
   @required_param_keys [
@@ -120,7 +119,6 @@ defmodule Kiln.RPC.Handlers.Review do
            "semantic_digest" => review.semantic_digest,
            "verdict" => review.verdict,
            "findings" => review.findings,
-           "implementer_assignment_ref" => review.implementer_assignment_ref,
            "reviewer_assignment_ref" => review.reviewer_assignment_ref,
            "plan_ref" => review.plan_ref,
            "patch_ref" => review.patch_ref,
@@ -139,15 +137,8 @@ defmodule Kiln.RPC.Handlers.Review do
       {:error, %{code: :E_REVIEWER_CONTEXT_CONTAMINATED} = err} ->
         {:error, err}
 
-      {:error, %DomainError{code: code, message: message}} ->
-        {:error, %{code: code, reason: message}}
-
       {:error, %{code: _} = err} ->
         {:error, err}
-
-      {:error, reason} ->
-        _ = opts
-        {:error, %{code: :E_REVIEW_BUILD_FAILED, reason: inspect(reason)}}
     end
   end
 

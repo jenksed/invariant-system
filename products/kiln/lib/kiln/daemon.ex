@@ -50,15 +50,14 @@ defmodule Kiln.Daemon do
   # Cowboy routes the upgrade to the WebSocket handler before the Plug
   # sees the request.
   defp dispatch_table do
-    :cowboy_router.compile_dispatch(
+    :cowboy_router.compile(
       [
         {:_,
          [
            {"/ws", Kiln.Activity.WebSocket, []},
            {:_, {Plug.Cowboy.Translator, {Kiln.Service, []}}, []}
          ]}
-      ],
-      :kiln_service_dispatch
+      ]
     )
   end
 end

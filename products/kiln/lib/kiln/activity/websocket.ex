@@ -43,6 +43,7 @@ defmodule Kiln.Activity.WebSocket do
 
   alias Kiln.Activity.Hub
 
+  @impl :cowboy_websocket
   def init(req, _opts) do
     case :cowboy_req.parse_header("authorization", req) do
       {:bearer, token} ->

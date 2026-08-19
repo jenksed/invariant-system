@@ -81,8 +81,8 @@ defmodule Kiln.M12DHandlersTest do
 
   defp post_rpc(token, body) do
     json = Jason.encode!(body)
-    conn = conn(:post, "/api/rpc", json) |> put_req_header("content-type", "application/json")
-    conn = put_req_header(conn, "authorization", "Bearer #{token}")
+    conn = conn(:post, "/api/rpc", json) |> Plug.Conn.put_req_header("content-type", "application/json")
+    conn = Plug.Conn.put_req_header(conn, "authorization", "Bearer #{token}")
     Service.call(conn, Service.init([]))
   end
 

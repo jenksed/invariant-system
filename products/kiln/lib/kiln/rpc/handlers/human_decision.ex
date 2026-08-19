@@ -34,7 +34,6 @@ defmodule Kiln.RPC.Handlers.HumanDecision do
     E_HUMAN_DECISION_INVALID, E_HUMAN_DECISION_FAILED
   """
 
-  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.HumanDecision
 
   @required_param_keys [
@@ -48,13 +47,14 @@ defmodule Kiln.RPC.Handlers.HumanDecision do
   @spec handle(String.t(), map(), keyword()) ::
           {:ok, term()} | {:error, %{required(:code) => atom()}}
   def handle("human.decide", params, opts) when is_map(params) and is_list(opts) do
+    _ = opts
     with :ok <- require_all(params, @required_param_keys),
          {:ok, plan_ref} <- require_artifact_ref(params["plan_ref"], "plan_ref"),
          {:ok, patch_ref} <- require_artifact_ref(params["patch_ref"], "patch_ref"),
          {:ok, digest} <- require_digest(params["result_state_digest"], "result_state_digest"),
          {:ok, review_ref} <- require_optional_artifact_ref(params["review_ref"], "review_ref"),
          {:ok, decision} <- require_decision(params["decision"]) do
-      build_and_emit(plan_ref, patch_ref, digest, review_ref, decision, opts)
+      build_and_emit(plan_ref, patch_ref, digest, review_ref, decision)
     end
   end
 
@@ -64,7 +64,7 @@ defmodule Kiln.RPC.Handlers.HumanDecision do
 
   # -- build + emit --
 
-  defp build_and_emit(plan_ref, patch_ref, result_state_digest, review_ref, decision, opts) do
+  defp build_and_emit(plan_ref, patch_ref, result_state_digest, review_ref, decision) do
     case HumanDecision.build(plan_ref, patch_ref, result_state_digest, review_ref, decision) do
       {:ok, hd_struct} ->
         {:ok,
@@ -82,15 +82,8 @@ defmodule Kiln.RPC.Handlers.HumanDecision do
       {:error, %{code: :E_HUMAN_DECISION_INVALID} = err} ->
         {:error, err}
 
-      {:error, %DomainError{code: code, message: message}} ->
-        {:error, %{code: code, reason: message}}
-
       {:error, %{code: _} = err} ->
         {:error, err}
-
-      {:error, reason} ->
-        _ = opts
-        {:error, %{code: :E_HUMAN_DECISION_FAILED, reason: inspect(reason)}}
     end
   end
 
