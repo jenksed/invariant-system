@@ -55,7 +55,7 @@ defmodule Kiln.Daemon do
     Supervisor.init(children, strategy: :one_for_one, max_restarts: 3, max_seconds: 5)
   end
 
-  # Build the Cowboy dispatch table.
+  # Build the Cowboy route list (NOT the pre-compiled dispatch).
   #
   # `/ws` is handled by the WebSocket handler module; everything else
   # falls through to the Plug via `Plug.Cowboy.Translator`. The Plug
@@ -63,15 +63,21 @@ defmodule Kiln.Daemon do
   # was simplified in WP-09 Lane 2 to authenticate and hand off;
   # Cowboy routes the upgrade to the WebSocket handler before the Plug
   # sees the request.
+  #
+  # IMPORTANT: return the raw route list, NOT the result of
+  # `:cowboy_router.compile/1`. Plug.Cowboy's `to_args/5`
+  # (deps/plug_cowboy/lib/plug/cowboy.ex:370) unconditionally calls
+  # `:cowboy_router.compile/1` on whatever `:dispatch` value it
+  # receives. Pre-compiling here causes a double-compile and the
+  # compiled 2-tuple fed back into `compile_paths/2` raises the
+  # `<<"ws">>` catch-all error at deps/cowboy/src/cowboy_router.erl:92.
   defp dispatch_table do
-    :cowboy_router.compile(
-      [
-        {:_,
-         [
-           {"/ws", Kiln.Activity.WebSocket, []},
-           {:_, {Plug.Cowboy.Translator, {Kiln.Service, []}}, []}
-         ]}
-      ]
-    )
+    [
+      {:_,
+       [
+         {"/ws", Kiln.Activity.WebSocket, []},
+         {:_, {Plug.Cowboy.Translator, {Kiln.Service, []}}, []}
+       ]}
+    ]
   end
 end

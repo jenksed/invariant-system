@@ -179,27 +179,56 @@ defmodule Kiln.M12DKilnDaemonTest do
     end
   end
 
-  # WP-09 repair-5 regression guard: Plug.Cowboy 2.9.0+ REQUIRES :plug in
-  # the child spec (deps/plug_cowboy/lib/plug/cowboy.ex:265-272). The
-  # bounded daemon uses a manual Cowboy :dispatch table that routes
-  # /ws to Kiln.Activity.WebSocket and all other paths to the Plug via
-  # Plug.Cowboy.Translator. The plug value is NOT initialized nor
-  # dispatched to when :dispatch is supplied (moduledoc line 25-27);
-  # but the child spec MUST still contain :plug or supervisor boot raises.
+  # WP-09 repair-5 + repair-6 regression guards:
+  #   - Plug.Cowboy 2.9.0+ REQUIRES :plug in the child spec
+  #     (deps/plug_cowboy/lib/plug/cowboy.ex:265-272).
+  #   - The bounded daemon supplies a manual Cowboy :dispatch table
+  #     that routes /ws to Kiln.Activity.WebSocket and all other
+  #     paths to the Plug via Plug.Cowboy.Translator.
+  #   - The dispatch value passed in :options must be the raw route
+  #     LIST, NOT the result of :cowboy_router.compile/1.
+  #     Plug.Cowboy.to_args/5 unconditionally re-compiles the
+  #     :dispatch value, which causes the cowboy_router catch-all
+  #     "MUST begin with a slash" error when a pre-compiled
+  #     2-tuple is fed back into compile_paths/2.
   describe "Kiln.Daemon bounded Plug.Cowboy child spec" do
-    test "child spec can be constructed without raising (Plug.Cowboy :plug required)" do
-      # This test does NOT start the daemon (that requires a real port
-      # and supervisor); it only verifies that the supervisor child
-      # spec shape satisfies Plug.Cowboy 2.9.0's required-key contract.
-      children = Kiln.Daemon.init(port: 0)
+    test "Supervisor.init/2 returns ok with child_spec that satisfies Plug.Cowboy 2.9.0 :plug contract" do
+      # Kiln.Daemon.init/1 returns the standard Supervisor callback
+      # shape: {:ok, {supervisor_flags, child_specs}}. Extract the
+      # child_specs via the public Supervisor.child_spec/2 contract,
+      # NOT by destructuring implementation-specific tuple internals.
+      assert {:ok, {sup_flags, child_specs}} = Kiln.Daemon.init(port: 0)
+      assert is_list(sup_flags)
+      assert is_list(child_specs)
+      assert length(child_specs) == 1
 
-      [{plug_cowboy_module, opts}] = children
-      assert plug_cowboy_module == Plug.Cowboy
+      [{module, opts, _type}] = child_specs
+      assert module == Plug.Cowboy
       assert Keyword.get(opts, :scheme) == :http
       assert Keyword.has_key?(opts, :plug),
              "Plug.Cowboy 2.9.0 child spec must include :plug even with manual :dispatch"
-      assert Keyword.get(opts, :options)[:dispatch] != nil,
-             "manual :dispatch must be present in options"
+
+      dispatch = Keyword.get(opts, :options)[:dispatch]
+      assert is_list(dispatch),
+             "options[:dispatch] must be the raw route LIST (Plug.Cowboy compiles it)"
+
+      # Validate the route shape: /ws -> Kiln.Activity.WebSocket;
+      # everything else -> Plug.Cowboy.Translator -> Kiln.Service.
+      assert [{:_, routes}] = dispatch
+      assert is_list(routes)
+
+      {ws_route, fallback_route} = case routes do
+        [ws, fb] -> {ws, fb}
+        [ws] -> {ws, nil}
+      end
+
+      assert {"/ws", ws_handler, _ws_opts} = ws_route
+      assert ws_handler == Kiln.Activity.WebSocket
+
+      if fallback_route do
+        assert {:_, translator, _fb_opts} = fallback_route
+        assert {Plug.Cowboy.Translator, {Kiln.Service, []}} = translator
+      end
 
       # Now exercise Plug.Cowboy.child_spec/1 directly. If :plug is
       # missing this raises KeyError, which is the regression we are
@@ -213,7 +242,7 @@ defmodule Kiln.M12DKilnDaemonTest do
     test "Plug.Cowboy child_spec/1 raises KeyError without :plug (sanity)" do
       # Sanity: confirm that without :plug the child_spec raises, so
       # the regression test above is meaningful.
-      opts = [scheme: :http, options: [port: 0, dispatch: %{}]]
+      opts = [scheme: :http, options: [port: 0, dispatch: [{:_, [{:_, Plug.Cowboy.Handler, {Plug.Test, []}}]}]]
 
       assert_raise KeyError, fn ->
         Plug.Cowboy.child_spec(opts)

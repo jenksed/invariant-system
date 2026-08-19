@@ -12,7 +12,13 @@
 #        MIX_ENV=test mix test \
 #          test/kiln/m12_d_handlers_test.exs \
 #          test/kiln/activity_hub_test.exs
-#   2. WP-08 regression gate (10 files, previously 71 passing)
+#   2. WP-08 regression + WP-09-added daemon regression guard gate
+#      (the 10 inherited WP-08 regression files PLUS the
+#      m12_d_contract_drift_test.exs + m12_d_scope_regression_test.exs
+#      + the daemon guards inside m12_d_kiln_daemon_test.exs — total
+#      expected 73/73; previously the WP-08 set was 71/71; +2 are
+#      WP-09-added daemon regression guards; +0 are changes to the
+#      WP-08 inherited test files themselves).
 #   3. Full Kiln suite
 #   4. Temper tests
 #
@@ -58,9 +64,24 @@ MIX_ENV=test mix test \
   test/kiln/activity_hub_test.exs
 
 # -----------------------------------------------------------------------
-# Gate 2: WP-08 regression suite (previously 71/71 passing)
+# Gate 2: WP-08 inherited regression suite + WP-09-added daemon guard
+#
+# WP-08 PROVEN at WP08_FINAL_SHA = 96f76ad reported 71 tests passing
+# across 10 files. WP-09 added:
+#   - m12_d_contract_drift_test.exs   (new file, +7 categories)
+#   - m12_d_scope_regression_test.exs  (new file, +6 cases)
+#   - daemon guards inside m12_d_kiln_daemon_test.exs (already
+#     counted in the 10 inherited files; new tests added to the
+#     inherited file)
+#   - m12_d_handlers_test.exs (already in the focused gate 1 set;
+#     covered by gate 1; not duplicated here)
+#
+# Expected total at this gate: 73/73 (was 71/71; +2 from
+# m12_d_contract_drift_test.exs + m12_d_scope_regression_test.exs).
+# If the count differs, the verifier must explain WHY before claiming
+# PASS — not just print green.
 # -----------------------------------------------------------------------
-log "Gate 2: WP-08 regression suite (10 files, previously 71/71)"
+log "Gate 2: WP-08 inherited regressions + WP-09-added daemon guards (expected 73/73)"
 cd "$KILN"
 MIX_ENV=test mix test \
   test/kiln/restart_test.exs \
@@ -72,7 +93,9 @@ MIX_ENV=test mix test \
   test/kiln/m12_d_patch_rpc_test.exs \
   test/kiln/patch_service_test.exs \
   test/kiln/m12_e_session_daemon_restart_test.exs \
-  test/kiln/m12_e_session_recovery_fi_test.exs
+  test/kiln/m12_e_session_recovery_fi_test.exs \
+  test/kiln/m12_d_contract_drift_test.exs \
+  test/kiln/m12_d_scope_regression_test.exs
 
 # -----------------------------------------------------------------------
 # Gate 3: full Kiln suite
