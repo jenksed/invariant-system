@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -13,6 +14,7 @@ ALLOWED_STATUS = {"current", "partial", "experimental", "planned", "frontier", "
 REQUIRED_FIELDS = {"title", "description", "status", "verified_at_commit", "source_paths", "audience"}
 LEGACY_WITHOUT_FRONTMATTER = {DOCS / "MONOREPO-MIGRATION.md"}
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
 
 def parse_frontmatter(path: Path, text: str) -> tuple[dict[str, object], list[str]]:
@@ -61,6 +63,17 @@ def parse_frontmatter(path: Path, text: str) -> tuple[dict[str, object], list[st
     return data, errors
 
 
+def commit_resolves(sha: str) -> bool:
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{sha}^{{commit}}"],
+        cwd=ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def resolve_link(source: Path, target: str) -> Path | None:
     target = target.strip()
     if not target or target.startswith(("#", "http://", "https://", "mailto:", "tel:")):
@@ -90,14 +103,27 @@ def main() -> int:
             data, errors = parse_frontmatter(path, text)
             for error in errors:
                 failures.append(f"{path.relative_to(ROOT)}: {error}")
+
+            verified_at_commit = data.get("verified_at_commit")
+            if isinstance(verified_at_commit, str):
+                if not FULL_SHA_RE.fullmatch(verified_at_commit):
+                    failures.append(
+                        f"{path.relative_to(ROOT)}: verified_at_commit must be a full 40-character lowercase SHA"
+                    )
+                elif not commit_resolves(verified_at_commit):
+                    failures.append(
+                        f"{path.relative_to(ROOT)}: verified_at_commit does not resolve in local history: {verified_at_commit}; fetch full history before validating docs"
+                    )
+
             source_paths = data.get("source_paths", [])
             if isinstance(source_paths, list):
                 for source_path in source_paths:
                     candidate = ROOT / str(source_path)
                     if not candidate.exists():
                         failures.append(
-                            f"{path.relative_to(ROOT)}: source_path does not exist: {source_path}"
+                            f"{path.relative_to(ROOT)}: source_path does not exist in current tree: {source_path}"
                         )
+
         for match in LINK_RE.finditer(text):
             candidate = resolve_link(path, match.group(1))
             if candidate is not None and not candidate.exists():
@@ -120,6 +146,7 @@ def main() -> int:
         return 1
 
     print(f"documentation check: PASS ({len(docs)} Markdown files checked)")
+    print("note: structural docs validation does not establish semantic freshness or product acceptance")
     return 0
 
 
