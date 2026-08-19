@@ -8,6 +8,9 @@
 #   ./invariant check boundaries       deterministic architecture-boundary checks
 #   ./invariant test [product]         canonical validation (default: all)
 #       products: arsenal loadout kiln temper integration
+#   ./invariant docs check             documentation metadata/link/source checks
+#   ./invariant docs build             build static documentation HTML
+#   ./invariant docs dev               run local documentation development server
 #
 # Root commands delegate to each product's own canonical commands; nothing
 # here reimplements product logic.
@@ -73,8 +76,8 @@ cmd_doctor() {
   check_tool git "required"
   check_tool gh "GitHub operations"
   check_tool python3 "arsenal tooling"
-  check_tool node "loadout/temper"
-  check_tool npm "loadout/temper"
+  check_tool node "loadout/temper/docs"
+  check_tool npm "loadout/temper/docs"
   check_tool mix "kiln"
   check_tool cc "kiln command-host helper, exqlite"
   check_tool vale "kiln prose lint (scripts/check)"
@@ -375,6 +378,24 @@ cmd_test() {
   esac
 }
 
+cmd_docs() {
+  local action=${1:-check}
+  case "$action" in
+    check)
+      python3 docs-site/scripts/check_docs.py
+      ;;
+    build)
+      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm ci"
+      (cd docs-site && npm run build)
+      ;;
+    dev)
+      [[ -d docs-site/node_modules ]] || fail "docs dependencies missing; run: cd docs-site && npm ci"
+      (cd docs-site && npm run start)
+      ;;
+    *) fail "unknown docs action: $action (expected: check|build|dev)" ;;
+  esac
+}
+
 main() {
   local cmd=${1:-help}
   shift || true
@@ -391,8 +412,9 @@ main() {
       fi
       ;;
     test)    cmd_test "$@" ;;
+    docs)    cmd_docs "$@" ;;
     help|--help|-h)
-      sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
       ;;
     *) fail "unknown command: $cmd (try: ./invariant help)" ;;
   esac

@@ -1,0 +1,49 @@
+name: Documentation static build
+
+on:
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'docs-site/**'
+      - 'products/*/README.md'
+      - 'integration/**/README.md'
+      - 'invariant'
+      - '.github/workflows/docs-build.yml'
+  push:
+    branches:
+      - docs/invariant-documentation-foundation
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'docs-site/**'
+      - 'products/*/README.md'
+      - 'integration/**/README.md'
+      - 'invariant'
+      - '.github/workflows/docs-build.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - name: Install pinned documentation dependencies
+        working-directory: docs-site
+        run: npm ci --no-audit --no-fund
+      - name: Build static documentation site
+        working-directory: docs-site
+        run: npm run build
+      - name: Verify static output exists
+        run: |
+          test -f docs-site/build/index.html
+          test -f docs-site/build/status/index.html || test -f docs-site/build/status.html

@@ -1,0 +1,48 @@
+name: Documentation source checks
+
+on:
+  pull_request:
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'docs-site/**'
+      - 'products/*/README.md'
+      - 'integration/**/README.md'
+      - 'invariant'
+      - '.github/workflows/docs-check.yml'
+  push:
+    branches:
+      - docs/invariant-documentation-foundation
+    paths:
+      - 'README.md'
+      - 'docs/**'
+      - 'docs-site/**'
+      - 'products/*/README.md'
+      - 'integration/**/README.md'
+      - 'invariant'
+      - '.github/workflows/docs-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  source-truth:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Record repository baseline
+        run: |
+          git status --short
+          git branch --show-current
+          git rev-parse HEAD
+          git log --oneline -15
+          ./invariant status
+          ./invariant doctor || true
+      - name: Root structural checks
+        run: |
+          ./invariant check
+          ./invariant check boundaries
+      - name: Documentation metadata links and sources
+        run: ./invariant docs check

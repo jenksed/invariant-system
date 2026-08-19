@@ -1,58 +1,45 @@
-# Wave 3 Integration Proof
+# Repository Recon Integration Scenario
 
-This directory holds the scaffolding for the Wave 3 integration proof.
+This directory contains the current cross-product Repository Recon proof and the broader historical Wave 3 acceptance material around it.
 
-The integration proof is the only place where the three products
-(Arsenal, Loadout, Kiln) are exercised together against a real
-target. It is the acceptance gate for Wave 3.
+## What runs today
+
+`run.sh` executes the automated golden path from one `invariant-system` checkout:
+
+1. build Loadout and Temper when needed;
+2. compile Kiln when needed;
+3. create a real temporary Git repository from `proof-repo/`;
+4. install Loadout's `repository-recon` capability;
+5. compile a Plan with `--execution kiln`;
+6. run through the real Kiln supervision boundary;
+7. assert the canonical `engineering-system/run-result-envelope/v0` result is not simulated;
+8. render the recorded result through Temper.
+
+Run it with:
+
+```bash
+./integration/scenarios/repository-recon/run.sh
+# or
+./invariant test integration
+```
+
+Temporary state is removed on exit unless `KEEP_WORKDIR=1`.
+
+## What does not run automatically here
+
+`TEST-MATRIX.md` and `EXPECTED-RESULTS.md` preserve the broader Wave 3 acceptance design, including restart durability, negative cases, and dogfood. The current monorepo runner automates the golden path only.
+
+Do not cite the existence of the matrix as evidence that every row was executed by this script.
 
 ## Directory layout
 
-- `proof-repo/` — deterministic mini-repository fixture with the right
-  signals for Recon v1 to produce a useful result. Real `.git`, real
-  commit, deliberately surfaced unknowns.
-- `TEST-MATRIX.md` — the 8 negative cases + golden path + restart + dogfood
-  that the verifier must run.
-- `EXPECTED-RESULTS.md` — exactly what the proof must produce: the
-  Recon v1 shape, the Plan shape, the Kiln Run Result Envelope shape.
-- `run-logs/` — populated by the integration verifier after the
-  proof runs. Not authored by anyone ahead of time.
+- `proof-repo/` — deterministic source fixture copied into a verifier-local real Git repository.
+- `run.sh` — current monorepo golden-path runner.
+- `TEST-MATRIX.md` — broader acceptance matrix and negative/restart cases.
+- `EXPECTED-RESULTS.md` — expected contract/output shapes.
 
-## Authoring rules
+## Contract boundaries
 
-- The spec for the proof lives in
-  `engineering-system/program/wave-3/WAVE-3-FIRST-REAL-RUN.md`.
-- The proof does NOT add a fifth cross-product contract.
-- The proof does NOT widen capability scope beyond `repository-recon`.
-- The proof MUST distinguish Simulated from Real Kiln.
-- The proof MUST demonstrate restart durability.
+This scenario does not create a new cross-product contract. It exercises the canonical contracts under `contracts/` and verifies the real-vs-simulated distinction explicitly.
 
-## Running the proof
-
-The integration verifier runs this proof from clean, built product
-artifacts (no uncommitted working-tree code). The verifier:
-
-1. Builds product CLIs from the exact merged heads.
-2. Initializes the proof repository under a temp directory: `git init
-   && git add -A && git commit -m "Initial deterministic proof-repo
-   fixture"`. The fixture files themselves live in this engineering-system
-   commit and are copied verbatim; the `.git` is verifier-local so the
-   proof repo is a real-on-disk git repo without nesting inside the
-   engineering-system `.git`.
-3. Records the proof-repo HEAD commit for the integration proof log.
-4. Runs the golden path (TEST-MATRIX §A).
-5. Runs the restart durability proof (TEST-MATRIX §B).
-6. Runs the 8 negative cases (TEST-MATRIX §C).
-7. Runs the dogfood against one real project repo (TEST-MATRIX §D).
-8. Writes the result to `run-logs/<run-id>.md` with the WAVE-3-SYSTEM-PROOF
-   block populated.
-
-## Acceptance
-
-Wave 3 is complete only when:
-
-- Every row in the test matrix produced the expected outcome.
-- The press-worthy 30-second demo runs without caveats hiding simulation
-  or ephemeral state.
-- Restart reproduces the same durable facts.
-- The honest QMR status (`experimental`) is reported truthfully.
+Historical Wave 3 references to the former `engineering-system` repository are provenance, not instructions to restore the old repository topology.
