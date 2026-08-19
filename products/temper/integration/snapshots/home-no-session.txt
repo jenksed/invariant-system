@@ -1,0 +1,30 @@
+ ◆ TEMPER                                                                           Session —  ·  ●
+ project  /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-… kiln /Users/jenk…
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ┌─ PROJECT ──────────────────────────────────────────────────────────────────────────────────────┐
+ │ Path     /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha            │
+ │ Kiln home/Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha/.kiln      │
+ │ Session  —                                                                                     │
+ │ Revision —                                                                                     │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+ ┌─ LAST CANONICAL STATE ─────────────────────────────────────────────────────────────────────────┐
+ │ No active Session. Submit an intent below to start one.                                        │
+ │                                                                                                │
+ │                                                                                                │
+ │                                                                                                │
+ │                                                                                                │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+ ┌─ INTENT ───────────────────────────────────────────────────────────────────────────────────────┐
+ │ > Fix the reconnect projection so stale activity cannot overwrite canonical state.             │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter submit · esc clear · ctrl-k palette · q quit · ctrl-c interrupt

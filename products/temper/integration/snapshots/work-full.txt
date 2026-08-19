@@ -1,0 +1,32 @@
+ ◆ TEMPER                                                                                      Session ses…567890  ·  ●
+ project  /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ┌─ WORK ───────────────────────────────────────────────────────────────┐ ┌─ MOTION (canonical deltas) ───────────────┐
+ │ You                                                                  │ │ 12:00:00  run state changed: pending → a… │
+ │ Fix the reconnect projection so stale activity cannot overwrite      │ │ 12:00:30  verification result recorded: … │
+ │ canonical state.                                                     │ │ 12:01:00  review verdict recorded: — → A… │
+ │                                                                      │ │                                           │
+ │ Pulse (live activity)                                                │ │                                           │
+ │ 12:00:05  Kiln state changed · session:ses_ab…7890 · rev 47 → canon… │ │                                           │
+ │ 12:00:25  Kiln state changed · run:run_ro…_001 · rev 49 → canonical… │ │                                           │
+ │ 12:00:55  Kiln state changed · operation:opn_te…_run · rev 50 → can… │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ └───────────────────────────────────────────┘
+ │                                                                      │
+ │                                                                      │ ┌─ FRONTIER · ATTENTION ────────────────────┐
+ │                                                                      │ │ Objective Fix reconnect projection so st… │
+ │                                                                      │ │ Run       active                          │
+ │                                                                      │ │ Verify    PASS                            │
+ │                                                                      │ │ Review    PENDING                         │
+ │                                                                      │ │ Human     PENDING                         │
+ │                                                                      │ │ Unknowns  none                            │
+ │                                                                      │ │                                           │
+ │                                                                      │ │ ⚠ YOU                                     │
+ │                                                                      │ │ A pending decision requires your judgm…   │
+ │                                                                      │ └───────────────────────────────────────────┘
+ └──────────────────────────────────────────────────────────────────────┘
+
+ esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming

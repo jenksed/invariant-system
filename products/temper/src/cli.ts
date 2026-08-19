@@ -4,15 +4,24 @@ import { loadWorkbench } from './load.js';
 import { FOCUSES, renderWorkbench } from './render.js';
 import type { Focus, WorkbenchModel } from './types.js';
 import { LiveMode } from './live.js';
+import { resolveWorkbenchOptions, runWorkbench } from './workbench_cli.js';
 
 interface Arguments {
   repository: string;
   snapshot: boolean;
   live: boolean;
+  workbench: boolean;
+  once: boolean;
   focus: Focus;
   width?: number;
   runPath?: string;
   planPath?: string;
+  kilnUrl?: string;
+  kilnWsUrl?: string;
+  kilnReadToken?: string;
+  kilnOperateToken?: string;
+  snapshotDir?: string;
+  actorId?: string;
 }
 
 const ESC = {
@@ -24,6 +33,27 @@ const ESC = {
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
   const width = args.width ?? process.stdout.columns ?? 100;
+
+  // Workbench Alpha default: when no --snapshot/--live flag is given,
+  // open the new Workbench TUI against the bounded Kiln daemon.
+  // `--workbench` is the explicit form of the same mode.
+  if (args.workbench || (!args.snapshot && !args.live)) {
+    const resolved = resolveWorkbenchOptions({
+      repository: args.repository,
+      ...(args.kilnUrl ? { baseUrl: args.kilnUrl } : {}),
+      ...(args.kilnWsUrl ? { wsUrl: args.kilnWsUrl } : {}),
+      ...(args.kilnReadToken ? { readToken: args.kilnReadToken } : {}),
+      ...(args.kilnOperateToken ? { operateToken: args.kilnOperateToken } : {}),
+      ...(args.snapshotDir ? { snapshotDir: args.snapshotDir } : {}),
+      ...(args.actorId ? { actorId: args.actorId } : {})
+    });
+    if ('error' in resolved) {
+      process.stderr.write(`temper: ${resolved.error}\n`);
+      process.exit(2);
+    }
+    const code = await runWorkbench({ ...resolved, once: args.once });
+    process.exit(code);
+  }
 
   if (args.live) {
     await runLive(args, width);
@@ -170,16 +200,26 @@ function parseArguments(argv: string[]): Arguments {
   let repository = process.cwd();
   let snapshot = false;
   let live = false;
+  let workbench = false;
+  let once = false;
   let focus: Focus = 'overview';
   let width: number | undefined;
   let runPath: string | undefined;
   let planPath: string | undefined;
+  let kilnUrl: string | undefined;
+  let kilnWsUrl: string | undefined;
+  let kilnReadToken: string | undefined;
+  let kilnOperateToken: string | undefined;
+  let snapshotDir: string | undefined;
+  let actorId: string | undefined;
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (!argument) continue;
     if (argument === '--snapshot') snapshot = true;
     else if (argument === '--live') live = true;
+    else if (argument === '--workbench') workbench = true;
+    else if (argument === '--once') once = true;
     else if (argument === '--help' || argument === '-h') {
       printUsage();
       process.exit(0);
@@ -189,6 +229,12 @@ function parseArguments(argv: string[]): Arguments {
       if (!Number.isFinite(width) || width < 48) throw new Error('--width must be an integer >= 48');
     } else if (argument === '--run') runPath = requireValue(argv, ++index, '--run');
     else if (argument === '--plan') planPath = requireValue(argv, ++index, '--plan');
+    else if (argument === '--kiln-url') kilnUrl = requireValue(argv, ++index, '--kiln-url');
+    else if (argument === '--kiln-ws-url') kilnWsUrl = requireValue(argv, ++index, '--kiln-ws-url');
+    else if (argument === '--kiln-read-token') kilnReadToken = requireValue(argv, ++index, '--kiln-read-token');
+    else if (argument === '--kiln-operate-token') kilnOperateToken = requireValue(argv, ++index, '--kiln-operate-token');
+    else if (argument === '--snapshot-dir') snapshotDir = requireValue(argv, ++index, '--snapshot-dir');
+    else if (argument === '--actor-id') actorId = requireValue(argv, ++index, '--actor-id');
     else if (argument.startsWith('-')) throw new Error(`unknown option: ${argument}`);
     else repository = argument;
   }
@@ -196,10 +242,18 @@ function parseArguments(argv: string[]): Arguments {
     repository,
     snapshot,
     live,
+    workbench,
+    once,
     focus,
     ...(width !== undefined ? { width } : {}),
     ...(runPath ? { runPath } : {}),
-    ...(planPath ? { planPath } : {})
+    ...(planPath ? { planPath } : {}),
+    ...(kilnUrl ? { kilnUrl } : {}),
+    ...(kilnWsUrl ? { kilnWsUrl } : {}),
+    ...(kilnReadToken ? { kilnReadToken } : {}),
+    ...(kilnOperateToken ? { kilnOperateToken } : {}),
+    ...(snapshotDir ? { snapshotDir } : {}),
+    ...(actorId ? { actorId } : {})
   };
 }
 
@@ -217,10 +271,16 @@ function parseFocus(value: string): Focus {
 function printUsage(): void {
   process.stdout.write(`Usage: temper [repository] [options]\n\n`);
   process.stdout.write(`Options:\n`);
+  process.stdout.write(`  --workbench      open the Workbench TUI (default when no other mode is set)\n`);
   process.stdout.write(`  --snapshot       render once without interactive terminal control\n`);
-  process.stdout.write(`  --live           connect to a bounded Kiln daemon for live activity\n`);
-  process.stdout.write(`                   (requires KILN_URL, KILN_READ_TOKEN,\n`);
-  process.stdout.write(`                    KILN_OPERATE_TOKEN, KILN_WS_URL)\n`);
+  process.stdout.write(`  --live           legacy live mode (kept for compatibility)\n`);
+  process.stdout.write(`  --once           render a single workbench frame and exit (case-study capture)\n`);
+  process.stdout.write(`  --kiln-url URL           Kiln daemon base URL (default: $KILN_URL)\n`);
+  process.stdout.write(`  --kiln-ws-url URL        Kiln WebSocket URL (default: $KILN_WS_URL)\n`);
+  process.stdout.write(`  --kiln-read-token TOKEN  Read-scoped token (default: $KILN_READ_TOKEN)\n`);
+  process.stdout.write(`  --kiln-operate-token TKN Operate-scoped token (default: $KILN_OPERATE_TOKEN)\n`);
+  process.stdout.write(`  --snapshot-dir PATH      Directory to write milestone snapshots\n`);
+  process.stdout.write(`  --actor-id ID            Actor id for session.start (default: temper_operator)\n`);
   process.stdout.write(`  --focus <name>   initial focus (${FOCUSES.join(', ')})\n`);
   process.stdout.write(`  --width <cols>   snapshot width (minimum 48)\n`);
   process.stdout.write(`  --run <path>     explicit Loadout Run record\n`);

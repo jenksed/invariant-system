@@ -1,0 +1,30 @@
+ ◆ TEMPER                                                                  Session ses…567890  ·  ●
+ project  /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-… kiln /Users/jenk…
+────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ┌─ PROJECT ──────────────────────────────────────────────────────────────────────────────────────┐
+ │ Path     /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha            │
+ │ Kiln home/Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha/.kiln      │
+ │ Session  ses…567890                                                                            │
+ │ Revision 47                                                                                    │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+ ┌─ LAST CANONICAL STATE ─────────────────────────────────────────────────────────────────────────┐
+ │ Objective      Temper Workbench Alpha — first real TUI screen                                  │
+ │ Run state      active                                                                          │
+ │ Verification   PENDING                                                                         │
+ │ Review         PENDING                                                                         │
+ │ Human          PENDING                                                                         │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+   submit failed: session.start failed: E_SESSION_ALREADY_EXISTS
+
+
+
+
+
+
+
+
+ ┌─ INTENT ───────────────────────────────────────────────────────────────────────────────────────┐
+ │ >                                                                                              │
+ └────────────────────────────────────────────────────────────────────────────────────────────────┘
+ Enter submit · esc clear · ctrl-k palette · q quit · ctrl-c interrupt

@@ -1,0 +1,32 @@
+ ◆ TEMPER                                                                                      Session ses…567890  ·  ●
+ project  /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+ ┌─ WORK ───────────────────────────────────────────────────────────────┐ ┌─ MOTION (canonical deltas) ───────────────┐
+ │ You                                                                  │ │ No Motion yet — canonical state unchanged.│
+ │ Fix the reconnect projection so stale activity cannot overwrite      │ │                                           │
+ │ canonical state.                                                     │ │                                           │
+ │                                                                      │ │                                           │
+ │ Pulse (live activity)                                                │ │                                           │
+ │ 12:00:05  Kiln state changed · session:ses_ab…7890 · rev 47 → canon… │ │                                           │
+ │ 12:00:25  Kiln state changed · run:run_ro…_001 · rev 49 → canonical… │ │                                           │
+ │ 12:00:55  Kiln state changed · operation:opn_te…_run · rev 50 → can… │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ └───────────────────────────────────────────┘
+ │                                                                      │
+ │                                                                      │ ┌─ FRONTIER · ATTENTION ────────────────────┐
+ │                                                                      │ │ Objective Fix reconnect projection so st… │
+ │                                                                      │ │ Run       active                          │
+ │                                                                      │ │ Verify    PENDING                         │
+ │                                                                      │ │ Review    PENDING                         │
+ │                                                                      │ │ Human     PENDING                         │
+ │                                                                      │ │ Unknowns  none                            │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ └───────────────────────────────────────────┘
+ └──────────────────────────────────────────────────────────────────────┘
+
+ esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming
