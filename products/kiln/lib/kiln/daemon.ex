@@ -32,7 +32,6 @@ defmodule Kiln.Daemon do
     children = [
       {Cowboy,
        scheme: :http,
-       plug: {Kiln.Service, []},
        options: [
          port: port,
          dispatch: dispatch_table()
@@ -44,18 +43,19 @@ defmodule Kiln.Daemon do
 
   # Build the Cowboy dispatch table.
   #
-  # `/ws` is handled by the WebSocket handler; everything else falls
-  # through to the Plug. The Plug itself does not respond to `/ws` —
-  # `Kiln.Service.handle_websocket/1` was simplified in WP-09 Lane 2
-  # to authenticate and hand off; Cowboy routes the upgrade to the
-  # WebSocket handler before the Plug sees the request.
+  # `/ws` is handled by the WebSocket handler module; everything else
+  # falls through to the Plug via `Plug.Cowboy.Translator`. The Plug
+  # itself no longer responds to `/ws` — `Kiln.Service.handle_websocket/1`
+  # was simplified in WP-09 Lane 2 to authenticate and hand off;
+  # Cowboy routes the upgrade to the WebSocket handler before the Plug
+  # sees the request.
   defp dispatch_table do
     :cowboy_router.compile_dispatch(
       [
         {:_,
          [
            {"/ws", Kiln.Activity.WebSocket, []},
-           {:_, Plug.Cowboy.Translator, :kiln_service_plug_translator}
+           {:_, {Plug.Cowboy.Translator, {Kiln.Service, []}}, []}
          ]}
       ],
       :kiln_service_dispatch
