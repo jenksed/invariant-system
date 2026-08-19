@@ -34,6 +34,13 @@ defmodule Kiln.Application do
 
     base ++
       [
+        # WP-09 Lane 2: bounded activity publication + subscription hub.
+        # The Hub holds no authoritative state; it is a bounded fan-out
+        # for `activity.notification` envelopes. The Hub is supervised
+        # unconditionally because publishing is a pure function of the
+        # caller's `publish/1` payload — even with no subscribers, no
+        # resource is held and no state diverges.
+        {Kiln.Activity.Hub, []},
         {Finch,
          name: Kiln.MinimaxFinch,
          pools: %{

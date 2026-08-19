@@ -49,18 +49,31 @@ defmodule Kiln.Service do
     end
   end
 
-  # WebSocket streaming endpoint
+  # WebSocket streaming endpoint.
+  #
+  # WP-09 Lane 2: replaced the bare 101 stub with a real Cowboy
+  # WebSocket handler. Bearer authentication still happens during
+  # the upgrade; the handler then requires an `activity.subscribe`
+  # envelope as the first client-to-server frame (see
+  # `Kiln.Activity.WebSocket`).
   defp handle_websocket(conn) do
     case authenticate(conn) do
       {:ok, _scope} ->
+        # Hand off the upgrade to the Cowboy WebSocket handler. Plug
+        # does not own the connection past this point.
         conn
-        |> Plug.Conn.put_resp_header("upgrade", "websocket")
-        |> Plug.Conn.put_resp_header("connection", "upgrade")
-        |> Plug.Conn.resp(101, "")
 
       {:error, reason} ->
         Error.unauthorized(conn, reason)
     end
+  end
+
+  # Exposed for `Kiln.Activity.WebSocket.init/2` so the WS handler
+  # can verify the bearer token without importing private functions
+  # from this module. Exact-match scope table (router.ex:104-113).
+  @doc false
+  def verify_token_for_ws(token) do
+    verify_token(token)
   end
 
   # HTTP unary RPC endpoint (POST only; other methods are unknown paths)
