@@ -144,6 +144,37 @@ defmodule Kiln.RPC.Router do
       "patch.apply" ->
         Kiln.RPC.Handlers.Patch.handle("patch.apply", params, opts)
 
+      # WP-09 Lane 1: lifecycle closure. Each handler wraps existing
+      # bounded Kiln machinery (Worker.propose/5, M0VerificationResult.build/6,
+      # Review.build/9, HumanDecision.build/5, Project.open). The RPC
+      # layer adapts to existing domain ownership; it does NOT introduce
+      # new Worker / verification / review / HumanDecision semantics.
+      "worker.propose" ->
+        Kiln.RPC.Handlers.Worker.handle("worker.propose", params, opts)
+
+      "verify.run" ->
+        Kiln.RPC.Handlers.Verify.handle("verify.run", params, opts)
+
+      "review.propose" ->
+        Kiln.RPC.Handlers.Review.handle("review.propose", params, opts)
+
+      "human.decide" ->
+        Kiln.RPC.Handlers.HumanDecision.handle("human.decide", params, opts)
+
+      "project.open" ->
+        Kiln.RPC.Handlers.Project.handle("project.open", params, opts)
+
+      "project.list" ->
+        Kiln.RPC.Handlers.Project.handle("project.list", params, opts)
+
+      # WP-09 Lane 2: activity.subscribe returns the initial
+      # canonical projection envelope. The actual notification stream
+      # is delivered over WebSocket at /ws (handlers/activity_websocket.ex).
+      # This handler exists only for clients that want the initial
+      # canonical snapshot without opening a WebSocket.
+      "activity.subscribe" ->
+        Kiln.RPC.Handlers.Activity.handle("activity.subscribe", params, opts)
+
       _ ->
         {:error, %{code: :E_NOT_IMPLEMENTED, method: method}}
     end
