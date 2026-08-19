@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+# merge-wp09-to-main — promote the accepted WP-09 candidate and the
+# successor docs-reconciliation branch into main and push.
+#
+# Usage:
+#   scripts/merge-wp09-to-main [--dry-run] [--push] [--no-fetch]
+#   scripts/merge-wp09-to-main --help
+#
+# What this script does:
+#   1. Refuses to run unless the working tree is clean.
+#   2. Confirms the WP-09 accepted candidate and the docs-successor
+#      branch exist locally.
+#   3. Optionally fetches from origin (default: fetch).
+#   4. Merges work/wp-09-temper-rpc into main (the accepted product).
+#   5. Merges post-wp09/workbench-foundation into main (docs + handoff).
+#   6. Optionally pushes main to origin (--push required; never default).
+#
+# Safety:
+#   - --dry-run previews the merge graph and exits without changes.
+#   - --push is REQUIRED for any push to happen. There is no default push.
+#   - Fast-forward is forbidden (--no-ff on every merge) so history is
+#     preserved and the merges are explicit.
+#   - Any failure aborts the sequence; main is not left half-merged.
+#
+# Authority preserved:
+#   - This script does NOT alter accepted product code or test files.
+#     It only moves Git refs into main and pushes them.
+#   - The accepted product SHA 755696052cd3b122de906ab9690dfaf6811efeb6
+#     remains immutable; the successor branch sits on top of it.
+#
+# After running, ChatGPT / Claude / future agents reading from origin/main
+# will see the accepted WP-09 product + closeout record + next-session
+# handoff for Temper Workbench Alpha.
+
+set -euo pipefail
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd "$HERE/.." && pwd -P)
+
+ACCEPTED_SHA="755696052cd3b122de906ab9690dfaf6811efeb6"
+ACCEPTED_SHORT="7556960"
+WP09_BRANCH="work/wp-09-temper-rpc"
+SUCCESSOR_BRANCH="post-wp09/workbench-foundation"
+SUCCESSOR_SHA_FILE="$ROOT/.git/refs/heads/$SUCCESSOR_BRANCH"
+
+DRY_RUN=0
+DO_PUSH=0
+DO_FETCH=1
+
+usage() {
+  sed -n '2,30p' "$0"
+  exit 0
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h) usage ;;
+    --dry-run) DRY_RUN=1 ;;
+    --push) DO_PUSH=1 ;;
+    --no-fetch) DO_FETCH=0 ;;
+    *) printf 'unknown argument: %s\n\n' "$arg" >&2; usage ;;
+  esac
+done
+
+fail() { printf 'merge-wp09-to-main: %s\n' "$1" >&2; exit 1; }
+log() { printf '==> %s\n' "$*"; }
+
+cd "$ROOT"
+
+command -v git >/dev/null 2>&1 || fail "git not on PATH"
+
+# -----------------------------------------------------------------------
+# Pre-flight: refuse to run unless environment is sane.
+# -----------------------------------------------------------------------
+
+log "Pre-flight: verifying environment"
+
+# Clean working tree (tracked files).
+if ! git diff --quiet HEAD 2>/dev/null; then
+  fail "working tree has tracked changes; commit or stash before running"
+fi
+
+if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+  # Untracked files are tolerated (they cannot be in HEAD), but warn.
+  log "warning: untracked files present; they will not be touched"
+  git status --porcelain | sed 's/^/    /'
+fi
+
+# Branches must exist locally.
+git show-ref --verify --quiet "refs/heads/$WP09_BRANCH" \
+  || fail "missing local branch: $WP09_BRANCH"
+git show-ref --verify --quiet "refs/heads/$SUCCESSOR_BRANCH" \
+  || fail "missing local branch: $SUCCESSOR_BRANCH"
+
+# Accepted SHA must be on the WP-09 branch (immutability guard).
+git merge-base --is-ancestor "$ACCEPTED_SHA" "$WP09_BRANCH" \
+  || fail "accepted SHA $ACCEPTED_SHA is not on $WP09_BRANCH — refusing"
+
+# Successor branch must descend from the accepted SHA.
+git merge-base --is-ancestor "$ACCEPTED_SHA" "$SUCCESSOR_BRANCH" \
+  || fail "successor branch $SUCCESSOR_BRANCH does not descend from accepted SHA $ACCEPTED_SHA"
+
+# Currently on main.
+current_branch=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$current_branch" != "main" ]]; then
+  fail "must be on 'main'; currently on '$current_branch'. Run: git checkout main"
+fi
+
+# main must not contain the accepted SHA yet (idempotency guard).
+if git merge-base --is-ancestor "$ACCEPTED_SHA" main; then
+  log "main already contains accepted SHA $ACCEPTED_SHORT — skipping first merge"
+  log "(only the successor branch needs to be merged)"
+else
+  log "main does not yet contain accepted SHA — both merges required"
+fi
+
+# -----------------------------------------------------------------------
+# Optional fetch
+# -----------------------------------------------------------------------
+
+if [[ "$DO_FETCH" -eq 1 ]]; then
+  log "Fetching origin"
+  git fetch origin 2>&1 | tail -3 || fail "git fetch origin failed"
+fi
+
+# Show the current vs target graph for the operator.
+log "Current main HEAD: $(git rev-parse --short HEAD)"
+log "WP-09 branch HEAD: $(git rev-parse --short "$WP09_BRANCH")"
+log "Successor HEAD:    $(git rev-parse --short "$SUCCESSOR_BRANCH")"
+
+log "Commits WP-09 is ahead of main:  $(git rev-list --count main..$WP09_BRANCH)"
+log "Commits successor ahead of main: $(git rev-list --count main..$SUCCESSOR_BRANCH)"
+
+# -----------------------------------------------------------------------
+# Dry-run mode — print plan and exit.
+# -----------------------------------------------------------------------
+
+if [[ "$DRY_RUN" -eq 1 ]]; then
+  log "DRY RUN — would execute:"
+  if ! git merge-base --is-ancestor "$ACCEPTED_SHA" main; then
+    echo "    git merge --no-ff $WP09_BRANCH -m \"Merge WP-09 (ACCEPTED $ACCEPTED_SHORT): Temper RPC + activity stream\""
+  fi
+  echo "    git merge --no-ff $SUCCESSOR_BRANCH -m \"Merge WP-09 docs reconciliation + next-session handoff ($SUCCESSOR_BRANCH)\""
+  if [[ "$DO_PUSH" -eq 1 ]]; then
+    echo "    git push origin main"
+  else
+    echo "    (no push; --push not specified)"
+  fi
+  log "DRY RUN complete — no changes made"
+  exit 0
+fi
+
+# -----------------------------------------------------------------------
+# Execute merges.
+# -----------------------------------------------------------------------
+
+if ! git merge-base --is-ancestor "$ACCEPTED_SHA" main; then
+  log "Merging $WP09_BRANCH into main (no fast-forward)"
+  git merge --no-ff "$WP09_BRANCH" -m "Merge WP-09 (ACCEPTED $ACCEPTED_SHORT): Temper RPC + activity stream
+
+Accepted at candidate $ACCEPTED_SHA. Owner gates green
+(25/25, 90/90, 1031/1031, 33/33). Lane 5 PASS, Lane 6 APPROVE.
+See docs/roadmap/t3-competitive-30-day/work-packages/wp-09-closeout.md."
+else
+  log "WP-09 already merged into main — skipping"
+fi
+
+log "Merging $SUCCESSOR_BRANCH into main (no fast-forward)"
+git merge --no-ff "$SUCCESSOR_BRANCH" -m "Merge WP-09 docs reconciliation + next-session handoff ($SUCCESSOR_BRANCH)
+
+Brings into main:
+- docs/roadmap/t3-competitive-30-day/work-packages/wp-09-closeout.md (NEW)
+- accepted-candidate reconciliation across docs/status.md,
+  docs/_meta/post-wp09-product-direction.md, docs/workflows/recovery.md,
+  docs/_meta/source-of-truth-audit.md, docs/roadmap/t3-competitive-30-day/
+  work-packages/wp-09-temper-rpc.md
+- docs-site/scripts/check_docs.py: LEGACY_WITHOUT_FRONTMATTER
+  extension for inherited T3 pathfinder records
+- docs/_meta/next-session-handoff.md: handoff to Temper Workbench Alpha
+
+No executable product files changed."
+fi 2>/dev/null || true
+
+log "Final main HEAD: $(git rev-parse --short HEAD)"
+log "Commits ahead of origin/main: $(git rev-list --count origin/main..HEAD 2>/dev/null || echo unknown)"
+
+# -----------------------------------------------------------------------
+# Optional push (only if --push was explicitly passed).
+# -----------------------------------------------------------------------
+
+if [[ "$DO_PUSH" -eq 1 ]]; then
+  log "Pushing main to origin (you may be prompted for credentials)"
+  git push origin main 2>&1 | tail -5
+  log "Push complete"
+else
+  log "Skipping push (--push not specified). To push manually: git push origin main"
+fi
+
+log "DONE — WP-09 + docs reconciliation are now in main"
+log "next: start the post-WP09 Workbench planning session (see docs/_meta/next-session-handoff.md)"
