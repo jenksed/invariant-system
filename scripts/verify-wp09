@@ -76,13 +76,17 @@ MIX_ENV=test mix test \
 #   - m12_d_handlers_test.exs (already in the focused gate 1 set;
 #     covered by gate 1; not duplicated here)
 #
-# Expected total at this gate: 87/87 (was 71/71; +16 from
+# Expected total at this gate: 90/90 (was 71/71; +19 from
 # WP-09 additions counted via `grep -cE '^\s*test\s+"'` in each
-# affected test file).
+# affected test file). Repair-8 strengthened the daemon regression
+# test by replacing 1 structural test with 4 runtime tests
+# (Supervisor flags shape, dispatch round-trip via
+# :cowboy_router.compile/1, /healthz runtime exercise, child spec
+# validation).
 # If the count differs, the verifier must explain WHY before claiming
 # PASS — not just print green.
 # -----------------------------------------------------------------------
-log "Gate 2: WP-08 inherited regressions + WP-09-added daemon + contract guards (expected 87/87)"
+log "Gate 2: WP-08 inherited regressions + WP-09-added daemon + contract guards (expected 90/90)"
 cd "$KILN"
 MIX_ENV=test mix test \
   test/kiln/restart_test.exs \
