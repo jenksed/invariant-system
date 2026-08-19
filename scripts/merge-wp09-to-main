@@ -34,14 +34,10 @@
 
 set -euo pipefail
 
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
-ROOT=$(cd "$HERE/.." && pwd -P)
-
 ACCEPTED_SHA="755696052cd3b122de906ab9690dfaf6811efeb6"
 ACCEPTED_SHORT="7556960"
 WP09_BRANCH="work/wp-09-temper-rpc"
 SUCCESSOR_BRANCH="post-wp09/workbench-foundation"
-SUCCESSOR_SHA_FILE="$ROOT/.git/refs/heads/$SUCCESSOR_BRANCH"
 
 DRY_RUN=0
 DO_PUSH=0
@@ -65,7 +61,9 @@ done
 fail() { printf 'merge-wp09-to-main: %s\n' "$1" >&2; exit 1; }
 log() { printf '==> %s\n' "$*"; }
 
-cd "$ROOT"
+# Resolve ROOT to the git worktree at CWD (or fail if CWD isn't a git worktree).
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)"
+[[ -n "$ROOT" && -d "$ROOT" ]] || fail "current directory is not inside a git worktree"
 
 command -v git >/dev/null 2>&1 || fail "git not on PATH"
 
