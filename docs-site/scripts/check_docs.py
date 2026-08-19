@@ -12,7 +12,31 @@ ROOT = Path(__file__).resolve().parents[2]
 DOCS = ROOT / "docs"
 ALLOWED_STATUS = {"current", "partial", "experimental", "planned", "frontier", "historical"}
 REQUIRED_FIELDS = {"title", "description", "status", "verified_at_commit", "source_paths", "audience"}
-LEGACY_WITHOUT_FRONTMATTER = {DOCS / "MONOREPO-MIGRATION.md"}
+LEGACY_WITHOUT_FRONTMATTER = {
+    DOCS / "MONOREPO-MIGRATION.md",
+    # T3 competitive program material inherited from docs/invariant-documentation-foundation
+    # SHA f26cd4d60330f67a356c619e69b01d3982f65f7e. These are protected
+    # historical records (per WP-09 closeout Section 10) — they precede
+    # the frontmatter convention. They remain legible at their original
+    # commit and are not modified to satisfy the check.
+    DOCS / "roadmap" / "t3-competitive-30-day" / "HOW_TO_DOGFOOD_WP09.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "LANE-EVIDENCE-M12-TEMPER-RPC.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "LANE-EVIDENCE-WP09-CONTRACTS.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "LANE-EVIDENCE-WP09-RECON.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "LANE-EVIDENCE-WP09-REVIEW-CHECKLIST.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "WP09-LESSONS-AND-REGRESSION-GUARDS.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "WP09-WARNING-BASELINE.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "client-server-boundary.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "index.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "prototype-results.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "provider-runtime-strategy.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "t3-reference-map.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "workspace-recovery.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "work-packages" / "wp-07-daemon.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "work-packages" / "wp-08-session.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "work-packages" / "wp-09-temper-rpc.md",
+    DOCS / "roadmap" / "t3-competitive-30-day" / "work-packages" / "wp-10-provider-runtime.md",
+}
 LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 FULL_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 
