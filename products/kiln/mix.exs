@@ -34,7 +34,16 @@ defmodule Kiln.MixProject do
       # + incremental bounded body receipt + ability to terminate receipt
       # when the byte limit is crossed. OTP :httpc cannot satisfy both.
       # Mint is transitive; castore was removed in v0.19.0.
-      {:finch, "~> 0.20"}
+      {:finch, "~> 0.20"},
+      # M12-D WP-07: bounded Kiln daemon (HTTP + WebSocket). Plug.Cowboy is
+      # the smallest Erlang HTTP server with built-in WebSocket upgrade.
+      # Avoided full Phoenix framework to keep bounded machinery surface
+      # narrow; per-method scope + bounded reconnect + per-entity streams
+      # implemented directly in Kiln.Service (Pathfinder WP-02).
+      {:plug_cowboy, "~> 2.5"},
+      # M12-D WP-07: bounded JSON encoding for bounded RPC payloads.
+      # Jason is canonical Elixir JSON; bounded alternative to Poison.
+      {:jason, "~> 1.4"}
     ]
   end
 
