@@ -126,7 +126,6 @@ defmodule Kiln.M12DHandlersTest do
     body = Jason.decode!(conn.resp_body)
     assert is_map(body)
     assert body["projects"] == []
-    assert body["scope_table_version"] == "kiln/rpc/scope-table/v1"
   end
 
   # -- contract freeze: bounded error codes preserved (P5) --

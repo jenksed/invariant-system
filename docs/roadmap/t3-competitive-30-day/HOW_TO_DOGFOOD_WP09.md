@@ -141,8 +141,7 @@ Expected response:
   "session_id": null,
   "canonical_session_revision": 0,
   "orphaned": false,
-  "unknowns": [],
-  "scope_table_version": "kiln/rpc/scope-table/v1"
+  "unknowns": []
 }
 ```
 
