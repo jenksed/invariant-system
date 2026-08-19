@@ -30,6 +30,19 @@ export interface WorkDeps {
   intent: string;
   /** Called when the operator presses esc / q to leave Work. */
   onExit: () => void;
+  /**
+   * N2: invoked when the operator presses A / R / V to submit
+   * a governed human decision. The implementation performs the
+   * real Kiln `human.decide` RPC and returns the bounded result.
+   * The screen renders the result faithfully.
+   */
+  onHumanDecide?: (
+    decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION'
+  ) => Promise<{
+    ok: boolean;
+    errorCode?: string;
+    errorReason?: string;
+  }>;
 }
 
 export interface WorkState {
@@ -54,6 +67,23 @@ export interface WorkState {
    * the connection re-establishes.
    */
   disconnectedAt: string | null;
+  /**
+   * N2: status of the most recent human-decide submission.
+   * idle: no submission yet (or last result dismissed)
+   * submitting: the RPC is in flight
+   * success: the bounded result was ok
+   * rejected: the bounded result was ok:false with a real code
+   * (e.g. E_HUMAN_DECISION_INVALID, E_RUN_TRANSITION_NOT_ALLOWED)
+   * error: transport or other non-bounded failure
+   * Cleared when the operator presses any key.
+   */
+  humanDecide: {
+    status: 'idle' | 'submitting' | 'success' | 'rejected' | 'error';
+    decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION' | null;
+    code: string | null;
+    reason: string | null;
+    at: string | null;
+  };
 }
 
 export function createWorkScreen(deps: WorkDeps): ScreenSpec {
@@ -65,7 +95,8 @@ export function createWorkScreen(deps: WorkDeps): ScreenSpec {
       pulse: [],
       motion: [],
       lastReconnectAt: null,
-      disconnectedAt: null
+      disconnectedAt: null,
+      humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
     }),
     view: (state, ctx) => renderWork(state as WorkState, ctx, deps),
     update: (state, key, ctx) => updateWork(state as WorkState, key, ctx, deps)
@@ -110,6 +141,21 @@ export function clearWorkReconnectBanner(state: WorkState): WorkState {
   return { ...state, lastReconnectAt: null };
 }
 
+/** Set the human-decide submission result. Called by the
+ *  orchestrator after the real Kiln RPC returns. */
+export function setHumanDecideResult(
+  state: WorkState,
+  result: {
+    status: 'idle' | 'submitting' | 'success' | 'rejected' | 'error';
+    decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION' | null;
+    code: string | null;
+    reason: string | null;
+    at: string | null;
+  }
+): WorkState {
+  return { ...state, humanDecide: result };
+}
+
 function updateWork(
   state: WorkState,
   key: Key,
@@ -127,9 +173,49 @@ function updateWork(
     deps.onExit();
     return { state, msgs: [{ kind: 'quit' }] };
   }
-  // Pressing any other key dismisses the "since you left" banner.
-  if (state.lastReconnectAt) {
-    return { state: clearWorkReconnectBanner(state), msgs: [] };
+
+  // N2: human-decide key handlers (A / R / V). The screen
+  // dispatches via the orchestrator's onHumanDecide callback and
+  // transitions to 'submitting' immediately. The orchestrator
+  // owns the result lifecycle and calls setHumanDecideResult on
+  // the state when the real Kiln RPC returns.
+  if (
+    key.kind === 'char' &&
+    deps.onHumanDecide &&
+    state.humanDecide.status === 'idle' &&
+    (key.value === 'A' || key.value === 'R' || key.value === 'V')
+  ) {
+    const decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION' =
+      key.value === 'A' ? 'ACCEPT' : key.value === 'R' ? 'REJECT' : 'REQUEST_REVISION';
+    void deps.onHumanDecide(decision);
+    return {
+      state: {
+        ...state,
+        humanDecide: { status: 'submitting', decision, code: null, reason: null, at: new Date().toISOString() }
+      },
+      msgs: []
+    };
+  }
+
+  // Pressing any other key (or a key after a result) dismisses
+  // the since-you-left banner and a terminal human-decide result.
+  // 'submitting' is intentionally not a terminal state — any key
+  // during submit is a no-op so the operator cannot double-submit
+  // or accidentally dismiss a result that has not arrived yet.
+  if (
+    state.humanDecide.status === 'submitting' &&
+    (key.kind === 'char' || key.kind === 'enter')
+  ) {
+    return { state, msgs: [] };
+  }
+  if (state.lastReconnectAt || state.humanDecide.status !== 'idle') {
+    return {
+      state: {
+        ...clearWorkReconnectBanner(state),
+        humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
+      },
+      msgs: []
+    };
   }
   // Future: d → diff, e → evidence, g → graph (later), ? → help.
   return { state, msgs: [] };
@@ -182,12 +268,40 @@ function renderWork(state: WorkState, ctx: ScreenContext, deps: WorkDeps): Frame
     putString(frame, bannerRow, 0, pad(headline, ctx.cols), 'success');
     putString(frame, bannerRow + 1, 0, pad(subline, ctx.cols), 'muted');
     putString(frame, bannerRow + 2, 0, pad(dismiss, ctx.cols), 'muted');
+  } else if (state.humanDecide.status !== 'idle') {
+    // N2: human-decide submission status banner.
+    const hd = state.humanDecide;
+    const ts = hd.at ? hd.at.slice(11, 19) : '';
+    let headline = '';
+    let subline = '';
+    let style: 'success' | 'warn' | 'error' = 'warn';
+    if (hd.status === 'submitting') {
+      headline = ` ⏳ Submitting ${hd.decision ?? 'decision'} to Kiln…`;
+      subline = '   awaiting canonical adjudication';
+      style = 'warn';
+    } else if (hd.status === 'success') {
+      headline = ` ✓ ${hd.decision ?? 'decision'} accepted by Kiln`;
+      subline = `   canonical human status updated (${ts})`;
+      style = 'success';
+    } else if (hd.status === 'rejected') {
+      headline = ` ✕ ${hd.decision ?? 'decision'} NOT applied: ${hd.code ?? 'E_UNKNOWN'}`;
+      subline = hd.reason ? `   ${truncate(hd.reason, ctx.cols - 6)}` : '   bounded rejection from Kiln';
+      style = 'error';
+    } else if (hd.status === 'error') {
+      headline = ` ✕ ${hd.decision ?? 'decision'} failed: ${hd.code ?? 'E_TRANSPORT'}`;
+      subline = hd.reason ? `   ${truncate(hd.reason, ctx.cols - 6)}` : '   transport or unknown failure';
+      style = 'error';
+    }
+    putString(frame, bannerRow, 0, pad(headline, ctx.cols), style);
+    putString(frame, bannerRow + 1, 0, pad(subline, ctx.cols), 'muted');
+    putString(frame, bannerRow + 2, 0, pad('   press any key to dismiss', ctx.cols), 'muted');
   }
 
   const showReconnectBanner = !isDisconnected && state.lastReconnectAt && isRecent(state.lastReconnectAt, 30_000);
+  const showHumanDecideBanner = !isDisconnected && !showReconnectBanner && state.humanDecide.status !== 'idle';
   const bodyTop = isDisconnected
     ? bannerRow + 4
-    : showReconnectBanner
+    : showReconnectBanner || showHumanDecideBanner
       ? bannerRow + 4
       : 4;
   const footerRow = ctx.rows - 1;
@@ -300,7 +414,9 @@ function renderWork(state: WorkState, ctx: ScreenContext, deps: WorkDeps): Frame
   }
 
   // Footer
-  const footer = ' esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming ';
+  const footer = deps.onHumanDecide
+    ? ' A accept · R reject · V request-revision · esc back · q quit '
+    : ' esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming ';
   putString(frame, footerRow, 0, pad(footer, ctx.cols), 'footer');
   return frame;
 }

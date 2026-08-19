@@ -22,6 +22,7 @@ import {
   createWorkScreen,
   markWorkDisconnect,
   markWorkReconnect,
+  setHumanDecideResult,
   setWorkProjection,
   type WorkState
 } from './screens/work.js';
@@ -94,6 +95,53 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
         runtime.replace(homeScreen);
         active = 'home';
         if (homeState) runtime.setTopState(homeState);
+      },
+      onHumanDecide: async (decision) => {
+        // N2: invoke the real bounded `human.decide` Kiln RPC.
+        // The bounded envelope fields are sourced from the
+        // Session projection where they are present, or fall back
+        // to bounded placeholders that the daemon will reject with
+        // an exact error code. The result is rendered faithfully
+        // by the Work screen via setHumanDecideResult.
+        if (!workState) {
+          return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'no work state' };
+        }
+        // Bound the result-update so the screen reflects the
+        // bounded result the operator asked for.
+        const setResult = (result: { ok: boolean; errorCode?: string; errorReason?: string }) => {
+          workState = setHumanDecideResult(workState!, {
+            status: result.ok ? 'success' : 'rejected',
+            decision,
+            code: result.ok ? null : (result.errorCode ?? 'E_UNKNOWN'),
+            reason: result.ok ? null : (result.errorReason ?? ''),
+            at: new Date().toISOString()
+          });
+          if (active === 'work') runtime.setTopState(workState);
+        };
+        try {
+          const result = await connection.submitHumanDecision(
+            decision,
+            {
+              plan_ref: { id: 'pln_pending_session', digest: 'sha256:' + '0'.repeat(64) },
+              patch_ref: { id: 'pp_pending_session', digest: 'sha256:' + '0'.repeat(64) },
+              result_state_digest: 'sha256:' + '0'.repeat(64),
+              review_ref: null
+            },
+            options.actorId ?? 'temper_operator'
+          );
+          setResult(result);
+          // After a successful human.decide, the canonical
+          // Session has advanced; resync so the next render
+          // shows the new state.
+          if (result.ok) {
+            await connection.resync('resync');
+          }
+          return result;
+        } catch (err) {
+          const errResult = { ok: false, errorCode: 'E_TRANSPORT', errorReason: (err as Error).message };
+          setResult(errResult);
+          return errResult;
+        }
       }
     });
   }

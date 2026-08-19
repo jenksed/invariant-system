@@ -124,6 +124,61 @@ export class WorkbenchConnection {
     return this.projection;
   }
 
+  /**
+   * Submit a governed human decision (ACCEPT | REJECT |
+   * REQUEST_REVISION) through the existing real `human.decide`
+   * Kiln RPC. Returns the canonical bounded envelope result.
+   *
+   * The bounded envelope fields (plan_ref, patch_ref,
+   * result_state_digest, review_ref) are passed through
+   * unchanged. Temper does not invent them. If they are
+   * placeholders or stale, Kiln returns a bounded error
+   * (E_HUMAN_DECISION_INVALID, E_RUN_TRANSITION_NOT_ALLOWED,
+   * E_MISSING_FIELDS, E_INVALID_DIGEST) and the result
+   * `ok: false` carries the exact code + reason. The
+   * operator sees the real result.
+   */
+  async submitHumanDecision(
+    decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION',
+    envelope: {
+      plan_ref: { id: string; digest: string };
+      patch_ref: { id: string; digest: string };
+      result_state_digest: string;
+      review_ref?: { id: string; digest: string } | null;
+    },
+    actorId: string
+  ): Promise<{
+    ok: boolean;
+    result?: Record<string, unknown>;
+    errorCode?: string;
+    errorReason?: string;
+  }> {
+    if (!this.projection.sessionId) {
+      return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
+    }
+    const params: Record<string, unknown> = {
+      plan_ref: envelope.plan_ref,
+      patch_ref: envelope.patch_ref,
+      result_state_digest: envelope.result_state_digest,
+      decision,
+      actor_id: actorId,
+      ...(envelope.review_ref ? { review_ref: envelope.review_ref } : {}),
+      session_id: this.projection.sessionId
+    };
+    const resp = await this.client.call<typeof params, Record<string, unknown>>({
+      method: 'human.decide',
+      params
+    });
+    if (!resp.ok) {
+      return {
+        ok: false,
+        errorCode: resp.error.code,
+        errorReason: resp.error.reason ?? ''
+      };
+    }
+    return { ok: true, result: resp.result };
+  }
+
   onProjection(listener: ProjectionListener): () => void {
     this.projectionListeners.add(listener);
     return () => this.projectionListeners.delete(listener);
