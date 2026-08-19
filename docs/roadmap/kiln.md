@@ -1,43 +1,71 @@
 ---
 title: Kiln Roadmap
-description: System-facing view of Kiln's accepted bounded implementation sequence.
+description: System-facing view of Kiln's durable Session, authority, recovery, evidence, and operator-service responsibilities.
 status: planned
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
 source_paths:
   - products/kiln/docs/ROADMAP.md
   - products/kiln/docs/IMPLEMENTATION-SLICES.md
   - products/kiln/lib/
   - products/kiln/test/
+  - docs/_meta/post-wp09-product-direction.md
 audience:
   - developer
 ---
 
 # Kiln Roadmap
 
-Kiln has the most detailed product-local implementation/authorization record in the system. This page does not replace it.
+Kiln has the most detailed product-local implementation/authorization record in the system. This page does not replace it and does not authorize Kiln work independently of its accepted lane/process state.
 
-## NOW
+## Evidence-backed baseline
 
-Current code includes durable single-Run foundations plus integrated authority, evidence/artifact, registered-verification, supervision, result-projection, and recovery work used by the monorepo integration path.
+The documentation branch's verified source basis includes durable Run foundations, authority evaluation, artifacts/evidence, registered verification, supervision, result projection, and recovery foundations. The active WP-08/WP-09 implementation state is not present on this remote documentation branch, so its reported progress is not promoted here as demonstrated fact.
 
-## NEXT
+## Gate — accepted durable Session/service foundation
 
-Kiln's accepted roadmap sequences evidence-backed Single-Run change work before delegated child-run work. Its historical plan names exact ticket/authorization gates; those gates remain the authority for Kiln implementation, not this system documentation.
+Before Workbench Alpha consumes WP-09 capabilities, accepted evidence should establish the exact Session/service/recovery contract and update [Current system status](../status.md).
 
-For the system Development Loop, the decisive milestone is:
+The important property is not “daemon exists.” It is that canonical governed Session state survives client/UI loss, exposes the facts/actions an operator needs, and does not weaken authority or recovery semantics.
 
-**Problem:** one authorized exact code proposal must become an observable repository effect with state-bound verification and recoverable evidence.
+## NEXT — serve the operator product without surrendering authority
 
-**Prerequisites:** the currently accepted Kiln slice sequence and any required owner authorization; exact base-state/mutation ownership; artifact/evidence substrate; registered command boundary.
+Kiln should expose the smallest stable query/action surface Temper needs for:
 
-**Acceptance property:** denied/stale/unbound proposals cannot mutate; accepted exact mutation produces durable effect/evidence state; interruption cannot silently become success or unsafe replay.
+- current Session/project identity;
+- lifecycle and explicit human-attention state;
+- activity/evidence/change traversal;
+- verification/review/decision state;
+- governed human actions;
+- recovery/reconciliation state;
+- freshness/version identity sufficient for a projection to detect staleness.
 
-**Evidence required:** negative authority/state tests, mutation digest/base-state evidence, durable journal/projection, registered verification against resulting state, recovery/reconciliation cases.
+Temper should not need direct access to Kiln internals or a duplicate durable workflow database.
 
-## LATER
+## Distributed operation
 
-Kiln's roadmap places independent read-only verifier child work after accepted Single-Run runtime evidence. That dependency is important: independent falsification should not be simulated by self-review inside the implementing Root Run.
+Remote Temper → Kiln is a near-term system target once local Session/query/action semantics are frozen.
 
-## FRONTIER
+The transport must preserve, rather than emulate loosely:
 
-Broader TUI, managed mutation isolation, richer code intelligence, telemetry, remote execution, and multi-language pack/platform work remain evidence-gated expansion rather than prerequisites for Development Loop v0.
+- Kiln identity and execution-host identity;
+- project/repository/Session identity;
+- authenticated/authorized actor identity;
+- state/version binding for actions;
+- explicit stale/conflict responses;
+- reconnect/requery behavior;
+- interruption and unknown-effect semantics.
+
+Remote operation is not accepted merely because an HTTP request crosses the network.
+
+## Evidence required
+
+- restart/reconstruction tests from authoritative state;
+- denial/stale-state/action-binding negative cases;
+- recovery cases for interrupted consequential effects;
+- public query/action contract tests;
+- local Workbench end-to-end proof;
+- remote topology proof with forced disconnect/reconnect before remote acceptance.
+
+## Later expansion
+
+Delegated child work, richer isolation, broader provider/runtime support, telemetry, and multi-language/platform work remain evidence-gated. They should be pulled forward only when they protect a property required by the operator product, dogfood, or a separately authorized strategic program.

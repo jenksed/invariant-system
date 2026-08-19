@@ -85,6 +85,7 @@ const sidebars = {
       label: 'Development',
       items: [
         'development/index',
+        'development/engineering-process',
         'development/repository-layout',
         'development/architecture-boundaries',
         'development/contracts',
@@ -100,6 +101,7 @@ const sidebars = {
         'reference/index',
         'reference/commands',
         'reference/contracts',
+        'reference/traceability',
         'reference/status-model',
         'reference/terminology',
       ],
@@ -110,11 +112,12 @@ const sidebars = {
       items: [
         'roadmap/index',
         'roadmap/system',
-        'roadmap/arsenal',
-        'roadmap/loadout',
-        'roadmap/kiln',
         'roadmap/temper',
+        'roadmap/kiln',
+        'roadmap/loadout',
         'roadmap/manifold',
+        'roadmap/arsenal',
+        'roadmap/strategic-programs',
       ],
     },
     {

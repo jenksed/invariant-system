@@ -23,9 +23,9 @@ Invariant keeps those questions out of the model's self-report.
 
 The core rule is simple: **intelligence may propose; authority, effects, evidence, and acceptance must have explicit owners.**
 
-## A workflow that runs today
+## A workflow that runs on the verified documentation baseline
 
-The repository-recon integration path is the current cross-product proof:
+The repository-recon integration path is the cross-product proof represented by the current docs status page:
 
 ```text
 Goal: “Understand this repository”
@@ -54,7 +54,7 @@ Run it from one checkout:
 
 The executable scenario lives at [`integration/scenarios/repository-recon/run.sh`](integration/scenarios/repository-recon/run.sh). It asserts that the result uses `engineering-system/run-result-envelope/v0` and is **not** simulated.
 
-That proof is intentionally narrower than the larger architecture. The golden path is automated today; the broader restart, negative-case, and dogfood matrix remains incomplete.
+Newer engineering branches/worktrees may contain later accepted work. The documentation only upgrades a current capability claim after that implementation and its evidence basis are reconciled into the repository state being documented.
 
 ## The system at a glance
 
@@ -64,54 +64,35 @@ flowchart LR
     A[Arsenal\nmethods + learning]
     B[Bench\nqualification evidence]
     L[Loadout\ngoals + plans]
-    M[Manifold\nselection boundary only]
+    M[Manifold\nselection boundary]
     K[Kiln\nauthority + execution truth]
-    T[Temper\noperator projection]
+    T[Temper\noperator projection / control surface]
 
     A --> B
     B -. qualification evidence .-> M
     H --> L
     L -->|Work Envelope| K
-    M -. future assignment .-> K
-    K -->|Run Result + evidence| T
+    M -. selection cannot expand authority .-> K
+    K -->|Run/Session truth + evidence| T
     T --> H
+    T -. governed action request .-> K
     K -. observations .-> A
 ```
 
-The dashed Manifold path is architectural direction, not current runtime behavior.
+Not every edge above is necessarily automated on the same repository state. Product/status docs distinguish current behavior from architectural direction.
 
-## Products
+## Product boundaries
 
-| Area | Owns | Current state |
+| Area | Owns | Must not become |
 | --- | --- | --- |
-| **Arsenal** | reusable engineering intelligence, methods, research, learning | Current; machine-checked asset/capability system and distribution work exist |
-| **Bench** | evaluation and qualification evidence inside Arsenal | Current/experimental; 19-case v0 corpus with explicit executed vs designed-not-run semantics |
-| **Loadout** | goals, capabilities, planning, Work Envelope preparation | Current; CLI/web surface, simulated boundary, and real Kiln boundary |
-| **Kiln** | authority, execution, effects, artifacts, evidence, registered verification, acceptance truth | Current/partial; durable single-Run foundation and real supervision exist; broader roadmap remains incomplete |
-| **Temper** | operator experience and truthful projection | Current/partial; read-only real-run workbench |
-| **Manifold** | intelligence selection and allocation semantics | Planned boundary; **no runtime implementation** |
+| **Arsenal** | reusable engineering intelligence, methods, research, learning | execution/mutation authority |
+| **Bench** | evaluation and qualification evidence inside Arsenal | runtime selection or execution authority |
+| **Loadout** | goals, capabilities, planning, Work Envelope preparation | durable execution truth or authority grantor |
+| **Manifold** | intelligence selection/allocation semantics | executor, mutator, qualifier, authority grantor, generic workflow engine |
+| **Kiln** | authority, execution/effects, artifacts/evidence, registered verification, acceptance truth | model qualification/R&D owner |
+| **Temper** | operator experience, truthful projection, governed action initiation | canonical workflow state, execution truth, mutation authority |
 
 Architectural ownership is enforced by [`invariant.boundaries.json`](invariant.boundaries.json). Bench is not a peer repository or `products/bench`; it lives at [`products/arsenal/evaluation/`](products/arsenal/evaluation/).
-
-## What works today
-
-- **One canonical Git root** with Arsenal, Loadout, Kiln, Temper, Manifold boundary docs, contracts, integration scenarios, and program history.
-- **Arsenal** asset registry, capability contracts, compiler/distribution path, governance checks, qualification/evaluation machinery, and Repository Truth distribution work.
-- **Bench** case-health, counterfactual/ablation, evidence-passport, and lifecycle concepts backed by a 19-case v0 corpus. Its own docs explicitly refuse to turn deterministic contract evidence into unsupported model-efficacy claims.
-- **Loadout** Goal → Capability → Plan / Work Envelope preparation, repository-recon and verify-change paths, deterministic simulation, and a fail-closed real Kiln driver.
-- **Kiln** durable Run/journal foundations, authority evaluation, artifact/evidence substrate, Work Envelope supervision, registered verification, Run Result projection, and recovery foundations implemented in the current codebase.
-- **Temper** read-only inspection of real Loadout Plan and Kiln Run Result records, including truthful `n/a` states when the contract does not contain a fact.
-- **Cross-product Repository Recon** through real Kiln supervision and Temper projection from a single monorepo checkout.
-
-See [`docs/status.md`](docs/status.md) for the evidence-backed current-state matrix as the documentation foundation fills out.
-
-## What is not done
-
-- Manifold has no runtime.
-- The complete Development Loop v0 — one real code change from planning through governed mutation, registered verification, independent review, human decision, projection, and learning observation — is not yet a finished product path.
-- The full Wave 3 integration matrix is not automated by the current monorepo runner.
-- Planned Kiln child-run, broader recovery, provider, and execution slices must not be inferred from roadmap prose as existing capability.
-- A roadmap is not execution authority.
 
 ## Inspect the repository
 
@@ -124,7 +105,7 @@ Start by asking the repository what is actually present:
 ./invariant check boundaries
 ```
 
-Then exercise the current integration path:
+Then exercise the repository-visible integration path:
 
 ```bash
 ./invariant test integration
@@ -140,8 +121,6 @@ Or run all product gates:
 
 ## How Invariant treats authority and evidence
 
-The architecture keeps several concepts deliberately separate:
-
 ```text
 capability ≠ authority
 proposal   ≠ mutation
@@ -151,76 +130,66 @@ projection ≠ source of truth
 roadmap    ≠ authorization
 ```
 
-A useful method can live in Arsenal. Bench can produce evidence that a configuration is qualified for a role. Loadout can prepare work. Manifold may eventually select among qualified intelligence. None of those facts grants repository mutation authority. Kiln owns runtime authorization and durable execution truth. Temper can show that truth; it cannot create it. Human decisions remain explicit where the workflow requires them.
+A useful method can live in Arsenal. Bench can produce evidence that a configuration is qualified for a role. Loadout can prepare work. Manifold may select among qualified intelligence. None of those facts grants repository mutation authority. Kiln owns runtime authorization and durable execution truth. Temper may show that truth and initiate governed actions; it does not create the authority behind them. Human decisions remain explicit where the workflow requires them.
 
 Read [`docs/concepts/authority.md`](docs/concepts/authority.md), [`docs/concepts/evidence.md`](docs/concepts/evidence.md), and [`docs/architecture/product-boundaries.md`](docs/architecture/product-boundaries.md) for the deeper model.
 
-## Contracts, not source coupling
+## Contracts, evidence, and engineering traceability
 
-Products exchange facts through canonical contracts and files rather than importing one another's source trees.
+Products exchange facts through canonical contracts and files rather than importing one another's source trees. Current cross-product contracts live in [`contracts/`](contracts/).
 
-Current cross-product contracts live in [`contracts/`](contracts/):
+Consequential engineering work should make the chain visible:
 
-- Work Envelope v0
-- Run Result Envelope v0
-- Qualified Method Record v0
-- Learning Observation v0
+```text
+acceptance property
+→ owner / authority
+→ canonical contract(s)
+→ exact implementation state
+→ verification evidence
+→ independent review
+→ human decision
+→ documentation / roadmap reconciliation
+```
 
-Their `engineering-system/*` schema identity strings are historical stable identifiers. They are intentionally **not** renamed during the monorepo migration.
+The [evidence-driven engineering process](docs/development/engineering-process.md) defines the working gate model. [Engineering traceability](docs/reference/traceability.md) defines the minimal fields needed to connect existing authoritative artifacts without building a second ledger in Markdown.
 
 ## Documentation
 
-The documentation system is being built from canonical Markdown under [`docs/`](docs/). Generated HTML is presentation output, not source truth.
+Canonical Markdown under [`docs/`](docs/) is both the documentation source and the durable process map. Generated HTML is presentation output, not source truth.
 
 Start here:
 
 - [Documentation home](docs/index.md)
 - [Current system status](docs/status.md)
+- [Evidence-driven engineering process](docs/development/engineering-process.md)
+- [Engineering traceability](docs/reference/traceability.md)
 - [System map](docs/architecture/system-map.md)
 - [Product boundaries](docs/architecture/product-boundaries.md)
-- [Repository Recon workflow](docs/workflows/repository-recon.md)
 - [Roadmap](docs/roadmap/index.md)
+- [Strategic programs / T3 preservation](docs/roadmap/strategic-programs.md)
 - [Source-of-truth audit](docs/_meta/source-of-truth-audit.md)
 
 Historical migration evidence remains in [`docs/MONOREPO-MIGRATION.md`](docs/MONOREPO-MIGRATION.md), [`MIGRATION-REPORT.md`](MIGRATION-REPORT.md), and [`program/historical/`](program/historical/).
 
-## Development and verification
+## Near-term product direction
 
-Broad prerequisites are Git, Python 3.12+, Node 20.10+ and npm, Elixir/Erlang for Kiln, a C compiler, and the product-specific tools reported by `./invariant doctor`.
+After the current WP-09 durable foundation is accepted, the next product target is **Temper Workbench Alpha**:
 
-Canonical root commands:
+> From a repository directory, an operator can start Temper with one obvious command, enter a project-centric workbench, see the current governed Session and repository state, inspect activity/changes/evidence, take required human actions, recover after disconnect, and hand editing to Zed without transferring execution authority out of Kiln.
 
-```bash
-./invariant check
-./invariant check boundaries
-./invariant test arsenal
-./invariant test loadout
-./invariant test kiln
-./invariant test temper
-./invariant test integration
-./invariant test
-```
-
-Product-local `AGENTS.md` and READMEs still apply inside each product tree. Root [`AGENTS.md`](AGENTS.md) governs cross-product work.
-
-## Roadmap direction
-
-The next system milestone is the smallest coherent **Development Loop v0** that proves a real code change through public boundaries without collapsing ownership:
+The visible entry point is intended to be:
 
 ```text
-Loadout request / plan
-→ qualified intelligence selection when selection is actually needed
-→ Kiln-governed implementation and mutation
-→ registered verification
-→ independent review
-→ explicit human decision
-→ truthful Temper projection
-→ reviewed learning observation back toward Arsenal
+temper .
 ```
 
-Bench only becomes involved when a later controlled evaluation or qualification step is explicitly justified; a Learning Observation is not qualification evidence by itself.
+The local acceptance path should prove project discovery, canonical Session reconstruction, explicit attention, governed human actions, evidence traversal, and UI-loss recovery. The stretch target moves Temper to a separate operator Mac while Kiln remains on the execution/repository host and preserves the same authority, identity, freshness, and reconnect semantics.
 
-The dependency-aware roadmap lives under [`docs/roadmap/`](docs/roadmap/). It separates **NOW**, **NEXT**, **LATER**, and **FRONTIER** and records acceptance properties instead of calendar promises.
+See [`docs/roadmap/`](docs/roadmap/) for the dependency-aware capability roadmap.
+
+## Strategic programs
+
+The T3 Challenge / 30-day competitive program is an accelerator and comparison program, not the durable product architecture. Existing T3 program records are protected historical/program artifacts: preserve them and prefer additive cross-links. Do not rewrite old targets or failures to match the newest product sequencing.
 
 ## Repository rules
 
@@ -230,3 +199,4 @@ The dependency-aware roadmap lives under [`docs/roadmap/`](docs/roadmap/). It se
 - Cross-product schema identities are stable contracts, not paths to rename.
 - Historical evidence stays historical.
 - Completion claims require evidence against the intended property.
+- Passing tests are evidence; acceptance remains an explicit judgment where the process requires it.

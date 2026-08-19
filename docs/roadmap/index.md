@@ -1,16 +1,16 @@
 ---
 title: Invariant Roadmap
-description: Dependency-aware roadmap derived from current implementation, contracts, active product roadmaps, and known system gaps.
+description: Capability-oriented roadmap connecting the demonstrated foundation to Temper Workbench, distributed operation, engineering intelligence, dogfood, and strategic programs.
 status: planned
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
 source_paths:
   - README.md
   - invariant.boundaries.json
-  - integration/scenarios/repository-recon/
+  - docs/status.md
+  - docs/_meta/post-wp09-product-direction.md
   - products/arsenal/docs/roadmap/capability-system.md
   - products/kiln/docs/ROADMAP.md
   - products/manifold/README.md
-  - program/
 audience:
   - developer
   - operator
@@ -18,95 +18,89 @@ audience:
 
 # Invariant Roadmap
 
-This roadmap is a reconciliation, not a concatenation of older plans.
+This roadmap reconciles product direction; it does not prove implementation and does not authorize product work by itself. [Current system status](../status.md) remains the evidence-backed baseline until newer branch/worktree evidence is promoted and reconciled.
 
-`program/PROJECT-STATE.md` and `program/DEPENDENCIES.md` preserve an earlier multi-repository launch phase and are not used as current execution order. Product-local roadmaps remain valuable where they describe accepted product sequencing, but system milestones still need to respect current cross-product boundaries.
+The near-term direction is capability-oriented so internal work-package numbers do not become the product model.
 
-A roadmap records intent and dependencies. It does **not** grant implementation or execution authority.
+## Gate 0 — close the current durable foundation
 
-## NOW — demonstrated foundation
+The post-WP-09 sequence begins only after WP-09 is accepted against its own contract and evidence. The documentation branch does not currently contain the active WP-08/WP-09 implementation state, so it does not upgrade those capabilities from local milestone reports.
 
-| Milestone | Owner | Acceptance property | Evidence |
-| --- | --- | --- | --- |
-| Canonical monorepo | Invariant root | one Git root without collapsing product boundaries | root checks, migration record, boundary policy |
-| Repository Recon real golden path | Loadout + Kiln + Temper | Work Envelope crosses real Kiln boundary and result is truthfully projected | `integration/scenarios/repository-recon/run.sh` |
-| Arsenal capability/evaluation foundation | Arsenal + Bench | reusable methods/capability artifacts are machine checked and evaluation claims remain scoped | Arsenal gates + Bench v0 corpus |
-| Durable runtime foundation | Kiln | current Run/authority/evidence/verification foundations survive repository-native gates | Kiln implementation/tests + migration CI record |
-| Read-only real-run workbench | Temper | operator can inspect accepted plan/run facts without Temper inventing authority | Temper tests + Repository Recon |
+When WP-09 is accepted/promoted, reconcile this roadmap, [status](../status.md), Kiln recovery/session docs, and the [traceability](../reference/traceability.md) record before dependent Workbench work treats the capability as available.
 
-## NEXT — smallest coherent system advance
+## Operator product — Temper Workbench Alpha
 
-The next system milestone is **Development Loop v0: one real code change through the intended public boundaries**.
+Primary acceptance direction:
 
-It should not begin as six unrelated feature streams. Several pieces consume unresolved or dependency-sensitive boundaries.
+> From a repository directory, an operator can start Temper with one obvious command, enter a persistent project-centric workbench, see the current governed Session and repository state, inspect live activity/changes/evidence, take required human actions, recover after disconnect, and hand source editing to Zed without transferring execution authority out of Kiln.
 
-```mermaid
-flowchart LR
-    A[Current Repository Recon\nreal public boundaries]
-    B[Code-change request + exact work envelope]
-    C[Kiln governed mutation + state-bound evidence]
-    D[Registered verification]
-    E[Independent review evidence]
-    F[Explicit human decision]
-    G[Temper projection]
-    H[Learning observation]
+Target sequence:
 
-    A --> B --> C --> D --> E --> F --> G
-    F --> H
-```
+| Capability | Owner(s) | Acceptance property | Dependency | Current documentation status |
+| --- | --- | --- | --- | --- |
+| `temper .` entry + project discovery | Temper | current directory resolves to an explicit project/repository identity or a truthful error | project identity contract | planned |
+| Project-centric Workbench | Temper | one surface projects current Session/repository/activity/evidence without inventing state | canonical Kiln query surface | planned |
+| Explicit `ATTENTION` | Kiln truth + Temper projection | required human action is durable/queryable and visibly distinguished from passive status | durable Session/action state | planned |
+| Governed human actions | Temper → Kiln | operator can approve/revise/decide through Kiln; Temper cannot self-authorize | authority/action API | planned |
+| Activity / changes / verification / review traversal | Kiln evidence + Temper | every view traces to canonical state/evidence and represents missing/stale facts honestly | evidence/query contracts | planned |
+| Zed handoff | Temper adapter | editor receives path/context while execution authority remains in Kiln | project identity + editor adapter | planned |
+| UI-loss recovery | Kiln + Temper | a new Temper process reconstructs actionable Session state from Kiln | accepted durable Session recovery | planned |
 
-### NEXT dependency graph
+## Distributed operation
 
-| Milestone | Owning product | Problem | Prerequisites / dependencies | Acceptance property | Required evidence | Status / blocker |
-| --- | --- | --- | --- | --- | --- | --- |
-| DL0-1 Code-change envelope | Loadout + contract consumers | prepare a real change request without granting authority | current Plan/Work Envelope; existing verify-change work; contract review if semantics change | one bounded change request is representable without hidden execution policy | contract fixtures + Loadout tests + consumer tests | `partial`; exact system-level request shape must be reconciled with current implementation |
-| DL0-2 Governed mutation slice | Kiln | turn an authorized exact proposal into an observed repository effect | Kiln's accepted product slice ordering; exact base-state binding; one mutation owner | unauthorized/stale proposal cannot mutate; authorized exact bytes produce observable bounded effect | negative tests, state binding, durable effect record, restart/reconciliation evidence | `planned`; must follow Kiln authorization rather than docs roadmap |
-| DL0-3 Verification binding | Kiln | prove required checks ran against the exact accepted state | DL0-2; current registered verification | required verification is registry-bound, state-bound, and cannot be replaced by arbitrary shell success | command/evidence artifacts + negative stale-state cases | `partial`; registered verification exists, full change-loop binding remains to prove |
-| DL0-4 Independent review | Arsenal method + Kiln runtime evidence | challenge implementation without letting implementer self-grade | DL0-3; reviewer independence semantics; no Manifold requirement unless selection is genuinely needed | reviewer receives bounded independent context and cannot fabricate acceptance | review artifact/evidence + independence proof + falsification cases | `planned`; exact reviewer-selection/representation boundary unresolved |
-| DL0-5 Human decision | Kiln-owned durable truth, surfaced by Temper | record accept/revise without moving authority into UI | DL0-4; decision schema/state owner | human decision is explicit, durable, attributable, and cannot be inferred from passing tests | decision record + projection tests + denial/absence cases | `planned`; operator action surface must not make Temper canonical authority |
-| DL0-6 Learning observation | Arsenal consumer | preserve useful outcome evidence without laundering one run into broad efficacy | DL0-5; Learning Observation contract | a reviewed Loadout/Kiln observation retains scope/provenance and enters Arsenal without becoming a Claim, qualification, or policy automatically | contract fixture + producer/consumer validation + no-auto-promotion negative case | `planned`; Bench involvement requires later explicit evaluation/qualification work rather than direct promotion |
-| DL0-7 Whole-loop acceptance | Invariant integration | prove the property through public boundaries | DL0-1 through DL0-6 | one real code change traverses public boundaries, fails closed, survives required restart/review checks, and ends with explicit human decision | clean end-to-end scenario + negative matrix + exact commit/state receipts | `planned` |
+Remote operation is now a near-term product target rather than a generic frontier idea, but it remains evidence-gated.
 
-## Parallel-safe vs dependency-sensitive work
+| Capability | Acceptance property |
+| --- | --- |
+| Temper → remote Kiln topology | operator and execution hosts can differ without changing authority ownership |
+| Topology identity | project/repo/Session/Kiln/host identities are explicit rather than inferred from path or `localhost` |
+| Disconnect/reconnect | canonical Session continues independently of Temper connectivity; reconnect reconstructs state |
+| Freshness/staleness | stale projections are detectable and represented rather than silently treated as current |
+| Remote human authority | governed actions traverse Kiln and remain attributable/state-bound across the transport |
 
-Safe to advance independently when it does not consume unsettled runtime semantics:
+The stretch target is to exercise Workbench Alpha against Kiln running on another Mac with the same authority/recovery properties as local operation.
 
-- documentation and source-of-truth checks;
-- Bench evaluation-case health and controlled campaign infrastructure;
-- Temper read-only projection improvements for facts already present in accepted contracts;
-- Arsenal methods that do not grant or imply runtime authority;
-- integration negative tests for already-defined current contracts.
+## Engineering intelligence
 
-Dependency-sensitive work that should not be fanned out prematurely:
+Loadout, Manifold, Bench, and Arsenal should improve planning, selection, qualification, experimentation, and method promotion without becoming alternative execution authorities.
 
-- governed mutation before Kiln's exact authority/effect contract is accepted;
-- independent reviewer runtime wiring before reviewer identity/context/evidence boundaries are settled;
-- Temper accept/revise mutation UI before the durable decision owner/API is settled;
-- Manifold runtime before multiple qualified configurations make selection a real requirement;
-- learning/lifecycle promotion based on a single runtime result without Bench claim-scope rules.
+Near-term work should favor evidence that reduces friction for the operator product:
 
-## LATER
+- Loadout produces bounded work/requirements without granting execution authority;
+- Manifold selection consumes qualified options only when a real selection problem exists;
+- Bench qualification is scoped/current and cannot grant runtime authority;
+- Arsenal experiments may accelerate product decisions, but research findings require explicit promotion before runtime adoption.
 
-After Development Loop v0 has accepted evidence:
+## Dogfood / system proof
 
-- broader restart/unknown-effect recovery matrices;
-- bounded child-run delegation and independent verifier runtime where Kiln's accepted roadmap authorizes it;
-- richer operator navigation/interactions that continue to delegate authority to owning components;
-- evidence-based model/configuration routing backed by Bench evidence;
-- richer learning/knowledge-plane integration based on real run histories;
-- portability and packaging work justified by demonstrated multi-language/product needs.
+A decisive system proof is Invariant operating on Invariant through its public boundaries while the operator can see the same contracts/evidence/decisions used to judge completion.
 
-## FRONTIER
+Dogfood should demonstrate the governed property, not merely run an agent inside the repository.
 
-Explicitly not committed implementation:
+## Strategic programs
 
-- deeper Manifold allocation/routing policies beyond the first demonstrated selection need;
-- larger nested/concurrent run organizations beyond Kiln's accepted bounded child-run sequence;
-- longitudinal repository-quality memory derived from accumulated reviewed evidence;
-- broader third-party capability and qualification ecosystems;
-- organization-scale policy/signing/attestation surfaces.
+The [T3 Challenge / 30-day competitive program](strategic-programs.md) is a protected strategic overlay. It may consume or accelerate Workbench, remote-operation, Arsenal, provider/model, and other product work. It does not replace the durable Invariant roadmap and its historical program records should not be rewritten to match newer product sequencing.
 
-These are directions, not commitments. They are not reasons to widen the next acceptance slice.
+## Parallel-safe versus dependency-sensitive work
+
+Generally parallel-safe after inputs are frozen:
+
+- read-only reconnaissance;
+- documentation and traceability updates;
+- independent falsification against immutable candidate state;
+- tests for already-defined contracts;
+- Temper projection work against frozen canonical fields;
+- Arsenal experiments that do not mutate runtime contracts.
+
+Dependency-sensitive:
+
+- UI/actions before Kiln action/state semantics are accepted;
+- remote transport before identity/freshness/authority semantics are frozen;
+- producer/consumer implementation before a changed shared contract is resolved;
+- reviewer/runtime wiring before independence and evidence ownership are explicit;
+- promotion of Arsenal findings before qualification/promotion evidence is accepted.
+
+See the [engineering process](../development/engineering-process.md) for the gate model.
 
 ## Product roadmaps
 
@@ -116,3 +110,4 @@ These are directions, not commitments. They are not reasons to widen the next ac
 - [Temper](temper.md)
 - [Manifold](manifold.md)
 - [System](system.md)
+- [Strategic programs](strategic-programs.md)

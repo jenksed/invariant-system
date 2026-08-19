@@ -1,12 +1,13 @@
 ---
 title: Invariant Documentation
-description: System documentation for Invariant — architecture, products, workflows, operations, development, and roadmap.
+description: System documentation for Invariant — architecture, products, governed engineering process, operations, evidence, and roadmap.
 status: current
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
 source_paths:
   - README.md
   - AGENTS.md
   - invariant.boundaries.json
+  - docs/development/engineering-process.md
 audience:
   - developer
   - operator
@@ -16,27 +17,29 @@ audience:
 
 Invariant is an engineering system for AI-assisted software work where intelligence can propose, but authority, effects, evidence, and acceptance remain explicit system concerns.
 
-If you are new to the project, start with the working path rather than the vocabulary:
+The documentation is both a truthful projection of repository state and a map through the engineering process. It should tell you what is implemented, what is merely planned, which contracts govern the work, what evidence is required, and where the decision that accepted the work lives.
 
-```text
-Goal
-→ Loadout Plan + Work Envelope
-→ Kiln authority + real supervision
-→ Run Result + evidence
-→ Temper operator projection
-```
+## Start with the question you have
 
-That Repository Recon path runs today. The broader Development Loop — governed implementation, mutation, verification, independent review, human decision, and learning — is the next system milestone, not a completed capability.
+### What is true now?
 
-## Choose a path
-
-### Understand the system
-
-- [Current status](status.md) — what works, what is partial, what does not exist.
+- [Current status](status.md) — evidence-backed maturity, bound to an explicit repository state.
 - [System map](architecture/system-map.md) — products, boundaries, and flows.
-- [Doctrine](concepts/doctrine.md) — the engineering rules behind the architecture.
-- [Authority](concepts/authority.md) — why capability, selection, execution, and acceptance stay separate.
-- [Evidence](concepts/evidence.md) — what a completion claim must be bound to.
+- [Product boundaries](architecture/product-boundaries.md) — ownership and negative authority rules.
+
+### How should this change be engineered?
+
+- [Evidence-driven engineering process](development/engineering-process.md) — recon → acceptance property → contract freeze → implementation → evidence → review → decision → docs reconciliation.
+- [Engineering traceability](reference/traceability.md) — connect requirement, contract, exact state, evidence, review, and human decision.
+- [Cross-product contracts](architecture/contracts.md) — canonical producer/consumer semantics.
+- [Evidence flow](architecture/evidence-flow.md) — evidence is not judgment and qualification is not authority.
+
+### Where is the product going?
+
+- [Roadmap](roadmap/index.md) — capability-oriented post-WP-09 direction.
+- [Temper roadmap](roadmap/temper.md) — `temper .`, Workbench Alpha, governed actions, recovery, and remote operation.
+- [Kiln roadmap](roadmap/kiln.md) — durable Session/query/action/recovery requirements for the operator product.
+- [Strategic programs](roadmap/strategic-programs.md) — T3 Challenge relationship and preservation rule.
 
 ### Understand the products
 
@@ -44,21 +47,13 @@ That Repository Recon path runs today. The broader Development Loop — governed
 - [Bench](products/bench/index.md) — evaluation and qualification evidence inside Arsenal.
 - [Loadout](products/loadout/index.md) — goals, capabilities, planning, and Work Envelopes.
 - [Kiln](products/kiln/index.md) — runtime authority, execution truth, evidence, and acceptance state.
-- [Temper](products/temper/index.md) — truthful operator projection.
-- [Manifold](products/manifold/index.md) — selection/allocation boundary; no runtime yet.
+- [Temper](products/temper/index.md) — truthful operator projection and evolving control surface.
+- [Manifold](products/manifold/index.md) — selection/allocation boundary.
 
-### Run something real
+### Run the repository-visible proof
 
-- [Repository Recon](workflows/repository-recon.md) — the current Loadout → Kiln → Temper golden path.
+- [Repository Recon](workflows/repository-recon.md) — the verified Loadout → Kiln → Temper golden path represented by this docs baseline.
 - [Operations](operations/index.md) — root commands, doctor, testing, and troubleshooting.
-
-### Build or review the system
-
-- [Architecture](architecture/index.md)
-- [Development](development/index.md)
-- [Contracts](architecture/contracts.md)
-- [Roadmap](roadmap/index.md)
-- [Source-of-truth audit](_meta/source-of-truth-audit.md)
 
 ## Truth labels
 
@@ -71,4 +66,4 @@ Every major page declares a status:
 - `frontier` — research direction without commitment;
 - `historical` — provenance, not current behavior.
 
-Those labels are part of the documentation contract. A compelling diagram is not permission to depict unfinished architecture as shipped software.
+Those labels are part of the documentation contract. A compelling diagram, milestone report, or green proxy test is not permission to depict unfinished architecture as demonstrated product behavior.

@@ -1,45 +1,76 @@
 ---
-title: Development Loop v0
-description: Target one-change workflow for Invariant; not yet complete end to end.
-status: planned
-verified_at_commit: cae53750ab6aa8405396172f3af4fffa5bfdb6f4
+title: Governed Engineering Loop
+description: Normative change process connecting intent, contracts, bounded implementation, evidence, independent review, human decision, and documentation reconciliation.
+status: current
+verified_at_commit: 325b1b5fe2e65c35bde9a1cd75e099a540b283aa
 source_paths:
-  - README.md
-  - program/
-  - products/
+  - AGENTS.md
+  - invariant.boundaries.json
+  - docs/development/engineering-process.md
+  - docs/architecture/contracts.md
+  - docs/architecture/evidence-flow.md
 audience:
   - developer
   - operator
 ---
 
-# Development Loop v0
+# Governed Engineering Loop
 
-The next system milestone is deliberately small: prove one real code change through the intended authority boundaries.
-
-Target shape:
+This page specifies the **engineering process shape** Invariant work should follow. It does not claim that every stage is automated by current product code. Use [Current system status](../status.md) for implementation maturity.
 
 ```mermaid
 flowchart LR
-    L[Loadout\nrequest + plan]
-    M[Manifold\nselection when needed]
-    K1[Kiln\nbounded implementation]
-    K2[Exact mutation]
-    V[Registered verification]
-    R[Independent review]
+    G[Goal / problem]
+    R[Recon + state basis]
+    A[Acceptance property]
+    C[Contract + dependency freeze]
+    I[Bounded implementation]
+    V[Verification]
+    Q[Independent review]
     H[Human decision]
-    T[Temper projection]
-    A[Arsenal / Bench\nlearning observation]
+    P[Promotion / integration]
+    D[Docs + roadmap reconciliation]
 
-    L --> M --> K1 --> K2 --> V --> R --> H --> T
-    H -. observation .-> A
+    G --> R --> A --> C --> I --> V --> Q --> H --> P --> D
+    V -. defect .-> I
+    Q -. defect / weak proof .-> I
+    H -. revise .-> I
 ```
 
-## Current vs target
+## What must be true at each transition
 
-Current components already cover substantial pieces: Loadout planning, real Kiln supervision, registered verification foundations, Arsenal review methods, Temper projection, and cross-product contracts.
+| Transition | Minimum condition |
+| --- | --- |
+| Recon → acceptance | Current state, ownership, and relevant prior evidence are identified. |
+| Acceptance → contract freeze | The intended property is explicit enough to distinguish proof from proxy. |
+| Contract freeze → implementation | Shared contracts/decisions consumed by implementation are resolved or explicitly bounded. |
+| Implementation → verification | Candidate state is immutable/identifiable and the relevant checks target that state. |
+| Verification → review | Evidence artifacts are available with scope and limitations; implementer narrative is not the only source. |
+| Review → human decision | Material defects/uncertainty are classified; reviewer did not silently become acceptance authority. |
+| Human decision → promotion | The authorized state and exact decision are recorded; rejected/revise states cannot be promoted as complete. |
+| Promotion → docs reconciliation | Current docs, status, roadmap, and historical records reflect the new truth without rewriting history. |
 
-The complete chain above is still **planned**. In particular, documentation must not imply that Manifold selection, governed mutation, independent reviewer selection, explicit human decision, and learning feedback are all currently connected as one public workflow.
+## Visibility requirement
 
-## Acceptance property
+Every consequential lane should expose enough [traceability](../reference/traceability.md) to answer:
 
-A v0 implementation is credible only when a real repository change traverses the intended public boundaries, authority cannot be bypassed through convenience paths, verification/review are state-bound, the human decision is explicit, and the final projected result can be independently inspected.
+```text
+what property?
+which owner/authority?
+which contract?
+which exact state?
+which evidence?
+which independent challenge?
+which human decision?
+which documentation/status changed because of it?
+```
+
+A compact authoritative handoff/state file is preferable to repeating the same information in every lane.
+
+## Parallel work
+
+Parallel execution is cheap; independent work is not. Fan out recon, falsification, documentation, or tests only when they do not consume unresolved shared decisions. Shared contract/authority decisions should be frozen before dependent implementation lanes proceed.
+
+## Completion
+
+A model saying “done,” a clean diff, or a green test suite may be necessary evidence. None is sufficient by itself. Completion is the accepted result of the governed process for the stated property.

@@ -21,7 +21,13 @@ The authoritative summary is machine-readable in `invariant.boundaries.json`.
 | Loadout | capabilities, goals, planning, Work Envelope preparation | durable execution truth; authority grantor |
 | Manifold | intelligence selection, allocation | executor; mutator; qualifier; authority grantor; generic workflow engine |
 | Kiln | authority, execution, effects, artifacts, evidence, registered verification, acceptance truth | R&D intelligence owner; model qualification system |
-| Temper | operator experience, projection | canonical authority; execution truth; mutation surface |
+| Temper | operator experience, projection, governed action initiation | canonical workflow state; execution truth; mutation authority; second execution path |
+
+## Control surface is not authority
+
+A Temper button, command, TUI action, or remote request may initiate a governed operation. That does not make Temper the owner of the operation. The action must cross the owning boundary, where Kiln validates authority/state and records the resulting truth.
+
+The same distinction applies to editor integration: handing source editing/context to Zed or another editor does not transfer Kiln execution authority.
 
 ## Why the negative boundaries matter
 
