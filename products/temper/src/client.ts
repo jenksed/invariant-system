@@ -62,6 +62,9 @@ export class KilnClient {
   private readonly baseUrl: string;
   private readonly readToken: string;
   private readonly operateToken: string;
+  // Optional per-instance fetch for test injection. When unset,
+  // falls back to the global `fetch`.
+  private readonly fetchImpl?: typeof fetch;
 
   constructor(config: KilnClientConfig) {
     this.baseUrl = config.baseUrl.replace(/\/$/, '');
@@ -90,10 +93,14 @@ export class KilnClient {
     }
 
     const token = scope === 'orchestration:read' ? this.readToken : this.operateToken;
+    // Honor per-instance fetch injection (the existing test seam
+    // sets `(client as any).fetch = fetch`). Falls back to the
+    // optional fetchImpl field, then to the global fetch.
+    const fetchFn = (this as unknown as { fetch?: typeof fetch }).fetch ?? this.fetchImpl ?? fetch;
 
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}/api/rpc`, {
+      res = await fetchFn(`${this.baseUrl}/api/rpc`, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -147,7 +154,9 @@ export class KilnClient {
         error: {
           code: errBody.code ?? 'E_DISPATCH_FAILED',
           reason: errBody.reason ?? `http ${res.status}`,
-          method: errBody.method
+          // exactOptionalPropertyTypes: do not assign undefined to an
+          // optional field. Spread only when present.
+          ...(errBody.method ? { method: errBody.method } : {})
         }
       };
     }

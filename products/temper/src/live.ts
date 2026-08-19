@@ -90,7 +90,9 @@ export class LiveMode {
   public async stop(): Promise<void> {
     if (this.stream) {
       this.stream.close();
-      this.stream = undefined;
+      // exactOptionalPropertyTypes: `?:` fields cannot be assigned
+      // undefined. Use delete to clear the optional slot.
+      delete (this as unknown as { stream?: ActivityStream }).stream;
     }
   }
 

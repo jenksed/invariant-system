@@ -54,7 +54,6 @@ test('KilnClient.send uses the read token for orchestration:read methods', async
   });
 
   const client = new KilnClient({ ...baseConfig });
-  // @ts-expect-error injecting fake fetch
   (client as any).fetch = fetch;
 
   await client.call({ method: 'project.list', params: {} });
@@ -70,7 +69,6 @@ test('KilnClient.send uses the operate token for orchestration:operate methods',
   });
 
   const client = new KilnClient({ ...baseConfig });
-  // @ts-expect-error injecting fake fetch
   (client as any).fetch = fetch;
 
   await client.call({ method: 'project.open', params: { path: '/tmp/x' } });
@@ -79,18 +77,17 @@ test('KilnClient.send uses the operate token for orchestration:operate methods',
 });
 
 test('KilnClient surfaces bounded error codes without flattening (P5)', async () => {
+  // The daemon's wire envelope is FLAT: { code, reason, scope, method, fields, field }
+  // (see Kiln.RPC.Error.do_bounded/2 at lib/kiln/rpc/error.ex:50-71). The
+  // client must read body.code directly without inventing a wrapper.
   const fetch = makeFakeFetch(() =>
     jsonResponse(400, {
-      ok: false,
-      error: {
-        code: 'E_MUTATION_UNKNOWN_EFFECT',
-        reason: 'do not retry'
-      }
+      code: 'E_MUTATION_UNKNOWN_EFFECT',
+      reason: 'do not retry'
     })
   );
 
   const client = new KilnClient({ ...baseConfig });
-  // @ts-expect-error injecting fake fetch
   (client as any).fetch = fetch;
 
   const resp: RpcResponse<unknown> = await client.call({ method: 'patch.apply', params: {} });
@@ -103,13 +100,17 @@ test('KilnClient surfaces bounded error codes without flattening (P5)', async ()
 });
 
 test('KilnClient unwrap throws KilnRpcError preserving code', async () => {
-  const fetch = makeFakeFetch(() => jsonResponse(400, { code: 'E_SCOPE_INSUFFICIENT', method: 'x' }));
+  const fetch = makeFakeFetch(() =>
+    jsonResponse(400, { code: 'E_SCOPE_INSUFFICIENT', method: 'worker.propose' })
+  );
   const client = new KilnClient({ ...baseConfig });
-  // @ts-expect-error injecting fake fetch
   (client as any).fetch = fetch;
 
+  // Use a method that IS in the SCOPE_TABLE so the fetch is actually
+  // invoked. The mock returns E_SCOPE_INSUFFICIENT and the client
+  // surfaces it via KilnRpcError.
   await assert.rejects(
-    () => Promise.resolve(KilnClient.unwrap<unknown>(await client.call({ method: 'x', params: {} }))),
+    async () => KilnClient.unwrap<unknown>(await client.call({ method: 'worker.propose', params: {} })),
     (err: KilnRpcError) => err.rpcError.code === 'E_SCOPE_INSUFFICIENT'
   );
 });
@@ -122,7 +123,6 @@ test('KilnClient forwards idempotency_key + request_digest on the wire', async (
   });
 
   const client = new KilnClient({ ...baseConfig });
-  // @ts-expect-error injecting fake fetch
   (client as any).fetch = fetch;
 
   await client.call({

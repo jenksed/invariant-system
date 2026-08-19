@@ -56,9 +56,17 @@ export class ActivityStream {
 
   /** Open the WS, subscribe, and start the keepalive ping loop. */
   public async open(): Promise<void> {
-    const ws = new WebSocket(this.config.wsUrl, {
-      headers: { authorization: `Bearer ${this.config.operateToken}` }
-    } as unknown as WebSocketConstructorOptions);
+    // Node 22+ global WebSocket accepts a headers option in its
+    // implementation but its TypeScript signature does not export
+    // WebSocketConstructorOptions. Cast to the standard second-arg
+    // shape so the compiler accepts the runtime-accepted headers.
+    const ws = new WebSocket(
+      this.config.wsUrl,
+      { headers: { authorization: `Bearer ${this.config.operateToken}` } } as unknown as
+        | string
+        | string[]
+        | undefined
+    );
 
     this.ws = ws;
 
@@ -95,7 +103,9 @@ export class ActivityStream {
     this.stopPing();
     if (this.ws) {
       this.ws.close(1000, 'temper-close');
-      this.ws = undefined;
+      // exactOptionalPropertyTypes: `?:` fields cannot be assigned
+      // undefined. Use delete to clear the optional slot.
+      delete (this as unknown as { ws?: WebSocket }).ws;
     }
   }
 
@@ -165,7 +175,9 @@ export class ActivityStream {
   private stopPing(): void {
     if (this.pingTimer) {
       clearInterval(this.pingTimer);
-      this.pingTimer = undefined;
+      // exactOptionalPropertyTypes: `?:` fields cannot be assigned
+      // undefined. Use delete to clear the optional slot.
+      delete (this as unknown as { pingTimer?: ReturnType<typeof setInterval> }).pingTimer;
     }
   }
 

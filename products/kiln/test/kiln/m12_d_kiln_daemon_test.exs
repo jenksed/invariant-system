@@ -210,35 +210,75 @@ defmodule Kiln.M12DKilnDaemonTest do
       assert length(child_specs) == 1
     end
 
-    test "daemon.ex source preserves Plug.Cowboy 2.9.0 :plug contract + canonical dispatch" do
-      # After Supervisor normalization the pre-Plug.Cowboy options
-      # are not directly observable. Source-inspect daemon.ex to
-      # prove the structural properties that the Plug.Cowboy layer
-      # requires, without trying to recover the pre-normalization
-      # opts from Supervisor.
-      source = File.read!("products/kiln/lib/kiln/daemon.ex")
+    test "normalized Cowboy dispatch contains /ws route + Plug.Cowboy.Handler fallback" do
+      # The previous source-regex assertion was inaccessible from
+      # the owner machine because the inner `~` characters collide
+      # with the outer `~r~...~` sigil delimiter. Replace it with
+      # the normalized-boundary assertion: the start MFA on the
+      # child spec map carries the actual Cowboy protocol options
+      # AFTER :cowboy_router.compile/1, so we can walk the compiled
+      # dispatch directly.
+      #
+      # Required observable properties:
+      #   - protocol options contain :env with a :dispatch list
+      #   - outer host tuple {:_, _, routes}
+      #   - /ws compiled route → Kiln.Activity.WebSocket
+      #   - fallback route → Plug.Cowboy.Handler with {Kiln.Service, []}
+      {:ok, {_sup_flags, child_specs}} = Kiln.Daemon.init(port: 0)
+      child = hd(child_specs)
 
-      assert source =~ ~r/plug:\s*Kiln\.Service/,
-             "daemon.ex child spec must include plug: Kiln.Service (Plug.Cowboy 2.9.0 :plug contract)"
+      {_mod, _fun, args} = child.start
 
-      assert source =~ ~r/dispatch: dispatch_table\(\)/,
-             "daemon.ex child spec must include the custom dispatch"
+      # Plug.Cowboy.to_args/5 (deps/plug_cowboy/lib/plug/cowboy.ex:370)
+      # returns the MFA:
+      #   {:ranch_embedded_sup, :start_link,
+      #    [ref, transport, trans_opts, protocol, protocol_options]}
+      # The 5th positional arg is the protocol options map.
+      assert length(args) == 5,
+             "expected Ranch embedded sup MFA to carry 5 positional args"
 
-      assert source =~ ~r~{"/ws", Kiln\.Activity\.WebSocket, \[\]}~,
-             "daemon.ex must route /ws to Kiln.Activity.WebSocket"
+      protocol_opts = Enum.at(args, 4)
+      assert is_map(protocol_opts),
+             "Cowboy protocol options must be a map containing :env"
 
-      assert source =~
-               ~r~{:_, Plug\.Cowboy\.Handler, \{Kiln\.Service, \[\]\}}~,
-             "daemon.ex HTTP fallback must use Plug.Cowboy.Handler (canonical)"
+      assert Map.has_key?(protocol_opts, :env)
+      env = protocol_opts.env
+      assert is_map(env)
+      assert Map.has_key?(env, :dispatch)
 
-      refute source =~ ~r/Plug\.Cowboy\.Translator\s*,\s*\{Kiln/,
-             "daemon.ex must NOT put Plug.Cowboy.Translator in the Handler module position"
+      dispatch = env.dispatch
+      assert is_list(dispatch),
+             "compiled Cowboy dispatch must be a list of host tuples"
 
-      refute source =~ ~r/dispatch: :cowboy_router\.compile/,
-             "daemon.ex must NOT pre-compile the dispatch (Plug.Cowboy compiles once)"
+      # Outer host tuple is {:_, binding, routes}.
+      assert {:_, _binding, routes} = hd(dispatch)
+      assert is_list(routes)
 
-      assert source =~ ~r/defp dispatch_table do/,
-             "dispatch_table must remain a private function"
+      # The compiled /ws route is {["ws"], binding, handler, opts}.
+      ws_route =
+        Enum.find(routes, fn
+          {["ws"], _binding, _handler, _opts} -> true
+          _ -> false
+        end)
+
+      assert ws_route != nil,
+             "compiled dispatch must contain /ws route bound to Kiln.Activity.WebSocket"
+
+      {_, _, ws_handler, _} = ws_route
+      assert ws_handler == Kiln.Activity.WebSocket
+
+      # The fallback route is {:_, binding, handler, opts} where
+      # handler is Plug.Cowboy.Handler and opts is {Kiln.Service, []}.
+      fallback =
+        Enum.find(routes, fn
+          {:_, _binding, Plug.Cowboy.Handler, {_plug, []}} -> true
+          _ -> false
+        end)
+
+      assert fallback != nil,
+             "compiled dispatch must contain fallback route to Plug.Cowboy.Handler with {Kiln.Service, []}"
+
+      {_, _, Plug.Cowboy.Handler, {Kiln.Service, []}} = fallback
     end
 
     test "normalized child spec start MFA boots Plug.Cowboy via ranch_embedded_sup" do
