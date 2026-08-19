@@ -16,7 +16,7 @@
 #      (the 10 inherited WP-08 regression files PLUS the
 #      m12_d_contract_drift_test.exs + m12_d_scope_regression_test.exs
 #      + the daemon guards inside m12_d_kiln_daemon_test.exs — total
-#      expected 73/73; previously the WP-08 set was 71/71; +2 are
+#      expected 87/87; previously the WP-08 set was 71/71; +16 are
 #      WP-09-added daemon regression guards; +0 are changes to the
 #      WP-08 inherited test files themselves).
 #   3. Full Kiln suite
@@ -68,20 +68,21 @@ MIX_ENV=test mix test \
 #
 # WP-08 PROVEN at WP08_FINAL_SHA = 96f76ad reported 71 tests passing
 # across 10 files. WP-09 added:
-#   - m12_d_contract_drift_test.exs   (new file, +7 categories)
-#   - m12_d_scope_regression_test.exs  (new file, +6 cases)
+#   - m12_d_contract_drift_test.exs   (new file, +9 tests)
+#   - m12_d_scope_regression_test.exs  (new file, +6 tests)
 #   - daemon guards inside m12_d_kiln_daemon_test.exs (already
-#     counted in the 10 inherited files; new tests added to the
-#     inherited file)
+#     counted in the 10 inherited files; +2 new tests added to
+#     the inherited file)
 #   - m12_d_handlers_test.exs (already in the focused gate 1 set;
 #     covered by gate 1; not duplicated here)
 #
-# Expected total at this gate: 73/73 (was 71/71; +2 from
-# m12_d_contract_drift_test.exs + m12_d_scope_regression_test.exs).
+# Expected total at this gate: 87/87 (was 71/71; +16 from
+# WP-09 additions counted via `grep -cE '^\s*test\s+"'` in each
+# affected test file).
 # If the count differs, the verifier must explain WHY before claiming
 # PASS — not just print green.
 # -----------------------------------------------------------------------
-log "Gate 2: WP-08 inherited regressions + WP-09-added daemon guards (expected 73/73)"
+log "Gate 2: WP-08 inherited regressions + WP-09-added daemon + contract guards (expected 87/87)"
 cd "$KILN"
 MIX_ENV=test mix test \
   test/kiln/restart_test.exs \
