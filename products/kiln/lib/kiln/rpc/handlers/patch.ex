@@ -225,8 +225,11 @@ defmodule Kiln.RPC.Handlers.Patch do
 
         {:error, err}
 
-      {:error, _} = err ->
-        err
+      {:error, %{code: _} = err} ->
+        {:error, err}
+
+      {:error, reason} ->
+        {:error, %{code: :E_PATCH_INTERNAL, reason: inspect(reason)}}
     end
   end
 

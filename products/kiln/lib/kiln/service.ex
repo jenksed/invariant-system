@@ -86,11 +86,15 @@ defmodule Kiln.Service do
       |> Plug.Conn.resp(200, Jason.encode!(result))
     else
       # Order matters: more-specific patterns first.
-      {:error, %{code: :E_BODY_READ_FAILED}} ->
-        Error.bounded(conn, :E_BODY_READ_FAILED, status: 400)
+      # P5: forward the entire bounded error envelope (code, method,
+      # scope, fields, field, reason) so handlers' diagnostic metadata
+      # reaches the client without flattening. Only the truly bare
+      # body-read failure collapses to its atom code.
+      {:error, %{code: :E_BODY_READ_FAILED} = err} ->
+        Error.bounded_from_err(conn, err, status: 400)
 
-      {:error, %{code: code}} ->
-        Error.bounded(conn, code, status: 400)
+      {:error, %{code: _} = err} ->
+        Error.bounded_from_err(conn, err, status: 400)
 
       {:error, :missing_authorization} ->
         Error.unauthorized(conn, :missing_authorization)

@@ -26,12 +26,42 @@ defmodule Kiln.RPC.Error do
     do_bounded(conn, Keyword.put(attrs, :code, code))
   end
 
+  @doc """
+  Bounded error response forwarding the entire bounded error envelope
+  from the handler (preserves method, scope, fields, reason, etc.).
+  This is the path that keeps P5 — bounded error codes and their
+  accompanying metadata reach the client without flattening.
+  """
+  def bounded_from_err(%Plug.Conn{} = conn, err_map, attrs \\ [])
+      when is_map(err_map) and is_list(attrs) do
+    err_map = Map.put(err_map, :code, Map.fetch!(err_map, :code))
+    attrs = Keyword.put(attrs, :code, err_map.code)
+    attrs = maybe_put(attrs, :reason, Map.get(err_map, :reason))
+    attrs = maybe_put(attrs, :method, Map.get(err_map, :method))
+    attrs = maybe_put(attrs, :scope, Map.get(err_map, :scope))
+    attrs = maybe_put(attrs, :fields, Map.get(err_map, :fields))
+    attrs = maybe_put(attrs, :field, Map.get(err_map, :field))
+    do_bounded(conn, attrs)
+  end
+
+  defp maybe_put(attrs, key, nil), do: attrs
+  defp maybe_put(attrs, key, value), do: Keyword.put(attrs, key, value)
+
   defp do_bounded(conn, attrs) do
     code = attrs[:code] || :E_UNKNOWN
     reason = attrs[:reason] || :unspecified
     scope = attrs[:scope]
     method = attrs[:method]
-    body = Jason.encode!(%{code: code, reason: reason, scope: scope, method: method})
+
+    body =
+      Jason.encode!(%{
+        code: code,
+        reason: reason,
+        scope: scope,
+        method: method,
+        fields: attrs[:fields],
+        field: attrs[:field]
+      })
 
     conn
     |> Plug.Conn.put_resp_content_type("application/json")

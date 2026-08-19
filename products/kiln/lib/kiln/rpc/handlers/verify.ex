@@ -38,7 +38,7 @@ defmodule Kiln.RPC.Handlers.Verify do
   """
 
   alias Kiln.Domain.Error, as: DomainError
-  alias Kiln.M0VerificationResult
+  alias Kiln.VerificationResult
 
   @required_param_keys [
     "plan_ref",
@@ -79,7 +79,7 @@ defmodule Kiln.RPC.Handlers.Verify do
   # -- build + emit --
 
   defp build_and_emit(plan_ref, patch_ref, result_state_digest, verifier_ref, status, evidence_refs, opts) do
-    case M0VerificationResult.build(
+    case VerificationResult.build(
            plan_ref,
            patch_ref,
            result_state_digest,

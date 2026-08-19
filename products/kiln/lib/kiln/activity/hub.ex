@@ -58,6 +58,11 @@ defmodule Kiln.Activity.Hub do
     since_revision  — initial revision hint
 
   Returns `:ok` or `{:error, :already_registered}`.
+
+  The argument is a plain map; the Hub does NOT require a struct.
+  Map.from_struct/1 is intentionally not used so callers can pass
+  a plain map directly (the contract freeze §7 keeps the Hub API
+  contract-only, not struct-only).
   """
   @spec register(%{
           required(:subscription_id) => String.t(),
@@ -65,8 +70,8 @@ defmodule Kiln.Activity.Hub do
           required(:session_id) => String.t() | nil,
           required(:since_revision) => non_neg_integer()
         }) :: :ok | {:error, atom()}
-  def register(%{subscription_id: sub_id} = sub) do
-    GenServer.call(@name, {:register, sub_id, Map.from_struct(sub)})
+  def register(%{subscription_id: sub_id} = sub) when is_map(sub) do
+    GenServer.call(@name, {:register, sub_id, sub})
   end
 
   @doc "Unregister a subscription. Idempotent."

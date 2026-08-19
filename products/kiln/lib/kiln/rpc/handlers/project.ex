@@ -200,9 +200,6 @@ defmodule Kiln.RPC.Handlers.Project do
              session_id: sid,
              block: block
            }}
-
-        {:error, %{code: _} = err} ->
-          {:error, err}
       end
     end
   end

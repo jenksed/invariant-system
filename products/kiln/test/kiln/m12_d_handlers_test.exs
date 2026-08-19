@@ -34,11 +34,21 @@ defmodule Kiln.M12DHandlersTest do
 
     read_token = Base.encode16(:crypto.strong_rand_bytes(32))
     operate_token = Base.encode16(:crypto.strong_rand_bytes(32))
+    # review.propose requires `review:write` per the frozen WP-09
+    # scope table (LANE-EVIDENCE-WP09-CONTRACTS.md §4). The operate
+    # token does NOT grant this scope (exact-match, not superset);
+    # therefore review.propose tests must use the dedicated
+    # review_write_token below.
+    review_write_token = Base.encode16(:crypto.strong_rand_bytes(32))
 
     Application.put_env(
       :kiln,
       :scoped_tokens,
-      %{read_token => "orchestration:read", operate_token => "orchestration:operate"}
+      %{
+        read_token => "orchestration:read",
+        operate_token => "orchestration:operate",
+        review_write_token => "review:write"
+      }
     )
 
     dir = Path.join(System.tmp_dir!(), "kiln-wp09-handlers-#{System.unique_integer([:positive])}")
@@ -66,6 +76,7 @@ defmodule Kiln.M12DHandlersTest do
     %{
       read_token: read_token,
       operate_token: operate_token,
+      review_write_token: review_write_token,
       store: store
     }
   end
@@ -199,7 +210,7 @@ defmodule Kiln.M12DHandlersTest do
 
   # -- reviewer independence (M9Review.build/9) --
 
-  test "review.propose with reviewer==implementer digest is rejected", %{operate_token: tok} do
+  test "review.propose with reviewer==implementer digest is rejected", %{review_write_token: tok} do
     common_digest = "sha256:0000000000000000000000000000000000000000000000000000000000000001"
     conn =
       post_rpc(tok, %{

@@ -122,7 +122,7 @@ defmodule Kiln.RPC.Handlers.Review do
            "reviewer_assignment_ref" => review.reviewer_assignment_ref,
            "plan_ref" => review.plan_ref,
            "patch_ref" => review.patch_ref,
-           "verification_ref" => review.verification_ref,
+           "verifier_ref" => review.verifier_ref,
            "result_state_digest" => review.result_state_digest,
            "context_manifest_ref" => review.context_manifest_ref,
            "implementer_transcript_received" => review.implementer_transcript_received
