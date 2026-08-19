@@ -38,6 +38,22 @@ export interface WorkState {
   pulse: PulseEvent[];
   /** Most recent canonical-delta events (newest last). */
   motion: MotionEvent[];
+  /**
+   * Wall-clock ISO timestamp of the most recent reconnect
+   * transition. When non-null and recent (within ~30s), the
+   * Work screen surfaces a "SINCE YOU LEFT" feed so the
+   * operator can see what materially changed during the
+   * disconnect window. Auto-clears when the operator presses
+   * any key on the screen, or after the window expires.
+   */
+  lastReconnectAt: string | null;
+  /**
+   * Wall-clock ISO timestamp captured at the moment the
+   * connection entered a non-connected state. Used to show
+   * how long the disconnect has been active. Cleared when
+   * the connection re-establishes.
+   */
+  disconnectedAt: string | null;
 }
 
 export function createWorkScreen(deps: WorkDeps): ScreenSpec {
@@ -47,7 +63,9 @@ export function createWorkScreen(deps: WorkDeps): ScreenSpec {
     init: () => ({
       projection: null,
       pulse: [],
-      motion: []
+      motion: [],
+      lastReconnectAt: null,
+      disconnectedAt: null
     }),
     view: (state, ctx) => renderWork(state as WorkState, ctx, deps),
     update: (state, key, ctx) => updateWork(state as WorkState, key, ctx, deps)
@@ -71,6 +89,27 @@ export function appendWorkMotion(state: WorkState, event: MotionEvent, maxEvents
   return { ...state, motion: next };
 }
 
+/** Mark a reconnect transition. Called by the orchestrator when
+ *  the WorkbenchConnection's state listener observes a transition
+ *  from non-connected to connected. */
+export function markWorkReconnect(state: WorkState, at: string = new Date().toISOString()): WorkState {
+  return { ...state, lastReconnectAt: at, disconnectedAt: null };
+}
+
+/** Mark a disconnect transition. Called when the connection
+ *  state becomes 'reconnecting' or 'disconnected'. */
+export function markWorkDisconnect(state: WorkState, at: string = new Date().toISOString()): WorkState {
+  // Don't overwrite an earlier disconnect timestamp if already set.
+  if (state.disconnectedAt) return state;
+  return { ...state, disconnectedAt: at };
+}
+
+/** Dismiss the "since you left" banner (operator dismissed it
+ *  or the window expired). */
+export function clearWorkReconnectBanner(state: WorkState): WorkState {
+  return { ...state, lastReconnectAt: null };
+}
+
 function updateWork(
   state: WorkState,
   key: Key,
@@ -87,6 +126,10 @@ function updateWork(
   if (key.kind === 'char' && key.value === 'q') {
     deps.onExit();
     return { state, msgs: [{ kind: 'quit' }] };
+  }
+  // Pressing any other key dismisses the "since you left" banner.
+  if (state.lastReconnectAt) {
+    return { state: clearWorkReconnectBanner(state), msgs: [] };
   }
   // Future: d → diff, e → evidence, g → graph (later), ? → help.
   return { state, msgs: [] };
@@ -111,7 +154,42 @@ function renderWork(state: WorkState, ctx: ScreenContext, deps: WorkDeps): Frame
   putString(frame, 2, 0, '─'.repeat(ctx.cols), 'border');
 
   // Two-pane layout: left = work stream (pulse + intent), right = motion + frontier.
-  const bodyTop = 4;
+  // Disconnect / reconnect banner — occupies the rows right below
+  // the header. Always visible when the connection is non-connected;
+  // visible briefly on reconnect (until dismissed by any key press
+  // or the window expires).
+  const bannerRow = 3;
+  const isDisconnected = p?.connection === 'disconnected' || p?.connection === 'reconnecting';
+  if (isDisconnected) {
+    const since = state.disconnectedAt ? durationSince(state.disconnectedAt) : '';
+    const headline = p?.connection === 'reconnecting'
+      ? ' ⚠ RECONNECTING to Kiln…'
+      : ' ✕ DISCONNECTED from Kiln';
+    const subline = p?.sessionId
+      ? `   last canonical: Session ${formatSession(p.sessionId)} · revision ${p.canonicalSessionRevision ?? '—'}${since ? '  (' + since + ')' : ''}`
+      : '   no canonical session known';
+    const caution = '   do not assume work stopped; awaiting Kiln to re-authorize';
+    putString(frame, bannerRow, 0, pad(headline, ctx.cols), 'warn');
+    putString(frame, bannerRow + 1, 0, pad(subline, ctx.cols), 'muted');
+    putString(frame, bannerRow + 2, 0, pad(caution, ctx.cols), 'muted');
+  } else if (state.lastReconnectAt && isRecent(state.lastReconnectAt, 30_000)) {
+    const motionSinceReconnect = state.motion.filter(
+      (e) => e.detectedAt > (state.lastReconnectAt as string)
+    );
+    const headline = ' ✓ Resynchronized to Kiln — SINCE YOU LEFT';
+    const subline = `   ${motionSinceReconnect.length} canonical delta(s) recorded during the disconnect window`;
+    const dismiss = '   press any key to dismiss';
+    putString(frame, bannerRow, 0, pad(headline, ctx.cols), 'success');
+    putString(frame, bannerRow + 1, 0, pad(subline, ctx.cols), 'muted');
+    putString(frame, bannerRow + 2, 0, pad(dismiss, ctx.cols), 'muted');
+  }
+
+  const showReconnectBanner = !isDisconnected && state.lastReconnectAt && isRecent(state.lastReconnectAt, 30_000);
+  const bodyTop = isDisconnected
+    ? bannerRow + 4
+    : showReconnectBanner
+      ? bannerRow + 4
+      : 4;
   const footerRow = ctx.rows - 1;
   const bodyHeight = footerRow - bodyTop - 1;
   const leftW = Math.max(40, Math.floor(ctx.cols * 0.6));
@@ -238,6 +316,29 @@ function attentionFor(sq: SessionQueryResult): string | null {
     return 'A pending decision is recorded in the canonical Session.';
   }
   return null;
+}
+
+/** Render a short human duration since an ISO timestamp, e.g.
+ *  "12s ago", "3m ago", "1h ago". Returns "" for malformed input. */
+function durationSince(iso: string): string {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return '';
+  const ms = Date.now() - then;
+  if (ms < 0) return 'just now';
+  if (ms < 1000) return 'just now';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s ago`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  return `${h}h ago`;
+}
+
+/** True when `iso` is within `windowMs` milliseconds of now. */
+function isRecent(iso: string, windowMs: number): boolean {
+  const then = Date.parse(iso);
+  if (Number.isNaN(then)) return false;
+  return Date.now() - then < windowMs;
 }
 
 function pad(text: string, width: number): string {

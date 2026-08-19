@@ -1,0 +1,32 @@
+ ◆ TEMPER                                                                                      Session ses…567890  ·  ●
+ project  /Users/jenksed/Developer/invariant-system-worktrees/temper-workbench-alpha
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ✓ Resynchronized to Kiln — SINCE YOU LEFT
+   3 canonical delta(s) recorded during the disconnect window
+   press any key to dismiss
+
+ ┌─ WORK ───────────────────────────────────────────────────────────────┐ ┌─ MOTION (canonical deltas) ───────────────┐
+ │ You                                                                  │ │ 21:33:19  verification result recorded: … │
+ │ Fix the reconnect projection so stale activity cannot overwrite      │ │ 21:33:20  human decision recorded: PENDI… │
+ │ canonical state.                                                     │ │ 21:33:20  pending decision changed: abse… │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │ No Pulse yet — awaiting activity.                                    │ │                                           │
+ │ Pulse is read-only; it is not proof of progress.                     │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ │                                           │
+ │                                                                      │ └───────────────────────────────────────────┘
+ │                                                                      │
+ │                                                                      │ ┌─ FRONTIER · ATTENTION ────────────────────┐
+ │                                                                      │ │ Objective Fix reconnect projection so st… │
+ │                                                                      │ │ Run       active                          │
+ │                                                                      │ │ Verify    PASS                            │
+ │                                                                      │ │ Review    PENDING                         │
+ │                                                                      │ │ Human     PENDING                         │
+ │                                                                      │ │ Unknowns  none                            │
+ │                                                                      │ │                                           │
+ │                                                                      │ │ ⚠ YOU                                     │
+ │                                                                      │ └───────────────────────────────────────────┘
+ └──────────────────────────────────────────────────────────────────────┘
+
+ esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming

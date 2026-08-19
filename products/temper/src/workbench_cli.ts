@@ -20,6 +20,8 @@ import {
   appendWorkMotion,
   appendWorkPulse,
   createWorkScreen,
+  markWorkDisconnect,
+  markWorkReconnect,
   setWorkProjection,
   type WorkState
 } from './screens/work.js';
@@ -126,6 +128,22 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     }
   });
 
+  // Wire connection state transitions into the Work screen so it
+  // can show a prominent disconnect banner and the "since you
+  // left" feed on reconnect. We track the previous state to
+  // detect the transition that triggers the reconnect banner.
+  let previousConnection: WorkbenchProjection['connection'] | null = null;
+  const unsubConnection = connection.onConnection((state) => {
+    if (!workState) return;
+    if (state === 'disconnected' || state === 'reconnecting') {
+      workState = markWorkDisconnect(workState);
+    } else if (state === 'connected' && previousConnection !== 'connected') {
+      workState = markWorkReconnect(workState);
+    }
+    previousConnection = state;
+    if (active === 'work') runtime.setTopState(workState);
+  });
+
   runtime.start();
 
   try {
@@ -161,6 +179,7 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
   await connection.stop();
   unsubProjection();
   unsubActivity();
+  unsubConnection();
   return 0;
 }
 
