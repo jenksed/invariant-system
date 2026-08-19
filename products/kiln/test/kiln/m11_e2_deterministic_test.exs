@@ -655,12 +655,29 @@ defmodule Kiln.M11E2DeterministicTest do
       before_digest = sha256_hex(before)
       after_digest = sha256_hex(after_content)
 
+      blocked_before = "before-blocked\n"
+      blocked_after = "after-blocked\n"
+
       File.write!(Path.join(tmp, "README.md"), before)
 
-      # Pre-create a DIRECTORY at the second op's target path so the
-      # bounded mutator's File.write!/2 raises (:eisdir) AFTER the first
-      # op has already taken effect.
-      File.mkdir_p!(Path.join(tmp, "blocked.txt"))
+      # Create a regular file at the second op's target path and
+      # chmod it read-only. The preimage check for op 2 (a :replace
+      # with before_digest matching the current contents) passes
+      # because the file is readable. The fault is triggered AFTER op
+      # 1 has taken effect: op 2's write_op/2 calls File.write!/2,
+      # which raises File.Error (:eacces) because the file is
+      # read-only.
+      #
+      # This proves partial-effect uncertainty: op 1 succeeded, op 2
+      # failed mid-mutation, the bounded result is
+      # E_MUTATION_UNKNOWN_EFFECT, and the repository is in a
+      # partially-applied state. Recovery is the only way forward.
+      File.write!(Path.join(tmp, "blocked.txt"), blocked_before)
+      File.chmod!(Path.join(tmp, "blocked.txt"), 0o444)
+
+      on_exit(fn ->
+        File.chmod!(Path.join(tmp, "blocked.txt"), 0o644)
+      end)
 
       ops_with_bytes = [
         %{
@@ -671,11 +688,11 @@ defmodule Kiln.M11E2DeterministicTest do
           after_image_digest: after_digest
         },
         %{
-          op: :add,
+          op: :replace,
           path: "blocked.txt",
-          content: "x",
-          before_digest: nil,
-          after_image_digest: sha256_hex("x")
+          content: blocked_after,
+          before_digest: sha256_hex(blocked_before),
+          after_image_digest: sha256_hex(blocked_after)
         }
       ]
 
@@ -689,6 +706,9 @@ defmodule Kiln.M11E2DeterministicTest do
       # (b) Op A took effect — the repository is PARTIALLY applied, NOT
       # zero-effect.
       assert File.read!(Path.join(tmp, "README.md")) == after_content
+
+      # (c) The blocked.txt file is UNCHANGED (write failed with EACCES).
+      assert File.read!(Path.join(tmp, "blocked.txt")) == blocked_before
 
       # (d) Recovery against a state digest that is neither base nor the
       # expected post-state is denied.

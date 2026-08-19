@@ -138,9 +138,40 @@ defmodule Kiln.M11E4ProviderComposedTest do
       :kiln,
       :minimax_transport,
       fn _request, _credential, _opts ->
-        {:ok, %{status: 200, headers: [], body: envelope_bytes}}
+        # The bounded adapter parses the response body through
+        # `decode_provider_response_wrapper/1` which expects the canonical
+        # MiniMax chat-completion wrapper, NOT the raw envelope bytes.
+        # Return the wrapped body so the adapter extracts the embedded
+        # envelope and the test's completion_bytes assertions hold.
+        {:ok, %{status: 200, headers: [], body: wrap_in_minimax(envelope_bytes)}}
       end
     )
+  end
+
+  # Wrap a canonical envelope JSON string in the MiniMax chat-completion
+  # response wrapper format expected by `decode_provider_response_wrapper/1`.
+  defp wrap_in_minimax(envelope_json) when is_binary(envelope_json) do
+    JSON.encode!(%{
+      "choices" => [
+        %{
+          "finish_reason" => "tool_calls",
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "tool_calls" => [
+              %{
+                "id" => "call_test_001",
+                "type" => "function",
+                "function" => %{
+                  "name" => "kiln_emit_candidate_envelope",
+                  "arguments" => envelope_json
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
   end
 
   defp install_failing_provider_transport(failure) do

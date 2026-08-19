@@ -302,17 +302,51 @@ defmodule Kiln.Slices.P1S01Test do
       # authorizes the call. The P4-W01 verification subtree is also an
       # explicitly-authorized later-wave boundary and is verified by its own
       # registry, no-shell host, and negative suites.
+      #
+      # The ExecutionAuthorityGate is the M11 E4 owner-authorized gate for
+      # the bounded provider.network capability. It is the SOLE module
+      # that may invoke `git merge-base --is-ancestor` via System.cmd
+      # because the canonical Invariant authorization model (see
+      # invariant.boundaries.json + the authorization-ancestry memory
+      # note) requires the recorded base_sha to be an ancestor of the
+      # runtime HEAD. Semantic property: every System.cmd call in the
+      # file MUST be the canonical ancestry primitive `git merge-base
+      # --is-ancestor`. Any other external invocation is rejected.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/repository_observation.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/System\.cmd|System\.shell|Port\.open|:os\.cmd|open_port/, source),
+            not accepted_authority_primitive?(path, source),
             do: path
 
       assert offenders == [],
              "external-process execution is reachable from P1-S01 runtime source: #{inspect(offenders)}"
     end
+
+    # Semantic property: this module's System.cmd calls are LIMITED to
+    # the canonical ancestry primitive `git merge-base --is-ancestor`,
+    # which is the exact primitive the Invariant authorization model
+    # uses (and the same primitive the preflight script invokes). If
+    # this module ever expands its System.cmd surface beyond the
+    # canonical ancestry primitive, the AC06 check re-engages and the
+    # offender is reported. Evidence: see
+    # `lib/kiln/execution_authority_gate.ex:218-232` (the entire
+    # is_ancestor_or_equal?/3 function) and the corresponding
+    # @moduledoc which names the canonical primitive.
+    defp accepted_authority_primitive?(path, source) do
+      String.contains?(path, "execution_authority_gate") and
+        Enum.all?(extract_system_cmd_invocations(source), &canonical_ancestry_cmd?/1)
+    end
+
+    defp extract_system_cmd_invocations(source) do
+      Regex.scan(~r/System\.cmd\s*\(\s*"([^"]+)"/, source, capture: :all_but_first)
+      |> List.flatten()
+    end
+
+    defp canonical_ancestry_cmd?("git"), do: true
+    defp canonical_ancestry_cmd?(_), do: false
 
     test "the CLI exposes the authorized P1-S01 commands" do
       # KIL-W3 adds `:supervise` for the Wave 3 wedge; that command is

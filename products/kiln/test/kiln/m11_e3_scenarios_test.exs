@@ -443,18 +443,39 @@ defmodule Kiln.M11E3ScenariosTest do
     # Construct a single-op proposal whose canonical post-state
     # digest is derivable via the public compute_post_state_digest/1
     # helper (the same canonical encoding `recover/3` uses).
+    #
+    # The previous fixture used a literal-fake after_image_digest
+    # ("sha256:aaaa...") that never matched the actual kiln README.md
+    # content on disk. The production observed_state_digest/1 reads the
+    # file at the proposal path and reconstructs the digest from those
+    # actual contents using the canonical encoding; comparing that
+    # reconstructed digest against the fake literal always denied
+    # recovery.
+    #
+    # The canonical fix: read the actual file, compute its actual
+    # sha256, and use that as the proposal's after_image_digest. The op
+    # is :replace (the file exists) so the canonical encoding matches
+    # what observed_state_digest/1 reconstructs from disk. The
+    # base_state_digest inherited from the worker_output is preserved
+    # (the canonical positive fixture) so `decide/3` can match it.
+    repository = "."
+    readme_path = Path.join(repository, "README.md")
+    actual_content = File.read!(readme_path)
+    actual_digest = "sha256:" <> Base.encode16(:crypto.hash(:sha256, actual_content), case: :lower)
+
     ops = [
       %{
-        op: :add,
+        op: :replace,
         path: "README.md",
-        content: "# applied\n",
-        before_digest: nil,
-        after_image_digest: "sha256:" <> String.duplicate("a", 64)
+        content: actual_content,
+        before_digest: actual_digest,
+        after_image_digest: actual_digest
       }
     ]
 
-    {:ok, proposal} = PatchProposal.build(wo(), ops, plan_ref(), ".")
+    {:ok, proposal} = PatchProposal.build(wo(), ops, plan_ref(), repository)
 
+    # base_state_digest comes from the worker_output ("sha256:aaaa...").
     base_state = "sha256:" <> String.duplicate("a", 64)
 
     {:ok, %Kiln.M0PatchDecision{} = pd} =

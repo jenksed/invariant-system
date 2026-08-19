@@ -4,6 +4,34 @@ defmodule Kiln.M0CandidateInvocationTest do
   alias Kiln.CandidateInvocation
   alias Kiln.MinimaxM3Adapter
 
+  # Wrap a canonical envelope JSON string in the MiniMax chat-completion
+  # response wrapper format expected by `decode_provider_response_wrapper/1`.
+  # This is the canonical accepted provider response shape; the bounded
+  # parser rejects anything else with E_MALFORMED_OUTPUT.
+  defp wrap_in_minimax(envelope_json) when is_binary(envelope_json) do
+    Jason.encode!(%{
+      "choices" => [
+        %{
+          "finish_reason" => "tool_calls",
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "tool_calls" => [
+              %{
+                "id" => "call_test_001",
+                "type" => "function",
+                "function" => %{
+                  "name" => "kiln_emit_candidate_envelope",
+                  "arguments" => envelope_json
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
+  end
+
   @valid_request %{
     "invocation_id" => "inv-test-001",
     "mode" => "PRODUCTION",
@@ -98,29 +126,83 @@ defmodule Kiln.M0CandidateInvocationTest do
       # means the caller bypassed `new_request/1`'s validation; the
       # adapter's bounded response handling and failure-class mapping
       # still apply to the raw response from the seam.
+      #
+      # The previous fixture returned body: "ok" which is not a valid
+      # MiniMax wrapper and therefore caused the adapter to return
+      # E_MALFORMED_OUTPUT, not the asserted {:ok, _}. The body must
+      # be a valid canonical wrapper so the parser succeeds and the
+      # adapter extracts the embedded envelope.
+      #
+      # on_exit registers failure-safe state restoration: even if the
+      # assertion fails AND the previous inline cleanup is skipped,
+      # the transport seam and the env var are still cleaned up.
+      original_key = System.get_env("MINIMAX_API_KEY")
+      original_transport = Application.get_env(:kiln, :minimax_transport)
+
+      on_exit(fn ->
+        case original_key do
+          nil -> System.delete_env("MINIMAX_API_KEY")
+          v -> System.put_env("MINIMAX_API_KEY", v)
+        end
+
+        case original_transport do
+          nil -> Application.delete_env(:kiln, :minimax_transport)
+          v -> Application.put_env(:kiln, :minimax_transport, v)
+        end
+      end)
+
       System.put_env("MINIMAX_API_KEY", "sentinel-value-not-leaked-into-output")
 
       {:ok, request} = CandidateInvocation.new_request(@valid_request)
 
       tampered = %{request | semantic_digest: "sha256:" <> String.duplicate("0", 64)}
 
+      # Canonical envelope JSON: same semantic_digest computation as the
+      # candidate invocation's normalized inputs produces.
+      envelope =
+        Jason.encode!(%{
+          "schema" => "engineering-system/implementer-patch-proposal-input/v1",
+          "operations" => [
+            %{
+              "op" => "add",
+              "path" => "products/kiln/lib/kiln/_decoy.ex",
+              "mode" => "100644",
+              "after_image_bytes" => "x"
+            }
+          ]
+        })
+
       Application.put_env(
         :kiln,
         :minimax_transport,
         fn _request, _credential, _opts ->
-          {:ok, %{status: 200, headers: [], body: "ok"}}
+          {:ok, %{status: 200, headers: [], body: wrap_in_minimax(envelope)}}
         end
       )
 
       assert {:ok, _} =
                MinimaxM3Adapter.stream(tampered, fn _ -> :ok end)
-
-      Application.delete_env(:kiln, :minimax_transport)
-      System.delete_env("MINIMAX_API_KEY")
     end
 
     test "NEGATIVE secret-disclosure: credential value does not appear in any result field" do
       sentinel = "SENTINEL-CREDENTIAL-VALUE-NEVER-IN-RESULT"
+
+      # Failure-safe cleanup registered BEFORE any assertion can fail.
+      original_key = System.get_env("MINIMAX_API_KEY")
+      original_transport = Application.get_env(:kiln, :minimax_transport)
+
+      on_exit(fn ->
+        case original_key do
+          nil -> System.delete_env("MINIMAX_API_KEY")
+          v -> System.put_env("MINIMAX_API_KEY", v)
+        end
+
+        case original_transport do
+          nil -> Application.delete_env(:kiln, :minimax_transport)
+          v -> Application.put_env(:kiln, :minimax_transport, v)
+        end
+      end)
+
       System.put_env("MINIMAX_API_KEY", sentinel)
 
       # Install a deterministic transport seam that returns a canned 401
@@ -142,9 +224,6 @@ defmodule Kiln.M0CandidateInvocationTest do
                  "credential value leaked into result field: #{inspect({k, v})}"
         end
       end
-
-      Application.delete_env(:kiln, :minimax_transport)
-      System.delete_env("MINIMAX_API_KEY")
     end
 
     test "endpoint is the single bounded MiniMax M3 chat completions endpoint" do

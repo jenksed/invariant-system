@@ -90,9 +90,11 @@ defmodule Kiln.M11E4ProviderP3ApprovalTransferTest do
          worker_output_store
        ) do
     # Install the deterministic transport seam to return the canned envelope.
+    # The bounded adapter expects the canonical MiniMax chat-completion wrapper
+    # AND `transport_seam` is the raw envelope, so wrap it before returning.
     Application.put_env(:kiln, :minimax_transport, fn _request, _credential, _opts ->
       send(authority_test_pid, :transport_was_called)
-      {:ok, %{status: 200, headers: [], body: transport_seam}}
+      {:ok, %{status: 200, headers: [], body: wrap_in_minimax(transport_seam)}}
     end)
 
     # Install the provider-backed mode.
@@ -326,5 +328,31 @@ defmodule Kiln.M11E4ProviderP3ApprovalTransferTest do
     end
 
     receive_loop.(receive_loop, 0)
+  end
+
+  # Wrap a canonical envelope JSON string in the MiniMax chat-completion
+  # response wrapper format expected by `decode_provider_response_wrapper/1`.
+  defp wrap_in_minimax(envelope_json) when is_binary(envelope_json) do
+    Jason.encode!(%{
+      "choices" => [
+        %{
+          "finish_reason" => "tool_calls",
+          "index" => 0,
+          "message" => %{
+            "role" => "assistant",
+            "tool_calls" => [
+              %{
+                "id" => "call_test_001",
+                "type" => "function",
+                "function" => %{
+                  "name" => "kiln_emit_candidate_envelope",
+                  "arguments" => envelope_json
+                }
+              }
+            ]
+          }
+        }
+      ]
+    })
   end
 end
