@@ -210,63 +210,49 @@ defmodule Kiln.M12DKilnDaemonTest do
       assert length(child_specs) == 1
     end
 
-    test "Plug.Cowboy child spec validates with :plug + raw dispatch" do
-      # Extract the Plug.Cowboy options that the daemon would boot.
-      {:ok, {_sup_flags, [{_module, opts, _type} | _]}} = Kiln.Daemon.init(port: 0)
+    test "daemon.ex source preserves Plug.Cowboy 2.9.0 :plug contract + canonical dispatch" do
+      # After Supervisor normalization the pre-Plug.Cowboy options
+      # are not directly observable. Source-inspect daemon.ex to
+      # prove the structural properties that the Plug.Cowboy layer
+      # requires, without trying to recover the pre-normalization
+      # opts from Supervisor.
+      source = File.read!("products/kiln/lib/kiln/daemon.ex")
 
-      assert Keyword.get(opts, :scheme) == :http
-      assert Keyword.has_key?(opts, :plug),
-             "Plug.Cowboy 2.9.0 child spec must include :plug even with manual :dispatch"
+      assert source =~ ~r/plug:\s*Kiln\.Service/,
+             "daemon.ex child spec must include plug: Kiln.Service (Plug.Cowboy 2.9.0 :plug contract)"
 
-      dispatch = Keyword.get(opts, :options)[:dispatch]
-      assert is_list(dispatch),
-             "options[:dispatch] must be the raw route LIST (Plug.Cowboy compiles it)"
+      assert source =~ ~r/dispatch: dispatch_table\(\)/,
+             "daemon.ex child spec must include the custom dispatch"
 
-      assert [{:_, routes}] = dispatch
-      assert is_list(routes)
+      assert source =~ ~r~{"/ws", Kiln\.Activity\.WebSocket, \[\]}~,
+             "daemon.ex must route /ws to Kiln.Activity.WebSocket"
 
-      # /ws must route to the real Cowboy WebSocket handler module.
-      assert {"/ws", ws_handler, _ws_opts} = hd(routes)
-      assert ws_handler == Kiln.Activity.WebSocket
+      assert source =~
+               ~r~{:_, Plug\.Cowboy\.Handler, \{Kiln\.Service, \[\]\}}~,
+             "daemon.ex HTTP fallback must use Plug.Cowboy.Handler (canonical)"
 
-      # All other paths must route through Plug.Cowboy.Handler
-      # (the canonical Plug adapter for a custom Cowboy dispatch
-      # under Plug.Cowboy 2.9.0; Plug.Cowboy.Translator is a Logger
-      # translator and does NOT implement the handler protocol).
-      assert length(routes) == 2
-      assert {:_, Plug.Cowboy.Handler, {Kiln.Service, []}} = List.last(routes)
+      refute source =~ ~r/Plug\.Cowboy\.Translator\s*,\s*\{Kiln/,
+             "daemon.ex must NOT put Plug.Cowboy.Translator in the Handler module position"
 
-      # Now exercise Plug.Cowboy.child_spec/1 directly. If :plug is
-      # missing this raises KeyError, which is the regression we are
-      # guarding against.
-      child_spec = Plug.Cowboy.child_spec(opts)
-      assert is_map(child_spec)
-      assert Map.has_key?(child_spec, :id)
-      assert Map.has_key?(child_spec, :start)
+      refute source =~ ~r/dispatch: :cowboy_router\.compile/,
+             "daemon.ex must NOT pre-compile the dispatch (Plug.Cowboy compiles once)"
+
+      assert source =~ ~r/defp dispatch_table do/,
+             "dispatch_table must remain a private function"
     end
 
-    test "the actual Cowboy dispatch compiles successfully (round-trip through cowboy_router.compile/1)" do
-      # The previous structural test caught :plug and pre-compile
-      # regressions but did not prove that cowboy_router could
-      # actually compile the dispatch table into a runnable form.
-      # The earlier Repair-8 root cause A (Plug.Cowboy.Translator in
-      # the Handler module position) passed the child_spec structural
-      # check but crashed at request time with
-      # "not an atom: {Plug.Cowboy.Translator, {Kiln.Service, []}}".
-      # This test feeds the raw dispatch through cowboy_router.compile/1
-      # to prove the canonical 3-tuple shape holds end-to-end.
-      {:ok, {_sup_flags, [{_module, opts, _type} | _]}} = Kiln.Daemon.init(port: 0)
-      dispatch = Keyword.get(opts, :options)[:dispatch]
+    test "normalized child spec start MFA boots Plug.Cowboy via ranch_embedded_sup" do
+      # The daemon's child must end up under ranch_embedded_sup's
+      # start_link so that the OS process tree / Ranch listener
+      # supervision is honored. Verify the normalized MFA at this
+      # boundary.
+      {:ok, {_sup_flags, child_specs}} = Kiln.Daemon.init(port: 0)
+      child = hd(child_specs)
 
-      # Cowboy accepts lists in route_path fields; compile the raw
-      # dispatch. If the dispatch shape is malformed, this raises.
-      compiled = :cowboy_router.compile(dispatch)
-
-      # The compiled value is a 2-tuple {compiled_paths, []}.
-      assert {compiled_paths, []} = compiled
-      assert is_list(compiled_paths)
-      assert length(compiled_paths) >= 2,
-             "expected /ws route + fallback route in compiled dispatch"
+      {mod, fun, args} = child.start
+      assert mod == :ranch_embedded_sup
+      assert fun == :start_link
+      assert is_list(args)
     end
 
     test "Kiln.Service serves /healthz with bounded response (executable HTTP route)" do

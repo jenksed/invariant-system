@@ -26,16 +26,54 @@ defmodule Kiln.M12DContractDriftTest do
   cycle actually exposed.
 
   Path resolution: every cross-product source inspection uses
-  `repo_path/1` derived from `@repo_root`, which is computed from
-  `__DIR__`. The test does NOT depend on the caller's shell working
-  directory.
+  `repo_path/1` derived from `@repo_root`, which is established by
+  `find_repo_root/0` walking upward from `__DIR__` until both
+  `products/kiln/mix.exs` AND `products/temper/package.json` exist
+  in the same directory. The test does NOT depend on:
+    - the caller's shell working directory
+    - the owner's absolute path
+    - the worktree directory name
+    - how many directory levels the test file happens to occupy
+  It DOES fail loudly if no repository root can be established.
   """
 
   use ExUnit.Case, async: true
 
-  # File location: products/kiln/test/kiln/m12_d_contract_drift_test.exs
-  # Repo root is ../../.. from __DIR__.
-  @repo_root Path.expand("../../..", __DIR__)
+  # Walk upward from `start` until we find a directory containing
+  # BOTH products/kiln/mix.exs AND products/temper/package.json.
+  # Returns the absolute path of that directory.
+  #
+  # Fails loudly (raises) if no repository root can be established
+  # within a reasonable depth (16 levels, well beyond any realistic
+  # monorepo nesting).
+  defp find_repo_root(start) do
+    Path.expand(start)
+    |> walk_up_for_repo_root(16)
+  end
+
+  defp walk_up_for_repo_root(_dir, 0) do
+    raise "could not locate repository root (no directory found with both products/kiln/mix.exs AND products/temper/package.json within 16 levels of #{__DIR__})"
+  end
+
+  defp walk_up_for_repo_root(dir, depth) do
+    kilns_mix = Path.join([dir, "products", "kiln", "mix.exs"])
+    temper_pkg = Path.join([dir, "products", "temper", "package.json"])
+
+    if File.regular?(kilns_mix) and File.regular?(temper_pkg) do
+      dir
+    else
+      parent = Path.dirname(dir)
+
+      if parent == dir do
+        raise "could not locate repository root (filesystem root reached without finding both products/kiln/mix.exs AND products/temper/package.json)"
+      end
+
+      walk_up_for_repo_root(parent, depth - 1)
+    end
+  end
+
+  # The repo root must be resolved AFTER the helper is defined.
+  @repo_root find_repo_root(__DIR__)
 
   defp repo_path(relative), do: Path.join(@repo_root, relative)
 
@@ -201,7 +239,7 @@ defmodule Kiln.M12DContractDriftTest do
     m0_types = File.read!(repo_path("products/kiln/lib/kiln/m0_types.ex"))
 
     [struct_section] =
-      Regex.scan(m0_types, ~r/defstruct\s+\[[^\]]*\]/, capture: :all_but_first)
+      Regex.scan(~r/defstruct\s+\[[^\]]*\]/, m0_types, capture: :all_but_first)
 
     assert struct_section =~ ~r/:verifier_ref/,
            "M0Review defstruct must declare :verifier_ref"
@@ -251,10 +289,9 @@ defmodule Kiln.M12DContractDriftTest do
 
   # Extracts the @scopes map literal from router.ex.
   #
-  # Subject + regex argument order is `Regex.run(regex, subject)` per
-  # the canonical Elixir contract; previous versions of this helper
-  # had the arguments reversed, which raised a type warning at
-  # compile time.
+  # Regex.run canonical signature: Regex.run(regex, subject, opts).
+  # The previous version of this helper had the arguments reversed
+  # (subject, regex), which raised a type warning.
   defp extract_scope_table(source) do
     case Regex.run(~r/@scopes\s+%\{([^}]+)\}/m, source, capture: :all_but_first) do
       [body] ->
