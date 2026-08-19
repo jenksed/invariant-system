@@ -54,6 +54,7 @@ defmodule Kiln.M0CurrentnessTest do
 
     test "newly-derived eligibility (just now) is current" do
       now = DateTime.utc_now()
+
       eligibility = %{
         "eligibility_id" => "elg_just_now",
         "eligibility" => "QUALIFIED",
@@ -69,6 +70,7 @@ defmodule Kiln.M0CurrentnessTest do
   describe "C6-2: stale reviewer at dispatch fails closed" do
     test "eligibility beyond 168h from derived_at returns false" do
       now = DateTime.utc_now()
+
       eligibility = %{
         "eligibility_id" => "elg_stale",
         "eligibility" => "QUALIFIED",
@@ -82,6 +84,7 @@ defmodule Kiln.M0CurrentnessTest do
 
     test "eligibility past valid_until returns false" do
       now = DateTime.utc_now()
+
       eligibility = %{
         "eligibility_id" => "elg_expired",
         "eligibility" => "QUALIFIED",
@@ -123,9 +126,10 @@ defmodule Kiln.M0CurrentnessTest do
       reviewer_eligibility = %{
         "eligibility_id" => "elg_reviewer_stale",
         "eligibility" => "QUALIFIED",
-        "derived_at" => DateTime.utc_now()
-        |> DateTime.add(-3600 * 24 * 8)
-        |> DateTime.to_iso8601(),
+        "derived_at" =>
+          DateTime.utc_now()
+          |> DateTime.add(-3600 * 24 * 8)
+          |> DateTime.to_iso8601(),
         "valid_until" => DateTime.utc_now() |> DateTime.add(3600 * 24) |> DateTime.to_iso8601(),
         "role" => "REVIEWER"
       }
@@ -241,9 +245,9 @@ defmodule Kiln.M0CurrentnessTest do
 
     test "garbage timestamp returns false (no raise)" do
       refute M0Currentness.within_currentness_window?(%{
-        "derived_at" => "not-a-timestamp",
-        "valid_until" => @future
-      })
+               "derived_at" => "not-a-timestamp",
+               "valid_until" => @future
+             })
     end
   end
 end

@@ -27,7 +27,23 @@ defmodule Kiln.MixProject do
     [
       # Direct SQLite state store per ADR-0022. The 0.39 line bundles SQLite
       # 3.53.3, which contains the WAL-reset corruption fix from 3.51.3.
-      {:exqlite, "~> 0.39"}
+      {:exqlite, "~> 0.39"},
+      # Bounded MiniMax M3 provider transport (KILN-M0-01 narrow scope).
+      # Finch v0.20 is the smallest dependency that satisfies the accepted
+      # combined property: status available before/during body processing
+      # + incremental bounded body receipt + ability to terminate receipt
+      # when the byte limit is crossed. OTP :httpc cannot satisfy both.
+      # Mint is transitive; castore was removed in v0.19.0.
+      {:finch, "~> 0.20"},
+      # M12-D WP-07: bounded Kiln daemon (HTTP + WebSocket). Plug.Cowboy is
+      # the smallest Erlang HTTP server with built-in WebSocket upgrade.
+      # Avoided full Phoenix framework to keep bounded machinery surface
+      # narrow; per-method scope + bounded reconnect + per-entity streams
+      # implemented directly in Kiln.Service (Pathfinder WP-02).
+      {:plug_cowboy, "~> 2.5"},
+      # M12-D WP-07: bounded JSON encoding for bounded RPC payloads.
+      # Jason is canonical Elixir JSON; bounded alternative to Poison.
+      {:jason, "~> 1.4"}
     ]
   end
 

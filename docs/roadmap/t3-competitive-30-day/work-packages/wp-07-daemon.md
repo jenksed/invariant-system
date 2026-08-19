@@ -1,0 +1,65 @@
+# WP-07 — Kiln Daemon / Service Boundary Implementation (Week 1)
+
+- **ID:** WP-07
+- **Title:** Implement Kiln daemon with HTTP + WebSocket via Phoenix Channels
+- **Objective:** Local `invariant serve` daemon that hosts the Kiln bounded execution runtime + RPC surface for Temper
+- **Owner/product:** Kiln
+- **Authoritative inputs:** Pathfinder WP-02 service boundary decision; existing Kiln bounded dispatch (PROVEN); M0 contracts; bounded apply / bounded evidence
+- **Dependencies:** WP-02 (decided); Phoenix dependency in products/kiln/mix.exs (NEW; bounded add)
+- **Parallel-safety:** NO (sequential after WP-02; blocks WP-08, WP-09, WP-11)
+- **Scope:**
+  - Add Phoenix + Plug + WebSocket deps to products/kiln/mix.exs
+  - Implement `Kiln.Service` Plug module (HTTP + WebSocket)
+  - Implement `Kiln.RPC.Router` Phoenix Channel router (per-method scope)
+  - Implement daemon lifecycle (Mix release `invariant serve`)
+  - One-time pairing for remote (T3-style `PairingGrantStore` pattern, adapted)
+  - Bearer token for local; bounded scope mapping
+  - Bounded error envelope (matches existing M0 bounded machinery)
+- **Non-goals:**
+  - Multi-region / multi-server (deferred)
+  - DPoP (deferred; bearer is sufficient for September)
+  - Custom protocol abstraction (HTTP+WS+JSON is the minimum)
+- **Authority boundaries:**
+  - Kiln daemon owns authoritative execution truth
+  - Client (Temper) owns UI projection only; never owns authority
+  - Bounded RPC contracts are M0 schemas; bounded per-method scope
+- **Files/surfaces likely affected:**
+  - `products/kiln/mix.exs` (add Phoenix deps)
+  - `products/kiln/lib/kiln/service.ex` (NEW — Plug module)
+  - `products/kiln/lib/kiln/rpc/router.ex` (NEW — Phoenix Channel router)
+  - `products/kiln/lib/kiln/rpc/scopes.ex` (NEW — per-method scope mapping)
+  - `products/kiln/lib/kiln/daemon.ex` (NEW — daemon lifecycle)
+  - `products/kiln/lib/mix/tasks/invariant.ex` (extend with `serve` task)
+- **Acceptance property:**
+  - `mix invariant serve` starts the daemon at `http://localhost:<port>`
+  - HTTP unary operations work (bounded per-method scope)
+  - WebSocket at `/ws` works for streaming (bounded activity stream)
+  - Bounded reconnect: client disconnect/reconnect preserves bounded state
+  - Bounded session token issued via one-time pairing (remote) or bearer (local)
+- **Required positive evidence:**
+  - `mix invariant serve` boots daemon + accepts first RPC within bounded timeout
+  - Bounded M12-A composed golden path runs via daemon (not CLI)
+  - HTTP unary + WS streaming both work for bounded operations
+- **Required negative evidence:**
+  - Unauthorized RPC request rejected with bounded error envelope
+  - Client disconnect does NOT corrupt bounded state
+  - Daemon restart does NOT blind-replay bounded mutations
+- **Validation commands:**
+  - `mix test` runs all existing M0 + M11 + M12 tests + new daemon tests
+  - `./invariant check` passes
+  - `./invariant check boundaries` passes
+  - End-to-end: start daemon, connect client, run bounded task, observe activity
+- **Failure/recovery requirements:**
+  - Daemon crash → bounded restart with bounded Session restoration
+  - Client disconnect → bounded reconnect (no bounded state loss)
+  - Token compromise → bounded revocation
+- **Stop conditions:**
+  - Phoenix + Plug + WebSocket deps installed and compiling
+  - `mix invariant serve` starts daemon; HTTP + WS accept connections
+  - M12-A composed golden path runs via daemon (bounded apply succeeds end-to-end via RPC)
+  - 3 reconnect scenarios pass (before-mutation, mid-mutation, post-mutation)
+  - 3 unauthorized RPC scenarios pass (bounded error envelope)
+- **Expected output/report:**
+  - Phoenix-based daemon committed
+  - Bounded reconnect/recovery tests committed
+  - `LANE-EVIDENCE-M12-DAEMON.md` with bounded proof

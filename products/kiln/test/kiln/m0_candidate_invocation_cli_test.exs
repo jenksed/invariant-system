@@ -209,7 +209,12 @@ defmodule Kiln.M0CandidateInvocationCLITest do
     end
 
     test "evaluation mode reaches the Candidate Invocation schema parser without a credential" do
-      path = Path.join(System.tmp_dir!(), "kiln-cli-m0-test-#{System.unique_integer([:positive])}.json")
+      path =
+        Path.join(
+          System.tmp_dir!(),
+          "kiln-cli-m0-test-#{System.unique_integer([:positive])}.json"
+        )
+
       File.write!(path, JSON.encode!(@valid_request))
 
       try do
@@ -239,7 +244,9 @@ defmodule Kiln.M0CandidateInvocationCLITest do
     end
 
     test "rejects an invalid request file with a bounded error" do
-      path = Path.join(System.tmp_dir!(), "kiln-cli-m0-bad-#{System.unique_integer([:positive])}.json")
+      path =
+        Path.join(System.tmp_dir!(), "kiln-cli-m0-bad-#{System.unique_integer([:positive])}.json")
+
       File.write!(path, "{not json")
 
       try do
@@ -268,7 +275,12 @@ defmodule Kiln.M0CandidateInvocationCLITest do
     end
 
     test "production mode requires MINIMAX_API_KEY presence" do
-      path = Path.join(System.tmp_dir!(), "kiln-cli-m0-prod-#{System.unique_integer([:positive])}.json")
+      path =
+        Path.join(
+          System.tmp_dir!(),
+          "kiln-cli-m0-prod-#{System.unique_integer([:positive])}.json"
+        )
+
       File.write!(path, JSON.encode!(@valid_request))
 
       try do
@@ -288,6 +300,7 @@ defmodule Kiln.M0CandidateInvocationCLITest do
         # blocked status with a non-zero exit.
         assert exit_code != 0,
                "production mode without MINIMAX_API_KEY must exit non-zero"
+
         assert status in [:denied, :blocked, :failed, :unknown],
                "expected a bounded non-ok status; got #{status}"
       after

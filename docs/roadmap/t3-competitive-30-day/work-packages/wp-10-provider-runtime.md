@@ -1,0 +1,54 @@
+# WP-10 — Provider-Runtime Adapter (Claude Code or Codex) (Week 2)
+
+- **ID:** WP-10
+- **Title:** Implement agent-runtime provider adapter (Claude Code or Codex or OpenCode)
+- **Objective:** ≥1 agent-runtime provider PROVEN end-to-end (alongside MiniMax-M3 direct provider)
+- **Owner/product:** Kiln
+- **Authoritative inputs:** Pathfinder WP-03 provider-runtime contract; Kiln.MinimaxM3Adapter (template)
+- **Dependencies:** WP-03 (decided); WP-07 (daemon — for end-to-end test)
+- **Parallel-safety:** partial (template can be copied in parallel; end-to-end test depends on WP-07)
+- **Scope:**
+  - Implement `Kiln.ClaudeCodeAdapter` (or Codex / OpenCode) — bounded subprocess via System.cmd
+  - Bounded output extraction (extract bounded envelope from agent CLI output)
+  - Bounded capability schema per `provider-capability.v0`
+  - Bounded content-validity gate (Code.string_to_quoted on canonical bytes)
+  - Provider driver registry entry
+- **Non-goals:**
+  - All agent runtimes (just one is sufficient for September P0)
+  - Custom agent CLI protocols (use whatever the agent provides)
+- **Authority boundaries:**
+  - Agent-runtime adapter owns bounded subprocess lifecycle
+  - Adapter never owns authority; bounded apply + bounded verify + bounded
+    review + bounded HumanDecision remain on Kiln side
+- **Files/surfaces likely affected:**
+  - `products/kiln/lib/kiln/claude_code_adapter.ex` (NEW — template follows Kiln.MinimaxM3Adapter)
+  - `products/kiln/lib/kiln/provider_registry.ex` (NEW — bounded by M0 contracts)
+  - `products/kiln/lib/kiln/provider_capability.ex` (NEW — bounded schema)
+  - `products/kiln/test/kiln/m12_e_provider_runtime_test.exs` (NEW — bounded end-to-end)
+- **Acceptance property:**
+  - Bounded M12-A composed golden path runs end-to-end with agent-runtime provider
+- **Required positive evidence:**
+  - 1 agent-runtime provider proven end-to-end via composed golden path
+  - Provider output extraction bounded by content-validity gate
+  - Provider failure modes (denial, malformed, death) bounded
+- **Required negative evidence:**
+  - Agent CLI denial → bounded E_PROVIDER_DENIED
+  - Malformed agent output → bounded E_MALFORMED_OUTPUT
+  - Process death mid-task → bounded recovery (E_MUTATION_UNKNOWN_EFFECT)
+- **Validation commands:**
+  - `mix test test/kiln/m12_e_provider_runtime_test.exs` — bounded end-to-end
+  - `mix test test/kiln/m12_e1_composed_golden_path_test.exs` — regression
+  - End-to-end: bounded golden path runs with both providers
+- **Failure/recovery requirements:**
+  - Agent CLI death → bounded subprocess restart (DynamicSupervisor)
+  - Agent CLI timeout → bounded failure classification
+  - Agent CLI malformed → bounded E_MALFORMED_OUTPUT
+- **Stop conditions:**
+  - 1 agent-runtime adapter implemented and bounded
+  - Composed golden path runs end-to-end with both providers
+  - Provider driver registry dispatches correctly
+- **Expected output/report:**
+  - Kiln.ClaudeCodeAdapter (or equivalent) committed
+  - Provider driver registry committed
+  - Bounded capability schema committed
+  - `LANE-EVIDENCE-M12-PROVIDER-RUNTIME.md` with bounded proof

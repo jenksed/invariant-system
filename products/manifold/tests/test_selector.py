@@ -598,5 +598,54 @@ class BoundaryDoctrineTests(unittest.TestCase):
             self.assertFalse(forbidden_top & set(metadata.keys()))
 
 
+class M11E3StaleQualificationTest(unittest.TestCase):
+    """M11 E3 Case 1 — explicit named scenario for the M11 evidence
+    ledger. Stale QUALIFIED Eligibility is rejected BEFORE assignment
+    is produced; the canonical selector returns a no-selection
+    artifact carrying `reason_code == E_QUALIFICATION_NOT_CURRENT`
+    and no `profile_ref` / no `eligibility_ref` refs.
+
+    This is the canonical executable evidence for Case 1; an
+    Elixir-side test cannot substitute for it because the
+    assignment-producing boundary lives in the Manifold selector
+    (products/manifold/src/selector.py).
+    """
+
+    def test_stale_eligibility_drives_no_selection_with_frozen_reason(self):
+        with tempfile.TemporaryDirectory(prefix="m11-e3-") as td:
+            td_path = Path(td)
+            req = _copy_to_tmp(
+                FIXTURES / "positive" / "02-implementer-requirement.json", td_path
+            )
+            prof = _copy_to_tmp(
+                FIXTURES / "positive" / "03-implementer-profile.json", td_path
+            )
+            elig_path = _copy_to_tmp(
+                FIXTURES / "positive" / "06-implementer-eligibility.json", td_path
+            )
+            _rewrite_eligibility_to_stale(
+                elig_path,
+                derived_at="2020-01-01T00:00:00Z",
+                valid_until="2020-01-08T00:00:00Z",
+                state="QUALIFIED",
+            )
+            out = td_path / "assignment.json"
+            rc, stdout, stderr = _run_selector(req, [prof], [elig_path], out)
+            # Selector exits 2 when no eligible candidate.
+            self.assertEqual(rc, 2, msg=stdout + stderr)
+            assignment = json.loads(out.read_text())
+            # Canonical no-selection envelope (selector.py lines 552-557, 666-694).
+            self.assertTrue(assignment["metadata"]["no_selection"])
+            # Stale QUALIFIED carries the frozen reason_code.
+            reason_codes = {
+                c["reason_code"]
+                for c in assignment["metadata"]["rejected_candidates"]
+            }
+            self.assertIn("E_QUALIFICATION_NOT_CURRENT", reason_codes)
+            # No Intelligence Assignment profile/eligibility refs are produced.
+            self.assertNotIn("profile_ref", assignment)
+            self.assertNotIn("eligibility_ref", assignment)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

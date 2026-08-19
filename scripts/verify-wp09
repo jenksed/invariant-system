@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# verify-wp09 — WP-09 deterministic closeout gate.
+#
+# Purpose: encode the final closeout sequence so future agents / operators
+# do not reconstruct it from chat or prose.
+#
+# This script FAILS FAST and does NOT continue after a failed gate.
+#
+# Gate sequence (in order):
+#   1. Focused WP-09 Kiln gate
+#        MIX_ENV=test mix compile --force
+#        MIX_ENV=test mix test \
+#          test/kiln/m12_d_handlers_test.exs \
+#          test/kiln/activity_hub_test.exs
+#   2. WP-08 regression + WP-09-added daemon regression guard gate
+#      (the 10 inherited WP-08 regression files PLUS the
+#      m12_d_contract_drift_test.exs + m12_d_scope_regression_test.exs
+#      + the daemon guards inside m12_d_kiln_daemon_test.exs — total
+#      expected 87/87; previously the WP-08 set was 71/71; +16 are
+#      WP-09-added daemon regression guards; +0 are changes to the
+#      WP-08 inherited test files themselves).
+#   3. Full Kiln suite
+#   4. Temper tests
+#
+# Lane 5 (integration scenario / five-task AC-06 / dogfood / Lane 6 review)
+# is NOT included. Those require a live daemon subprocess + interactive
+# owner setup + a fresh reviewer; embedding them here would make the
+# script misleading rather than useful.
+#
+# Authority preserved:
+#   - script does NOT mutate repository state
+#   - script does NOT bypass authorization, RPC, or Kiln authority
+#   - script does NOT generate fake evidence; a non-zero exit reports
+#     exactly which gate failed and the offending command
+
+set -euo pipefail
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd "$HERE/.." && pwd -P)
+KILN="$ROOT/products/kiln"
+TEMPER="$ROOT/products/temper"
+
+fail() {
+  printf 'verify-wp09: %s\n' "$1" >&2
+  exit 1
+}
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+for tool in mix npm; do
+  command -v "$tool" >/dev/null 2>&1 || fail "required tool not on PATH: $tool"
+done
+
+# -----------------------------------------------------------------------
+# Gate 1: focused WP-09 Kiln gate
+# -----------------------------------------------------------------------
+log "Gate 1: focused WP-09 Kiln gate (compile + m12_d_handlers + activity_hub)"
+cd "$KILN"
+MIX_ENV=test mix compile --force
+MIX_ENV=test mix test \
+  test/kiln/m12_d_handlers_test.exs \
+  test/kiln/activity_hub_test.exs
+
+# -----------------------------------------------------------------------
+# Gate 2: WP-08 inherited regression suite + WP-09-added daemon guard
+#
+# WP-08 PROVEN at WP08_FINAL_SHA = 96f76ad reported 71 tests passing
+# across 10 files. WP-09 added:
+#   - m12_d_contract_drift_test.exs   (new file, +9 tests)
+#   - m12_d_scope_regression_test.exs  (new file, +6 tests)
+#   - daemon guards inside m12_d_kiln_daemon_test.exs (already
+#     counted in the 10 inherited files; +2 new tests added to
+#     the inherited file)
+#   - m12_d_handlers_test.exs (already in the focused gate 1 set;
+#     covered by gate 1; not duplicated here)
+#
+# Expected total at this gate: 90/90 (was 71/71; +19 from
+# WP-09 additions counted via `grep -cE '^\s*test\s+"'` in each
+# affected test file). Repair-8 strengthened the daemon regression
+# test by replacing 1 structural test with 4 runtime tests
+# (Supervisor flags shape, dispatch round-trip via
+# :cowboy_router.compile/1, /healthz runtime exercise, child spec
+# validation).
+# If the count differs, the verifier must explain WHY before claiming
+# PASS — not just print green.
+# -----------------------------------------------------------------------
+log "Gate 2: WP-08 inherited regressions + WP-09-added daemon + contract guards (expected 90/90)"
+cd "$KILN"
+MIX_ENV=test mix test \
+  test/kiln/restart_test.exs \
+  test/kiln/domain/session_test.exs \
+  test/kiln/projections/session_test.exs \
+  test/kiln/supervision_restart_regression_test.exs \
+  test/kiln/m12_d_kiln_daemon_test.exs \
+  test/kiln/m12_d_session_rpc_test.exs \
+  test/kiln/m12_d_patch_rpc_test.exs \
+  test/kiln/patch_service_test.exs \
+  test/kiln/m12_e_session_daemon_restart_test.exs \
+  test/kiln/m12_e_session_recovery_fi_test.exs \
+  test/kiln/m12_d_contract_drift_test.exs \
+  test/kiln/m12_d_scope_regression_test.exs
+
+# -----------------------------------------------------------------------
+# Gate 3: full Kiln suite
+# -----------------------------------------------------------------------
+log "Gate 3: full Kiln suite"
+cd "$KILN"
+mix test
+
+# -----------------------------------------------------------------------
+# Gate 4: Temper tests
+# -----------------------------------------------------------------------
+log "Gate 4: Temper tests"
+cd "$TEMPER"
+npm ci
+npm test
+
+# -----------------------------------------------------------------------
+# All gates green
+# -----------------------------------------------------------------------
+log "verify-wp09: ALL GATES GREEN"

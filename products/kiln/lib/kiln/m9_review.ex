@@ -128,6 +128,58 @@ defmodule Kiln.Review do
   defp canonical_digest(schema, payload) do
     "sha256:" <> Canonical.digest(schema, payload)
   end
+
+  @doc """
+  M11 N-7 (canonical): revalidate a previously-emitted Review against a
+  candidate (patch_ref, result_state_digest) tuple. If the prior
+  Review was bound to a different patch_ref or result_state_digest,
+  it is stale for the current revision and the canonical contract
+  rejects with `:E_REVIEW_STALE`.
+
+  This is the smallest deterministic implementation of the
+  `review-after-revision staled` acceptance property documented in
+  the M9 readiness dossier and required by the canonical
+  `integration/fixtures/m0/negative/review-reuse-after-patch-revision.json`
+  contract (mapped to `E_REVIEW_STALE` in
+  `integration/validate_m0.py`).
+
+  No public schema expansion: it operates on the already-canonical
+  `%M0Review{}` envelope. No new fields; no API breaking change.
+  """
+  @spec revalidate(M0Review.t(), map(), String.t()) ::
+          :ok | {:error, %{required(:code) => atom(), required(:reason) => String.t()}}
+  def revalidate(%M0Review{} = previous, current_patch_ref, current_result_state_digest)
+      when is_map(current_patch_ref) and is_binary(current_result_state_digest) do
+    cond do
+      previous.patch_ref["digest"] != current_patch_ref["digest"] ->
+        {:error,
+         %{
+           code: :E_REVIEW_STALE,
+           reason:
+             "review.patch_ref.digest #{previous.patch_ref["digest"]} does not match current patch_ref.digest #{current_patch_ref["digest"]}; a revised patch requires a new Review"
+         }}
+
+      previous.result_state_digest != current_result_state_digest ->
+        {:error,
+         %{
+           code: :E_REVIEW_STALE,
+           reason:
+             "review.result_state_digest does not match current result_state_digest; the reviewed state has changed"
+         }}
+
+      true ->
+        :ok
+    end
+  end
+
+  def revalidate(_previous, _current_patch_ref, _current_result_state_digest) do
+    {:error,
+     %{
+       code: :E_REVIEW_STALE,
+       reason:
+         "revalidate/3 requires a prior M0Review, a current patch_ref map, and a current result_state_digest binary"
+     }}
+  end
 end
 
 defmodule Kiln.HumanDecision do
@@ -335,14 +387,40 @@ defmodule Kiln.RunResultProjection do
     end
   end
 
+  # M11 E2 B-repair: convenience wrapper that accepts a single map
+  # (with either atom or string keys) and delegates to build/10. The
+  # M11 E2 scenario constructs the truth + refs as a single map;
+  # build/10 is the canonical 10-arg entry point and remains the
+  # authoritative surface — this wrapper is the bounded glue that
+  # lets the scenario call build(truth) without wiring every ref
+  # position manually.
+  @spec build(map()) :: {:ok, M0RunResultProjection.t()} | {:error, map()}
+  def build(refs) when is_map(refs) do
+    build(
+      fetch(refs, :plan_ref, "plan_ref"),
+      fetch(refs, :implementer_assignment_ref, "implementer_assignment_ref"),
+      fetch(refs, :reviewer_assignment_ref, "reviewer_assignment_ref"),
+      fetch(refs, :patch_ref, "patch_ref"),
+      fetch(refs, :patch_decision_ref, "patch_decision_ref"),
+      fetch(refs, :verification_ref, "verification_ref"),
+      fetch(refs, :review_ref, "review_ref"),
+      fetch(refs, :human_decision_ref, "human_decision_ref"),
+      fetch(refs, :run_result_ref, "run_result_ref"),
+      fetch(refs, :truth, "truth")
+    )
+  end
+
+  defp fetch(refs, atom_key, string_key) do
+    Map.get(refs, atom_key) || Map.get(refs, string_key)
+  end
+
   defp validate_truth(truth) do
     cond do
       truth["run_status"] not in @allowed_run_status ->
         {:error,
          %{
            code: :E_PROJECTION_NOT_CANONICAL,
-           reason:
-             "truth.run_status must be one of completed|blocked|cancelled|failed|unknown"
+           reason: "truth.run_status must be one of completed|blocked|cancelled|failed|unknown"
          }}
 
       truth["verification_status"] not in @allowed_verification_status ->

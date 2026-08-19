@@ -42,6 +42,7 @@ defmodule Kiln.CLI.Request do
     :worker_propose,
     :patch_decide,
     :patch_apply,
+    :patch_apply_governed,
     :patch_recover,
     :verify_run,
     :review_propose,
@@ -57,13 +58,17 @@ defmodule Kiln.CLI.Request do
     "worker-propose" => :worker_propose,
     "patch-decide" => :patch_decide,
     "patch-apply" => :patch_apply,
+    "patch-apply-governed" => :patch_apply_governed,
     "patch-recover" => :patch_recover,
     "verify-run" => :verify_run,
     "review-propose" => :review_propose,
     "human-decide" => :human_decide
   }
 
-  @command_lookup Map.merge(Map.new(@supported_commands, &{Atom.to_string(&1), &1}), @command_aliases)
+  @command_lookup Map.merge(
+                    Map.new(@supported_commands, &{Atom.to_string(&1), &1}),
+                    @command_aliases
+                  )
 
   # The accepted default home directory. Matches
   # `docs/CLI-AND-LOCAL-DELIVERY-CONTRACT.md` §3.1 rule 9.
@@ -116,7 +121,7 @@ defmodule Kiln.CLI.Request do
 
   # -- tokenization --
 
-  @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change --request --mode)
+    @value_flags ~w(--format --kiln-home --actor-id --repo --objective --criterion --constraint --exclude --reason --work-envelope --verification-change --request --mode --assignment --eligibility --repository --plan --out --proposal --decision --operations --worker-output --observed-state-digest --patch --result-state-digest --registered-verifier --status --evidence --implementer-assignment --reviewer-assignment --context-manifest --verdict --findings --review --verification)
   @repeating_flags ~w(criterion constraint exclude)
   @command_flags %{
     start: ~w(repo objective criterion constraint exclude),
@@ -129,10 +134,12 @@ defmodule Kiln.CLI.Request do
     candidate_invocation_digest: [],
     worker_propose: ~w(assignment eligibility repository request plan out),
     patch_decide: ~w(proposal decision out),
-    patch_apply: ~w(decision operations out),
+    patch_apply: ~w(proposal decision operations out),
+    patch_apply_governed: ~w(proposal decision worker-output out),
     patch_recover: ~w(proposal decision observed-state-digest out),
     verify_run: ~w(plan patch result-state-digest registered-verifier status evidence out),
-    review_propose: ~w(implementer-assignment eligibility plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
+    review_propose:
+      ~w(implementer-assignment eligibility plan patch verification result-state-digest reviewer-assignment context-manifest verdict findings out),
     human_decide: ~w(plan patch result-state-digest review decision out)
   }
 
@@ -344,7 +351,9 @@ defmodule Kiln.CLI.Request do
         usage_result("--mode is required (production|evaluation)")
 
       options["mode"] not in ["production", "evaluation"] ->
-        usage_result("--mode must be one of: production|evaluation (got #{inspect(options["mode"])})")
+        usage_result(
+          "--mode must be one of: production|evaluation (got #{inspect(options["mode"])})"
+        )
 
       true ->
         :ok

@@ -1,0 +1,7 @@
+work_id=KILN-M0-01-E4
+state=authorized
+owner=Joshua Jenks
+base_sha=4587baa37b47a8ae91c7997e4bdfa5e23f622069
+plan_sha256=2c26b46b68ffc68ff99b453c1d30413413422d706483bfa0f98a5e886266e7ae
+authorized_at=2026-08-17T20:21:45-04:00
+scope=provider.network capability for the bounded MiniMax M3 adapter only. Endpoint: https://api.minimax.io/v1/chat/completions. MINIMAX_API_KEY presence-only. Operation: dispatch via Finch.stream_while/5 from Worker.build_provider_completion/1. Mutation class: provider.dispatch only (no mutation, no approval, no HumanDecision authority). Verify: kiln.compile. Failure: blocked-state-no-retry. No retry, no fallback, no alternate provider. No push, no merge.

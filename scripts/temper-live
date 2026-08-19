@@ -1,0 +1,339 @@
+#!/usr/bin/env bash
+# temper-live — WP-09 owner-machine dogfood launcher.
+#
+# Usage:
+#   scripts/temper-live <repository-path> [--port N] [--state-path PATH] [--keep-workdir] [--help]
+#
+# What this script does:
+#   1. Compiles the Kiln product from this checkout if needed.
+#   2. Generates two scoped tokens at runtime (read + operate) — never
+#      written to source or to disk.
+#   3. Starts the bounded Kiln daemon with --state-path <repo>/.kiln/state.sqlite3
+#      and the KILN_SCOPED_TOKENS env var. Bearer auth + exact-scope match
+#      are unchanged.
+#   4. Starts Temper in --live mode against the running daemon.
+#   5. Prints the canonical 14-step workflow (HOW_TO_DOGFOOD_WP09).
+#
+# Authority boundaries preserved:
+#   - The launcher never POSTs to /api/rpc on the user's behalf.
+#     Every consequential RPC is dispatched by Temper (or by an
+#     explicit `kiln-live-rpc` helper) so authorization, scope match,
+#     idempotency, and P2/P5 contracts remain load-bearing.
+#   - The launcher does NOT mint Session / Run / Operation ids. Kiln
+#     remains the sole authority for state.
+#   - The launcher does NOT bypass Kiln.Restart.reconstruct/1 — when
+#     the daemon restarts, the journal is replayed canonically.
+#
+# Cleanup:
+#   - SIGINT (Ctrl-C) stops both the daemon and Temper, removes the
+#     workdir unless --keep-workdir is passed.
+#
+# Requirements: bash, mix, curl, openssl, python3, node >= 18 (for Temper).
+
+set -euo pipefail
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd "$HERE/.." && pwd -P)
+KILN="$ROOT/products/kiln"
+TEMPER="$ROOT/products/temper"
+
+# -- defaults --
+PORT=4000
+KEEP_WORKDIR=0
+STATE_PATH_ARG=""
+REPO=""
+SHOW_HELP=0
+
+usage() {
+  cat <<'USAGE'
+temper-live — WP-09 owner-machine dogfood launcher
+
+Usage:
+  scripts/temper-live <repository-path> [--port N] [--state-path PATH] [--keep-workdir] [--help]
+
+Arguments:
+  <repository-path>        Absolute path to the bounded repository
+                           to operate on through Temper live mode.
+
+Options:
+  --port N                 TCP port for the bounded Kiln daemon
+                           (default: 4000).
+  --state-path PATH        SQLite path for the bounded Store
+                           (default: <repo>/.kiln/state.sqlite3).
+  --keep-workdir           Keep the workdir on exit (debug aid).
+  --help                   Print this help.
+
+What it does (and does not):
+  Coordinates build, daemon startup, token generation, Temper
+  launch, and shutdown. Does NOT bypass daemon RPC, authorization,
+  Kiln authority, or any WP-09 acceptance boundary.
+
+After startup, the launcher prints the canonical 14-step workflow
+("HOW_TO_DOGFOOD_WP09") with the exact commands the operator runs.
+
+Environment overrides:
+  KILN_PORT                default --port
+  KEEP_WORKDIR=1           same as --keep-workdir
+
+USAGE
+}
+
+# -- arg parse --
+if [[ $# -eq 0 ]]; then SHOW_HELP=1; fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h) SHOW_HELP=1; shift ;;
+    --port)    PORT="$2"; shift 2 ;;
+    --state-path) STATE_PATH_ARG="$2"; shift 2 ;;
+    --keep-workdir) KEEP_WORKDIR=1; shift ;;
+    --*) echo "temper-live: unknown option: $1" >&2; exit 2 ;;
+    *)  if [[ -z "$REPO" ]]; then REPO="$1"; else echo "temper-live: unexpected positional: $1" >&2; exit 2; fi; shift ;;
+  esac
+done
+
+[[ "${KEEP_WORKDIR:-0}" == "1" ]] && KEEP_WORKDIR=1
+[[ -n "${KILN_PORT:-}" ]] && PORT="$KILN_PORT"
+
+if [[ "$SHOW_HELP" == "1" ]]; then
+  usage
+  exit 0
+fi
+
+if [[ -z "$REPO" ]]; then
+  echo "temper-live: repository path is required" >&2
+  usage >&2
+  exit 2
+fi
+
+if [[ ! -d "$REPO" ]]; then
+  echo "temper-live: not a directory: $REPO" >&2
+  exit 2
+fi
+
+REPO=$(cd "$REPO" && pwd -P)
+
+if [[ -z "$STATE_PATH_ARG" ]]; then
+  STATE_PATH="$REPO/.kiln/state.sqlite3"
+else
+  STATE_PATH="$STATE_PATH_ARG"
+fi
+
+for tool in mix curl openssl python3 node; do
+  command -v "$tool" >/dev/null 2>&1 || { echo "temper-live: required tool not on PATH: $tool" >&2; exit 1; }
+done
+
+# -- workspace --
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/temper-live.XXXXXX")
+LOG_DIR="$WORK/logs"
+mkdir -p "$LOG_DIR"
+DAEMON_PID=""
+TEMPER_PID=""
+
+cleanup() {
+  local rc=$?
+  if [[ -n "$TEMPER_PID" ]] && kill -0 "$TEMPER_PID" 2>/dev/null; then
+    kill "$TEMPER_PID" 2>/dev/null || true
+    wait "$TEMPER_PID" 2>/dev/null || true
+  fi
+  if [[ -n "$DAEMON_PID" ]] && kill -0 "$DAEMON_PID" 2>/dev/null; then
+    kill "$DAEMON_PID" 2>/dev/null || true
+    wait "$DAEMON_PID" 2>/dev/null || true
+  fi
+  if [[ "$KEEP_WORKDIR" == "0" ]]; then
+    rm -rf "$WORK"
+  else
+    echo "temper-live: workdir kept at $WORK"
+  fi
+  exit "$rc"
+}
+trap cleanup EXIT INT TERM
+
+# -- build kiln if needed --
+if [[ ! -d "$KILN/_build" ]] || [[ ! -d "$KILN/deps" ]]; then
+  echo "==> compiling kiln (mix deps.get + mix compile)"
+  ( cd "$KILN" && mix deps.get >/dev/null && mix compile >/dev/null )
+fi
+
+# -- temper build if needed --
+if [[ ! -d "$TEMPER/node_modules" ]] || [[ ! -d "$TEMPER/dist" ]]; then
+  echo "==> building temper (npm ci + npm run build)"
+  ( cd "$TEMPER" && npm ci >/dev/null && npm run build >/dev/null )
+fi
+
+mkdir -p "$(dirname "$STATE_PATH")"
+
+# -- scoped tokens (runtime-generated, never written to source/disk) --
+READ_TOKEN=$(openssl rand -hex 32)
+OPERATE_TOKEN=$(openssl rand -hex 32)
+KILN_SCOPED_TOKENS="${READ_TOKEN}:orchestration:read,${OPERATE_TOKEN}:orchestration:operate"
+
+# Persist tokens only inside the workdir for the duration of this run.
+echo "$READ_TOKEN"    > "$WORK/token.read"
+echo "$OPERATE_TOKEN"  > "$WORK/token.operate"
+chmod 600 "$WORK/token.read" "$WORK/token.operate"
+
+# -- start daemon --
+echo "==> starting bounded kiln daemon on 127.0.0.1:${PORT}"
+echo "    state_path: $STATE_PATH"
+echo "    logs:       $LOG_DIR/daemon.log"
+(
+  cd "$KILN"
+  KILN_SCOPED_TOKENS="$KILN_SCOPED_TOKENS" \
+    exec mix invariant serve --port "$PORT" --state-path "$STATE_PATH"
+) >"$LOG_DIR/daemon.log" 2>&1 &
+DAEMON_PID=$!
+
+# Wait for /healthz (bounded, no arbitrary sleep as correctness gate).
+ready=0
+for _ in $(seq 1 60); do
+  if ! kill -0 "$DAEMON_PID" 2>/dev/null; then
+    echo "temper-live: daemon exited before becoming ready" >&2
+    cat "$LOG_DIR/daemon.log" >&2 || true
+    exit 1
+  fi
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/healthz" 2>/dev/null || true)
+  if [[ "$code" == "200" ]]; then ready=1; break; fi
+  sleep 0.5
+done
+[[ "$ready" == "1" ]] || { echo "temper-live: daemon not ready" >&2; cat "$LOG_DIR/daemon.log" >&2; exit 1; }
+echo "==> daemon ready (pid=$DAEMON_PID, http://127.0.0.1:${PORT})"
+
+# -- start temper in --live mode --
+echo "==> launching temper in --live mode"
+(
+  cd "$TEMPER"
+  KILN_URL="http://127.0.0.1:${PORT}" \
+  KILN_READ_TOKEN="$READ_TOKEN" \
+  KILN_OPERATE_TOKEN="$OPERATE_TOKEN" \
+  KILN_WS_URL="ws://127.0.0.1:${PORT}/ws" \
+    exec node dist/cli.js --live "$REPO"
+) >"$LOG_DIR/temper.log" 2>&1 &
+TEMPER_PID=$!
+
+# -- print canonical workflow --
+cat <<'WORKFLOW'
+
+==> temper-live ready.
+
+HOW_TO_DOGFOOD_WP09
+===================
+
+The launcher has prepared two runtime-generated scoped tokens
+(orchestration:read + orchestration:operate) and exposed them to
+Temper via KILN_* env. The bounded daemon is the only authoritative
+state surface. Every step below is observed through Temper's
+canonical projection — none of these commands bypass RPC,
+authorization, or Kiln authority.
+
+  WORKDIR=<workdir-from-launcher-output>
+  READ=$(cat "$WORKDIR/token.read")
+  OPERATE=$(cat "$WORKDIR/token.operate")
+  PORT=<port-from-launcher-output>
+  REPO=<absolute-repository-path>
+
+0. Confirm the daemon is alive:
+     curl -s -o /dev/null -w '%{http_code}\n' \
+       http://127.0.0.1:$PORT/healthz         # expect 200
+
+1. Prerequisites / build:
+     (cd products/kiln  && mix deps.get && mix compile)
+     (cd products/temper && npm ci && npm run build)
+
+2. Daemon startup: handled by `scripts/temper-live <repo>`.
+     Equivalent manual command:
+       KILN_SCOPED_TOKENS="$READ:orchestration:read,$OPERATE:orchestration:operate" \
+         mix invariant serve --state-path "$REPO/.kiln/state.sqlite3" --port $PORT
+
+3. State-path selection: $REPO/.kiln/state.sqlite3
+   (the launcher default; pass --state-path to override).
+
+4. Authentication / token setup: tokens are generated by the launcher
+   at runtime and injected via KILN_SCOPED_TOKENS. The launcher never
+   persists them outside the workdir. The daemon enforces exact-scope
+   match (router.ex:104-113); no scope widening is possible.
+
+5. Temper live-mode startup: handled by the launcher. Manual:
+       KILN_URL=http://127.0.0.1:$PORT \
+       KILN_READ_TOKEN=$READ \
+       KILN_OPERATE_TOKEN=$OPERATE \
+       KILN_WS_URL=ws://127.0.0.1:$PORT/ws \
+         node products/temper/dist/cli.js --live "$REPO"
+
+6. Repository / project opening (Temper renders the canonical
+   projection after a project.open RPC):
+     POST http://127.0.0.1:$PORT/api/rpc
+       Authorization: Bearer $OPERATE
+       { "method":"project.open", "params":{ "path":"$REPO" } }
+   Expected response (contract freeze §9):
+       { "ok":true, "result":{
+           "status":"opened", "path":"$REPO", "kiln_home":"$REPO/.kiln",
+           "session_id":null, "canonical_session_revision":0,
+           "orphaned":false, "unknowns":[],
+           "scope_table_version":"kiln/rpc/scope-table/v1" } }
+
+7. Starting or resuming a bounded Session:
+     POST /api/rpc
+       Authorization: Bearer $OPERATE
+       { "method":"session.start",
+         "params":{
+           "objective":"<bounded objective>",
+           "criteria":["<bounded criterion>"],
+           "actor_id":"operator",
+           "project_observation":{
+             "repository_root":"$REPO",
+             "repository_fingerprint":"sha256:0000000000000000000000000000000000000000000000000000000000000001",
+             "observed_at":"2026-08-19T13:30:00Z" } } }
+   Resume an existing session:
+     { "method":"session.resume", "params":{
+         "session_id":"ses_<32hex>",
+         "actor_id":"operator",
+         "expected_session_revision":<int> } }
+
+8. Observing live activity: Temper renders notifications as they
+   arrive; the operator can also subscribe to a specific Session:
+     { "method":"activity.subscribe", "params":{
+         "subscription_id":"sub_<32hex>",
+         "filter":{ "session_id":"ses_<32hex>" } } }
+
+9. Approving a proposed mutation (Temper UI dispatches:
+     POST /api/rpc worker.propose -> patch.apply with
+     decision=APPROVE_EXACT_BYTES).
+
+10. Observing apply + verification + review (Temper renders the
+    canonical RunResultProjection after each bounded step).
+
+11. Submitting HumanDecision (Temper UI dispatches):
+     POST /api/rpc
+       Authorization: Bearer $OPERATE
+       { "method":"human.decide", "params":{
+           "plan_ref":<ArtifactRef>, "patch_ref":<ArtifactRef>,
+           "result_state_digest":"sha256:...",
+           "review_ref":<ArtifactRef>|null,
+           "decision":"ACCEPT|REJECT|REQUEST_REVISION" } }
+
+12. Disconnecting and reconnecting Temper: kill the temper
+    process; restart it with the same env. Canonical resync is
+    performed automatically on reconnect (contract freeze §8).
+
+13. Restarting Kiln and reconstructing the Session: kill the
+    daemon; restart with the same KILN_SCOPED_TOKENS +
+    --state-path. `Kiln.Restart.reconstruct/1` replays the
+    journal canonically; Temper reconnects and obtains the
+    canonical state via session.query.
+
+14. Clean shutdown: Ctrl-C in this launcher (SIGINT to the trap
+    kills Temper, then the daemon, then removes the workdir).
+
+Negative paths (exercised by integration scenarios):
+  - Unauthorized RPC: omit the Authorization header or use a
+    wrong-scope token -> HTTP 401 / bounded error envelope.
+  - Approval-bypass: patch.apply with stale decision bytes ->
+    E_PATCH_PREIMAGE_MISMATCH (P3 preserved).
+  - Stale approval reuse: patch.apply with a different base ->
+    E_PATCH_BASE_MISMATCH (P4 preserved).
+
+WORKFLOW
+
+# Park this script until the operator signals shutdown.
+echo "==> temper-live parked. Ctrl-C to stop both processes."
+wait "$DAEMON_PID" || true

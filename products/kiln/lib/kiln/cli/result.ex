@@ -164,6 +164,15 @@ defmodule Kiln.CLI.Result do
     }
   end
 
+  # M11 E2 B1: accept any struct that implements the Exception
+  # protocol (an uncaught exception caught by normalize_dispatch_result/2
+  # rescue). Surface its `Exception.message/1` and a stable
+  # INTERNAL_ERROR code so the CLI emits a structured error
+  # envelope rather than crashing or producing a malformed entry.
+  def to_error(%{__exception__: true} = exception) do
+    to_error(%{code: :internal_error, message: Exception.message(exception)})
+  end
+
   @doc "Build one bounded structured warning entry."
   @spec warning(String.t(), String.t()) :: warning()
   def warning(code, message) when is_binary(code) and is_binary(message),

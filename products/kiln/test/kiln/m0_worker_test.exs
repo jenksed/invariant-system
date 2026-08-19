@@ -35,9 +35,9 @@ defmodule Kiln.M0WorkerTest do
                                )
 
   @m6_implementer_eligibility_path Path.expand(
-                                      "../../../../products/arsenal/evaluation/qualifications/m0/implementer-eligibility.json",
-                                      __DIR__
-                                    )
+                                     "../../../../products/arsenal/evaluation/qualifications/m0/implementer-eligibility.json",
+                                     __DIR__
+                                   )
 
   setup do
     profile = read_json(@m6_implementer_profile_path)
@@ -83,7 +83,9 @@ defmodule Kiln.M0WorkerTest do
     end
 
     test "profile digest mismatch fails closed", %{profile: profile, eligibility: eligibility} do
-      tampered = put_in(eligibility, ["profile_ref", "digest"], "sha256:" <> String.duplicate("0", 64))
+      tampered =
+        put_in(eligibility, ["profile_ref", "digest"], "sha256:" <> String.duplicate("0", 64))
+
       assignment = build_assignment(profile, tampered)
 
       assert {:error, %{code: :E_PROFILE_REF_MISMATCH}} =
@@ -93,20 +95,23 @@ defmodule Kiln.M0WorkerTest do
 
   describe "bounded operation (E2)" do
     test "build_bounded_completion is deterministic", %{profile: _profile} do
-      ci_attrs = %{
-        "invocation_id" => "inv_test_001",
-        "mode" => "PRODUCTION",
-        "profile_ref" => %{"id" => "prf_test", "digest" => "sha256:abc"},
-        "context_manifest_ref" => %{"id" => "ctx_test", "digest" => "sha256:def"},
-        "tool_policy_ref" => %{"id" => "tp_test", "digest" => "sha256:ghi"},
-        "timeout_ms" => 60_000,
-        "output_contract" => "IMPLEMENTER_PATCH_PROPOSAL"
+      # M11 E2 B-repair: `build_bounded_completion/1` now accepts the
+      # canonical `implementer-patch-proposal-input/v1` envelope
+      # (the bounded patch content the Worker is proposing) and
+      # serializes it. Same envelope → same bytes → same digest.
+      envelope = %{
+        "schema" => "engineering-system/implementer-patch-proposal-input/v1",
+        "operations" => [
+          %{
+            "op" => "add",
+            "path" => "README.md",
+            "after_image_bytes" => "# hi\n"
+          }
+        ]
       }
 
-      {:ok, ci_request} = Kiln.CandidateInvocation.new_request(ci_attrs)
-
-      assert {:ok, bytes_a, digest_a} = Worker.build_bounded_completion(ci_request)
-      assert {:ok, bytes_b, digest_b} = Worker.build_bounded_completion(ci_request)
+      assert {:ok, bytes_a, digest_a} = Worker.build_bounded_completion(envelope)
+      assert {:ok, bytes_b, digest_b} = Worker.build_bounded_completion(envelope)
 
       assert bytes_a == bytes_b
       assert digest_a == digest_b
@@ -121,7 +126,10 @@ defmodule Kiln.M0WorkerTest do
     %{
       "schema" => "engineering-system/intelligence-assignment/m0-v1",
       "assignment_id" => "asg_test_" <> short_id(),
-      "requirement_ref" => %{"id" => "req_test", "digest" => "sha256:" <> String.duplicate("a", 64)},
+      "requirement_ref" => %{
+        "id" => "req_test",
+        "digest" => "sha256:" <> String.duplicate("a", 64)
+      },
       "profile_ref" => %{
         "id" => profile["profile_id"],
         "digest" => profile["semantic_digest"]

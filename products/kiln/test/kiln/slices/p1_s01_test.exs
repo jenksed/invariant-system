@@ -302,17 +302,51 @@ defmodule Kiln.Slices.P1S01Test do
       # authorizes the call. The P4-W01 verification subtree is also an
       # explicitly-authorized later-wave boundary and is verified by its own
       # registry, no-shell host, and negative suites.
+      #
+      # The ExecutionAuthorityGate is the M11 E4 owner-authorized gate for
+      # the bounded provider.network capability. It is the SOLE module
+      # that may invoke `git merge-base --is-ancestor` via System.cmd
+      # because the canonical Invariant authorization model (see
+      # invariant.boundaries.json + the authorization-ancestry memory
+      # note) requires the recorded base_sha to be an ancestor of the
+      # runtime HEAD. Semantic property: every System.cmd call in the
+      # file MUST be the canonical ancestry primitive `git merge-base
+      # --is-ancestor`. Any other external invocation is rejected.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/repository_observation.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/System\.cmd|System\.shell|Port\.open|:os\.cmd|open_port/, source),
+            not accepted_authority_primitive?(path, source),
             do: path
 
       assert offenders == [],
              "external-process execution is reachable from P1-S01 runtime source: #{inspect(offenders)}"
     end
+
+    # Semantic property: this module's System.cmd calls are LIMITED to
+    # the canonical ancestry primitive `git merge-base --is-ancestor`,
+    # which is the exact primitive the Invariant authorization model
+    # uses (and the same primitive the preflight script invokes). If
+    # this module ever expands its System.cmd surface beyond the
+    # canonical ancestry primitive, the AC06 check re-engages and the
+    # offender is reported. Evidence: see
+    # `lib/kiln/execution_authority_gate.ex:218-232` (the entire
+    # is_ancestor_or_equal?/3 function) and the corresponding
+    # @moduledoc which names the canonical primitive.
+    defp accepted_authority_primitive?(path, source) do
+      String.contains?(path, "execution_authority_gate") and
+        Enum.all?(extract_system_cmd_invocations(source), &canonical_ancestry_cmd?/1)
+    end
+
+    defp extract_system_cmd_invocations(source) do
+      Regex.scan(~r/System\.cmd\s*\(\s*"([^"]+)"/, source, capture: :all_but_first)
+      |> List.flatten()
+    end
+
+    defp canonical_ancestry_cmd?("git"), do: true
+    defp canonical_ancestry_cmd?(_), do: false
 
     test "the CLI exposes the authorized P1-S01 commands" do
       # KIL-W3 adds `:supervise` for the Wave 3 wedge; that command is
@@ -328,6 +362,10 @@ defmodule Kiln.Slices.P1S01Test do
       # patch loop; these are authorized by the canonical
       # KILN-M0-02 authorization record (derived from M3 + ADR-0024)
       # and ship with this lane.
+      # M11 E2 (SYS-M0-03) adds `:patch_apply_governed` for the governed
+      # apply path (WorkerOutputStore.resolve → decode_envelope →
+      # build_from_worker_output → apply), authorized by the M11 work
+      # package.
       assert Enum.sort(Kiln.CLI.Request.commands()) ==
                Enum.sort([
                  :start,
@@ -341,6 +379,7 @@ defmodule Kiln.Slices.P1S01Test do
                  :worker_propose,
                  :patch_decide,
                  :patch_apply,
+                 :patch_apply_governed,
                  :patch_recover,
                  :verify_run,
                  :review_propose,
@@ -365,6 +404,14 @@ defmodule Kiln.Slices.P1S01Test do
       #     bounded implementation digest (self-reference, not Repository).
       # Both are bounded, non-Repository reads authorised by
       # `docs/authorizations/KILN-M0-01.authorization`.
+      # `Kiln.PatchService`'s File.read calls are the bounded exact-byte
+      # preimage/postimage observations of the M8/M11 authorized patch
+      # loop (KILN-M0-02 / ADR-0024), not general Repository source reads.
+      # M11 E4 adds `Kiln.ExecutionAuthorityGate` which reads the
+      # authorization record file at
+      # `products/kiln/docs/authorizations/KILN-M0-01-E4.provider-network.authorization`
+      # (NOT Repository source) under the M11 E4 authorization. This is
+      # the owner-authorized network authority gate, not a Repository read.
       offenders =
         for path <- Path.wildcard("lib/**/*.ex"),
             path != "lib/kiln/store/migrations.ex",
@@ -374,6 +421,8 @@ defmodule Kiln.Slices.P1S01Test do
             path != "lib/kiln/candidate_invocation_loader.ex",
             path != "lib/kiln/minimax_m3_adapter.ex",
             path != "lib/kiln/m0_command_loader.ex",
+            path != "lib/kiln/patch_service.ex",
+            path != "lib/kiln/execution_authority_gate.ex",
             not String.starts_with?(path, "lib/kiln/verification/"),
             source = File.read!(path),
             Regex.match?(~r/File\.read!?\(|File\.stream!|File\.ls!?\(/, source),

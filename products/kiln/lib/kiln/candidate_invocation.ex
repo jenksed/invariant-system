@@ -27,9 +27,15 @@ defmodule Kiln.CandidateInvocation do
   @type artifact_ref :: %{required(:id) => String.t(), required(:digest) => String.t()}
   @type mode :: :QUALIFICATION | :PRODUCTION
   @type output_contract :: :IMPLEMENTER_PATCH_PROPOSAL | :REVIEW_VERDICT
-  @type failure_class :: :E_RUNTIME_UNAVAILABLE | :E_PROVIDER_DENIED | :E_TIMEOUT |
-                         :E_TERMINAL_RESULT | :E_CONNECTION_LOST | :E_UNKNOWN |
-                         :E_MALFORMED_OUTPUT | :E_POLICY_REJECTION
+  @type failure_class ::
+          :E_RUNTIME_UNAVAILABLE
+          | :E_PROVIDER_DENIED
+          | :E_TIMEOUT
+          | :E_TERMINAL_RESULT
+          | :E_CONNECTION_LOST
+          | :E_UNKNOWN
+          | :E_MALFORMED_OUTPUT
+          | :E_POLICY_REJECTION
 
   @type t :: %__MODULE__{
           schema: String.t(),
@@ -77,7 +83,8 @@ defmodule Kiln.CandidateInvocation do
          {:ok, context_manifest_ref} <- require_artifact_ref(attrs, :context_manifest_ref),
          {:ok, tool_policy_ref} <- require_artifact_ref(attrs, :tool_policy_ref),
          {:ok, timeout_ms} <- require_timeout(attrs),
-         {:ok, output_contract} <- require_enum(attrs, :output_contract, @allowed_output_contracts) do
+         {:ok, output_contract} <-
+           require_enum(attrs, :output_contract, @allowed_output_contracts) do
       identity_payload = %{
         invocation_id: invocation_id,
         mode: Atom.to_string(mode),
@@ -123,8 +130,10 @@ defmodule Kiln.CandidateInvocation do
   end
 
   @doc "Build a terminal result from a failure class. Result carries no adapter-restatement."
-  @spec terminal_result(failure_class()) :: %{required(:status) => failure_class(),
-                                              required(:failure_classification) => String.t()}
+  @spec terminal_result(failure_class()) :: %{
+          required(:status) => failure_class(),
+          required(:failure_classification) => String.t()
+        }
   def terminal_result(failure_class) do
     %{status: failure_class, failure_classification: @failure_classification}
   end
