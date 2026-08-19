@@ -39,43 +39,33 @@ defmodule Kiln.M12DContractDriftTest do
 
   use ExUnit.Case, async: true
 
-  # Walk upward from `start` until we find a directory containing
-  # BOTH products/kiln/mix.exs AND products/temper/package.json.
-  # Returns the absolute path of that directory.
+  # Walk upward from `dir` until we find a directory containing BOTH
+  # products/kiln/mix.exs AND products/temper/package.json. The walk
+  # terminates at the filesystem root and raises if no candidate is
+  # found.
   #
-  # Fails loudly (raises) if no repository root can be established
-  # within a reasonable depth (16 levels, well beyond any realistic
-  # monorepo nesting).
-  defp find_repo_root(start) do
-    Path.expand(start)
-    |> walk_up_for_repo_root(16)
-  end
+  # This is a runtime helper, NOT a module attribute. Computing the
+  # repository root via @repo_root = find_repo_root(__DIR__) compiles
+  # at module-load time and is brittle in CI sandboxes; the runtime
+  # resolution is functionally equivalent and avoids spurious compile
+  # failures.
+  defp find_repo_root(dir) do
+    kiln = Path.join(dir, "products/kiln/mix.exs")
+    temper = Path.join(dir, "products/temper/package.json")
 
-  defp walk_up_for_repo_root(_dir, 0) do
-    raise "could not locate repository root (no directory found with both products/kiln/mix.exs AND products/temper/package.json within 16 levels of #{__DIR__})"
-  end
+    cond do
+      File.exists?(kiln) and File.exists?(temper) ->
+        dir
 
-  defp walk_up_for_repo_root(dir, depth) do
-    kilns_mix = Path.join([dir, "products", "kiln", "mix.exs"])
-    temper_pkg = Path.join([dir, "products", "temper", "package.json"])
+      Path.dirname(dir) == dir ->
+        raise "unable to locate repository root (no directory found with both products/kiln/mix.exs AND products/temper/package.json)"
 
-    if File.regular?(kilns_mix) and File.regular?(temper_pkg) do
-      dir
-    else
-      parent = Path.dirname(dir)
-
-      if parent == dir do
-        raise "could not locate repository root (filesystem root reached without finding both products/kiln/mix.exs AND products/temper/package.json)"
-      end
-
-      walk_up_for_repo_root(parent, depth - 1)
+      true ->
+        find_repo_root(Path.dirname(dir))
     end
   end
 
-  # The repo root must be resolved AFTER the helper is defined.
-  @repo_root find_repo_root(__DIR__)
-
-  defp repo_path(relative), do: Path.join(@repo_root, relative)
+  defp repo_path(relative), do: Path.join(find_repo_root(__DIR__), relative)
 
   @frozen_rpc_methods [
     # WP-08 Lane 2 — session-family
