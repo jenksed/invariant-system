@@ -106,15 +106,29 @@ defmodule Kiln.RPC.Handlers.Project do
     end
   end
 
+  # WP-09 Lane-5 acceptance property (Repair-12): a valid repository
+  # DIRECTORY must pass path validation. The previous implementation
+  # used `File.regular?/1` which returns false for directories, so all
+  # directories were rejected with E_PROJECT_INVALID_PATH even though
+  # the error message described the rule as "not a regular file or
+  # directory" (i.e., the validator did not match its own contract).
+  #
+  # The canonical contract: project.open accepts a path that is either
+  # a regular file OR a directory. Any other filesystem object (device,
+  # socket, named pipe, dangling symlink, etc.) is E_PROJECT_INVALID_PATH;
+  # a missing path is E_PROJECT_NOT_FOUND.
   defp validate_path(path) do
     cond do
       not File.exists?(path) ->
         {:error,
          %{code: :E_PROJECT_NOT_FOUND, reason: "path does not exist: #{path}"}}
 
-      not File.regular?(path) ->
+      not (File.regular?(path) or File.dir?(path)) ->
         {:error,
-         %{code: :E_PROJECT_INVALID_PATH, reason: "path is not a regular file or directory: #{path}"}}
+         %{
+           code: :E_PROJECT_INVALID_PATH,
+           reason: "path is not a regular file or directory: #{path}"
+         }}
 
       true ->
         :ok

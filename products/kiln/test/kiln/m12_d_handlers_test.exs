@@ -158,6 +158,80 @@ defmodule Kiln.M12DHandlersTest do
     assert body["projects"] == []
   end
 
+  # -- WP-09 Repair-12: project.open path contract regression --
+  #
+  # The Lane-5 acceptance scenario surfaced a CANDIDATE_DEFECT at
+  # `products/kiln/lib/kiln/rpc/handlers/project.ex:109-122`: the
+  # validator used `File.regular?/1` which returns false for
+  # directories, so a real repository directory was rejected with
+  # E_PROJECT_INVALID_PATH even though the error message described
+  # the rule as "not a regular file or directory". The contract:
+  # project.open accepts a path that is either a regular file OR a
+  # directory.
+  describe "project.open path contract (Repair-12)" do
+    test "nonexistent path returns E_PROJECT_NOT_FOUND", %{operate_token: tok} do
+      nonexistent = "/tmp/wp09-handler-no-such-#{System.unique_integer([:positive])}"
+
+      conn =
+        post_rpc(tok, %{
+          method: "project.open",
+          params: %{"path" => nonexistent, "repository_fingerprint" => @fingerprint}
+        })
+
+      body = Jason.decode!(conn.resp_body)
+      assert body["code"] == "E_PROJECT_NOT_FOUND"
+      assert body["reason"] =~ nonexistent
+    end
+
+    test "a real directory path passes path validation far enough to exercise project.open",
+         %{operate_token: tok} do
+      # /tmp is the canonical owner-machine scratch root; the
+      # bounded validator must accept it as a valid filesystem
+      # object, not as E_PROJECT_INVALID_PATH. The downstream
+      # result may be E_STORE_UNAVAILABLE (no Store in this unit
+      # test) or a canonical projection — what matters is that
+      # E_PROJECT_INVALID_PATH is NOT the response.
+      conn =
+        post_rpc(tok, %{
+          method: "project.open",
+          params: %{"path" => "/tmp", "repository_fingerprint" => @fingerprint}
+        })
+
+      body = Jason.decode!(conn.resp_body)
+      refute body["code"] == "E_PROJECT_INVALID_PATH",
+             "directory path must not be rejected by validate_path"
+    end
+
+    test "regular file path passes path validation far enough to exercise project.open",
+         %{operate_token: tok} do
+      file = Path.join(System.tmp_dir!(), "wp09-handler-regular-#{System.unique_integer([:positive])}")
+      File.write!(file, "x")
+      on_exit(fn -> File.rm(file) end)
+
+      conn =
+        post_rpc(tok, %{
+          method: "project.open",
+          params: %{"path" => file, "repository_fingerprint" => @fingerprint}
+        })
+
+      body = Jason.decode!(conn.resp_body)
+      refute body["code"] == "E_PROJECT_INVALID_PATH",
+             "regular file path must not be rejected by validate_path"
+    end
+
+    test "scope table remains exact: read token cannot dispatch project.open",
+         %{read_token: tok} do
+      conn =
+        post_rpc(tok, %{
+          method: "project.open",
+          params: %{"path" => "/tmp", "repository_fingerprint" => @fingerprint}
+        })
+
+      body = Jason.decode!(conn.resp_body)
+      assert body["code"] == "E_SCOPE_INSUFFICIENT"
+    end
+  end
+
   # -- contract freeze: bounded error codes preserved (P5) --
 
   test "patch.apply with stale bytes returns E_PATCH_PREIMAGE_MISMATCH (P3)", %{operate_token: tok} do
