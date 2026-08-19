@@ -23,7 +23,6 @@ defmodule Kiln.M12DHandlersTest do
   import Plug.Test
 
   alias Kiln.{Service, Store}
-  alias Kiln.RPC.Router
 
   @now "2026-08-19T13:30:00Z"
   @fingerprint "sha256:0000000000000000000000000000000000000000000000000000000000000001"
@@ -180,7 +179,7 @@ defmodule Kiln.M12DHandlersTest do
         "project_observation" => %{
           "repository_root" => fixture,
           "repository_fingerprint" => @fingerprint,
-          "observed_at" => DateTime.to_iso8601(@at)
+          "observed_at" => @now
         }
       }
     }

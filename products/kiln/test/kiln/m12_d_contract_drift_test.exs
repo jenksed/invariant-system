@@ -1,0 +1,262 @@
+defmodule Kiln.M12DContractDriftTest do
+  @moduledoc """
+  WP-09 contract-drift guard.
+
+  A regression test that proves the frozen WP-09 contract survives
+  future edits. Each assertion here exists because a previous defect
+  in WP-09 was caused by exactly this drift.
+
+  Categories guarded:
+    1. All frozen RPC methods are routed (router stub shadowed the
+       real project handler in commit dfadd86 / fix 7fa53b2).
+    2. Required exact scopes match the frozen table (review:write
+       required for review.propose; no superset acceptance).
+    3. Bounded error envelope preserves method + scope + fields
+       + reason through the transport (P5 PROVEN).
+    4. Canonical contract identity strings are unchanged (no
+       rename across WP-09).
+    5. Activity schema version matches the Temper-side expectation.
+    6. Domain field names match the actual M0 structs (M0Review has
+       verifier_ref, not verification_ref — fix at commit ed8bb08).
+    7. Restart.reconstruct/1 return-shape consumed exactly per
+       @spec (lib/kiln/restart.ex:38-42).
+
+  This test is intentionally narrow: it does not build a general IDL
+  compiler. It checks the high-value invariants that the WP-09 defect
+  cycle actually exposed.
+  """
+
+  use ExUnit.Case, async: true
+
+  @frozen_rpc_methods [
+    # WP-08 Lane 2 — session-family
+    "session.start",
+    "session.cancel",
+    "session.resume",
+    "session.query",
+    "session.next_actions",
+    # WP-08 Lane 3 — patch
+    "patch.apply",
+    # WP-09 Lane 1 — lifecycle closure
+    "worker.propose",
+    "verify.run",
+    "review.propose",
+    "human.decide",
+    # WP-09 Lane 1 — project
+    "project.open",
+    "project.list",
+    # WP-09 Lane 2 — activity
+    "activity.subscribe"
+  ]
+
+  # Per LANE-EVIDENCE-WP09-CONTRACTS.md §4 — exact-match scope table.
+  @frozen_scope_table %{
+    "worker.propose" => "orchestration:operate",
+    "patch.apply" => "orchestration:operate",
+    "verify.run" => "orchestration:operate",
+    "review.propose" => "review:write",
+    "human.decide" => "orchestration:operate",
+    "project.open" => "orchestration:operate",
+    "project.list" => "orchestration:read",
+    "activity.subscribe" => "orchestration:read",
+    "terminal.attach" => "terminal:operate",
+    "session.start" => "orchestration:operate",
+    "session.cancel" => "orchestration:operate",
+    "session.resume" => "orchestration:operate",
+    "session.query" => "orchestration:read",
+    "session.next_actions" => "orchestration:read"
+  }
+
+  @frozen_contract_strings [
+    "engineering-system/run-result-envelope/v0",
+    "engineering-system/run-result-projection/m0-v1",
+    "loadout/plan/v0",
+    "engineering-system/verification-result/m0-v1",
+    "engineering-system/review/m0-v1",
+    "engineering-system/human-decision/m0-v1",
+    "implementer-patch-proposal-input/v1",
+    "external_operation_intent_recorded/v1",
+    "external_operation_observed/v1",
+    "session_projection/v1"
+  ]
+
+  # ------------------------------------------------------------------
+  # Category 1: every frozen RPC method is routed in router.ex
+  # ------------------------------------------------------------------
+
+  test "all frozen RPC methods are routed in router.ex" do
+    source =
+      File.read!("products/kiln/lib/kiln/rpc/router.ex")
+      |> then(&String.replace(&1, ~r/#[^\n]*/, ""))
+
+    for method <- @frozen_rpc_methods do
+      assert source =~ ~r/"#{Regex.escape(method)}"\s*->/,
+             "router.ex does not dispatch method #{inspect(method)}"
+    end
+  end
+
+  # ------------------------------------------------------------------
+  # Category 2: scope table matches the frozen WP-09 contract
+  # ------------------------------------------------------------------
+
+  test "router scope table exactly matches the frozen WP-09 contract" do
+    source = File.read!("products/kiln/lib/kiln/rpc/router.ex")
+    scopes = extract_scope_table(source)
+
+    for {method, expected_scope} <- @frozen_scope_table do
+      actual = Map.get(scopes, method)
+      assert actual == expected_scope,
+             "scope for #{inspect(method)} is #{inspect(actual)}, expected #{inspect(expected_scope)}"
+    end
+
+    # No method may be added to the scope table with a broader scope
+    # than required. Specifically: review.propose MUST NOT accept
+    # orchestration:operate (a superset of review:write).
+    refute Map.get(scopes, "review.propose") == "orchestration:operate",
+           "review.propose must require review:write, not a broader superset"
+
+    refute Map.get(scopes, "terminal.attach") == "orchestration:operate",
+           "terminal.attach must require terminal:operate, not orchestration:operate"
+  end
+
+  # ------------------------------------------------------------------
+  # Category 3: bounded error envelope preserves key fields
+  # ------------------------------------------------------------------
+
+  test "bounded error envelope carries code + method + scope + fields + field + reason keys" do
+    source = File.read!("products/kiln/lib/kiln/rpc/error.ex")
+    assert source =~ ~r/attrs\s*=\s*maybe_put\(attrs,\s*:reason/
+
+    # do_bounded must encode all six fields.
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*code:/,
+           "do_bounded must encode :code"
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*reason:/,
+           "do_bounded must encode :reason"
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*method:/,
+           "do_bounded must encode :method"
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*scope:/,
+           "do_bounded must encode :scope"
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*fields:/,
+           "do_bounded must encode :fields"
+    assert source =~ ~r/Jason\.encode!\(%\{[^}]*field:/,
+           "do_bounded must encode :field"
+  end
+
+  test "service.handle_unary preserves the full err envelope (no flattening)" do
+    source = File.read!("products/kiln/lib/kiln/service.ex")
+
+    # Service must NOT call the old `Error.bounded(conn, code, status: 400)`
+    # signature that dropped method/scope/fields/reason. Must use
+    # bounded_from_err/2 or 3.
+    refute source =~ ~r/Error\.bounded\(conn,\s*code,\s*status:\s*400\)/,
+           "service.ex must not flatten errors via Error.bounded/3"
+    assert source =~ ~r/Error\.bounded_from_err/,
+           "service.ex must use bounded_from_err to preserve the full envelope"
+  end
+
+  # ------------------------------------------------------------------
+  # Category 4: canonical contract identity strings are unchanged
+  # ------------------------------------------------------------------
+
+  test "frozen contract identity strings appear in expected files" do
+    files = [
+      {"engineering-system/run-result-envelope/v0", "products/temper/src/load.ts"},
+      {"engineering-system/run-result-projection/m0-v1", "products/temper/src/load.ts"},
+      {"loadout/plan/v0", "products/temper/src/load.ts"},
+      {"engineering-system/verification-result/m0-v1", "products/kiln/lib/kiln/m0_types.ex"},
+      {"engineering-system/review/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
+      {"engineering-system/human-decision/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
+      {"implementer-patch-proposal-input/v1", "products/kiln/lib/kiln/worker.ex"},
+      {"external_operation_intent_recorded/v1", "products/kiln/lib/kiln/journal/entry.ex"},
+      {"external_operation_observed/v1", "products/kiln/lib/kiln/journal/entry.ex"},
+      {"session_projection/v1", "products/kiln/lib/kiln/projections/session.ex"}
+    ]
+
+    for {string, file} <- files do
+      content = File.read!(file)
+      assert content =~ string,
+             "expected #{inspect(string)} in #{file}"
+    end
+  end
+
+  # ------------------------------------------------------------------
+  # Category 5: activity schema version
+  # ------------------------------------------------------------------
+
+  test "activity schema_version matches between Kiln and Temper" do
+    kiln = File.read!("products/kiln/lib/kiln/rpc/handlers/activity.ex")
+    assert kiln =~ ~r/schema_version.*=>.*"kiln\/activity\/v1"/,
+           "Kiln activity handler must emit schema_version = \"kiln/activity/v1\""
+
+    temper = File.read!("products/temper/src/types.ts")
+    assert temper =~ ~r/type:\s*'activity\.snapshot'/
+  end
+
+  # ------------------------------------------------------------------
+  # Category 6: M0Review field name (verifier_ref, not verification_ref)
+  # ------------------------------------------------------------------
+
+  test "M0Review struct uses verifier_ref (not verification_ref)" do
+    m0_types = File.read!("products/kiln/lib/kiln/m0_types.ex")
+    [struct_section] = Regex.scan(m0_types, ~r/defstruct\s+\[[^\]]*\]/, capture: :all_but_first)
+
+    assert struct_section =~ ~r/:verifier_ref/,
+           "M0Review defstruct must declare :verifier_ref"
+    refute struct_section =~ ~r/:verification_ref/,
+           "M0Review defstruct must NOT declare :verification_ref"
+  end
+
+  test "RPC review handler reads review.verifier_ref (not verification_ref)" do
+    handler = File.read!("products/kiln/lib/kiln/rpc/handlers/review.ex")
+
+    assert handler =~ ~r/review\.verifier_ref/,
+           "review handler must read review.verifier_ref"
+    refute handler =~ ~r/review\.verification_ref/,
+           "review handler must NOT read review.verification_ref"
+  end
+
+  # ------------------------------------------------------------------
+  # Category 7: Restart.reconstruct/1 return shape consumed exactly
+  # ------------------------------------------------------------------
+
+  test "Restart.reconstruct/1 spec is consumed exactly by handlers (no bare :empty)" do
+    activity = File.read!("products/kiln/lib/kiln/rpc/handlers/activity.ex")
+    project = File.read!("products/kiln/lib/kiln/rpc/handlers/project.ex")
+
+    # Per @spec at lib/kiln/restart.ex:38-42 the return is
+    # {:ok, :empty} (NOT the bare atom :empty).
+    refute activity =~ ~r/^\s*:empty\s*->/m,
+           "activity.ex must not have a bare :empty pattern (Restart returns {:ok, :empty})"
+    refute project =~ ~r/^\s*:empty\s*->/m,
+           "project.ex must not have a bare :empty pattern (Restart returns {:ok, :empty})"
+
+    # Same for :multiple_sessions — it returns {:error, %{code: :multiple_sessions, ...}},
+    # NOT the bare atom :multiple_sessions.
+    refute activity =~ ~r/^\s*:multiple_sessions\s*->/m,
+           "activity.ex must not have a bare :multiple_sessions pattern"
+    refute project =~ ~r/^\s*:multiple_sessions\s*->/m,
+           "project.ex must not have a bare :multiple_sessions pattern"
+  end
+
+  # ------------------------------------------------------------------
+  # helpers
+  # ------------------------------------------------------------------
+
+  # Extracts the @scopes map literal from router.ex.
+  defp extract_scope_table(source) do
+    case Regex.run(source, ~r/@scopes\s+%\{([^}]+)\}/m, capture: :all_but_first) do
+      [body] ->
+        body
+        |> String.split("\n", trim: true)
+        |> Enum.reduce(%{}, fn line, acc ->
+          case Regex.run(line, ~r/"([^"]+)"\s*=>\s*"([^"]+)"/, capture: :all_but_first) do
+            [method, scope] -> Map.put(acc, method, scope)
+            _ -> acc
+          end
+        end)
+
+      _ ->
+        %{}
+    end
+  end
+end

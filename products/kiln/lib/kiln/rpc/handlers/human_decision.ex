@@ -81,9 +81,6 @@ defmodule Kiln.RPC.Handlers.HumanDecision do
 
       {:error, %{code: :E_HUMAN_DECISION_INVALID} = err} ->
         {:error, err}
-
-      {:error, %{code: _} = err} ->
-        {:error, err}
     end
   end
 

@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# verify-wp09 — WP-09 deterministic closeout gate.
+#
+# Purpose: encode the final closeout sequence so future agents / operators
+# do not reconstruct it from chat or prose.
+#
+# This script FAILS FAST and does NOT continue after a failed gate.
+#
+# Gate sequence (in order):
+#   1. Focused WP-09 Kiln gate
+#        MIX_ENV=test mix compile --force
+#        MIX_ENV=test mix test \
+#          test/kiln/m12_d_handlers_test.exs \
+#          test/kiln/activity_hub_test.exs
+#   2. WP-08 regression gate (10 files, previously 71 passing)
+#   3. Full Kiln suite
+#   4. Temper tests
+#
+# Lane 5 (integration scenario / five-task AC-06 / dogfood / Lane 6 review)
+# is NOT included. Those require a live daemon subprocess + interactive
+# owner setup + a fresh reviewer; embedding them here would make the
+# script misleading rather than useful.
+#
+# Authority preserved:
+#   - script does NOT mutate repository state
+#   - script does NOT bypass authorization, RPC, or Kiln authority
+#   - script does NOT generate fake evidence; a non-zero exit reports
+#     exactly which gate failed and the offending command
+
+set -euo pipefail
+
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd "$HERE/.." && pwd -P)
+KILN="$ROOT/products/kiln"
+TEMPER="$ROOT/products/temper"
+
+fail() {
+  printf 'verify-wp09: %s\n' "$1" >&2
+  exit 1
+}
+
+log() {
+  printf '==> %s\n' "$*"
+}
+
+for tool in mix npm; do
+  command -v "$tool" >/dev/null 2>&1 || fail "required tool not on PATH: $tool"
+done
+
+# -----------------------------------------------------------------------
+# Gate 1: focused WP-09 Kiln gate
+# -----------------------------------------------------------------------
+log "Gate 1: focused WP-09 Kiln gate (compile + m12_d_handlers + activity_hub)"
+cd "$KILN"
+MIX_ENV=test mix compile --force
+MIX_ENV=test mix test \
+  test/kiln/m12_d_handlers_test.exs \
+  test/kiln/activity_hub_test.exs
+
+# -----------------------------------------------------------------------
+# Gate 2: WP-08 regression suite (previously 71/71 passing)
+# -----------------------------------------------------------------------
+log "Gate 2: WP-08 regression suite (10 files, previously 71/71)"
+cd "$KILN"
+MIX_ENV=test mix test \
+  test/kiln/restart_test.exs \
+  test/kiln/domain/session_test.exs \
+  test/kiln/projections/session_test.exs \
+  test/kiln/supervision_restart_regression_test.exs \
+  test/kiln/m12_d_kiln_daemon_test.exs \
+  test/kiln/m12_d_session_rpc_test.exs \
+  test/kiln/m12_d_patch_rpc_test.exs \
+  test/kiln/patch_service_test.exs \
+  test/kiln/m12_e_session_daemon_restart_test.exs \
+  test/kiln/m12_e_session_recovery_fi_test.exs
+
+# -----------------------------------------------------------------------
+# Gate 3: full Kiln suite
+# -----------------------------------------------------------------------
+log "Gate 3: full Kiln suite"
+cd "$KILN"
+mix test
+
+# -----------------------------------------------------------------------
+# Gate 4: Temper tests
+# -----------------------------------------------------------------------
+log "Gate 4: Temper tests"
+cd "$TEMPER"
+npm ci
+npm test
+
+# -----------------------------------------------------------------------
+# All gates green
+# -----------------------------------------------------------------------
+log "verify-wp09: ALL GATES GREEN"
