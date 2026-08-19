@@ -43,6 +43,13 @@ export interface WorkDeps {
     errorCode?: string;
     errorReason?: string;
   }>;
+  /**
+   * N3: invoked when the operator presses d to open the
+   * bounded diff surface. The orchestrator pushes the Diff
+   * screen onto the runtime stack; the Diff screen reads
+   * the bounded repository root from the projection.
+   */
+  onOpenDiff?: () => void;
 }
 
 export interface WorkState {
@@ -195,6 +202,13 @@ function updateWork(
       },
       msgs: []
     };
+  }
+
+  // N3: d opens the bounded diff surface. The orchestrator
+  // pushes the Diff screen onto the runtime stack.
+  if (key.kind === 'char' && key.value === 'd' && deps.onOpenDiff) {
+    deps.onOpenDiff();
+    return { state, msgs: [] };
   }
 
   // Pressing any other key (or a key after a result) dismisses
@@ -414,8 +428,8 @@ function renderWork(state: WorkState, ctx: ScreenContext, deps: WorkDeps): Frame
   }
 
   // Footer
-  const footer = deps.onHumanDecide
-    ? ' A accept · R reject · V request-revision · esc back · q quit '
+  const footer = (deps.onHumanDecide || deps.onOpenDiff)
+    ? ' d diff · A accept · R reject · V request-revision · esc back · q quit '
     : ' esc back · q quit · ctrl-c interrupt · (d diff · e evidence · g graph) — coming ';
   putString(frame, footerRow, 0, pad(footer, ctx.cols), 'footer');
   return frame;

@@ -16,6 +16,7 @@ import {
   setHomeProjection,
   type HomeState
 } from './screens/home.js';
+import { execFileSync } from 'node:child_process';
 import {
   appendWorkMotion,
   appendWorkPulse,
@@ -26,6 +27,7 @@ import {
   setWorkProjection,
   type WorkState
 } from './screens/work.js';
+import { createDiffScreen } from './screens/diff.js';
 import { WorkbenchConnection } from './workbench/connection.js';
 import { MotionLog } from './workbench/motion.js';
 import { PulseLog } from './workbench/pulse.js';
@@ -142,6 +144,51 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
           setResult(errResult);
           return errResult;
         }
+      },
+      onOpenDiff: () => {
+        // N3: open the bounded diff surface. The diff screen
+        // reads `git diff` from the current worktree via a
+        // bounded execFileSync. No new contracts.
+        const repoRoot = options.repository;
+        const diffSource = (root: string): Promise<{ ok: boolean; text: string; error?: string }> => {
+          try {
+            const text = execFileSync('git', ['-C', root, 'diff'], {
+              encoding: 'utf8',
+              maxBuffer: 2 * 1024 * 1024,
+              stdio: ['ignore', 'pipe', 'pipe']
+            });
+            return Promise.resolve({ ok: true, text: text ?? '' });
+          } catch (err) {
+            const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+            const stdout = typeof e.stdout === 'string' ? e.stdout : e.stdout?.toString('utf8') ?? '';
+            const stderr = typeof e.stderr === 'string' ? e.stderr : e.stderr?.toString('utf8') ?? '';
+            if (stdout.length > 0) {
+              return Promise.resolve({ ok: true, text: stdout });
+            }
+            return Promise.resolve({
+              ok: false,
+              text: '',
+              error: stderr || e.message || 'git diff failed'
+            });
+          }
+        };
+        runtime.push(
+          createDiffScreen({
+            repositoryRoot: repoRoot,
+            diffSource,
+            onExit: () => {
+              runtime.pop();
+            },
+            onResult: (result) => {
+              // The Diff screen is push-only and self-contained;
+              // it does not project into the workbench state.
+              // This is a deliberate boundary: a diff is a
+              // snapshot of current worktree bytes, not a
+              // canonical projection.
+              void result;
+            }
+          })
+        );
       }
     });
   }
