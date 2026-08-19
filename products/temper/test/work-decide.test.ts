@@ -57,8 +57,49 @@ function freshState(p: WorkbenchProjection = projection()): WorkState {
     motion: [],
     lastReconnectAt: null,
     disconnectedAt: null,
-    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
+    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null },
+    pendingEnvelope: null
   };
+}
+
+/** Repair A fixture: a canonical projection that has a real bounded
+ *  pending decision recorded by Kiln (decision_envelope +
+ *  pending_decision). Used by the key-press dispatch tests so the
+ *  precondition `state.pendingEnvelope !== null` is satisfied. */
+function envelopeProjection(): WorkbenchProjection {
+  return projection({
+    sessionQuery: {
+      session_id: 'ses_abcdef1234567890',
+      run_state: 'waiting_for_user',
+      verification_status: 'PASS',
+      review_status: 'APPROVE',
+      human_status: 'PENDING',
+      pending_decision: {
+        id: 'dec_aaaaaaaaaaaaaaaa',
+        subject_kind: 'run',
+        subject_id: 'run_root',
+        subject_revision: 3,
+        permitted_responses: ['ACCEPT', 'REJECT', 'REQUEST_REVISION']
+      },
+      references: {
+        decision_envelope: {
+          plan_ref: {
+            id: 'pln_canonical',
+            digest: 'sha256:' + 'a'.repeat(64)
+          },
+          patch_ref: {
+            id: 'pp_canonical',
+            digest: 'sha256:' + 'b'.repeat(64)
+          },
+          result_state_digest: 'sha256:' + 'c'.repeat(64),
+          review_ref: {
+            id: 'rev_canonical',
+            digest: 'sha256:' + 'd'.repeat(64)
+          }
+        }
+      }
+    }
+  });
 }
 
 const submitted: Array<'ACCEPT' | 'REJECT' | 'REQUEST_REVISION'> = [];
@@ -73,7 +114,8 @@ const work = createWorkScreen({
 
 test('N2 pressing A submits ACCEPT', () => {
   submitted.length = 0;
-  const r = work.update(freshState(), { kind: 'char', value: 'A' }, ctx(120, 30));
+  const seeded = setWorkProjection(freshState(), envelopeProjection());
+  const r = work.update(seeded, { kind: 'char', value: 'A' }, ctx(120, 30));
   const next = r.state as WorkState;
   assert.equal(next.humanDecide.status, 'submitting');
   assert.equal(next.humanDecide.decision, 'ACCEPT');
@@ -82,7 +124,8 @@ test('N2 pressing A submits ACCEPT', () => {
 
 test('N2 pressing R submits REJECT', () => {
   submitted.length = 0;
-  const r = work.update(freshState(), { kind: 'char', value: 'R' }, ctx(120, 30));
+  const seeded = setWorkProjection(freshState(), envelopeProjection());
+  const r = work.update(seeded, { kind: 'char', value: 'R' }, ctx(120, 30));
   const next = r.state as WorkState;
   assert.equal(next.humanDecide.decision, 'REJECT');
   assert.deepEqual(submitted, ['REJECT']);
@@ -90,10 +133,35 @@ test('N2 pressing R submits REJECT', () => {
 
 test('N2 pressing V submits REQUEST_REVISION', () => {
   submitted.length = 0;
-  const r = work.update(freshState(), { kind: 'char', value: 'V' }, ctx(120, 30));
+  const seeded = setWorkProjection(freshState(), envelopeProjection());
+  const r = work.update(seeded, { kind: 'char', value: 'V' }, ctx(120, 30));
   const next = r.state as WorkState;
   assert.equal(next.humanDecide.decision, 'REQUEST_REVISION');
   assert.deepEqual(submitted, ['REQUEST_REVISION']);
+});
+
+test('N4a pending-decision envelope panel surfaces bounded canonical refs', () => {
+  // Push the canonical envelope through setWorkProjection so the
+  // screen derives pendingEnvelope from the real Kiln projection
+  // shape. Then render and assert the bounded panel surfaces every
+  // ref without inventing values.
+  const state = setWorkProjection(freshState(), envelopeProjection());
+  assert.ok(state.pendingEnvelope, 'pendingEnvelope must be derived from canonical refs');
+  assert.equal(state.pendingEnvelope?.decision_id, 'dec_aaaaaaaaaaaaaaaa');
+  assert.equal(state.pendingEnvelope?.plan_ref.id, 'pln_canonical');
+  assert.equal(state.pendingEnvelope?.patch_ref.id, 'pp_canonical');
+  assert.equal(state.pendingEnvelope?.review_ref?.id, 'rev_canonical');
+  const text = frameToText(work.view(state, ctx(140, 50)));
+  assert.match(text, /PENDING DECISION \(canonical\)/);
+  assert.match(text, /pln_canonical/);
+  assert.match(text, /pp_canonical/);
+  assert.match(text, /rev_canonical/);
+  assert.match(text, /ACCEPT, REJECT, REQUEST_REVISION/);
+});
+
+test('N4a pending-decision envelope panel is absent when no canonical envelope is recorded', () => {
+  const text = frameToText(work.view(freshState(), ctx(140, 36)));
+  assert.doesNotMatch(text, /PENDING DECISION \(canonical\)/);
 });
 
 test('N2 submitting state shows the submitting banner', () => {

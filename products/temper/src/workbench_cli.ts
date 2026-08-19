@@ -99,17 +99,26 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
         if (homeState) runtime.setTopState(homeState);
       },
       onHumanDecide: async (decision) => {
-        // N2: invoke the real bounded `human.decide` Kiln RPC.
-        // The bounded envelope fields are sourced from the
-        // Session projection where they are present, or fall back
-        // to bounded placeholders that the daemon will reject with
-        // an exact error code. The result is rendered faithfully
-        // by the Work screen via setHumanDecideResult.
+        // N2 (Repair A): invoke the real bounded `human.decide` Kiln RPC.
+        // The bounded envelope is constructed ONLY from canonical
+        // state — the four bounded refs the operator must submit
+        // are read from session.query.projection.references.decision_envelope,
+        // recorded by Kiln at the decision-creation lifecycle point
+        // (review-propose). Temper does NOT invent placeholders.
+        //
+        // If canonical context is unavailable, the operator sees
+        // "decision action unavailable" rather than fabricated refs.
         if (!workState) {
           return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'no work state' };
         }
-        // Bound the result-update so the screen reflects the
-        // bounded result the operator asked for.
+        const envelope = workState.pendingEnvelope;
+        if (!envelope) {
+          return {
+            ok: false,
+            errorCode: 'E_DECISION_CONTEXT_UNAVAILABLE',
+            errorReason: 'no canonical pending decision envelope is currently recorded'
+          };
+        }
         const setResult = (result: { ok: boolean; errorCode?: string; errorReason?: string }) => {
           workState = setHumanDecideResult(workState!, {
             status: result.ok ? 'success' : 'rejected',
@@ -124,17 +133,18 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
           const result = await connection.submitHumanDecision(
             decision,
             {
-              plan_ref: { id: 'pln_pending_session', digest: 'sha256:' + '0'.repeat(64) },
-              patch_ref: { id: 'pp_pending_session', digest: 'sha256:' + '0'.repeat(64) },
-              result_state_digest: 'sha256:' + '0'.repeat(64),
-              review_ref: null
+              plan_ref: envelope.plan_ref,
+              patch_ref: envelope.patch_ref,
+              result_state_digest: envelope.result_state_digest,
+              review_ref: envelope.review_ref
             },
             options.actorId ?? 'temper_operator'
           );
           setResult(result);
           // After a successful human.decide, the canonical
           // Session has advanced; resync so the next render
-          // shows the new state.
+          // shows the new state and a freshly derived envelope
+          // (or null when no longer waiting_for_user).
           if (result.ok) {
             await connection.resync('resync');
           }

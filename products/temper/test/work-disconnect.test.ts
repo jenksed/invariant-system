@@ -74,7 +74,8 @@ function freshState(p: WorkbenchProjection | null = projection()): WorkState {
     motion: [],
     lastReconnectAt: null,
     disconnectedAt: null,
-    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
+    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null },
+    pendingEnvelope: null
   };
 }
 
@@ -208,7 +209,8 @@ test('N1 disconnected session: banner still renders with "—" when no session k
     motion: [],
     lastReconnectAt: null,
     disconnectedAt: '2026-08-19T12:00:00Z',
-    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
+    humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null },
+    pendingEnvelope: null
   };
   const text = frameToText(work.view(state, ctx(120, 30)));
   assert.match(text, /DISCONNECTED from Kiln/);

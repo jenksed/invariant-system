@@ -91,6 +91,27 @@ export interface WorkState {
     reason: string | null;
     at: string | null;
   };
+  /**
+   * Repair A: bounded pending-decision envelope surfaced from
+   * Kiln canonical state. When the canonical Run is in
+   * waiting_for_user, `pendingEnvelope` is the four-ref context the
+   * operator needs to submit a valid human.decide. Temper does NOT
+   * invent or own any of these refs; they are read directly from
+   * session.query.projection.references.decision_envelope. The panel
+   * surfaces this field read-only (N4a) so the operator can verify
+   * what the canonical system records before acting.
+   */
+  pendingEnvelope: {
+    plan_ref: { id: string; digest: string };
+    patch_ref: { id: string; digest: string };
+    result_state_digest: string;
+    review_ref: { id: string; digest: string } | null;
+    permitted_responses: string[];
+    decision_id: string | null;
+    subject_kind: string | null;
+    subject_id: string | null;
+    subject_revision: number | null;
+  } | null;
 }
 
 export function createWorkScreen(deps: WorkDeps): ScreenSpec {
@@ -103,7 +124,8 @@ export function createWorkScreen(deps: WorkDeps): ScreenSpec {
       motion: [],
       lastReconnectAt: null,
       disconnectedAt: null,
-      humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null }
+      humanDecide: { status: 'idle', decision: null, code: null, reason: null, at: null },
+      pendingEnvelope: null
     }),
     view: (state, ctx) => renderWork(state as WorkState, ctx, deps),
     update: (state, key, ctx) => updateWork(state as WorkState, key, ctx, deps)
@@ -112,7 +134,47 @@ export function createWorkScreen(deps: WorkDeps): ScreenSpec {
 
 /** External hooks to push canonical data into the screen state. */
 export function setWorkProjection(state: WorkState, projection: WorkbenchProjection): WorkState {
-  return { ...state, projection };
+  const envelope = derivePendingEnvelope(projection);
+  return { ...state, projection, pendingEnvelope: envelope };
+}
+
+/**
+ * Derive the bounded pending-decision envelope from a Session
+ * projection. Returns null when no canonical pending decision is
+ * present. The envelope is constructed from Kiln-owned state —
+ * `references.decision_envelope` plus the `pending_decision` decision
+ * metadata — and is the surface Temper renders for N4a and consumes
+ * for N2.
+ */
+function derivePendingEnvelope(projection: WorkbenchProjection): WorkState['pendingEnvelope'] {
+  const envelope = projection.sessionQuery?.references?.decision_envelope;
+  if (!envelope) return null;
+  const decision = projection.sessionQuery?.pending_decision;
+  const pending = isRecord(decision) ? decision : null;
+  if (!pending) return null;
+  const id = typeof pending.id === 'string' ? pending.id : null;
+  const subjectKind = typeof pending.subject_kind === 'string' ? pending.subject_kind : null;
+  const subjectId = typeof pending.subject_id === 'string' ? pending.subject_id : null;
+  const subjectRevision =
+    typeof pending.subject_revision === 'number' ? pending.subject_revision : null;
+  const permitted = Array.isArray(pending.permitted_responses)
+    ? pending.permitted_responses.filter((r): r is string => typeof r === 'string')
+    : [];
+  return {
+    plan_ref: envelope.plan_ref,
+    patch_ref: envelope.patch_ref,
+    result_state_digest: envelope.result_state_digest,
+    review_ref: envelope.review_ref,
+    permitted_responses: permitted,
+    decision_id: id,
+    subject_kind: subjectKind,
+    subject_id: subjectId,
+    subject_revision: subjectRevision
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function appendWorkPulse(state: WorkState, event: PulseEvent, maxEvents = 100): WorkState {
@@ -181,15 +243,22 @@ function updateWork(
     return { state, msgs: [{ kind: 'quit' }] };
   }
 
-  // N2: human-decide key handlers (A / R / V). The screen
-  // dispatches via the orchestrator's onHumanDecide callback and
-  // transitions to 'submitting' immediately. The orchestrator
+  // N2 (Repair A): human-decide key handlers (A / R / V). The
+  // screen dispatches via the orchestrator's onHumanDecide callback
+  // and transitions to 'submitting' immediately. The orchestrator
   // owns the result lifecycle and calls setHumanDecideResult on
   // the state when the real Kiln RPC returns.
+  //
+  // Repair A precondition: the canonical pending-decision envelope
+  // must be present (read from session.query). If it is not, the
+  // key press is a no-op and the screen surfaces
+  // E_DECISION_CONTEXT_UNAVAILABLE via the result lifecycle
+  // rather than fabricating placeholders.
   if (
     key.kind === 'char' &&
     deps.onHumanDecide &&
     state.humanDecide.status === 'idle' &&
+    state.pendingEnvelope !== null &&
     (key.value === 'A' || key.value === 'R' || key.value === 'V')
   ) {
     const decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION' =
@@ -422,6 +491,34 @@ function renderWork(state: WorkState, ctx: ScreenContext, deps: WorkDeps): Frame
           fr += 1;
         }
       }
+
+      // N4a (Repair A): bounded pending-decision envelope panel.
+      // Read-only: every field is taken verbatim from
+      // session.query.projection.references.decision_envelope plus
+      // session.query.pending_decision. Temper does NOT invent
+      // placeholders; if Kiln has not recorded an envelope, the
+      // panel simply does not render.
+      const envelope = state.pendingEnvelope;
+      if (envelope && fr < frontierRow + frontierH - 1) {
+        fr += 1;
+        putString(frame, fr, rightCol + 2, 'PENDING DECISION (canonical)', 'muted');
+        fr += 1;
+        const rows: Array<[string, string]> = [
+          ['decision', envelope.decision_id ?? '—'],
+          ['subject', formatSubject(envelope)],
+          ['plan_ref', formatRef(envelope.plan_ref)],
+          ['patch_ref', formatRef(envelope.patch_ref)],
+          ['result', shortDigest(envelope.result_state_digest)],
+          ['review', formatRef(envelope.review_ref)],
+          ['responses', envelope.permitted_responses.join(', ') || '—']
+        ];
+        for (const [label, value] of rows) {
+          if (fr >= frontierRow + frontierH - 1) break;
+          putString(frame, fr, rightCol + 2, label, 'muted');
+          putString(frame, fr, rightCol + 12, truncate(value, innerW - 10), 'dim');
+          fr += 1;
+        }
+      }
     } else {
       putString(frame, fr, rightCol + 2, 'No canonical Session yet.', 'muted');
     }
@@ -492,4 +589,28 @@ function connectionGlyph(state: WorkbenchProjection['connection']): string {
   if (state === 'connected') return '●';
   if (state === 'reconnecting') return '◌';
   return '○';
+}
+
+/** N4a: format a bounded ref (id + digest fingerprint). The id is
+ *  shown verbatim; the digest is shown as a short prefix/suffix so
+ *  the operator can compare against canonical without overflow. */
+function formatRef(ref: { id: string; digest: string } | null): string {
+  if (!ref) return '—';
+  return `${ref.id}  ${shortDigest(ref.digest)}`;
+}
+
+/** N4a: format a digest as a 12-char fingerprint
+ *  (`abcd…wxyz`) suitable for compact inspection. */
+function shortDigest(digest: string): string {
+  if (!digest) return '—';
+  if (digest.length <= 16) return digest;
+  return `${digest.slice(0, 8)}…${digest.slice(-4)}`;
+}
+
+/** N4a: assemble the bounded subject tuple (kind:id@revision). */
+function formatSubject(env: NonNullable<WorkState['pendingEnvelope']>): string {
+  const kind = env.subject_kind ?? '—';
+  const id = env.subject_id ?? '—';
+  const rev = env.subject_revision == null ? '—' : `r${env.subject_revision}`;
+  return `${kind}:${id}@${rev}`;
 }

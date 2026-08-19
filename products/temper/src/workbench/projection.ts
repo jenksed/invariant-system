@@ -22,6 +22,22 @@ export interface SessionQueryResult {
   objective?: string;
   criteria?: string[];
   pending_decision?: unknown;
+  /**
+   * Repair A: bounded decision context captured by Kiln at the
+   * decision-creation lifecycle point (e.g. review-propose). Carries
+   * the four bounded refs the operator needs to construct a valid
+   * human.decide envelope from canonical state alone — no
+   * placeholders, no filesystem archaeology.
+   */
+  references?: {
+    project_observation_id?: string;
+    decision_envelope?: {
+      plan_ref: { id: string; digest: string };
+      patch_ref: { id: string; digest: string };
+      result_state_digest: string;
+      review_ref: { id: string; digest: string } | null;
+    };
+  };
   operation?: unknown;
   verification_status?: 'PASS' | 'FAIL' | 'TIMEOUT' | 'ERROR' | 'PENDING' | 'NOT_RUN';
   review_status?: 'APPROVE' | 'REQUEST_REVISION' | 'REJECT' | 'PENDING' | 'NOT_RUN';
