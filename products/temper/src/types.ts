@@ -140,3 +140,109 @@ export interface WorkbenchModel {
   errors: string[];
   sources: Record<string, SourceFact>;
 }
+
+// =========================================================================
+// WP-09 RPC + activity envelopes (contract freeze §1, §2, §7, §9)
+// =========================================================================
+
+export type RpcScope =
+  | 'orchestration:read'
+  | 'orchestration:operate'
+  | 'review:write'
+  | 'terminal:operate';
+
+export interface RpcRequest<P = Record<string, unknown>> {
+  method: string;
+  params: P;
+  idempotency_key?: string;
+  request_digest?: string;
+}
+
+export type RpcResponse<R = unknown> =
+  | { ok: true; result: R }
+  | { ok: false; error: RpcError };
+
+export interface RpcError {
+  code: string;
+  reason?: string;
+  scope?: RpcScope;
+  method?: string;
+  field?: string;
+  fields?: string[];
+  details?: Record<string, unknown>;
+}
+
+export interface ProjectOpenResult {
+  status: 'opened';
+  path: string;
+  kiln_home: string;
+  session_id: string | null;
+  canonical_session_revision: number | null;
+  orphaned: boolean | null;
+  unknowns: string[];
+  scope_table_version: string;
+}
+
+export interface SessionStartParams {
+  objective: string;
+  criteria: string[];
+  actor_id: string;
+  project_observation: {
+    repository_root: string;
+    repository_fingerprint: string;
+    observed_at: string;
+  };
+  constraints?: string[];
+  exclusions?: string[];
+  idempotency_key?: string;
+  request_digest?: string;
+}
+
+export interface ActivitySubscribeFrame {
+  type: 'activity.subscribe';
+  subscription_id: string;
+  filter?: { session_id?: string };
+  since_revision?: number;
+}
+
+export interface ActivitySnapshotFrame {
+  type: 'activity.snapshot';
+  subscription_id: string;
+  since_revision: number;
+  schema_version: string;
+}
+
+export interface ActivityNotificationFrame {
+  type: 'activity.notification';
+  subscription_id: string;
+  revision: number;
+  emitted_at: string;
+  subject: { kind: 'session' | 'run' | 'operation'; id: string };
+  event_kind: 'state_changed';
+  canonical_session_revision: number;
+}
+
+export interface ActivityErrorFrame {
+  type: 'activity.error';
+  code: string;
+  reason: string;
+}
+
+export interface ActivityPongFrame {
+  type: 'pong';
+}
+
+export type ActivityFrame =
+  | ActivitySubscribeFrame
+  | ActivitySnapshotFrame
+  | ActivityNotificationFrame
+  | ActivityErrorFrame
+  | ActivityPongFrame;
+
+// Client configuration
+export interface KilnClientConfig {
+  baseUrl: string;
+  wsUrl: string;
+  readToken: string;
+  operateToken: string;
+}

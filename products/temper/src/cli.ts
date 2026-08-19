@@ -2,24 +2,38 @@
 import process from 'node:process';
 import { loadWorkbench } from './load.js';
 import { FOCUSES, renderWorkbench } from './render.js';
-import type { Focus } from './types.js';
+import type { Focus, WorkbenchModel } from './types.js';
+import { LiveMode } from './live.js';
 
 interface Arguments {
   repository: string;
   snapshot: boolean;
+  live: boolean;
   focus: Focus;
   width?: number;
   runPath?: string;
   planPath?: string;
 }
 
+const ESC = {
+  clear: '[2J[H',
+  hideCursor: '[?25l',
+  showCursor: '[?25h'
+};
+
 async function main(): Promise<void> {
   const args = parseArguments(process.argv.slice(2));
+  const width = args.width ?? process.stdout.columns ?? 100;
+
+  if (args.live) {
+    await runLive(args, width);
+    return;
+  }
+
   const model = await loadWorkbench(args.repository, {
     ...(args.runPath ? { runPath: args.runPath } : {}),
     ...(args.planPath ? { planPath: args.planPath } : {})
   });
-  const width = args.width ?? process.stdout.columns ?? 100;
 
   if (args.snapshot || !process.stdin.isTTY || !process.stdout.isTTY) {
     process.stdout.write(`${renderWorkbench(model, args.focus, width)}\n`);
@@ -28,27 +42,27 @@ async function main(): Promise<void> {
 
   let focus = args.focus;
   const draw = (): void => {
-    process.stdout.write('\u001b[2J\u001b[H');
+    process.stdout.write(ESC.clear);
     process.stdout.write(renderWorkbench(model, focus, process.stdout.columns ?? width));
   };
   const finish = (): void => {
     if (process.stdin.isRaw) process.stdin.setRawMode(false);
     process.stdin.pause();
-    process.stdout.write('\u001b[?25h\n');
+    process.stdout.write(`${ESC.showCursor}\n`);
   };
 
-  process.stdout.write('\u001b[?25l');
+  process.stdout.write(ESC.hideCursor);
   process.stdin.setRawMode(true);
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
   draw();
 
   process.stdin.on('data', (key: string) => {
-    if (key === 'q' || key === '\u0003') {
+    if (key === 'q' || key === '') {
       finish();
       return;
     }
-    if (key === '\u001b') focus = 'overview';
+    if (key === '') focus = 'overview';
     else if (key === 'p') focus = 'plan';
     else if (key === 'u') focus = 'run';
     else if (key === 'a') focus = 'authority';
@@ -56,10 +70,95 @@ async function main(): Promise<void> {
     else if (key === 't') focus = 'artifacts';
     else if (key === 'r') focus = 'raw';
     else if (key === '?') focus = 'help';
-    else if (key === '\t' || key === '\u001b[C' || key === '\u001b[B') focus = adjacent(focus, 1);
-    else if (key === '\u001b[D' || key === '\u001b[A') focus = adjacent(focus, -1);
+    else if (key === '\t' || key === '[C' || key === '[B') focus = adjacent(focus, 1);
+    else if (key === '[D' || key === '[A') focus = adjacent(focus, -1);
     draw();
   });
+}
+
+// WP-09 Lane 3: live mode. Reads Kiln endpoint + tokens from env
+// (KILN_URL, KILN_READ_TOKEN, KILN_OPERATE_TOKEN, KILN_WS_URL),
+// opens a project.open RPC for canonical state, subscribes to the
+// activity stream, and re-renders on every notification. Snapshot
+// mode is preserved for offline use.
+async function runLive(args: Arguments, width: number): Promise<void> {
+  const baseUrl = process.env.KILN_URL;
+  const readToken = process.env.KILN_READ_TOKEN;
+  const operateToken = process.env.KILN_OPERATE_TOKEN;
+  const wsUrl = process.env.KILN_WS_URL;
+
+  if (!baseUrl || !readToken || !operateToken || !wsUrl) {
+    process.stderr.write(
+      'temper --live requires KILN_URL, KILN_READ_TOKEN, KILN_OPERATE_TOKEN, KILN_WS_URL\n'
+    );
+    process.exit(2);
+  }
+
+  const live = new LiveMode({
+    baseUrl,
+    wsUrl,
+    readToken,
+    operateToken,
+    repository: args.repository,
+    onProjection: (model) => {
+      if (!process.stdout.isTTY) {
+        process.stdout.write(`${renderWorkbench(model, focus, width)}\n`);
+        return;
+      }
+      process.stdout.write(ESC.clear);
+      process.stdout.write(renderWorkbench(model, focus, process.stdout.columns ?? width));
+    }
+  });
+
+  let focus: Focus = args.focus;
+
+  const finish = (): void => {
+    if (process.stdin.isRaw) process.stdin.setRawMode(false);
+    process.stdin.pause();
+    process.stdout.write(`${ESC.showCursor}\n`);
+    void live.stop();
+    process.exit(0);
+  };
+
+  try {
+    const model = await live.start();
+
+    if (args.snapshot || !process.stdin.isTTY || !process.stdout.isTTY) {
+      process.stdout.write(`${renderWorkbench(model, focus, width)}\n`);
+      await live.stop();
+      return;
+    }
+
+    process.stdout.write(ESC.hideCursor);
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    process.stdin.on('data', (key: string) => {
+      if (key === 'q' || key === '') {
+        finish();
+        return;
+      }
+      if (key === '') focus = 'overview';
+      else if (key === 'p') focus = 'plan';
+      else if (key === 'u') focus = 'run';
+      else if (key === 'a') focus = 'authority';
+      else if (key === 'e') focus = 'evidence';
+      else if (key === 't') focus = 'artifacts';
+      else if (key === 'r') focus = 'raw';
+      else if (key === '?') focus = 'help';
+      else if (key === '\t' || key === '[C' || key === '[B') focus = adjacent(focus, 1);
+      else if (key === '[D' || key === '[A') focus = adjacent(focus, -1);
+      const m = live.currentModel as WorkbenchModel | undefined;
+      if (m) {
+        process.stdout.write(ESC.clear);
+        process.stdout.write(renderWorkbench(m, focus, process.stdout.columns ?? width));
+      }
+    });
+  } catch (err) {
+    process.stderr.write(`temper --live: ${(err as Error).message}\n`);
+    process.exit(1);
+  }
 }
 
 function adjacent(focus: Focus, offset: number): Focus {
@@ -70,6 +169,7 @@ function adjacent(focus: Focus, offset: number): Focus {
 function parseArguments(argv: string[]): Arguments {
   let repository = process.cwd();
   let snapshot = false;
+  let live = false;
   let focus: Focus = 'overview';
   let width: number | undefined;
   let runPath: string | undefined;
@@ -79,6 +179,7 @@ function parseArguments(argv: string[]): Arguments {
     const argument = argv[index];
     if (!argument) continue;
     if (argument === '--snapshot') snapshot = true;
+    else if (argument === '--live') live = true;
     else if (argument === '--help' || argument === '-h') {
       printUsage();
       process.exit(0);
@@ -94,6 +195,7 @@ function parseArguments(argv: string[]): Arguments {
   return {
     repository,
     snapshot,
+    live,
     focus,
     ...(width !== undefined ? { width } : {}),
     ...(runPath ? { runPath } : {}),
@@ -116,6 +218,9 @@ function printUsage(): void {
   process.stdout.write(`Usage: temper [repository] [options]\n\n`);
   process.stdout.write(`Options:\n`);
   process.stdout.write(`  --snapshot       render once without interactive terminal control\n`);
+  process.stdout.write(`  --live           connect to a bounded Kiln daemon for live activity\n`);
+  process.stdout.write(`                   (requires KILN_URL, KILN_READ_TOKEN,\n`);
+  process.stdout.write(`                    KILN_OPERATE_TOKEN, KILN_WS_URL)\n`);
   process.stdout.write(`  --focus <name>   initial focus (${FOCUSES.join(', ')})\n`);
   process.stdout.write(`  --width <cols>   snapshot width (minimum 48)\n`);
   process.stdout.write(`  --run <path>     explicit Loadout Run record\n`);
