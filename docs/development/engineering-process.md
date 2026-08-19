@@ -1,6 +1,6 @@
 ---
 title: Evidence-Driven Engineering Process
-description: How documentation, contracts, implementation, evidence, review, and human decisions stay connected during Invariant engineering work.
+description: How documentation, contracts, implementation, evidence, review, and human decisions stay connected during Invariant engineering work, with risk-scaled verification tiering.
 status: current
 verified_at_commit: fed26fcc8b7598a56ce86e47c99d0154e6b46436
 source_paths:
@@ -85,6 +85,248 @@ STATUS =
 ```
 
 The record is an index into truth, not a substitute for it. Link to contracts, source, tests, evidence artifacts, accepted SHAs, and decision records rather than copying their contents into a second ledger.
+
+The work-package contract should also carry a `RISK_TIER` (one of `Tier 0`, `Tier 1`, `Tier 2`, `Tier 3`) classified by the property below. The tier determines verification burden; it is not project-management metadata.
+
+## Risk-scaled verification
+
+Apply the minimum process necessary to prove the property at risk. Increase verification burden only when a change can affect authority, canonical state, shared contracts, provenance, recovery, or completion truth. This is the principle the four tiers below implement.
+
+### Tier model
+
+Classify the change by the worst property it can affect, not by the size of the diff.
+
+```text
+Tier 0  local / mechanically bounded
+        copy changes, styling, isolated refactors,
+        deterministic transformations, obvious local
+        defects with negligible shared-state impact
+
+Tier 1  bounded behavioral change
+        provider adapters using an existing contract,
+        UI projections, CLI/parser behavior, small
+        runtime features, localized error handling
+
+Tier 2  shared contract / state boundary
+        serialization, canonical Session state,
+        cross-product interfaces, reconnect/recovery
+        semantics, provider contracts, shared schemas,
+        persistent compatibility
+
+Tier 3  authority / completion truth
+        authorization, governed mutation, approval,
+        completion semantics, provenance/evidence,
+        qualification, independent review authority,
+        human decision authority, recovery truth
+```
+
+### Verification burden by tier
+
+```text
+Tier 0
+  focused validation; relevant tests/lint/build;
+  no independent-review ceremony unless
+  implementation discovers additional risk
+
+Tier 1
+  explicit acceptance property; focused regression
+  coverage; an appropriate public-boundary or
+  integration check when the behavior exposes one;
+  independent review optional unless discovered
+  risk warrants escalation
+
+Tier 2
+  frozen acceptance property; regression coverage;
+  public-boundary verification; independent review
+  of the actual diff and affected contract; explicit
+  compatibility / regression assessment
+
+Tier 3
+  acceptance property defined before implementation;
+  adversarial independent review; reviewer independently
+  reconstructs or reproduces the important path where
+  possible; public-boundary / end-to-end evidence where
+  applicable; explicit accounting of what remains
+  unproven; human acceptance remains separate from
+  implementation and review
+```
+
+These tiers exist to determine verification burden. They are not project-management bureaucracy.
+
+### Three mandatory questions for Tier 1-3 work
+
+Answer these before implementation. Keep the answers concise.
+
+```text
+PROPERTY
+  What must actually be true when the work is complete?
+  Do not describe only the implementation task.
+
+  Bad:    Add Kimi support.
+  Better: A canonical provider invocation can use Kimi
+          through the existing Kiln provider boundary
+          and produce a normalized result without
+          transferring execution authority.
+
+BOUNDARY
+  Where must the property be demonstrated?
+  Examples: unit boundary, public API, CLI subprocess,
+  provider seam, filesystem/git boundary, reconnect
+  path, governed workflow. Use the smallest boundary
+  that genuinely proves the property.
+
+MISLEADING GREEN
+  What could make tests pass while the intended
+  property is still false?
+  Examples: internal functions work but CLI argument
+  wiring is broken; fixtures serialize differently
+  from runtime state; adapter tests pass but the
+  canonical invocation path is broken; initial
+  connection works but reconnect/resync is incorrect;
+  projection snapshots pass while canonical state
+  handling is wrong.
+```
+
+This section exists specifically to prevent proxy tests from becoming completion evidence.
+
+### Evidence vocabulary
+
+The repository must clearly distinguish:
+
+```text
+REPORTED
+  The implementer says something happened.
+  This is a claim.
+
+SUPPLIED EVIDENCE
+  The implementer provides logs, test output,
+  snapshots, artifacts, traces, command results.
+  This is evidence, but still implementer-supplied.
+
+INDEPENDENTLY VERIFIED
+  A reviewer independently reruns the relevant path,
+  inspects repository state, reproduces the behavior,
+  or directly verifies the contract or property.
+
+INFERENCE
+  A conclusion supported by evidence but not directly
+  demonstrated. Label it accordingly.
+
+UNPROVEN
+  A material claim for which available evidence is
+  insufficient. Do not upgrade unproven claims merely
+  because the implementation appears coherent.
+```
+
+An implementation-agent completion summary is a **claim set** to evaluate, not authoritative evidence of repository state. Narrative quality must not substitute for proof.
+
+### Frozen acceptance rule
+
+Implementation or repair difficulty does not silently weaken acceptance.
+
+```text
+If acceptance requires:        Then internal function
+  public CLI behavior           tests passing
+  is not a substitute.
+
+If acceptance requires:        Then initial connection
+  reconnect restores canonical  succeeding
+  Session truth                 is not a substitute.
+
+If acceptance requires:        Then adapter unit tests
+  provider-backed governed      passing
+  execution                     is not a substitute.
+```
+
+Changing acceptance requires an explicit human decision. Repair work must not redefine success by attrition.
+
+### Repair-loop discipline
+
+After a repair attempt fails, do not stack another speculative repair based only on the previous narrative. Use:
+
+```text
+failure observed
+  → reproduce violated property
+  → isolate smallest demonstrated cause
+  → repair
+  → rerun original failing path
+  → run relevant regression
+```
+
+Avoid:
+
+```text
+failure
+  → plausible patch
+  → adjacent warning
+  → second plausible patch
+  → tests become greener
+  → completion claim
+```
+
+When a material defect escaped prior verification or caused repeated repair work, the report should contain:
+
+```text
+DEFECT
+  What was actually wrong.
+
+VIOLATED PROPERTY
+  Which intended property was false.
+
+ROOT CAUSE
+  Demonstrated cause rather than guessed symptom.
+
+WHY PREVIOUS VERIFICATION MISSED IT
+  What boundary or property was not exercised.
+
+VERIFICATION REPAIR
+  What now detects this failure class.
+```
+
+Do not require this for trivial typos or obvious local mistakes. Use it when prior meaningful verification failed.
+
+### Risk can escalate or de-escalate
+
+Initial classification is not permanent. A Tier 0 or Tier 1 task should escalate if implementation discovers effects involving canonical state, shared contracts, authority, provenance, recovery, persistent compatibility, or completion semantics. Likewise, if investigation demonstrates a supposedly high-risk change is mechanically bounded, do not retain Tier-3 ceremony merely because the change was originally feared to be complex.
+
+### Ceremony test
+
+Every process step must protect a named failure mode or acceptance property. If removing it would not materially reduce confidence, remove it.
+
+```text
+Do NOT require by default:
+  independent review for cosmetic changes
+  elaborate evidence directories for trivial
+    deterministic changes
+  architecture proposals for one-off adapters
+  generalized abstractions before repeated
+    concrete implementations expose a stable
+    common requirement
+  full-system E2E tests when a smaller public
+    boundary directly proves the property
+  postmortems for obvious local mistakes
+
+DO require stronger verification where false
+confidence would be expensive.
+```
+
+### Existing Invariant doctrine preserved
+
+The tier model must not weaken:
+
+```text
+- capability is not authority
+- intelligence proposes, infrastructure enforces
+- completion requires evidence
+- test the property, not the proxy
+- independent review must actually be independent
+- human decision authority remains human
+- canonical truth must not be invented by projections
+- provenance matters where mutation or completion
+  depends on it
+```
+
+This section concentrates rigor, not dilutes it.
 
 ## Change loop
 
