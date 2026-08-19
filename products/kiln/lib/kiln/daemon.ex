@@ -30,8 +30,22 @@ defmodule Kiln.Daemon do
   @impl Supervisor
   def init(port: port) do
     children = [
+      # WP-09 Lane 2: the listener uses a Cowboy dispatch table that
+      # routes /ws to Kiln.Activity.WebSocket and all other paths to
+      # the HTTP Kiln.Service plug via Plug.Cowboy.Translator.
+      #
+      # Plug.Cowboy 2.9.0+ REQUIRES `:plug` in the child spec even when
+      # `:dispatch` is supplied manually (see
+      # deps/plug_cowboy/lib/plug/cowboy.ex:265-272 child_spec/1). With
+      # a manual :dispatch, the plug value is NOT initialized nor
+      # dispatched to (deps/plug_cowboy/lib/plug/cowboy.ex:25-27
+      # `:dispatch` moduledoc); the dispatch table fully owns routing.
+      # We supply Kiln.Service so the child spec is structurally
+      # well-formed; the dispatch table overrides what the plug would
+      # otherwise have served.
       {Cowboy,
        scheme: :http,
+       plug: Kiln.Service,
        options: [
          port: port,
          dispatch: dispatch_table()

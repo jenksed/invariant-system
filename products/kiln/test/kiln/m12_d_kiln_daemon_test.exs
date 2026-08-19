@@ -178,4 +178,46 @@ defmodule Kiln.M12DKilnDaemonTest do
       assert result.resp_body =~ ~s({"code":"E_UNAUTHORIZED")
     end
   end
+
+  # WP-09 repair-5 regression guard: Plug.Cowboy 2.9.0+ REQUIRES :plug in
+  # the child spec (deps/plug_cowboy/lib/plug/cowboy.ex:265-272). The
+  # bounded daemon uses a manual Cowboy :dispatch table that routes
+  # /ws to Kiln.Activity.WebSocket and all other paths to the Plug via
+  # Plug.Cowboy.Translator. The plug value is NOT initialized nor
+  # dispatched to when :dispatch is supplied (moduledoc line 25-27);
+  # but the child spec MUST still contain :plug or supervisor boot raises.
+  describe "Kiln.Daemon bounded Plug.Cowboy child spec" do
+    test "child spec can be constructed without raising (Plug.Cowboy :plug required)" do
+      # This test does NOT start the daemon (that requires a real port
+      # and supervisor); it only verifies that the supervisor child
+      # spec shape satisfies Plug.Cowboy 2.9.0's required-key contract.
+      children = Kiln.Daemon.init(port: 0)
+
+      [{plug_cowboy_module, opts}] = children
+      assert plug_cowboy_module == Plug.Cowboy
+      assert Keyword.get(opts, :scheme) == :http
+      assert Keyword.has_key?(opts, :plug),
+             "Plug.Cowboy 2.9.0 child spec must include :plug even with manual :dispatch"
+      assert Keyword.get(opts, :options)[:dispatch] != nil,
+             "manual :dispatch must be present in options"
+
+      # Now exercise Plug.Cowboy.child_spec/1 directly. If :plug is
+      # missing this raises KeyError, which is the regression we are
+      # guarding against.
+      child_spec = Plug.Cowboy.child_spec(opts)
+      assert is_map(child_spec)
+      assert Map.has_key?(child_spec, :id)
+      assert Map.has_key?(child_spec, :start)
+    end
+
+    test "Plug.Cowboy child_spec/1 raises KeyError without :plug (sanity)" do
+      # Sanity: confirm that without :plug the child_spec raises, so
+      # the regression test above is meaningful.
+      opts = [scheme: :http, options: [port: 0, dispatch: %{}]]
+
+      assert_raise KeyError, fn ->
+        Plug.Cowboy.child_spec(opts)
+      end
+    end
+  end
 end
