@@ -226,16 +226,20 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "M0Review struct uses verifier_ref (not verification_ref)" do
-    m0_types = File.read!(repo_path("products/kiln/lib/kiln/m0_types.ex"))
+    # Runtime struct introspection. The previous source-regex
+    # Regex.scan/3 used `capture: :all_but_first` against a regex
+    # with NO capture group, which returned one match-list per
+    # defstruct in the file (8 of them) and crashed the single-match
+    # pattern `[struct_section] = ...`. The runtime check is
+    # strictly stronger: it asserts the COMPILED struct shape,
+    # not the textual representation.
+    review = struct(Kiln.M0Review)
 
-    [struct_section] =
-      Regex.scan(~r/defstruct\s+\[[^\]]*\]/, m0_types, capture: :all_but_first)
+    assert Map.has_key?(review, :verifier_ref),
+           "M0Review struct must declare :verifier_ref"
 
-    assert struct_section =~ ~r/:verifier_ref/,
-           "M0Review defstruct must declare :verifier_ref"
-
-    refute struct_section =~ ~r/:verification_ref/,
-           "M0Review defstruct must NOT declare :verification_ref"
+    refute Map.has_key?(review, :verification_ref),
+           "M0Review struct must NOT declare :verification_ref"
   end
 
   test "RPC review handler reads review.verifier_ref (not verification_ref)" do
