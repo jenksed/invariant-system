@@ -375,13 +375,37 @@ defmodule Kiln.M0PatchTest do
   end
 
   describe "Patch Recovery (E4)" do
-    test "EXACT post-state recovery succeeds" do
-      proposal = build_proposal!()
+    test "EXACT post-state recovery succeeds (P4: disk must match observed)" do
+      tmp = fresh_tmp!("recover_post")
+      File.write!(Path.join(tmp, "README.md"), "# Original\n")
+
+      original = "# Original\n"
+      replaced = "# Replaced\n"
+      before_digest = sha256_hex(original)
+      after_digest = sha256_hex(replaced)
+
+      ops_with_bytes = [
+        %{
+          op: :replace,
+          path: "README.md",
+          content: replaced,
+          before_digest: before_digest,
+          after_image_digest: after_digest
+        }
+      ]
+
+      proposal =
+        build_proposal!(
+          operations: ops_with_bytes,
+          repository: tmp
+        )
+
       {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
 
-      # In production, the recovery path would compare against the actual
-      # observed filesystem state digest. Here we use the proposal-derived
-      # expected post-state digest.
+      # Apply the patch so the disk reaches the post-state that P4
+      # (recover/3 observes the repository) needs to verify.
+      assert {:ok, _evidence} = PatchService.apply(proposal, decision, ops_with_bytes)
+
       expected_post = derive_expected_post_digest(proposal)
 
       assert {:ok, %Evidence{effect: "EXACT_TARGET_STATE_OBSERVED"}} =
@@ -392,6 +416,9 @@ defmodule Kiln.M0PatchTest do
       proposal = build_proposal!()
       {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
 
+      # P4: the disk-observed digest never equals proposal.base_state_digest
+      # (different schemes), so P4 fails closed BEFORE the existing
+      # base-state branch runs.
       assert {:error, %{code: :E_PATCH_RECOVERY_DENIED}} =
                PatchService.recover(proposal, decision, proposal.base_state_digest)
     end
@@ -400,6 +427,8 @@ defmodule Kiln.M0PatchTest do
       proposal = build_proposal!()
       {:ok, decision} = PatchService.decide(proposal, :approve, proposal.base_state_digest)
 
+      # P4: a fabricated digest that does not match the disk fails
+      # closed at the new disk-observation check.
       assert {:error, %{code: :E_PATCH_RECOVERY_DENIED}} =
                PatchService.recover(proposal, decision, "sha256:" <> String.duplicate("9", 64))
     end

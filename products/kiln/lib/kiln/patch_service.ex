@@ -268,11 +268,19 @@ defmodule Kiln.PatchService do
   @doc """
   Recover a Run whose last-known evidence state is `:UNKNOWN_EFFECT`.
 
-  If the actual post-state equals the expected post-state digest
-  (recomputed by applying the proposal ops to the proposal's
-  `base_state_digest`), recovery records the canonical evidence
-  without re-applying. If state is neither expected preimage nor
-  expected postimage, recovery returns `:E_PATCH_RECOVERY_DENIED`.
+  WP-08 Lane 3 (P4): before any caller-supplied digest is trusted,
+  compute the OBSERVED state digest by hashing the repository at
+  `proposal.operations` paths. The caller's `observed_state_digest`
+  must match this disk-derived digest; otherwise recovery fails
+  closed with `:E_PATCH_RECOVERY_DENIED`. The same canonical scheme
+  used by `expected_post_state_digest/1` is reused so a caller that
+  has truthfully observed the post-state and recomputed the digest
+  with the same shape passes through.
+
+  If the caller's digest matches the disk-observed digest, the
+  existing classification applies: exact base → denied (nothing was
+  applied yet), exact target → canonical evidence re-emitted without
+  re-applying, anything else → denied (unknown repository state).
 
   Returns `{:ok, %Kiln.M0PatchEvidence{}}` or a bounded recovery error.
   """
@@ -284,7 +292,17 @@ defmodule Kiln.PatchService do
              | %{required(:code) => atom(), required(:reason) => String.t()}}
   def recover(proposal, decision, observed_state_digest)
       when not is_nil(proposal) and not is_nil(decision) and is_binary(observed_state_digest) do
+    disk_digest = observed_state_digest(proposal)
+
     cond do
+      observed_state_digest != disk_digest ->
+        {:error,
+         %{
+           code: :E_PATCH_RECOVERY_DENIED,
+           reason:
+             "supplied observed_state_digest does not match repository contents at proposal paths; refuse to repair without an honest observation"
+         }}
+
       observed_state_digest == proposal.base_state_digest ->
         {:error,
          %{
@@ -507,6 +525,31 @@ defmodule Kiln.PatchService do
 
   defp check_afterimage_digest(_op), do: :ok
 
+  defp check_preimage_digest(repository, %{op: :add, path: path}) do
+    full = Path.join(repository, path)
+
+    case File.lstat(full) do
+      {:error, :enoent} ->
+        :ok
+
+      {:ok, _stat} ->
+        {:error,
+         %{
+           code: :E_PATCH_PREIMAGE_MISMATCH,
+           reason:
+             "expected preimage at #{inspect(path)} to be absent (op is :add); found existing file or directory at the target path"
+         }}
+
+      {:error, reason} ->
+        {:error,
+         %{
+           code: :E_PATCH_PREIMAGE_MISMATCH,
+           reason:
+             "could not stat preimage at #{inspect(path)} for :add op: #{inspect(reason)}"
+         }}
+    end
+  end
+
   defp check_preimage_digest(repository, %{op: op, path: path, before_digest: before_digest})
        when op in [:replace, :delete] do
     full = Path.join(repository, path)
@@ -660,6 +703,43 @@ defmodule Kiln.PatchService do
         "base_state_digest" => proposal.base_state_digest,
         "operations" => canon_ops
       })
+  end
+
+  # WP-08 Lane 3 (P4): compute the OBSERVED state digest for `proposal`
+  # by hashing the repository at the proposal's `operations` paths. Uses
+  # the SAME canonical scheme (`expected-post`) as
+  # `expected_post_state_digest/1` so the OBSERVED digest equals the
+  # EXPECTED digest iff the disk state matches the proposal's expected
+  # post-state. This is what lets the existing `cond` in `recover/3`
+  # continue to work: once the caller's claim is verified against the
+  # disk, the second-stage comparison against `expected_post_state_digest`
+  # becomes the truth test.
+  defp observed_state_digest(proposal) do
+    canon_ops =
+      Enum.map(proposal.operations, fn op ->
+        %{
+          "op" => op["op"],
+          "path" => op["path"],
+          "before_digest" => op["before_digest"],
+          "after_image_digest" => actual_after_digest(proposal.repository, op),
+          "mode" => op["mode"]
+        }
+      end)
+
+    "sha256:" <>
+      Canonical.digest(@evidence_schema <> "/expected-post", %{
+        "base_state_digest" => proposal.base_state_digest,
+        "operations" => canon_ops
+      })
+  end
+
+  defp actual_after_digest(repository, op) do
+    full = Path.join(repository, op["path"])
+
+    case File.read(full) do
+      {:ok, bytes} -> sha256_hex(bytes)
+      {:error, _reason} -> nil
+    end
   end
 
   defp build_evidence(proposal, decision, effect, post_state_digest) do

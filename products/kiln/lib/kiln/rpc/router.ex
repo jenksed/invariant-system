@@ -141,6 +141,9 @@ defmodule Kiln.RPC.Router do
       "session.next_actions" ->
         Kiln.RPC.Handlers.Session.handle("session.next_actions", params, opts)
 
+      "patch.apply" ->
+        Kiln.RPC.Handlers.Patch.handle("patch.apply", params, opts)
+
       _ ->
         {:error, %{code: :E_NOT_IMPLEMENTED, method: method}}
     end
