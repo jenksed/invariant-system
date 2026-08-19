@@ -59,14 +59,10 @@ defmodule Kiln.RPC.Handlers.Project do
   # -- project.list --
   #
   # Truthful empty list. No project-registry module exists in WP-09
-  # scope; the contract freeze (§9) requires this shape so Temper
-  # can render an empty workbench without inventing state.
+  # scope; the contract freeze requires this shape so Temper can render
+  # an empty workbench without inventing state.
   defp project_list(_params) do
-    {:ok,
-     %{
-       "projects" => [],
-       "scope_table_version" => "kiln/rpc/scope-table/v1"
-     }}
+    {:ok, %{projects: []}}
   end
 
   # -- project.open --
@@ -84,14 +80,13 @@ defmodule Kiln.RPC.Handlers.Project do
          {:ok, reconstruction} <- safe_reconstruct(kiln_home) do
       {:ok,
        %{
-         "status" => "opened",
-         "path" => path,
-         "kiln_home" => kiln_home,
-         "session_id" => reconstruction[:session_id],
-         "canonical_session_revision" => reconstruction[:revision],
-         "orphaned" => reconstruction[:orphaned],
-         "unknowns" => reconstruction[:unknowns],
-         "scope_table_version" => "kiln/rpc/scope-table/v1"
+         status: "opened",
+         path: path,
+         kiln_home: kiln_home,
+         session_id: reconstruction[:session_id],
+         canonical_session_revision: reconstruction[:revision],
+         orphaned: reconstruction[:orphaned],
+         unknowns: reconstruction[:unknowns]
        }}
     end
   end

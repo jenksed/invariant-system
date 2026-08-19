@@ -123,9 +123,6 @@ defmodule Kiln.RPC.Router do
   # from the envelope top-level fields. When omitted, Workflow auto-mints.
   defp invoke(method, params, opts) do
     case method do
-      "project.list" -> {:ok, %{projects: []}}
-      "project.open" -> {:ok, %{status: "opened", path: params["path"]}}
-
       "session.start" ->
         Kiln.RPC.Handlers.Session.handle("session.start", params, opts)
 
@@ -146,9 +143,10 @@ defmodule Kiln.RPC.Router do
 
       # WP-09 Lane 1: lifecycle closure. Each handler wraps existing
       # bounded Kiln machinery (Worker.propose/5, M0VerificationResult.build/6,
-      # Review.build/9, HumanDecision.build/5, Project.open). The RPC
-      # layer adapts to existing domain ownership; it does NOT introduce
-      # new Worker / verification / review / HumanDecision semantics.
+      # Review.build/9, HumanDecision.build/5, Kiln.Restart.reconstruct/1).
+      # The RPC layer adapts to existing domain ownership; it does NOT
+      # introduce new Worker / verification / review / HumanDecision
+      # semantics.
       "worker.propose" ->
         Kiln.RPC.Handlers.Worker.handle("worker.propose", params, opts)
 
@@ -167,11 +165,9 @@ defmodule Kiln.RPC.Router do
       "project.list" ->
         Kiln.RPC.Handlers.Project.handle("project.list", params, opts)
 
-      # WP-09 Lane 2: activity.subscribe returns the initial
-      # canonical projection envelope. The actual notification stream
-      # is delivered over WebSocket at /ws (handlers/activity_websocket.ex).
-      # This handler exists only for clients that want the initial
-      # canonical snapshot without opening a WebSocket.
+      # WP-09 Lane 2: activity.subscribe returns the initial canonical
+      # projection envelope. The actual notification stream is delivered
+      # over WebSocket at /ws (lib/kiln/activity/websocket.ex).
       "activity.subscribe" ->
         Kiln.RPC.Handlers.Activity.handle("activity.subscribe", params, opts)
 

@@ -116,7 +116,6 @@ body = json.load(open(sys.argv[1]))
 expected_path = sys.argv[2]
 assert body.get("status") == "opened", body
 assert body.get("path") == expected_path, body
-assert body.get("scope_table_version") == "kiln/rpc/scope-table/v1", body
 assert "canonical_session_revision" in body, body
 assert "orphaned" in body, body
 assert isinstance(body.get("unknowns"), list), body
