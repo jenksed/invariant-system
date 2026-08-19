@@ -162,27 +162,87 @@ defmodule Kiln.M12DHandlersTest do
   # -- contract freeze: bounded error codes preserved (P5) --
 
   test "patch.apply with stale bytes returns E_PATCH_PREIMAGE_MISMATCH (P3)", %{operate_token: tok} do
+    # Establish a real Session via session.start so P2 intent journaling
+    # has a session_start anchor in the journal. Without this anchor,
+    # the journal reducer rejects the intent entry with :invalid_entry
+    # BEFORE PatchService.apply runs, and the P3 property never gets
+    # exercised. This fixture exists to prove the property itself.
+    fixture = "/tmp/kiln-fixture"
+    File.mkdir_p!(fixture)
+    File.write!(Path.join(fixture, "EXISTING.md"), "already there\n")
+
+    session_body = %{
+      method: "session.start",
+      params: %{
+        "objective" => "wp-09 stale-patch test",
+        "criteria" => ["bounded"],
+        "actor_id" => "operator",
+        "project_observation" => %{
+          "repository_root" => fixture,
+          "repository_fingerprint" => @fingerprint,
+          "observed_at" => DateTime.to_iso8601(@at)
+        }
+      }
+    }
+
+    start_conn = post_rpc(tok, session_body)
+    assert start_conn.status == 200, "session.start failed: #{start_conn.resp_body}"
+    started = Jason.decode!(start_conn.resp_body)
+    session_id = started["session_id"] || started["Session"]["session_id"]
+    assert is_binary(session_id) and byte_size(session_id) > 0
+
+    # Construct a proposal that triggers E_PATCH_PREIMAGE_MISMATCH.
+    # An :add op to an existing file at the target path is the canonical
+    # P3 stale-preimage condition. The proposal's digest fields must match
+    # the decision's digest fields (P3 authority-binding invariant).
+    base_state_digest = "sha256:" <> String.duplicate("a", 64)
+    patch_digest = "sha256:" <> String.duplicate("b", 64)
+
     conn =
       post_rpc(tok, %{
         method: "patch.apply",
         params: %{
-          "proposal" => %{"id" => "pp_invalid"},
-          "decision" => %{"decision" => "APPROVE_EXACT_BYTES"},
-          "operations_with_bytes" => [],
-          "session_id" => "ses_" <> String.duplicate("a", 32),
+          "proposal" => %{
+            "id" => "pp_stale",
+            "patch_digest" => patch_digest,
+            "base_state_digest" => base_state_digest,
+            "repository" => fixture,
+            "operations" => [
+              %{
+                "op" => "add",
+                "path" => "EXISTING.md",
+                "bytes" => "would clobber\n"
+              }
+            ]
+          },
+          "decision" => %{
+            "decision" => "APPROVE_EXACT_BYTES",
+            "patch_ref" => %{"id" => "pp_stale", "digest" => patch_digest},
+            "base_state_digest" => base_state_digest
+          },
+          "operations_with_bytes" => [
+            %{
+              "op" => "add",
+              "path" => "EXISTING.md",
+              "bytes" => "would clobber\n"
+            }
+          ],
+          "session_id" => session_id,
           "run_id" => "run_" <> String.duplicate("b", 32),
           "operation_id" => "opn_" <> String.duplicate("c", 32),
-          "subject_id" => "test",
-          "actor_id" => "test",
+          "subject_id" => fixture,
+          "actor_id" => "operator",
           "idempotency_key" => "idem_" <> String.duplicate("d", 32),
           "request_digest" => "sha256:" <> String.duplicate("0", 64)
         }
       })
 
     body = Jason.decode!(conn.resp_body)
-    # The handler validates first; this should yield E_MISSING_FIELDS or
-    # a bounded invalid-field error, NOT E_DISPATCH_FAILED (P5).
-    assert body["code"] != "E_DISPATCH_FAILED"
+    # The P3 acceptance property: stale preimage bytes fail closed with
+    # E_PATCH_PREIMAGE_MISMATCH. This is the bounded code that proves
+    # the property itself — NOT a transport-proxy assertion.
+    assert body["code"] == "E_PATCH_PREIMAGE_MISMATCH",
+           "expected E_PATCH_PREIMAGE_MISMATCH, got #{inspect(body)}"
   end
 
   test "router rejects unknown method with E_UNKNOWN_METHOD (no flattening)", %{operate_token: tok} do
