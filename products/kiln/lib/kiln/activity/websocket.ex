@@ -49,7 +49,18 @@ defmodule Kiln.Activity.WebSocket do
       {:bearer, token} ->
         case Kiln.Service.verify_token_for_ws(token) do
           {:ok, _scope} ->
-            {:upgrade, :protocol, :cowboy_websocket, req, %{subscription_id: nil}}
+            # WP-09 Repair-14: Cowboy 2.18's cowboy_handler:execute/2
+            # (cowboy_handler.erl:37-44) accepts only TWO upgrades
+            # shapes: a 3-tuple `{Mod, Req, State}` (delegated to
+            # `Mod:upgrade/4`) or a 4-tuple `{Mod, Req, State, Opts}`
+            # (delegated to `Mod:upgrade/5`). The `:upgrade` 5-tuple
+            # `{upgrade, :protocol, :cowboy_websocket, Req, State}`
+            # is the OLD Cowboy 1.x signature and is no longer
+            # accepted. Returning it raised TryClauseError and
+            # crashed every WebSocket upgrade. The 3-tuple form
+            # delegates to `:cowboy_websocket:upgrade/4` which is
+            # the supported path.
+            {:cowboy_websocket, req, %{subscription_id: nil}}
 
           {:error, _reason} ->
             :cowboy_req.reply(401, %{"content-type" => "application/json"},
