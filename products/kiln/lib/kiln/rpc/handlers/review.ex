@@ -99,7 +99,7 @@ defmodule Kiln.RPC.Handlers.Review do
          verdict,
          findings,
          context_ref,
-         opts
+         _opts
        ) do
     case Review.build(
            implementer_ref,
@@ -135,9 +135,6 @@ defmodule Kiln.RPC.Handlers.Review do
         {:error, err}
 
       {:error, %{code: :E_REVIEWER_CONTEXT_CONTAMINATED} = err} ->
-        {:error, err}
-
-      {:error, %{code: _} = err} ->
         {:error, err}
     end
   end

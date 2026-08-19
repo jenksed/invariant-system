@@ -132,7 +132,6 @@ defmodule Kiln.RPC.Handlers.Activity do
         {:error, %{code: :multiple_sessions} = err} -> {:error, Map.put(err, :reason, "multiple durable sessions in journal")}
         {:error, %{session_id: sid, block: block}} ->
           {:error, %{code: :E_JOURNAL_BLOCKED, reason: "journal blocked", session_id: sid, block: block}}
-        {:error, %{code: _} = err} -> {:error, err}
       end
     end
   end
@@ -175,9 +174,6 @@ defmodule Kiln.RPC.Handlers.Activity do
         {:error, %{session_id: sid, block: block}} ->
           {:error,
            %{code: :E_JOURNAL_BLOCKED, reason: "journal blocked", session_id: sid, block: block}}
-
-        {:error, %{code: _} = err} ->
-          {:error, err}
       end
     end
   end

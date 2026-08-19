@@ -44,7 +44,7 @@ defmodule Kiln.RPC.Error do
     do_bounded(conn, attrs)
   end
 
-  defp maybe_put(attrs, key, nil), do: attrs
+  defp maybe_put(attrs, _key, nil), do: attrs
   defp maybe_put(attrs, key, value), do: Keyword.put(attrs, key, value)
 
   defp do_bounded(conn, attrs) do

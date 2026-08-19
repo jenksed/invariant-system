@@ -37,7 +37,6 @@ defmodule Kiln.RPC.Handlers.Verify do
     E_STORE_UNAVAILABLE, E_VERIFICATION_BUILD_FAILED
   """
 
-  alias Kiln.Domain.Error, as: DomainError
   alias Kiln.VerificationResult
 
   @required_param_keys [
@@ -78,7 +77,7 @@ defmodule Kiln.RPC.Handlers.Verify do
 
   # -- build + emit --
 
-  defp build_and_emit(plan_ref, patch_ref, result_state_digest, verifier_ref, status, evidence_refs, opts) do
+  defp build_and_emit(plan_ref, patch_ref, result_state_digest, verifier_ref, status, evidence_refs, _opts) do
     case VerificationResult.build(
            plan_ref,
            patch_ref,
@@ -105,16 +104,6 @@ defmodule Kiln.RPC.Handlers.Verify do
 
       {:error, %{code: :E_VERIFICATION_EVIDENCE_MISSING} = err} ->
         {:error, err}
-
-      {:error, %DomainError{code: code, message: message}} ->
-        {:error, %{code: code, reason: message}}
-
-      {:error, %{code: _} = err} ->
-        {:error, err}
-
-      {:error, reason} ->
-        _ = opts
-        {:error, %{code: :E_VERIFICATION_BUILD_FAILED, reason: inspect(reason)}}
     end
   end
 

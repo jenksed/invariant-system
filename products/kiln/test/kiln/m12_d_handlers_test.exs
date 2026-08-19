@@ -83,8 +83,28 @@ defmodule Kiln.M12DHandlersTest do
 
   defp stop_registered_store do
     case Process.whereis(Kiln.Store.Connection) do
-      nil -> :ok
-      pid -> if Process.alive?(pid), do: GenServer.stop(pid, :normal, 5_000)
+      nil ->
+        :ok
+
+      pid ->
+        # The Store Connection is started via Connection.start_link
+        # (Store.start/1 → Connection.start_link/1, store.ex:85). The
+        # link goes to whichever process called Store.start/1 — i.e.
+        # the test setup. When the test process is exiting, on_exit
+        # may run after the test process has already begun shutdown,
+        # so a linked GenServer.stop/3 can deliver an EXIT signal into
+        # a half-dead test process. Unlink first, then stop.
+        Process.unlink(pid)
+
+        if Process.alive?(pid) do
+          try do
+            GenServer.stop(pid, :normal, 5_000)
+          catch
+            :exit, _ -> :ok
+          end
+        end
+
+        :ok
     end
   rescue
     _ -> :ok
@@ -114,7 +134,7 @@ defmodule Kiln.M12DHandlersTest do
     assert body["code"] == "E_MISSING_FIELDS"
   end
 
-  test "router routes review.propose to Kiln.RPC.Handlers.Review", %{operate_token: tok} do
+  test "router routes review.propose to Kiln.RPC.Handlers.Review", %{review_write_token: tok} do
     conn = post_rpc(tok, %{method: "review.propose", params: %{}})
     body = Jason.decode!(conn.resp_body)
     assert body["code"] == "E_MISSING_FIELDS"
