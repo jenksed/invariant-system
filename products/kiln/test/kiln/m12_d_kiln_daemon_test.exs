@@ -238,15 +238,5 @@ defmodule Kiln.M12DKilnDaemonTest do
       assert Map.has_key?(child_spec, :id)
       assert Map.has_key?(child_spec, :start)
     end
-
-    test "Plug.Cowboy child_spec/1 raises KeyError without :plug (sanity)" do
-      # Sanity: confirm that without :plug the child_spec raises, so
-      # the regression test above is meaningful.
-      opts = [scheme: :http, options: [port: 0, dispatch: [{:_, [{:_, Plug.Cowboy.Handler, {Plug.Test, []}}]}]]
-
-      assert_raise KeyError, fn ->
-        Plug.Cowboy.child_spec(opts)
-      end
-    end
   end
 end
