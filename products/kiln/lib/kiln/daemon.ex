@@ -76,7 +76,16 @@ defmodule Kiln.Daemon do
       {:_,
        [
          {"/ws", Kiln.Activity.WebSocket, []},
-         {:_, {Plug.Cowboy.Translator, {Kiln.Service, []}}, []}
+         # Cowboy route_path() type
+         # (deps/cowboy/src/cowboy_router.erl:37-38):
+         #   {Path::route_match(), Handler::module(), Opts::any()}
+         # Plug.Cowboy.Handler.init/2 takes `{plug, opts}` —
+         # it is the canonical Plug adapter for a custom Cowboy
+         # dispatch under Plug.Cowboy 2.9.0.
+         # (Plug.Cowboy.Translator is a Logger translator, NOT a
+         # dispatch handler; it does NOT implement :terminate/3 nor
+         # the handler protocol expected by Cowboy.)
+         {:_, Plug.Cowboy.Handler, {Kiln.Service, []}}
        ]}
     ]
   end

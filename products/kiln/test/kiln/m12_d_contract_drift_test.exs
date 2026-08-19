@@ -24,9 +24,20 @@ defmodule Kiln.M12DContractDriftTest do
   This test is intentionally narrow: it does not build a general IDL
   compiler. It checks the high-value invariants that the WP-09 defect
   cycle actually exposed.
+
+  Path resolution: every cross-product source inspection uses
+  `repo_path/1` derived from `@repo_root`, which is computed from
+  `__DIR__`. The test does NOT depend on the caller's shell working
+  directory.
   """
 
   use ExUnit.Case, async: true
+
+  # File location: products/kiln/test/kiln/m12_d_contract_drift_test.exs
+  # Repo root is ../../.. from __DIR__.
+  @repo_root Path.expand("../../..", __DIR__)
+
+  defp repo_path(relative), do: Path.join(@repo_root, relative)
 
   @frozen_rpc_methods [
     # WP-08 Lane 2 — session-family
@@ -67,17 +78,19 @@ defmodule Kiln.M12DContractDriftTest do
     "session.next_actions" => "orchestration:read"
   }
 
+  # Canonical contract identity strings (must NOT be renamed across
+  # WP-09). Each tuple: {string, file relative to repo root}.
   @frozen_contract_strings [
-    "engineering-system/run-result-envelope/v0",
-    "engineering-system/run-result-projection/m0-v1",
-    "loadout/plan/v0",
-    "engineering-system/verification-result/m0-v1",
-    "engineering-system/review/m0-v1",
-    "engineering-system/human-decision/m0-v1",
-    "implementer-patch-proposal-input/v1",
-    "external_operation_intent_recorded/v1",
-    "external_operation_observed/v1",
-    "session_projection/v1"
+    {"engineering-system/run-result-envelope/v0", "products/temper/src/load.ts"},
+    {"engineering-system/run-result-projection/m0-v1", "products/temper/src/load.ts"},
+    {"loadout/plan/v0", "products/temper/src/load.ts"},
+    {"engineering-system/verification-result/m0-v1", "products/kiln/lib/kiln/m0_types.ex"},
+    {"engineering-system/review/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
+    {"engineering-system/human-decision/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
+    {"implementer-patch-proposal-input/v1", "products/kiln/lib/kiln/worker.ex"},
+    {"external_operation_intent_recorded/v1", "products/kiln/lib/kiln/journal/entry.ex"},
+    {"external_operation_observed/v1", "products/kiln/lib/kiln/journal/entry.ex"},
+    {"session_projection/v1", "products/kiln/lib/kiln/projections/session.ex"}
   ]
 
   # ------------------------------------------------------------------
@@ -85,12 +98,12 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "all frozen RPC methods are routed in router.ex" do
-    source =
-      File.read!("products/kiln/lib/kiln/rpc/router.ex")
-      |> then(&String.replace(&1, ~r/#[^\n]*/, ""))
+    source = File.read!(repo_path("products/kiln/lib/kiln/rpc/router.ex"))
 
     for method <- @frozen_rpc_methods do
-      assert source =~ ~r/"#{Regex.escape(method)}"\s*->/,
+      pattern = ~s("#{Regex.escape(method)}"\\s*->)
+
+      assert source =~ Regex.compile!(pattern),
              "router.ex does not dispatch method #{inspect(method)}"
     end
   end
@@ -100,7 +113,7 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "router scope table exactly matches the frozen WP-09 contract" do
-    source = File.read!("products/kiln/lib/kiln/rpc/router.ex")
+    source = File.read!(repo_path("products/kiln/lib/kiln/rpc/router.ex"))
     scopes = extract_scope_table(source)
 
     for {method, expected_scope} <- @frozen_scope_table do
@@ -124,7 +137,7 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "bounded error envelope carries code + method + scope + fields + field + reason keys" do
-    source = File.read!("products/kiln/lib/kiln/rpc/error.ex")
+    source = File.read!(repo_path("products/kiln/lib/kiln/rpc/error.ex"))
     assert source =~ ~r/attrs\s*=\s*maybe_put\(attrs,\s*:reason/
 
     # do_bounded must encode all six fields.
@@ -143,7 +156,7 @@ defmodule Kiln.M12DContractDriftTest do
   end
 
   test "service.handle_unary preserves the full err envelope (no flattening)" do
-    source = File.read!("products/kiln/lib/kiln/service.ex")
+    source = File.read!(repo_path("products/kiln/lib/kiln/service.ex"))
 
     # Service must NOT call the old `Error.bounded(conn, code, status: 400)`
     # signature that dropped method/scope/fields/reason. Must use
@@ -159,23 +172,10 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "frozen contract identity strings appear in expected files" do
-    files = [
-      {"engineering-system/run-result-envelope/v0", "products/temper/src/load.ts"},
-      {"engineering-system/run-result-projection/m0-v1", "products/temper/src/load.ts"},
-      {"loadout/plan/v0", "products/temper/src/load.ts"},
-      {"engineering-system/verification-result/m0-v1", "products/kiln/lib/kiln/m0_types.ex"},
-      {"engineering-system/review/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
-      {"engineering-system/human-decision/m0-v1", "products/kiln/lib/kiln/m9_review.ex"},
-      {"implementer-patch-proposal-input/v1", "products/kiln/lib/kiln/worker.ex"},
-      {"external_operation_intent_recorded/v1", "products/kiln/lib/kiln/journal/entry.ex"},
-      {"external_operation_observed/v1", "products/kiln/lib/kiln/journal/entry.ex"},
-      {"session_projection/v1", "products/kiln/lib/kiln/projections/session.ex"}
-    ]
-
-    for {string, file} <- files do
-      content = File.read!(file)
+    for {string, relative_path} <- @frozen_contract_strings do
+      content = File.read!(repo_path(relative_path))
       assert content =~ string,
-             "expected #{inspect(string)} in #{file}"
+             "expected #{inspect(string)} in #{relative_path}"
     end
   end
 
@@ -184,11 +184,12 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "activity schema_version matches between Kiln and Temper" do
-    kiln = File.read!("products/kiln/lib/kiln/rpc/handlers/activity.ex")
+    kiln = File.read!(repo_path("products/kiln/lib/kiln/rpc/handlers/activity.ex"))
+
     assert kiln =~ ~r/schema_version.*=>.*"kiln\/activity\/v1"/,
            "Kiln activity handler must emit schema_version = \"kiln/activity/v1\""
 
-    temper = File.read!("products/temper/src/types.ts")
+    temper = File.read!(repo_path("products/temper/src/types.ts"))
     assert temper =~ ~r/type:\s*'activity\.snapshot'/
   end
 
@@ -197,20 +198,24 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "M0Review struct uses verifier_ref (not verification_ref)" do
-    m0_types = File.read!("products/kiln/lib/kiln/m0_types.ex")
-    [struct_section] = Regex.scan(m0_types, ~r/defstruct\s+\[[^\]]*\]/, capture: :all_but_first)
+    m0_types = File.read!(repo_path("products/kiln/lib/kiln/m0_types.ex"))
+
+    [struct_section] =
+      Regex.scan(m0_types, ~r/defstruct\s+\[[^\]]*\]/, capture: :all_but_first)
 
     assert struct_section =~ ~r/:verifier_ref/,
            "M0Review defstruct must declare :verifier_ref"
+
     refute struct_section =~ ~r/:verification_ref/,
            "M0Review defstruct must NOT declare :verification_ref"
   end
 
   test "RPC review handler reads review.verifier_ref (not verification_ref)" do
-    handler = File.read!("products/kiln/lib/kiln/rpc/handlers/review.ex")
+    handler = File.read!(repo_path("products/kiln/lib/kiln/rpc/handlers/review.ex"))
 
     assert handler =~ ~r/review\.verifier_ref/,
            "review handler must read review.verifier_ref"
+
     refute handler =~ ~r/review\.verification_ref/,
            "review handler must NOT read review.verification_ref"
   end
@@ -220,13 +225,14 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   test "Restart.reconstruct/1 spec is consumed exactly by handlers (no bare :empty)" do
-    activity = File.read!("products/kiln/lib/kiln/rpc/handlers/activity.ex")
-    project = File.read!("products/kiln/lib/kiln/rpc/handlers/project.ex")
+    activity = File.read!(repo_path("products/kiln/lib/kiln/rpc/handlers/activity.ex"))
+    project = File.read!(repo_path("products/kiln/lib/kiln/rpc/handlers/project.ex"))
 
     # Per @spec at lib/kiln/restart.ex:38-42 the return is
     # {:ok, :empty} (NOT the bare atom :empty).
     refute activity =~ ~r/^\s*:empty\s*->/m,
            "activity.ex must not have a bare :empty pattern (Restart returns {:ok, :empty})"
+
     refute project =~ ~r/^\s*:empty\s*->/m,
            "project.ex must not have a bare :empty pattern (Restart returns {:ok, :empty})"
 
@@ -234,6 +240,7 @@ defmodule Kiln.M12DContractDriftTest do
     # NOT the bare atom :multiple_sessions.
     refute activity =~ ~r/^\s*:multiple_sessions\s*->/m,
            "activity.ex must not have a bare :multiple_sessions pattern"
+
     refute project =~ ~r/^\s*:multiple_sessions\s*->/m,
            "project.ex must not have a bare :multiple_sessions pattern"
   end
@@ -243,13 +250,18 @@ defmodule Kiln.M12DContractDriftTest do
   # ------------------------------------------------------------------
 
   # Extracts the @scopes map literal from router.ex.
+  #
+  # Subject + regex argument order is `Regex.run(regex, subject)` per
+  # the canonical Elixir contract; previous versions of this helper
+  # had the arguments reversed, which raised a type warning at
+  # compile time.
   defp extract_scope_table(source) do
-    case Regex.run(source, ~r/@scopes\s+%\{([^}]+)\}/m, capture: :all_but_first) do
+    case Regex.run(~r/@scopes\s+%\{([^}]+)\}/m, source, capture: :all_but_first) do
       [body] ->
         body
         |> String.split("\n", trim: true)
         |> Enum.reduce(%{}, fn line, acc ->
-          case Regex.run(line, ~r/"([^"]+)"\s*=>\s*"([^"]+)"/, capture: :all_but_first) do
+          case Regex.run(~r/"([^"]+)"\s*=>\s*"([^"]+)"/, line, capture: :all_but_first) do
             [method, scope] -> Map.put(acc, method, scope)
             _ -> acc
           end
