@@ -570,6 +570,25 @@ defmodule Kiln.CLI do
           out_path = opts["out"] || default_out("review.json")
           File.write!(out_path, JSON.encode!(Kiln.M0Review.to_map(review)))
 
+          # Commit a canonical pending_decision_recorded/v1 to the journal
+          # so that human.decide is the canonical surface for accepting or
+          # rejecting the review verdict. The bounded context below carries
+          # the four refs the operator will need to construct a valid
+          # human.decide envelope without re-discovering upstream values.
+          case request.command do
+            :review_propose ->
+              record_pending_decision_at_review(
+                request,
+                plan_ref,
+                patch_ref,
+                result_state_digest,
+                review.id
+              )
+
+            _ ->
+              :ok
+          end
+
           {:ok,
            Result.ok("review-propose",
              data: %{
@@ -607,7 +626,7 @@ defmodule Kiln.CLI do
     with {:ok, plan_ref} <- load_artifact_ref(opts["plan"], "plan"),
          {:ok, patch_ref} <- load_artifact_ref(opts["patch"], "patch"),
          true <- is_binary(result_state_digest),
-         # M11 E2 B-repair: `--review` is optional. When supplied,
+         # M11 E2 B-repair: `--review is optional. When supplied,
          # the value is a JSON file path; decode it here so
          # `HumanDecision.build/5` receives a map (artifactRef)
          # rather than a string. Without this, the `is_map/2`
@@ -619,6 +638,10 @@ defmodule Kiln.CLI do
               other -> {:ok, other}
             end),
          true <- is_binary(decision) do
+      # Build the pure envelope first; canonical validation against the
+      # pending decision in the journal happens AFTER the envelope is
+      # constructed and BEFORE the journal commit. Kiln.HumanDecision.build/5
+      # remains a pure constructor.
       case Kiln.HumanDecision.build(
              plan_ref,
              patch_ref,
@@ -630,16 +653,31 @@ defmodule Kiln.CLI do
           out_path = opts["out"] || default_out("human_decision.json")
           File.write!(out_path, JSON.encode!(Kiln.M0HumanDecision.to_map(hd_struct)))
 
-          {:ok,
-           Result.ok("human-decide",
-             data: %{
-               "human_decision_id" => hd_struct.id,
-               "semantic_digest" => hd_struct.semantic_digest,
-               "decision" => Atom.to_string(hd_struct.decision),
-               "recorded_at" => hd_struct.recorded_at
-             },
-             next_actions: navigation_actions("human-decide")
-           )}
+          # Commit the canonical user_decision_recorded/v1 entry. The
+          # workflow validates the submitted bounded envelope against
+          # the canonical pending decision in the journal before
+          # accepting. If canonical validation rejects, the on-disk
+          # envelope remains but the canonical journal reflects the
+          # rejection. The CLI surfaces the bounded error verbatim.
+          case commit_user_decision(request, hd_struct) do
+            :ok ->
+              {:ok,
+               Result.ok("human-decide",
+                 data: %{
+                   "human_decision_id" => hd_struct.id,
+                   "semantic_digest" => hd_struct.semantic_digest,
+                   "decision" => Atom.to_string(hd_struct.decision),
+                   "recorded_at" => hd_struct.recorded_at
+                 },
+                 next_actions: navigation_actions("human-decide")
+               )}
+
+            {:error, %Error{} = err} ->
+              {:error,
+               Result.error("human-decide", :denied,
+                 errors: [Result.to_error(%{code: err.code, message: err.message})]
+               )}
+          end
 
         {:error, %{code: code, reason: reason}} when is_atom(code) ->
           {:error,
@@ -651,6 +689,33 @@ defmodule Kiln.CLI do
       {:error, %Result{} = result} -> {:error, result}
     end
     |> normalize_dispatch_result(request)
+  end
+
+  defp commit_user_decision(request, hd_struct) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        :ok
+
+      {:ok, %{session_id: session_id} = query_result} ->
+        opts = %{
+          actor_id: request.actor_id || "kiln:cli",
+          expected_session_revision: current_session_revision(query_result),
+          decision_id: hd_struct.id,
+          response: Atom.to_string(hd_struct.decision),
+          plan_ref: hd_struct.plan_ref,
+          patch_ref: hd_struct.patch_ref,
+          result_state_digest: hd_struct.result_state_digest,
+          review_ref: hd_struct.review_ref
+        }
+
+        case Workflow.record_user_decision(session_id, opts) do
+          {:ok, _result} -> :ok
+          {:error, %Error{} = err} -> {:error, err}
+        end
+
+      _ ->
+        :ok
+    end
   end
 
   # -- private helpers for M8 commands --
@@ -860,6 +925,70 @@ defmodule Kiln.CLI do
   end
 
   defp load_evidence_refs(nil), do: {:error, usage_result("--evidence is required")}
+
+  # Commit the canonical pending decision after a successful Review.build/9.
+  # The session_id is resolved from the canonical journal via
+  # `Workflow.current_session/0`; if no Session is open, the operator's
+  # review still produces the envelope on disk but no canonical decision
+  # is recorded (the kiln_home stays empty / no journal write).
+  defp record_pending_decision_at_review(
+         request,
+         plan_ref,
+         patch_ref,
+         result_state_digest,
+         review_id
+       ) do
+    case Workflow.current_session() do
+      {:ok, :empty} ->
+        :ok
+
+      {:ok, %{session_id: session_id} = query_result} ->
+        run_id = get_in(query_result, [:projection, "run", "id"]) || "run_unknown"
+
+        decision = %{
+          "id" => "dec_" <> short_session_token(session_id),
+          "subject_kind" => "run",
+          "subject_id" => run_id,
+          "subject_revision" => current_session_revision(query_result),
+          "requested_actor" => request.actor_id || "kiln:cli",
+          "permitted_responses" => ["ACCEPT", "REJECT", "REQUEST_REVISION"]
+        }
+
+        decision_context = %{
+          "plan_ref" => plan_ref,
+          "patch_ref" => patch_ref,
+          "result_state_digest" => result_state_digest,
+          "review_ref" => %{"id" => review_id, "digest" => review_id}
+        }
+
+        expected_revision = current_session_revision(query_result)
+
+        case Workflow.record_pending_decision(session_id, %{
+               actor_id: request.actor_id || "kiln:cli",
+               expected_session_revision: expected_revision,
+               decision: decision,
+               decision_context: decision_context
+             }) do
+          {:ok, _result} ->
+            :ok
+
+          {:error, %Error{} = err} ->
+            Result.error("review-propose", :denied,
+              errors: [Result.to_error(%{code: err.code, message: err.message})])
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp current_session_revision(%{projection: projection}) do
+    get_in(projection, ["session_revision"]) || 0
+  end
+
+  defp short_session_token(session_id) do
+    :crypto.hash(:sha256, session_id) |> Base.encode16(case: :lower) |> binary_part(0, 32)
+  end
 
   defp load_findings(path) when is_binary(path) do
     case Kiln.M0CommandLoader.load_json(path, "findings") do

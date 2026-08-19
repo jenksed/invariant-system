@@ -219,6 +219,103 @@ defmodule Kiln.Workflow do
     run_transition(session_id, opts, public_relation: :resume_session)
   end
 
+  @typedoc """
+  Returns from `record_pending_decision/2`.
+
+  `decision_id` is the canonical decision identifier (kind `:decision`,
+  e.g. `dec_<32hex>`). `run_state` is `:waiting_for_user` after the
+  commit; the journal reducer rejects states that disallow a pending
+  decision (e.g. when an active operation is present).
+  """
+  @type pending_decision_result :: %{
+          session_id: String.t(),
+          action_id: String.t(),
+          decision_id: String.t(),
+          session_revision: non_neg_integer(),
+          run_state: :waiting_for_user,
+          projection_digest: String.t()
+        }
+
+  @typedoc """
+  Returns from `record_user_decision/2`.
+
+  `run_state` is `:ready` after the journal reducer consumes the
+  pending decision (per the canonical transition policy).
+  """
+  @type user_decision_result :: %{
+          session_id: String.t(),
+          action_id: String.t(),
+          decision_id: String.t(),
+          response: String.t(),
+          session_revision: non_neg_integer(),
+          run_state: :ready,
+          projection_digest: String.t()
+        }
+
+  @doc """
+  Record a canonical pending decision at the lifecycle point where
+  human authority is required. Used by `mix kiln review-propose` and
+  any future decision-creation trigger.
+
+  Required opts:
+
+    * `:actor_id` — non-empty binary
+    * `:expected_session_revision` — non-negative integer
+    * `:decision` — `decision/v1` map (`id`, `subject_kind`,
+      `subject_id`, `subject_revision`, `requested_actor`,
+      `permitted_responses`)
+    * `:decision_context` — bounded context map (`plan_ref`,
+      `patch_ref`, `result_state_digest`, `review_ref`)
+
+  Optional: `:idempotency_key`.
+
+  Performs no journal write on any validation failure.
+  """
+  @spec record_pending_decision(String.t(), keyword() | map()) ::
+          {:ok, pending_decision_result()} | {:error, Error.t()}
+  def record_pending_decision(session_id, opts) do
+    with :ok <- require_session_id_format(session_id),
+         {:ok, normalized} <- normalize_decision_opts(opts),
+         {:ok, conn} <- store_conn() do
+      run_pending_decision_commit(conn, session_id, normalized)
+    end
+  end
+
+  @doc """
+  Record a canonical human decision against the current pending
+  decision in canonical state.
+
+  Validates the submitted bounded envelope against the
+  `decision_envelope` recorded by the matching
+  `pending_decision_recorded/v1`. Returns `:decision_context_mismatch`
+  with a field-by-field diff if any supplied ref disagrees with the
+  canonical pending decision. Returns `:decision_not_pending` when
+  no canonical pending decision exists. Returns `:decision_mismatch`
+  when the supplied `decision_id` disagrees with the canonical one.
+
+  Required opts:
+
+    * `:actor_id` — non-empty binary
+    * `:expected_session_revision` — non-negative integer
+    * `:decision_id` — canonical decision identifier
+    * `:response` — one of `ACCEPT`, `REJECT`, `REQUEST_REVISION`
+    * `:plan_ref`, `:patch_ref`, `:result_state_digest` — bounded refs
+    * `:review_ref` — bounded ref or `nil`
+
+  Optional: `:idempotency_key`.
+
+  Performs no journal write on any validation failure.
+  """
+  @spec record_user_decision(String.t(), keyword() | map()) ::
+          {:ok, user_decision_result()} | {:error, Error.t()}
+  def record_user_decision(session_id, opts) do
+    with :ok <- require_session_id_format(session_id),
+         {:ok, normalized} <- normalize_user_decision_opts(opts),
+         {:ok, conn} <- store_conn() do
+      run_user_decision_commit(conn, session_id, normalized)
+    end
+  end
+
   @doc """
   Return the ascending-sorted list of bounded atoms currently permitted
   from the current Run state for `session_id`.
@@ -298,6 +395,123 @@ defmodule Kiln.Workflow do
         request_digest,
         public_relation
       )
+    end
+  end
+
+  # ---- decision path (record_pending_decision + record_user_decision) ----
+
+  defp run_pending_decision_commit(conn, session_id, normalized) do
+    with {:ok, idempotency_key} <- resolve_idempotency_key(normalized),
+         {:ok, request_digest} <- build_pending_decision_request_digest(normalized, session_id) do
+      run_pending_decision_validate_and_commit(
+        conn,
+        session_id,
+        normalized,
+        idempotency_key,
+        request_digest
+      )
+    end
+  end
+
+  defp run_pending_decision_validate_and_commit(
+         conn,
+         session_id,
+         normalized,
+         idempotency_key,
+         request_digest
+       ) do
+    with {:ok, %{projection: projection}} <- load_projection(conn, session_id),
+         run_id = run_id_from_projection(projection) do
+      {:ok, action_id} = Id.generate(:action, strong_rand_bytes())
+
+      case build_pending_decision_action(
+             action_id,
+             session_id,
+             run_id,
+             normalized,
+             idempotency_key,
+             request_digest
+           ) do
+        {:ok, action} ->
+          entry = build_pending_decision_entry(normalized)
+
+          placeholder = build_pending_decision_placeholder(session_id, action_id, normalized)
+
+          commit(
+            conn,
+            action,
+            [entry],
+            placeholder,
+            &pending_decision_result_from_stored/1,
+            expected_revision: normalized.expected_session_revision,
+            session_id: session_id
+          )
+
+        {:error, _} = error ->
+          error
+      end
+    else
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  defp run_user_decision_commit(conn, session_id, normalized) do
+    with {:ok, idempotency_key} <- resolve_idempotency_key(normalized),
+         {:ok, request_digest} <- build_user_decision_request_digest(normalized, session_id) do
+      run_user_decision_validate_and_commit(
+        conn,
+        session_id,
+        normalized,
+        idempotency_key,
+        request_digest
+      )
+    end
+  end
+
+  defp run_user_decision_validate_and_commit(
+         conn,
+         session_id,
+         normalized,
+         idempotency_key,
+         request_digest
+       ) do
+    with {:ok, %{projection: projection}} <- load_projection(conn, session_id),
+         :ok <- require_pending_decision(projection),
+         :ok <- require_decision_identity(projection, normalized.decision_id),
+         :ok <- require_decision_context_match(projection, normalized) do
+      run_id = run_id_from_projection(projection)
+      {:ok, action_id} = Id.generate(:action, strong_rand_bytes())
+
+      case build_user_decision_action(
+             action_id,
+             session_id,
+             run_id,
+             normalized,
+             idempotency_key,
+             request_digest
+           ) do
+        {:ok, action} ->
+          entry = build_user_decision_entry(normalized)
+
+          placeholder = build_user_decision_placeholder(session_id, action_id, normalized)
+
+          commit(
+            conn,
+            action,
+            [entry],
+            placeholder,
+            &user_decision_result_from_stored/1,
+            expected_revision: normalized.expected_session_revision,
+            session_id: session_id
+          )
+
+        {:error, _} = error ->
+          error
+      end
+    else
+      {:error, _} = error ->
+        error
     end
   end
 
@@ -720,6 +934,66 @@ defmodule Kiln.Workflow do
   defp normalize_transition_opts(_opts),
     do: {:error, Error.new(:invalid_input, "options must be a keyword list or a map")}
 
+  defp normalize_decision_opts(opts) when is_list(opts) do
+    opts
+    |> Map.new()
+    |> normalize_decision_opts()
+  end
+
+  defp normalize_decision_opts(opts) when is_map(opts) do
+    with {:ok, actor_id} <- require_actor_id_map(opts),
+         {:ok, expected_session_revision} <- require_expected_revision_map(opts),
+         {:ok, idempotency_key_input} <- optional_idempotency_key_map(opts),
+         {:ok, decision} <- require_decision_map(opts),
+         {:ok, decision_context} <- require_decision_context_map(opts) do
+      {:ok,
+       %{
+         actor_id: actor_id,
+         expected_session_revision: expected_session_revision,
+         idempotency_key: idempotency_key_input,
+         decision: decision,
+         decision_context: decision_context
+       }}
+    end
+  end
+
+  defp normalize_decision_opts(_opts),
+    do: {:error, Error.new(:invalid_input, "options must be a keyword list or a map")}
+
+  defp normalize_user_decision_opts(opts) when is_list(opts) do
+    opts
+    |> Map.new()
+    |> normalize_user_decision_opts()
+  end
+
+  defp normalize_user_decision_opts(opts) when is_map(opts) do
+    with {:ok, actor_id} <- require_actor_id_map(opts),
+         {:ok, expected_session_revision} <- require_expected_revision_map(opts),
+         {:ok, idempotency_key_input} <- optional_idempotency_key_map(opts),
+         {:ok, decision_id} <- require_decision_id_map(opts),
+         {:ok, response} <- require_response_map(opts),
+         {:ok, plan_ref} <- require_artifact_ref_map(opts, :plan_ref),
+         {:ok, patch_ref} <- require_artifact_ref_map(opts, :patch_ref),
+         {:ok, result_state_digest} <- require_result_state_digest_map(opts),
+         {:ok, review_ref} <- optional_artifact_ref_map(opts, :review_ref) do
+      {:ok,
+       %{
+         actor_id: actor_id,
+         expected_session_revision: expected_session_revision,
+         idempotency_key: idempotency_key_input,
+         decision_id: decision_id,
+         response: response,
+         plan_ref: plan_ref,
+         patch_ref: patch_ref,
+         result_state_digest: result_state_digest,
+         review_ref: review_ref
+       }}
+    end
+  end
+
+  defp normalize_user_decision_opts(_opts),
+    do: {:error, Error.new(:invalid_input, "options must be a keyword list or a map")}
+
   # ---- input validation helpers ----
 
   defp require_actor_id_map(opts) do
@@ -864,6 +1138,485 @@ defmodule Kiln.Workflow do
 
       :error ->
         {:ok, :auto}
+    end
+  end
+
+  # ---- decision option validation ----
+
+  defp require_decision_map(opts) do
+    case fetch_field(opts, :decision) do
+      {:ok, %{} = decision} ->
+        with :ok <- require_nonempty_string_field(decision, "id"),
+             :ok <- require_nonempty_string_field(decision, "subject_kind"),
+             :ok <- require_nonempty_string_field(decision, "subject_id"),
+             :ok <- require_nonnegative_integer_field(decision, "subject_revision"),
+             :ok <- require_nonempty_string_field(decision, "requested_actor"),
+             :ok <- require_nonempty_string_list_field(decision, "permitted_responses") do
+          {:ok, decision}
+        end
+
+      {:ok, _} ->
+        {:error, Error.new(:invalid_decision, "decision must be a map", :decision)}
+
+      :error ->
+        {:error, Error.new(:missing_decision, "decision is required", :decision)}
+    end
+  end
+
+  defp require_decision_context_map(opts) do
+    case fetch_field(opts, :decision_context) do
+      {:ok, %{} = ctx} ->
+        with :ok <- require_artifact_ref_field(ctx, "plan_ref"),
+             :ok <- require_artifact_ref_field(ctx, "patch_ref"),
+             :ok <- require_canonical_digest_field(ctx, "result_state_digest"),
+             :ok <- optional_artifact_ref_field(ctx, "review_ref") do
+          {:ok, ctx}
+        end
+
+      {:ok, _} ->
+        {:error,
+         Error.new(:invalid_decision_context, "decision_context must be a map",
+           :decision_context)}
+
+      :error ->
+        {:error,
+         Error.new(:missing_decision_context, "decision_context is required",
+           :decision_context)}
+    end
+  end
+
+  defp require_decision_id_map(opts) do
+    case fetch_field(opts, :decision_id) do
+      {:ok, value} when is_binary(value) ->
+        if Id.valid?(:decision, value) do
+          {:ok, value}
+        else
+          {:error,
+           Error.new(:invalid_decision_id, "decision_id must be a decision identifier",
+             :decision_id)}
+        end
+
+      {:ok, _} ->
+        {:error,
+         Error.new(:invalid_decision_id, "decision_id must be a string", :decision_id)}
+
+      :error ->
+        {:error, Error.new(:missing_decision_id, "decision_id is required", :decision_id)}
+    end
+  end
+
+  defp require_response_map(opts) do
+    case fetch_field(opts, :response) do
+      {:ok, value} when value in ~w(ACCEPT REJECT REQUEST_REVISION) ->
+        {:ok, value}
+
+      {:ok, _} ->
+        {:error,
+         Error.new(
+           :invalid_response,
+           "response must be one of ACCEPT|REJECT|REQUEST_REVISION",
+           :response
+         )}
+
+      :error ->
+        {:error, Error.new(:missing_response, "response is required", :response)}
+    end
+  end
+
+  defp require_artifact_ref_map(opts, field) do
+    case fetch_field(opts, field) do
+      {:ok, %{} = ref} ->
+        with :ok <- require_nonempty_string_field(ref, "id"),
+             :ok <- require_nonempty_string_field(ref, "digest") do
+          {:ok, ref}
+        end
+
+      {:ok, _} ->
+        {:error, Error.new(:invalid_artifact_ref, "#{field} must be a map", field)}
+
+      :error ->
+        {:error, Error.new(:missing_artifact_ref, "#{field} is required", field)}
+    end
+  end
+
+  defp optional_artifact_ref_map(opts, field) do
+    case fetch_field(opts, field) do
+      {:ok, nil} ->
+        {:ok, nil}
+
+      {:ok, %{} = ref} ->
+        with :ok <- require_nonempty_string_field(ref, "id"),
+             :ok <- require_nonempty_string_field(ref, "digest") do
+          {:ok, ref}
+        end
+
+      {:ok, _} ->
+        {:error, Error.new(:invalid_artifact_ref, "#{field} must be a map or nil", field)}
+
+      :error ->
+        {:ok, nil}
+    end
+  end
+
+  defp require_result_state_digest_map(opts) do
+    case fetch_field(opts, :result_state_digest) do
+      {:ok, value} when is_binary(value) ->
+        if Regex.match?(~r/^sha256:[0-9a-f]{64}$/, value) do
+          {:ok, value}
+        else
+          {:error,
+           Error.new(:invalid_result_state_digest,
+             "result_state_digest must match sha256:<64hex>",
+             :result_state_digest)}
+        end
+
+      {:ok, _} ->
+        {:error,
+         Error.new(:invalid_result_state_digest, "result_state_digest must be a string",
+           :result_state_digest)}
+
+      :error ->
+        {:error,
+         Error.new(:missing_result_state_digest, "result_state_digest is required",
+           :result_state_digest)}
+    end
+  end
+
+  defp require_nonempty_string_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, value} when is_binary(value) and byte_size(value) > 0 -> :ok
+      {:ok, _} -> {:error, Error.new(:invalid_field, "#{field} must be a non-empty string", field)}
+      :error -> {:error, Error.new(:missing_field, "#{field} is required", field)}
+    end
+  end
+
+  defp require_nonempty_string_list_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, list} when is_list(list) and length(list) > 0 ->
+        cond do
+          Enum.all?(list, &is_binary/1) and Enum.all?(list, &(byte_size(&1) > 0)) -> :ok
+          true -> {:error, Error.new(:invalid_field, "#{field} must be a list of non-empty strings", field)}
+        end
+
+      {:ok, _} -> {:error, Error.new(:invalid_field, "#{field} must be a non-empty list", field)}
+      :error -> {:error, Error.new(:missing_field, "#{field} is required", field)}
+    end
+  end
+
+  defp require_nonnegative_integer_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, value} when is_integer(value) and value >= 0 -> :ok
+      {:ok, _} -> {:error, Error.new(:invalid_field, "#{field} must be a non-negative integer", field)}
+      :error -> {:error, Error.new(:missing_field, "#{field} is required", field)}
+    end
+  end
+
+  defp require_artifact_ref_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, %{} = ref} ->
+        with :ok <- require_nonempty_string_field(ref, "id"),
+             :ok <- require_nonempty_string_field(ref, "digest") do
+          :ok
+        end
+
+      {:ok, _} ->
+        {:error, Error.new(:invalid_field, "#{field} must be a %{id, digest} map", field)}
+
+      :error ->
+        {:error, Error.new(:missing_field, "#{field} is required", field)}
+    end
+  end
+
+  defp optional_artifact_ref_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, nil} -> :ok
+      {:ok, %{} = _ref} -> require_artifact_ref_field(map, field)
+      {:ok, _} -> {:error, Error.new(:invalid_field, "#{field} must be a %{id, digest} map or null", field)}
+      :error -> :ok
+    end
+  end
+
+  defp require_canonical_digest_field(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, value} when is_binary(value) ->
+        if Regex.match?(~r/^sha256:[0-9a-f]{64}$/, value) do
+          :ok
+        else
+          {:error, Error.new(:invalid_field, "#{field} must match sha256:<64hex>", field)}
+        end
+
+      {:ok, _} ->
+        {:error, Error.new(:invalid_field, "#{field} must be a string", field)}
+
+      :error ->
+        {:error, Error.new(:missing_field, "#{field} is required", field)}
+    end
+  end
+
+  # ---- decision canonical validation ----
+
+  defp require_pending_decision(projection) do
+    case projection["pending_decision"] do
+      %{"id" => _id} ->
+        :ok
+
+      _ ->
+        {:error,
+         Error.new(:decision_not_pending,
+           "no canonical pending decision is currently awaiting action",
+           nil)}
+    end
+  end
+
+  defp require_decision_identity(projection, decision_id) do
+    case projection["pending_decision"] do
+      %{"id" => ^decision_id} -> :ok
+      %{"id" => _other} ->
+        {:error,
+         Error.new(:decision_mismatch,
+           "supplied decision_id does not match the canonical pending decision",
+           nil)}
+      _ ->
+        {:error,
+         Error.new(:decision_not_pending,
+           "no canonical pending decision is currently awaiting action",
+           nil)}
+    end
+  end
+
+  # The canonical pre-decision context lives at
+  # `projection["references"]["decision_envelope"]`. A supplied
+  # decision_envelope that disagrees field-by-field is rejected with a
+  # bounded diff. The operator never gets to make refs canonical that
+  # the workflow did not record at the decision-creation point.
+  defp require_decision_context_match(projection, normalized) do
+    envelope = get_in(projection, ["references", "decision_envelope"]) || %{}
+    diff = decision_context_diff(envelope, normalized)
+
+    case diff do
+      [] -> :ok
+      fields -> {:error, Error.new(:decision_context_mismatch,
+             "supplied decision context disagrees with canonical pending decision",
+             nil, %{fields: fields})}
+    end
+  end
+
+  defp decision_context_diff(envelope, normalized) do
+    [
+      ref_diff("plan_ref", envelope["plan_ref"], normalized.plan_ref),
+      ref_diff("patch_ref", envelope["patch_ref"], normalized.patch_ref),
+      digest_diff("result_state_digest",
+        envelope["result_state_digest"], normalized.result_state_digest),
+      review_ref_diff(envelope["review_ref"], normalized.review_ref)
+    ]
+    |> Enum.reject(&is_nil/1)
+  end
+
+  defp ref_diff(field, expected, supplied) do
+    if ref_equal?(expected, supplied),
+      do: nil,
+      else: %{field: field, expected: expected, supplied: supplied}
+  end
+
+  defp ref_equal?(nil, nil), do: true
+  defp ref_equal?(%{} = a, %{} = b),
+    do: a["id"] == b["id"] and a["digest"] == b["digest"]
+  defp ref_equal?(_a, _b), do: false
+
+  defp digest_diff(field, expected, supplied) do
+    if expected == supplied,
+      do: nil,
+      else: %{field: field, expected: expected, supplied: supplied}
+  end
+
+  defp review_ref_diff(nil, nil), do: nil
+  defp review_ref_diff(%{} = expected, %{} = supplied) do
+    if ref_equal?(expected, supplied),
+      do: nil,
+      else: %{field: "review_ref", expected: expected, supplied: supplied}
+  end
+
+  defp review_ref_diff(expected, supplied) do
+    %{field: "review_ref", expected: expected, supplied: supplied}
+  end
+
+  # ---- decision action + entry + result builders ----
+
+  defp build_pending_decision_action(
+         action_id,
+         session_id,
+         run_id,
+         normalized,
+         idempotency_key,
+         request_digest
+       ) do
+    Action.new(%{
+      id: action_id,
+      session_id: session_id,
+      run_id: run_id,
+      expected_session_revision: normalized.expected_session_revision,
+      idempotency_key: idempotency_key,
+      actor_kind: :local_user,
+      actor_id: normalized.actor_id,
+      kind: :request_decision,
+      request_digest: request_digest,
+      payload: %{
+        decision_id: normalized.decision["id"],
+        subject_kind: normalized.decision["subject_kind"],
+        subject_id: normalized.decision["subject_id"],
+        subject_revision: normalized.decision["subject_revision"]
+      },
+      causation_action_id: nil,
+      correlation_id: nil,
+      requested_at: DateTime.utc_now()
+    })
+  end
+
+  defp build_user_decision_action(
+         action_id,
+         session_id,
+         run_id,
+         normalized,
+         idempotency_key,
+         request_digest
+       ) do
+    Action.new(%{
+      id: action_id,
+      session_id: session_id,
+      run_id: run_id,
+      expected_session_revision: normalized.expected_session_revision,
+      idempotency_key: idempotency_key,
+      actor_kind: :local_user,
+      actor_id: normalized.actor_id,
+      kind: :answer_decision,
+      request_digest: request_digest,
+      payload: %{
+        decision_id: normalized.decision_id,
+        response: normalized.response
+      },
+      causation_action_id: nil,
+      correlation_id: nil,
+      requested_at: DateTime.utc_now()
+    })
+  end
+
+  defp build_pending_decision_entry(normalized) do
+    %{
+      type: "pending_decision_recorded/v1",
+      payload_schema: "pending_decision_recorded/v1",
+      payload: %{
+        "decision" => normalized.decision,
+        "decision_context" => normalized.decision_context
+      }
+    }
+  end
+
+  defp build_user_decision_entry(normalized) do
+    %{
+      type: "user_decision_recorded/v1",
+      payload_schema: "user_decision_recorded/v1",
+      payload: %{
+        "decision_id" => normalized.decision_id,
+        "response" => normalized.response
+      }
+    }
+  end
+
+  defp build_pending_decision_placeholder(session_id, action_id, normalized) do
+    %{
+      session_id: session_id,
+      action_id: action_id,
+      decision_id: normalized.decision["id"],
+      session_revision: 0,
+      run_state: "waiting_for_user",
+      projection_digest: nil
+    }
+  end
+
+  defp build_user_decision_placeholder(session_id, action_id, normalized) do
+    %{
+      session_id: session_id,
+      action_id: action_id,
+      decision_id: normalized.decision_id,
+      response: normalized.response,
+      session_revision: 0,
+      run_state: "ready",
+      projection_digest: nil
+    }
+  end
+
+  defp build_pending_decision_request_digest(normalized, session_id) do
+    encode_request_digest(%{
+      "operation" => "record_pending_decision",
+      "session_id" => session_id,
+      "actor_id" => normalized.actor_id,
+      "expected_session_revision" => normalized.expected_session_revision,
+      "decision" => normalized.decision,
+      "decision_context" => normalized.decision_context
+    })
+  end
+
+  defp build_user_decision_request_digest(normalized, session_id) do
+    encode_request_digest(%{
+      "operation" => "record_user_decision",
+      "session_id" => session_id,
+      "actor_id" => normalized.actor_id,
+      "expected_session_revision" => normalized.expected_session_revision,
+      "decision_id" => normalized.decision_id,
+      "response" => normalized.response,
+      "plan_ref" => normalized.plan_ref,
+      "patch_ref" => normalized.patch_ref,
+      "result_state_digest" => normalized.result_state_digest,
+      "review_ref" => normalized.review_ref
+    })
+  end
+
+  defp pending_decision_result_from_stored(replay) do
+    with :ok <- require_application_result_schema(replay.result_schema, @application_result_schema),
+         :ok <- require_valid_session_id(replay.session_id),
+         :ok <- require_valid_action_id(replay.action_id),
+         :ok <- require_valid_decision_id(replay.result["decision_id"]),
+         :ok <- require_run_state(replay.result, :waiting_for_user),
+         :ok <- require_projection_digest(replay.result["projection_digest"]) do
+      {:ok,
+       %{
+         session_id: replay.session_id,
+         action_id: replay.action_id,
+         decision_id: replay.result["decision_id"],
+         session_revision: replay.result["session_revision"],
+         run_state: :waiting_for_user,
+         projection_digest: replay.result["projection_digest"]
+       }}
+    end
+  end
+
+  defp user_decision_result_from_stored(replay) do
+    with :ok <- require_application_result_schema(replay.result_schema, @application_result_schema),
+         :ok <- require_valid_session_id(replay.session_id),
+         :ok <- require_valid_action_id(replay.action_id),
+         :ok <- require_valid_decision_id(replay.result["decision_id"]),
+         :ok <- require_run_state(replay.result, :ready),
+         :ok <- require_projection_digest(replay.result["projection_digest"]) do
+      {:ok,
+       %{
+         session_id: replay.session_id,
+         action_id: replay.action_id,
+         decision_id: replay.result["decision_id"],
+         response: replay.result["response"],
+         session_revision: replay.result["session_revision"],
+         run_state: :ready,
+         projection_digest: replay.result["projection_digest"]
+       }}
+    end
+  end
+
+  defp require_valid_decision_id(value) do
+    if Id.valid?(:decision, value) do
+      :ok
+    else
+      corrupt_result_error("stored result decision_id is not a valid decision identifier", %{
+        field: :decision_id
+      })
     end
   end
 

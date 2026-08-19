@@ -135,13 +135,16 @@ defmodule Kiln.Journal.Reducer do
   end
 
   defp do_reduce(projection, %{type: "pending_decision_recorded/v1", payload: payload}) do
-    with :ok <- require_keys(payload, ["decision"]),
+    with :ok <- require_keys(payload, ["decision", "decision_context"]),
          :ok <- no_active_operation(projection),
          {:ok, _to} <- transition_run(projection, "waiting_for_user") do
+      references = put_decision_envelope(projection["references"] || %{}, payload["decision_context"])
+
       {:ok,
        projection
        |> put_run_state("waiting_for_user")
        |> Map.put("pending_decision", payload["decision"])
+       |> Map.put("references", references)
        |> maybe_put_step(payload["workflow_step"])}
     end
   end
@@ -150,12 +153,24 @@ defmodule Kiln.Journal.Reducer do
     with {:ok, decision} <- current_decision(projection, payload["decision_id"]),
          :ok <- response_permitted(decision, payload["response"]),
          {:ok, _to} <- transition_run(projection, "ready") do
+      references = Map.delete(projection["references"] || %{}, "decision_envelope")
+
       {:ok,
        projection
        |> put_run_state("ready")
        |> Map.put("pending_decision", nil)
+       |> Map.put("references", references)
        |> maybe_put_step(payload["workflow_step"])}
     end
+  end
+
+  defp put_decision_envelope(references, decision_context) do
+    Map.put(references, "decision_envelope", %{
+      "plan_ref" => decision_context["plan_ref"],
+      "patch_ref" => decision_context["patch_ref"],
+      "result_state_digest" => decision_context["result_state_digest"],
+      "review_ref" => decision_context["review_ref"]
+    })
   end
 
   defp do_reduce(projection, %{type: "external_operation_intent_recorded/v1", payload: payload}) do

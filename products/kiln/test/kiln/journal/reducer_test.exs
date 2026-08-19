@@ -175,7 +175,7 @@ defmodule Kiln.Journal.ReducerTest do
     assert {:error, %{code: :operation_active}} =
              Reducer.reduce(running, %{
                type: "pending_decision_recorded/v1",
-               payload: %{"decision" => decision()}
+               payload: %{"decision" => decision(), "decision_context" => decision_context()}
              })
   end
 
@@ -282,7 +282,7 @@ defmodule Kiln.Journal.ReducerTest do
          {:ok, running} <- transition(projection, "ready", "running") do
       Reducer.reduce(running, %{
         type: "pending_decision_recorded/v1",
-        payload: %{"decision" => decision()}
+        payload: %{"decision" => decision(), "decision_context" => decision_context()}
       })
     end
   end
@@ -316,6 +316,15 @@ defmodule Kiln.Journal.ReducerTest do
       "subject_revision" => 0,
       "requested_actor" => "local_user",
       "permitted_responses" => ["approve", "deny"]
+    }
+  end
+
+  defp decision_context do
+    %{
+      "plan_ref" => %{"id" => "pln_1", "digest" => "sha256:" <> String.duplicate("a", 64)},
+      "patch_ref" => %{"id" => "pp_1", "digest" => "sha256:" <> String.duplicate("b", 64)},
+      "result_state_digest" => "sha256:" <> String.duplicate("c", 64),
+      "review_ref" => nil
     }
   end
 

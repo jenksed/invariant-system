@@ -788,10 +788,23 @@ defmodule Kiln.CLITest do
     entry = %{
       type: "pending_decision_recorded/v1",
       payload_schema: "pending_decision_recorded/v1",
-      payload: %{"decision" => decision, "workflow_step" => "approval"}
+      payload: %{
+        "decision" => decision,
+        "decision_context" => decision_context(),
+        "workflow_step" => "approval"
+      }
     }
 
     {:ok, _} = Journal.commit(store.conn, action, [entry], now: @now)
+  end
+
+  defp decision_context do
+    %{
+      "plan_ref" => %{"id" => "pln_test", "digest" => "sha256:" <> String.duplicate("0", 64)},
+      "patch_ref" => %{"id" => "pp_test", "digest" => "sha256:" <> String.duplicate("1", 64)},
+      "result_state_digest" => "sha256:" <> String.duplicate("2", 64),
+      "review_ref" => nil
+    }
   end
 
   defp tmp_home! do

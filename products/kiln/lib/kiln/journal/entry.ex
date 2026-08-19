@@ -112,6 +112,7 @@ defmodule Kiln.Journal.Entry do
 
   defp validate("pending_decision_recorded/v1", p) do
     with :ok <- object(p, "decision", &decision/1),
+         :ok <- object(p, "decision_context", &decision_context/1),
          :ok <- optional_step(p) do
       :ok
     end
@@ -169,6 +170,79 @@ defmodule Kiln.Journal.Entry do
          :ok <- string(d, "requested_actor"),
          :ok <- non_empty_string_list(d, "permitted_responses", :empty_response) do
       :ok
+    end
+  end
+
+  # The bounded context that governs the pending decision. Captured at
+  # decision-creation time so a connected operator can construct a
+  # canonical human.decide envelope without re-discovering upstream refs.
+  # `review_ref` is null when the trigger occurred before a Review was
+  # recorded (per m0-v1 acceptance contract; see test
+  # `Kiln.M0AcceptanceTest` "review_ref may be nil when no Review has
+  # been recorded yet").
+  defp decision_context(c) do
+    with :ok <- is_object(c, "plan_ref"),
+         :ok <- artifact_ref(c, "plan_ref"),
+         :ok <- is_object(c, "patch_ref"),
+         :ok <- artifact_ref(c, "patch_ref"),
+         :ok <- digest(c, "result_state_digest"),
+         :ok <- optional_artifact_ref(c, "review_ref") do
+      :ok
+    end
+  end
+
+  defp artifact_ref(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, %{} = ref} ->
+        with :ok <- non_empty_string(ref, "id"),
+             :ok <- non_empty_string(ref, "digest") do
+          :ok
+        end
+
+      {:ok, _} ->
+        invalid(field, :not_a_map)
+
+      :error ->
+        invalid(field, :missing)
+    end
+  end
+
+  defp optional_artifact_ref(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, nil} ->
+        :ok
+
+      {:ok, %{} = ref} ->
+        with :ok <- non_empty_string(ref, "id"),
+             :ok <- non_empty_string(ref, "digest") do
+          :ok
+        end
+
+      {:ok, _} ->
+        invalid(field, :not_a_map_or_null)
+
+      :error ->
+        :ok
+    end
+  end
+
+  defp digest(map, field) do
+    case Map.fetch(map, field) do
+      {:ok, value} when is_binary(value) and byte_size(value) > 0 ->
+        if Regex.match?(~r/^sha256:[0-9a-f]{64}$/, value) do
+          :ok
+        else
+          invalid(field, :not_a_canonical_digest)
+        end
+
+      {:ok, ""} ->
+        invalid(field, :empty_string)
+
+      {:ok, _} ->
+        invalid(field, :not_a_string)
+
+      :error ->
+        invalid(field, :missing)
     end
   end
 

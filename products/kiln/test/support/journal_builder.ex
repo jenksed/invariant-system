@@ -76,9 +76,17 @@ defmodule Kiln.Test.JournalBuilder do
       "permitted_responses" => ["approve", "deny"]
     }
 
+    decision_context = %{
+      "plan_ref" => %{"id" => "pln_test", "digest" => "sha256:" <> String.duplicate("0", 64)},
+      "patch_ref" => %{"id" => "pp_test", "digest" => "sha256:" <> String.duplicate("1", 64)},
+      "result_state_digest" => "sha256:" <> String.duplicate("2", 64),
+      "review_ref" => nil
+    }
+
     entry =
       entry("pending_decision_recorded/v1", %{
         "decision" => decision,
+        "decision_context" => decision_context,
         "workflow_step" => "approval"
       })
 

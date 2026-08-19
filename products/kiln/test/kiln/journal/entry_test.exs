@@ -175,7 +175,11 @@ defmodule Kiln.Journal.EntryTest do
 
     test "accepts non-empty permitted responses" do
       decision = Map.put(decision_payload(), "permitted_responses", ["approve", "deny"])
-      assert {:ok, _} = Entry.decode("pending_decision_recorded/v1", %{"decision" => decision})
+      assert {:ok, _} =
+               Entry.decode("pending_decision_recorded/v1", %{
+                 "decision" => decision,
+                 "decision_context" => decision_context_payload()
+               })
     end
 
     test "rejects a malformed permitted-responses list and unexpected null" do
@@ -288,6 +292,15 @@ defmodule Kiln.Journal.EntryTest do
       "subject_revision" => 0,
       "requested_actor" => "local_user",
       "permitted_responses" => ["approve"]
+    }
+  end
+
+  defp decision_context_payload do
+    %{
+      "plan_ref" => %{"id" => "pln_1", "digest" => "sha256:" <> String.duplicate("a", 64)},
+      "patch_ref" => %{"id" => "pp_1", "digest" => "sha256:" <> String.duplicate("b", 64)},
+      "result_state_digest" => "sha256:" <> String.duplicate("c", 64),
+      "review_ref" => nil
     }
   end
 
