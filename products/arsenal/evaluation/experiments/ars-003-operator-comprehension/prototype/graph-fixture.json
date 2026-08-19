@@ -1,0 +1,293 @@
+{
+  "absence_interval": {
+    "end": "2026-08-19T09:42:00Z",
+    "start": "2026-08-19T09:35:00Z"
+  },
+  "event_log": [
+    {
+      "details": "Envelope ARS-003-TRACE-1 started.",
+      "event": "envelope_started",
+      "evidence_ref": null,
+      "node": "root-orchestrator",
+      "timestamp": "2026-08-19T09:00:00Z"
+    },
+    {
+      "details": "Contract drafting began.",
+      "event": "started",
+      "evidence_ref": null,
+      "node": "contract-worker",
+      "timestamp": "2026-08-19T09:05:00Z"
+    },
+    {
+      "details": "Doc generation began as a child of contract-worker.",
+      "event": "started",
+      "evidence_ref": null,
+      "node": "doc-worker",
+      "timestamp": "2026-08-19T09:06:00Z"
+    },
+    {
+      "details": "Documentation build succeeded.",
+      "event": "completed",
+      "evidence_ref": "kiln/doc-build/v1",
+      "node": "doc-worker",
+      "timestamp": "2026-08-19T09:08:00Z"
+    },
+    {
+      "details": "Independent test branch started.",
+      "event": "started",
+      "evidence_ref": null,
+      "node": "test-runner",
+      "timestamp": "2026-08-19T09:10:00Z"
+    },
+    {
+      "details": "Independent deploy branch started.",
+      "event": "started",
+      "evidence_ref": null,
+      "node": "deploy-worker",
+      "timestamp": "2026-08-19T09:12:00Z"
+    },
+    {
+      "details": "Contract test failed: syntax error in contract v3.",
+      "event": "failed",
+      "evidence_ref": "kiln/contract-test/v3",
+      "node": "contract-worker",
+      "timestamp": "2026-08-19T09:15:00Z"
+    },
+    {
+      "details": "Set to waiting because dependency contract-worker is failed.",
+      "event": "state_changed",
+      "evidence_ref": null,
+      "node": "schema-worker",
+      "timestamp": "2026-08-19T09:16:00Z"
+    },
+    {
+      "details": "Blocked: no reviewable contract artifact has been produced.",
+      "event": "blocked",
+      "evidence_ref": null,
+      "node": "reviewer-contract",
+      "timestamp": "2026-08-19T09:17:00Z"
+    },
+    {
+      "details": "Blocked: reviewer output unavailable and schema not ready.",
+      "event": "blocked",
+      "evidence_ref": null,
+      "node": "integration-worker",
+      "timestamp": "2026-08-19T09:20:00Z"
+    },
+    {
+      "details": "Waiting on contract branch, integration, deploy, and report branches.",
+      "event": "waiting",
+      "evidence_ref": null,
+      "node": "final-assembly",
+      "timestamp": "2026-08-19T09:30:00Z"
+    },
+    {
+      "details": "Operator stepped away.",
+      "event": "absence_interval_start",
+      "evidence_ref": null,
+      "node": "operator",
+      "timestamp": "2026-08-19T09:35:00Z"
+    },
+    {
+      "details": "Patched contract from v3 to v4.",
+      "event": "change_produced",
+      "evidence_ref": "kiln/contract-test/v4",
+      "node": "external-agent-7",
+      "timestamp": "2026-08-19T09:36:00Z"
+    },
+    {
+      "details": "Test branch completed with contract v4.",
+      "event": "completed",
+      "evidence_ref": "kiln/contract-test/v4",
+      "node": "test-runner",
+      "timestamp": "2026-08-19T09:38:00Z"
+    },
+    {
+      "details": "Report generation started after test-runner completion.",
+      "event": "started",
+      "evidence_ref": null,
+      "node": "report-worker",
+      "timestamp": "2026-08-19T09:40:00Z"
+    },
+    {
+      "details": "Report failed: output format mismatch.",
+      "event": "failed",
+      "evidence_ref": "kiln/report-check/v1",
+      "node": "report-worker",
+      "timestamp": "2026-08-19T09:41:00Z"
+    },
+    {
+      "details": "Operator returned after the absence interval.",
+      "event": "reconnect",
+      "evidence_ref": null,
+      "node": "operator",
+      "timestamp": "2026-08-19T09:42:00Z"
+    }
+  ],
+  "evidence_index": {
+    "kiln/contract-test/v3": {
+      "node": "contract-worker",
+      "status": "failed",
+      "summary": "Contract v3 syntax error observed in test run."
+    },
+    "kiln/contract-test/v4": {
+      "node": "test-runner",
+      "status": "complete",
+      "summary": "Contract v4 test passed after external-agent-7 patch."
+    },
+    "kiln/doc-build/v1": {
+      "node": "doc-worker",
+      "status": "complete",
+      "summary": "Documentation build succeeded."
+    },
+    "kiln/report-check/v1": {
+      "node": "report-worker",
+      "status": "failed",
+      "summary": "Report output format mismatch."
+    }
+  },
+  "experiment_id": "ARS-003",
+  "fixture_version": "0.1.0",
+  "graph": {
+    "edges": [
+      {
+        "relation": "orchestrates",
+        "source": "root-orchestrator",
+        "target": "contract-worker"
+      },
+      {
+        "relation": "orchestrates",
+        "source": "root-orchestrator",
+        "target": "test-runner"
+      },
+      {
+        "relation": "orchestrates",
+        "source": "root-orchestrator",
+        "target": "deploy-worker"
+      },
+      {
+        "relation": "depends_on",
+        "source": "contract-worker",
+        "target": "schema-worker"
+      },
+      {
+        "relation": "reviews",
+        "source": "contract-worker",
+        "target": "reviewer-contract"
+      },
+      {
+        "relation": "produces",
+        "source": "contract-worker",
+        "target": "doc-worker"
+      },
+      {
+        "relation": "blocks_until_reviewed",
+        "source": "reviewer-contract",
+        "target": "integration-worker"
+      },
+      {
+        "relation": "depends_on",
+        "source": "doc-worker",
+        "target": "integration-worker"
+      },
+      {
+        "relation": "depends_on",
+        "source": "schema-worker",
+        "target": "final-assembly"
+      },
+      {
+        "relation": "depends_on",
+        "source": "test-runner",
+        "target": "report-worker"
+      },
+      {
+        "relation": "depends_on",
+        "source": "deploy-worker",
+        "target": "final-assembly"
+      },
+      {
+        "relation": "depends_on",
+        "source": "integration-worker",
+        "target": "final-assembly"
+      },
+      {
+        "relation": "depends_on",
+        "source": "report-worker",
+        "target": "final-assembly"
+      }
+    ],
+    "nodes": [
+      {
+        "description": "Top-level coordinator for the envelope.",
+        "id": "root-orchestrator",
+        "label": "Root Orchestrator",
+        "role": "orchestrator",
+        "state": "running"
+      },
+      {
+        "description": "Drafting the shared contract; failed on contract v3 test run.",
+        "id": "contract-worker",
+        "label": "Contract Worker",
+        "role": "worker",
+        "state": "failed"
+      },
+      {
+        "description": "Blocked waiting for contract-worker output.",
+        "id": "schema-worker",
+        "label": "Schema Worker",
+        "role": "worker",
+        "state": "waiting"
+      },
+      {
+        "description": "Independent verification branch; completed during absence.",
+        "id": "test-runner",
+        "label": "Test Runner",
+        "role": "worker",
+        "state": "complete"
+      },
+      {
+        "description": "Assigned to review contract-worker output; nothing reviewable yet.",
+        "id": "reviewer-contract",
+        "label": "Contract Reviewer",
+        "role": "reviewer",
+        "state": "blocked"
+      },
+      {
+        "description": "Child of contract-worker; produced docs before the failure.",
+        "id": "doc-worker",
+        "label": "Documentation Worker",
+        "role": "worker",
+        "state": "complete"
+      },
+      {
+        "description": "Blocked waiting for reviewer output and schema completion.",
+        "id": "integration-worker",
+        "label": "Integration Worker",
+        "role": "worker",
+        "state": "blocked"
+      },
+      {
+        "description": "Independent deployment branch.",
+        "id": "deploy-worker",
+        "label": "Deploy Worker",
+        "role": "worker",
+        "state": "running"
+      },
+      {
+        "description": "Dependent on test-runner; failed during the absence interval.",
+        "id": "report-worker",
+        "label": "Report Worker",
+        "role": "worker",
+        "state": "failed"
+      },
+      {
+        "description": "Collects all branches; waiting on several incomplete dependencies.",
+        "id": "final-assembly",
+        "label": "Final Assembly",
+        "role": "worker",
+        "state": "waiting"
+      }
+    ]
+  },
+  "schema_version": "0.1.0"
+}

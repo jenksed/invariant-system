@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARS-003 Representation C — Hybrid</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f7f7f8;
+    color: #111;
+  }
+  .banner {
+    background: #1a1a2e;
+    color: #e0e0ff;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    border-bottom: 3px solid #e94560;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  h1 {
+    font-size: 1.35rem;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 1.1rem;
+    margin-top: 1.5rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.25rem;
+  }
+  .meta {
+    color: #555;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .node-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+  }
+  .node-header {
+    font-weight: 600;
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+  }
+  .role {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #666;
+  }
+  .state {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+  }
+  .state-running { background: #dbeafe; color: #1e40af; }
+  .state-waiting { background: #fef3c7; color: #92400e; }
+  .state-blocked { background: #fee2e2; color: #991b1b; }
+  .state-failed { background: #fecaca; color: #7f1d1d; }
+  .state-complete { background: #d1fae5; color: #065f46; }
+  .event {
+    background: #fff;
+    border-left: 3px solid #9ca3af;
+    padding: 0.5rem 0.75rem;
+    margin: 0.35rem 0;
+    font-size: 0.92rem;
+  }
+  .event time {
+    color: #6b7280;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+  }
+  .event .actor {
+    font-weight: 600;
+  }
+  .evidence {
+    font-size: 0.8rem;
+    color: #374151;
+    margin-top: 0.25rem;
+  }
+  .edge-list {
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    background: #fff;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f3f4f6;
+  }
+  svg {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    max-width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="banner">ARS-003 formative prototype — non-authoritative representation; not an execution surface.</div>
+<div class="container">
+<h1>Representation C: Hybrid (Graph / Node / Timeline)</h1>
+<p class="meta">Top: graph overview. Middle: per-node conversation panel. Bottom: timeline and evidence strip.</p>
+<h2>Graph overview</h2>
+<svg viewBox="0 0 800 560" xmlns="http://www.w3.org/2000/svg" aria-label="Static graph layout">
+<defs>
+  <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+    <polygon points="0 0, 10 3.5, 0 7" fill="#6b7280" />
+  </marker>
+</defs>
+<line x1="404.6" y1="70.2" x2="325.4" y2="133.8" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="365.0" y="102.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">orchestrates</text>
+<line x1="465.0" y1="84.0" x2="465.0" y2="120.0" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="465.0" y="102.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">orchestrates</text>
+<line x1="525.4" y1="70.2" x2="604.6" y2="133.8" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="565.0" y="102.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">orchestrates</text>
+<line x1="224.4" y1="159.2" x2="225.6" y2="224.8" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="225.0" y="192.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="305.6" y1="159.2" x2="304.4" y2="224.8" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="305.0" y="192.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">reviews</text>
+<line x1="265.0" y1="164.0" x2="265.0" y2="300.0" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="265.0" y="232.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">produces</text>
+<line x1="329.2" y1="263.3" x2="320.8" y2="380.7" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="325.0" y="322.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">blocks_until_reviewed</text>
+<line x1="294.1" y1="341.7" x2="275.9" y2="382.3" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="285.0" y="362.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="232.6" y1="257.0" x2="417.4" y2="487.0" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="325.0" y="372.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="465.0" y1="164.0" x2="465.0" y2="220.0" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="465.0" y="192.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="633.4" y1="161.2" x2="496.6" y2="482.8" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="565.0" y="322.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="360.1" y1="413.7" x2="409.9" y2="490.3" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="385.0" y="452.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<line x1="465.0" y1="264.0" x2="465.0" y2="480.0" stroke="#6b7280" stroke-width="1.5" marker-end="url(#arrowhead)" />
+<text x="465.0" y="372.0" font-size="10" fill="#4b5563" text-anchor="middle" dy="-3">depends_on</text>
+<rect x="200" y="120" width="130" height="44" rx="4" fill="#fecaca" stroke="#9ca3af" stroke-width="1" />
+<text x="265.0" y="142.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Contract Worker</text>
+<text x="265.0" y="178" font-size="10" text-anchor="middle" fill="#374151">failed</text>
+<rect x="600" y="120" width="130" height="44" rx="4" fill="#dbeafe" stroke="#9ca3af" stroke-width="1" />
+<text x="665.0" y="142.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Deploy Worker</text>
+<text x="665.0" y="178" font-size="10" text-anchor="middle" fill="#374151">running</text>
+<rect x="200" y="300" width="130" height="44" rx="4" fill="#d1fae5" stroke="#9ca3af" stroke-width="1" />
+<text x="265.0" y="322.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Documentation Worker</text>
+<text x="265.0" y="358" font-size="10" text-anchor="middle" fill="#374151">complete</text>
+<rect x="400" y="480" width="130" height="44" rx="4" fill="#fef3c7" stroke="#9ca3af" stroke-width="1" />
+<text x="465.0" y="502.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Final Assembly</text>
+<text x="465.0" y="538" font-size="10" text-anchor="middle" fill="#374151">waiting</text>
+<rect x="240" y="380" width="130" height="44" rx="4" fill="#fee2e2" stroke="#9ca3af" stroke-width="1" />
+<text x="305.0" y="402.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Integration Worker</text>
+<text x="305.0" y="438" font-size="10" text-anchor="middle" fill="#374151">blocked</text>
+<rect x="400" y="220" width="130" height="44" rx="4" fill="#fecaca" stroke="#9ca3af" stroke-width="1" />
+<text x="465.0" y="242.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Report Worker</text>
+<text x="465.0" y="278" font-size="10" text-anchor="middle" fill="#374151">failed</text>
+<rect x="280" y="220" width="130" height="44" rx="4" fill="#fee2e2" stroke="#9ca3af" stroke-width="1" />
+<text x="345.0" y="242.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Contract Reviewer</text>
+<text x="345.0" y="278" font-size="10" text-anchor="middle" fill="#374151">blocked</text>
+<rect x="400" y="40" width="130" height="44" rx="4" fill="#dbeafe" stroke="#9ca3af" stroke-width="1" />
+<text x="465.0" y="62.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Root Orchestrator</text>
+<text x="465.0" y="98" font-size="10" text-anchor="middle" fill="#374151">running</text>
+<rect x="120" y="220" width="130" height="44" rx="4" fill="#fef3c7" stroke="#9ca3af" stroke-width="1" />
+<text x="185.0" y="242.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Schema Worker</text>
+<text x="185.0" y="278" font-size="10" text-anchor="middle" fill="#374151">waiting</text>
+<rect x="400" y="120" width="130" height="44" rx="4" fill="#d1fae5" stroke="#9ca3af" stroke-width="1" />
+<text x="465.0" y="142.0" font-size="11" text-anchor="middle" dominant-baseline="middle" fill="#111" font-weight="600">Test Runner</text>
+<text x="465.0" y="178" font-size="10" text-anchor="middle" fill="#374151">complete</text>
+</svg>
+<h2>Per-node conversation panel</h2>
+<div class='node-card' id='node-root-orchestrator'><div class='node-header'>Root Orchestrator <span class='role'>orchestrator</span> <span class='state state-running'>running</span></div><div class='meta'>Top-level coordinator for the envelope.</div>
+<div class='event'><time>2026-08-19T09:00:00Z</time><span class='actor'>root-orchestrator</span> <strong>envelope_started</strong>: Envelope ARS-003-TRACE-1 started.</div>
+</div>
+<div class='node-card' id='node-contract-worker'><div class='node-header'>Contract Worker <span class='role'>worker</span> <span class='state state-failed'>failed</span></div><div class='meta'>Drafting the shared contract; failed on contract v3 test run.</div>
+<div class='event'><time>2026-08-19T09:05:00Z</time><span class='actor'>contract-worker</span> <strong>started</strong>: Contract drafting began.</div>
+<div class='event'><time>2026-08-19T09:15:00Z</time><span class='actor'>contract-worker</span> <strong>failed</strong>: Contract test failed: syntax error in contract v3.<div class='evidence'>Evidence: kiln/contract-test/v3 — Contract v3 syntax error observed in test run.</div></div>
+</div>
+<div class='node-card' id='node-schema-worker'><div class='node-header'>Schema Worker <span class='role'>worker</span> <span class='state state-waiting'>waiting</span></div><div class='meta'>Blocked waiting for contract-worker output.</div>
+<div class='event'><time>2026-08-19T09:16:00Z</time><span class='actor'>schema-worker</span> <strong>state_changed</strong>: Set to waiting because dependency contract-worker is failed.</div>
+</div>
+<div class='node-card' id='node-test-runner'><div class='node-header'>Test Runner <span class='role'>worker</span> <span class='state state-complete'>complete</span></div><div class='meta'>Independent verification branch; completed during absence.</div>
+<div class='event'><time>2026-08-19T09:10:00Z</time><span class='actor'>test-runner</span> <strong>started</strong>: Independent test branch started.</div>
+<div class='event'><time>2026-08-19T09:38:00Z</time><span class='actor'>test-runner</span> <strong>completed</strong>: Test branch completed with contract v4.<div class='evidence'>Evidence: kiln/contract-test/v4 — Contract v4 test passed after external-agent-7 patch.</div></div>
+</div>
+<div class='node-card' id='node-reviewer-contract'><div class='node-header'>Contract Reviewer <span class='role'>reviewer</span> <span class='state state-blocked'>blocked</span></div><div class='meta'>Assigned to review contract-worker output; nothing reviewable yet.</div>
+<div class='event'><time>2026-08-19T09:17:00Z</time><span class='actor'>reviewer-contract</span> <strong>blocked</strong>: Blocked: no reviewable contract artifact has been produced.</div>
+</div>
+<div class='node-card' id='node-doc-worker'><div class='node-header'>Documentation Worker <span class='role'>worker</span> <span class='state state-complete'>complete</span></div><div class='meta'>Child of contract-worker; produced docs before the failure.</div>
+<div class='event'><time>2026-08-19T09:06:00Z</time><span class='actor'>doc-worker</span> <strong>started</strong>: Doc generation began as a child of contract-worker.</div>
+<div class='event'><time>2026-08-19T09:08:00Z</time><span class='actor'>doc-worker</span> <strong>completed</strong>: Documentation build succeeded.<div class='evidence'>Evidence: kiln/doc-build/v1 — Documentation build succeeded.</div></div>
+</div>
+<div class='node-card' id='node-integration-worker'><div class='node-header'>Integration Worker <span class='role'>worker</span> <span class='state state-blocked'>blocked</span></div><div class='meta'>Blocked waiting for reviewer output and schema completion.</div>
+<div class='event'><time>2026-08-19T09:20:00Z</time><span class='actor'>integration-worker</span> <strong>blocked</strong>: Blocked: reviewer output unavailable and schema not ready.</div>
+</div>
+<div class='node-card' id='node-deploy-worker'><div class='node-header'>Deploy Worker <span class='role'>worker</span> <span class='state state-running'>running</span></div><div class='meta'>Independent deployment branch.</div>
+<div class='event'><time>2026-08-19T09:12:00Z</time><span class='actor'>deploy-worker</span> <strong>started</strong>: Independent deploy branch started.</div>
+</div>
+<div class='node-card' id='node-report-worker'><div class='node-header'>Report Worker <span class='role'>worker</span> <span class='state state-failed'>failed</span></div><div class='meta'>Dependent on test-runner; failed during the absence interval.</div>
+<div class='event'><time>2026-08-19T09:40:00Z</time><span class='actor'>report-worker</span> <strong>started</strong>: Report generation started after test-runner completion.</div>
+<div class='event'><time>2026-08-19T09:41:00Z</time><span class='actor'>report-worker</span> <strong>failed</strong>: Report failed: output format mismatch.<div class='evidence'>Evidence: kiln/report-check/v1 — Report output format mismatch.</div></div>
+</div>
+<div class='node-card' id='node-final-assembly'><div class='node-header'>Final Assembly <span class='role'>worker</span> <span class='state state-waiting'>waiting</span></div><div class='meta'>Collects all branches; waiting on several incomplete dependencies.</div>
+<div class='event'><time>2026-08-19T09:30:00Z</time><span class='actor'>final-assembly</span> <strong>waiting</strong>: Waiting on contract branch, integration, deploy, and report branches.</div>
+</div>
+<h2>Timeline / evidence strip</h2>
+<table><tr><th>time</th><th>actor</th><th>event</th><th>details</th><th>evidence</th></tr>
+<tr><td>2026-08-19T09:00:00Z</td><td>root-orchestrator</td><td>envelope_started</td><td>Envelope ARS-003-TRACE-1 started.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:05:00Z</td><td>contract-worker</td><td>started</td><td>Contract drafting began.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:06:00Z</td><td>doc-worker</td><td>started</td><td>Doc generation began as a child of contract-worker.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:08:00Z</td><td>doc-worker</td><td>completed</td><td>Documentation build succeeded.</td><td>kiln/doc-build/v1 <span class='evidence'>(Documentation build succeeded.)</span></td></tr>
+<tr><td>2026-08-19T09:10:00Z</td><td>test-runner</td><td>started</td><td>Independent test branch started.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:12:00Z</td><td>deploy-worker</td><td>started</td><td>Independent deploy branch started.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:15:00Z</td><td>contract-worker</td><td>failed</td><td>Contract test failed: syntax error in contract v3.</td><td>kiln/contract-test/v3 <span class='evidence'>(Contract v3 syntax error observed in test run.)</span></td></tr>
+<tr><td>2026-08-19T09:16:00Z</td><td>schema-worker</td><td>state_changed</td><td>Set to waiting because dependency contract-worker is failed.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:17:00Z</td><td>reviewer-contract</td><td>blocked</td><td>Blocked: no reviewable contract artifact has been produced.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:20:00Z</td><td>integration-worker</td><td>blocked</td><td>Blocked: reviewer output unavailable and schema not ready.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:30:00Z</td><td>final-assembly</td><td>waiting</td><td>Waiting on contract branch, integration, deploy, and report branches.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:35:00Z</td><td>operator</td><td>absence_interval_start</td><td>Operator stepped away.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:36:00Z</td><td>external-agent-7</td><td>change_produced</td><td>Patched contract from v3 to v4.</td><td>kiln/contract-test/v4 <span class='evidence'>(Contract v4 test passed after external-agent-7 patch.)</span></td></tr>
+<tr><td>2026-08-19T09:38:00Z</td><td>test-runner</td><td>completed</td><td>Test branch completed with contract v4.</td><td>kiln/contract-test/v4 <span class='evidence'>(Contract v4 test passed after external-agent-7 patch.)</span></td></tr>
+<tr><td>2026-08-19T09:40:00Z</td><td>report-worker</td><td>started</td><td>Report generation started after test-runner completion.</td><td>—</td></tr>
+<tr><td>2026-08-19T09:41:00Z</td><td>report-worker</td><td>failed</td><td>Report failed: output format mismatch.</td><td>kiln/report-check/v1 <span class='evidence'>(Report output format mismatch.)</span></td></tr>
+<tr><td>2026-08-19T09:42:00Z</td><td>operator</td><td>reconnect</td><td>Operator returned after the absence interval.</td><td>—</td></tr>
+</table>
+<h2>Evidence index</h2>
+<table><tr><th>evidence_ref</th><th>node</th><th>status</th><th>summary</th></tr>
+<tr><td>kiln/contract-test/v3</td><td>contract-worker</td><td>failed</td><td>Contract v3 syntax error observed in test run.</td></tr>
+<tr><td>kiln/contract-test/v4</td><td>test-runner</td><td>complete</td><td>Contract v4 test passed after external-agent-7 patch.</td></tr>
+<tr><td>kiln/doc-build/v1</td><td>doc-worker</td><td>complete</td><td>Documentation build succeeded.</td></tr>
+<tr><td>kiln/report-check/v1</td><td>report-worker</td><td>failed</td><td>Report output format mismatch.</td></tr>
+</table>
+</div>
+</body>
+</html>

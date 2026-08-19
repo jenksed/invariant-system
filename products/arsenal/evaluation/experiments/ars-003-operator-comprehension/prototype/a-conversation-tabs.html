@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARS-003 Representation A — Conversation Tabs</title>
+<style>
+  body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    margin: 0;
+    padding: 0;
+    background: #f7f7f8;
+    color: #111;
+  }
+  .banner {
+    background: #1a1a2e;
+    color: #e0e0ff;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    font-size: 0.9rem;
+    border-bottom: 3px solid #e94560;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 1.5rem;
+  }
+  h1 {
+    font-size: 1.35rem;
+    margin-top: 0;
+  }
+  h2 {
+    font-size: 1.1rem;
+    margin-top: 1.5rem;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 0.25rem;
+  }
+  .meta {
+    color: #555;
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  .node-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    margin: 0.5rem 0;
+  }
+  .node-header {
+    font-weight: 600;
+    display: flex;
+    gap: 0.75rem;
+    align-items: baseline;
+  }
+  .role {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #666;
+  }
+  .state {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+  }
+  .state-running { background: #dbeafe; color: #1e40af; }
+  .state-waiting { background: #fef3c7; color: #92400e; }
+  .state-blocked { background: #fee2e2; color: #991b1b; }
+  .state-failed { background: #fecaca; color: #7f1d1d; }
+  .state-complete { background: #d1fae5; color: #065f46; }
+  .event {
+    background: #fff;
+    border-left: 3px solid #9ca3af;
+    padding: 0.5rem 0.75rem;
+    margin: 0.35rem 0;
+    font-size: 0.92rem;
+  }
+  .event time {
+    color: #6b7280;
+    font-size: 0.8rem;
+    margin-right: 0.5rem;
+  }
+  .event .actor {
+    font-weight: 600;
+  }
+  .evidence {
+    font-size: 0.8rem;
+    color: #374151;
+    margin-top: 0.25rem;
+  }
+  .edge-list {
+    font-size: 0.9rem;
+    color: #374151;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    background: #fff;
+  }
+  th, td {
+    border: 1px solid #ddd;
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: #f3f4f6;
+  }
+  svg {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    max-width: 100%;
+  }
+</style>
+</head>
+<body>
+<div class="banner">ARS-003 formative prototype — non-authoritative representation; not an execution surface.</div>
+<div class="container">
+<h1>Representation A: Conversation / Session Tabs</h1>
+<p class="meta">Each tab is a node session. Events are shown as messages in chronological order. The Global tab shows cross-cutting events.</p>
+<style>.tabs { display: flex; flex-wrap: wrap; gap: 0.25rem; border-bottom: 2px solid #ddd; margin-bottom: 1rem; }.tabs label { padding: 0.5rem 0.75rem; cursor: pointer; background: #eee; border-radius: 4px 4px 0 0; }.tabs input { display: none; }.tabs input:checked + label { background: #1a1a2e; color: #fff; }.panel { display: none; }#tab-global:checked ~ #panel-global { display: block; }#tab-root-orchestrator:checked ~ #panel-root-orchestrator { display: block; }#tab-contract-worker:checked ~ #panel-contract-worker { display: block; }#tab-schema-worker:checked ~ #panel-schema-worker { display: block; }#tab-test-runner:checked ~ #panel-test-runner { display: block; }#tab-reviewer-contract:checked ~ #panel-reviewer-contract { display: block; }#tab-doc-worker:checked ~ #panel-doc-worker { display: block; }#tab-integration-worker:checked ~ #panel-integration-worker { display: block; }#tab-deploy-worker:checked ~ #panel-deploy-worker { display: block; }#tab-report-worker:checked ~ #panel-report-worker { display: block; }#tab-final-assembly:checked ~ #panel-final-assembly { display: block; }</style>
+<div class="tabs">
+<input type="radio" name="tab" id="tab-global" checked>
+<label for="tab-global">Global</label>
+<input type="radio" name="tab" id="tab-root-orchestrator">
+<label for="tab-root-orchestrator">Root Orchestrator</label>
+<input type="radio" name="tab" id="tab-contract-worker">
+<label for="tab-contract-worker">Contract Worker</label>
+<input type="radio" name="tab" id="tab-schema-worker">
+<label for="tab-schema-worker">Schema Worker</label>
+<input type="radio" name="tab" id="tab-test-runner">
+<label for="tab-test-runner">Test Runner</label>
+<input type="radio" name="tab" id="tab-reviewer-contract">
+<label for="tab-reviewer-contract">Contract Reviewer</label>
+<input type="radio" name="tab" id="tab-doc-worker">
+<label for="tab-doc-worker">Documentation Worker</label>
+<input type="radio" name="tab" id="tab-integration-worker">
+<label for="tab-integration-worker">Integration Worker</label>
+<input type="radio" name="tab" id="tab-deploy-worker">
+<label for="tab-deploy-worker">Deploy Worker</label>
+<input type="radio" name="tab" id="tab-report-worker">
+<label for="tab-report-worker">Report Worker</label>
+<input type="radio" name="tab" id="tab-final-assembly">
+<label for="tab-final-assembly">Final Assembly</label>
+</div>
+<div class="panel" id="panel-global">
+<h2>Global timeline</h2>
+<div class='event'><time>2026-08-19T09:00:00Z</time><span class='actor'>root-orchestrator</span> <strong>envelope_started</strong>: Envelope ARS-003-TRACE-1 started.</div>
+<div class='event'><time>2026-08-19T09:05:00Z</time><span class='actor'>contract-worker</span> <strong>started</strong>: Contract drafting began.</div>
+<div class='event'><time>2026-08-19T09:06:00Z</time><span class='actor'>doc-worker</span> <strong>started</strong>: Doc generation began as a child of contract-worker.</div>
+<div class='event'><time>2026-08-19T09:08:00Z</time><span class='actor'>doc-worker</span> <strong>completed</strong>: Documentation build succeeded.<div class='evidence'>Evidence: kiln/doc-build/v1 — Documentation build succeeded.</div></div>
+<div class='event'><time>2026-08-19T09:10:00Z</time><span class='actor'>test-runner</span> <strong>started</strong>: Independent test branch started.</div>
+<div class='event'><time>2026-08-19T09:12:00Z</time><span class='actor'>deploy-worker</span> <strong>started</strong>: Independent deploy branch started.</div>
+<div class='event'><time>2026-08-19T09:15:00Z</time><span class='actor'>contract-worker</span> <strong>failed</strong>: Contract test failed: syntax error in contract v3.<div class='evidence'>Evidence: kiln/contract-test/v3 — Contract v3 syntax error observed in test run.</div></div>
+<div class='event'><time>2026-08-19T09:16:00Z</time><span class='actor'>schema-worker</span> <strong>state_changed</strong>: Set to waiting because dependency contract-worker is failed.</div>
+<div class='event'><time>2026-08-19T09:17:00Z</time><span class='actor'>reviewer-contract</span> <strong>blocked</strong>: Blocked: no reviewable contract artifact has been produced.</div>
+<div class='event'><time>2026-08-19T09:20:00Z</time><span class='actor'>integration-worker</span> <strong>blocked</strong>: Blocked: reviewer output unavailable and schema not ready.</div>
+<div class='event'><time>2026-08-19T09:30:00Z</time><span class='actor'>final-assembly</span> <strong>waiting</strong>: Waiting on contract branch, integration, deploy, and report branches.</div>
+<div class='event'><time>2026-08-19T09:35:00Z</time><span class='actor'>operator</span> <strong>absence_interval_start</strong>: Operator stepped away.</div>
+<div class='event'><time>2026-08-19T09:36:00Z</time><span class='actor'>external-agent-7</span> <strong>change_produced</strong>: Patched contract from v3 to v4.<div class='evidence'>Evidence: kiln/contract-test/v4 — Contract v4 test passed after external-agent-7 patch.</div></div>
+<div class='event'><time>2026-08-19T09:38:00Z</time><span class='actor'>test-runner</span> <strong>completed</strong>: Test branch completed with contract v4.<div class='evidence'>Evidence: kiln/contract-test/v4 — Contract v4 test passed after external-agent-7 patch.</div></div>
+<div class='event'><time>2026-08-19T09:40:00Z</time><span class='actor'>report-worker</span> <strong>started</strong>: Report generation started after test-runner completion.</div>
+<div class='event'><time>2026-08-19T09:41:00Z</time><span class='actor'>report-worker</span> <strong>failed</strong>: Report failed: output format mismatch.<div class='evidence'>Evidence: kiln/report-check/v1 — Report output format mismatch.</div></div>
+<div class='event'><time>2026-08-19T09:42:00Z</time><span class='actor'>operator</span> <strong>reconnect</strong>: Operator returned after the absence interval.</div>
+</div>
+<div class="panel" id="panel-root-orchestrator">
+<h2>Root Orchestrator <span class='role'>orchestrator</span> <span class='state state-running'>running</span></h2>
+<p class='meta'>Top-level coordinator for the envelope.</p>
+<div class='event'><time>2026-08-19T09:00:00Z</time><span class='actor'>root-orchestrator</span> <strong>envelope_started</strong>: Envelope ARS-003-TRACE-1 started.</div>
+</div>
+<div class="panel" id="panel-contract-worker">
+<h2>Contract Worker <span class='role'>worker</span> <span class='state state-failed'>failed</span></h2>
+<p class='meta'>Drafting the shared contract; failed on contract v3 test run.</p>
+<div class='event'><time>2026-08-19T09:05:00Z</time><span class='actor'>contract-worker</span> <strong>started</strong>: Contract drafting began.</div>
+<div class='event'><time>2026-08-19T09:15:00Z</time><span class='actor'>contract-worker</span> <strong>failed</strong>: Contract test failed: syntax error in contract v3.<div class='evidence'>Evidence: kiln/contract-test/v3 — Contract v3 syntax error observed in test run.</div></div>
+</div>
+<div class="panel" id="panel-schema-worker">
+<h2>Schema Worker <span class='role'>worker</span> <span class='state state-waiting'>waiting</span></h2>
+<p class='meta'>Blocked waiting for contract-worker output.</p>
+<div class='event'><time>2026-08-19T09:16:00Z</time><span class='actor'>schema-worker</span> <strong>state_changed</strong>: Set to waiting because dependency contract-worker is failed.</div>
+</div>
+<div class="panel" id="panel-test-runner">
+<h2>Test Runner <span class='role'>worker</span> <span class='state state-complete'>complete</span></h2>
+<p class='meta'>Independent verification branch; completed during absence.</p>
+<div class='event'><time>2026-08-19T09:10:00Z</time><span class='actor'>test-runner</span> <strong>started</strong>: Independent test branch started.</div>
+<div class='event'><time>2026-08-19T09:38:00Z</time><span class='actor'>test-runner</span> <strong>completed</strong>: Test branch completed with contract v4.<div class='evidence'>Evidence: kiln/contract-test/v4 — Contract v4 test passed after external-agent-7 patch.</div></div>
+</div>
+<div class="panel" id="panel-reviewer-contract">
+<h2>Contract Reviewer <span class='role'>reviewer</span> <span class='state state-blocked'>blocked</span></h2>
+<p class='meta'>Assigned to review contract-worker output; nothing reviewable yet.</p>
+<div class='event'><time>2026-08-19T09:17:00Z</time><span class='actor'>reviewer-contract</span> <strong>blocked</strong>: Blocked: no reviewable contract artifact has been produced.</div>
+</div>
+<div class="panel" id="panel-doc-worker">
+<h2>Documentation Worker <span class='role'>worker</span> <span class='state state-complete'>complete</span></h2>
+<p class='meta'>Child of contract-worker; produced docs before the failure.</p>
+<div class='event'><time>2026-08-19T09:06:00Z</time><span class='actor'>doc-worker</span> <strong>started</strong>: Doc generation began as a child of contract-worker.</div>
+<div class='event'><time>2026-08-19T09:08:00Z</time><span class='actor'>doc-worker</span> <strong>completed</strong>: Documentation build succeeded.<div class='evidence'>Evidence: kiln/doc-build/v1 — Documentation build succeeded.</div></div>
+</div>
+<div class="panel" id="panel-integration-worker">
+<h2>Integration Worker <span class='role'>worker</span> <span class='state state-blocked'>blocked</span></h2>
+<p class='meta'>Blocked waiting for reviewer output and schema completion.</p>
+<div class='event'><time>2026-08-19T09:20:00Z</time><span class='actor'>integration-worker</span> <strong>blocked</strong>: Blocked: reviewer output unavailable and schema not ready.</div>
+</div>
+<div class="panel" id="panel-deploy-worker">
+<h2>Deploy Worker <span class='role'>worker</span> <span class='state state-running'>running</span></h2>
+<p class='meta'>Independent deployment branch.</p>
+<div class='event'><time>2026-08-19T09:12:00Z</time><span class='actor'>deploy-worker</span> <strong>started</strong>: Independent deploy branch started.</div>
+</div>
+<div class="panel" id="panel-report-worker">
+<h2>Report Worker <span class='role'>worker</span> <span class='state state-failed'>failed</span></h2>
+<p class='meta'>Dependent on test-runner; failed during the absence interval.</p>
+<div class='event'><time>2026-08-19T09:40:00Z</time><span class='actor'>report-worker</span> <strong>started</strong>: Report generation started after test-runner completion.</div>
+<div class='event'><time>2026-08-19T09:41:00Z</time><span class='actor'>report-worker</span> <strong>failed</strong>: Report failed: output format mismatch.<div class='evidence'>Evidence: kiln/report-check/v1 — Report output format mismatch.</div></div>
+</div>
+<div class="panel" id="panel-final-assembly">
+<h2>Final Assembly <span class='role'>worker</span> <span class='state state-waiting'>waiting</span></h2>
+<p class='meta'>Collects all branches; waiting on several incomplete dependencies.</p>
+<div class='event'><time>2026-08-19T09:30:00Z</time><span class='actor'>final-assembly</span> <strong>waiting</strong>: Waiting on contract branch, integration, deploy, and report branches.</div>
+</div>
+</div>
+</body>
+</html>
