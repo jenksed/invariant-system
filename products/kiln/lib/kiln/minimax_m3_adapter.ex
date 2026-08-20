@@ -422,6 +422,12 @@ defmodule Kiln.MinimaxM3Adapter do
   end
 
   defp bounded_context_text(request) do
+    objective_line =
+      case Map.get(request, :engineering_objective) do
+        nil -> ""
+        obj -> "\nengineering_objective: #{obj}"
+      end
+
     """
     Bounded dispatch context.
 
@@ -432,7 +438,7 @@ defmodule Kiln.MinimaxM3Adapter do
     output_contract: #{Atom.to_string(request.output_contract)}
     envelope_schema: #{@canonical_envelope_schema_id}
     invocation_id: #{request.invocation_id}
-    context_manifest_ref: #{inspect(request.context_manifest_ref)}
+    context_manifest_ref: #{inspect(request.context_manifest_ref)}#{objective_line}
     """
   end
 

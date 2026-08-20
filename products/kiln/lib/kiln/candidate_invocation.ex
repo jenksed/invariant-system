@@ -47,6 +47,7 @@ defmodule Kiln.CandidateInvocation do
           timeout_ms: pos_integer(),
           output_contract: output_contract(),
           failure_classification: String.t(),
+          engineering_objective: String.t() | nil,
           semantic_digest: String.t()
         }
 
@@ -62,7 +63,7 @@ defmodule Kiln.CandidateInvocation do
     :failure_classification,
     :semantic_digest
   ]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [engineering_objective: nil]
 
   @doc "The canonical schema identity string."
   @spec schema_id() :: String.t()
@@ -84,7 +85,8 @@ defmodule Kiln.CandidateInvocation do
          {:ok, tool_policy_ref} <- require_artifact_ref(attrs, :tool_policy_ref),
          {:ok, timeout_ms} <- require_timeout(attrs),
          {:ok, output_contract} <-
-           require_enum(attrs, :output_contract, @allowed_output_contracts) do
+           require_enum(attrs, :output_contract, @allowed_output_contracts),
+         {:ok, engineering_objective} <- optional_objective(attrs) do
       identity_payload = %{
         invocation_id: invocation_id,
         mode: Atom.to_string(mode),
@@ -107,6 +109,7 @@ defmodule Kiln.CandidateInvocation do
          timeout_ms: timeout_ms,
          output_contract: output_contract,
          failure_classification: @failure_classification,
+         engineering_objective: engineering_objective,
          semantic_digest: canonical_digest(identity_payload)
        }}
     end
@@ -210,6 +213,22 @@ defmodule Kiln.CandidateInvocation do
 
       other ->
         {:error, {:invalid_field, key, other}}
+    end
+  end
+
+  # Optional field. Validates type but allows absence. The field
+  # carries the bounded task statement for real-provider dispatches.
+  # Schema: minLength=1 when present.
+  defp optional_objective(map) do
+    case Map.get(map, :engineering_objective) do
+      nil ->
+        {:ok, nil}
+
+      value when is_binary(value) and byte_size(value) > 0 ->
+        {:ok, value}
+
+      other ->
+        {:error, {:invalid_field, :engineering_objective, other}}
     end
   end
 

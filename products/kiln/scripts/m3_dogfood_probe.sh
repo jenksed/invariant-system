@@ -85,8 +85,8 @@ run_case() {
 
 overall=0
 
-# 1. Happy path — real MiniMax drives Worker → verify → review →
-#    waiting_for_user → human ACCEPT → ready
+# 1. Happy path — real MiniMax drives Worker → verify → independent
+#    bounded reviewer → waiting_for_user → human ACCEPT → ready
 if ! run_case m3_r2_real_provider_lifecycle test/kiln/m3_r2_real_provider_lifecycle_test.exs m3_r2_real_provider_lifecycle; then
   overall=1
 fi
@@ -96,7 +96,13 @@ if ! run_case m3_r2_verification_failure test/kiln/m3_r2_verification_failure_te
   overall=1
 fi
 
-# 3. M3-R1 regression — deterministic :dogfood mode must remain green
+# 3. Governed apply — real MiniMax candidate applied to disposable
+#    checkout via patch-apply-governed
+if ! run_case m3_r2_governed_apply test/kiln/m3_r2_governed_apply_test.exs m3_r2_governed_apply; then
+  overall=1
+fi
+
+# 4. M3-R1 regression — deterministic :dogfood mode must remain green
 if ! run_case m3_r1_regression test/kiln/m3_dogfood_lifecycle_test.exs m3_dogfood; then
   overall=1
 fi

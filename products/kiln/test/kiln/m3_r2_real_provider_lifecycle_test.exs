@@ -188,7 +188,27 @@ defmodule Kiln.M3R2RealProviderLifecycleTest do
       IO.puts("[m3-r2-rp] verification_id: #{vr.id}")
       IO.puts("[m3-r2-rp] verification_semantic_digest: #{vr.semantic_digest}")
 
-      # ---- Phase 6: bounded Review ----
+      # ---- Phase 6: bounded INDEPENDENT Review ----
+      # The bounded reviewer is a SEPARATE role from the implementer
+      # (MiniMax). It re-decodes the candidate bytes, applies its own
+      # bounded rules, and returns its own verdict + findings. It does
+      # NOT see the implementer's explanation.
+      reviewer_ref = Kiln.BoundedReviewer.reviewer_assignment_ref()
+
+      assert {:ok, review_decision} =
+               Kiln.BoundedReviewer.review(
+                 worker_output.completion_bytes,
+                 vr,
+                 plan_ref,
+                 repo_root
+               )
+
+      IO.puts("[m3-r2-rp] reviewer_assignment_digest: #{reviewer_ref["digest"]}")
+      IO.puts("[m3-r2-rp] reviewer_verdict: #{review_decision.verdict}")
+      IO.puts("[m3-r2-rp] reviewer_findings: #{inspect(review_decision.findings)}")
+
+      assert review_decision.verdict in ["APPROVE", "REQUEST_REVISION", "REJECT"]
+
       assert {:ok, review_struct} =
                Review.build(
                  worker_output.assignment_ref,
@@ -196,13 +216,16 @@ defmodule Kiln.M3R2RealProviderLifecycleTest do
                  %{"id" => proposal.id, "digest" => proposal.patch_digest},
                  result_state_digest,
                  %{"id" => vr.id, "digest" => vr.semantic_digest},
-                 %{"id" => "reviewer_m3r2", "digest" => "sha256:" <> String.duplicate("a", 64)},
-                 "APPROVE",
-                 ["real-worker bounded patch proposal"],
+                 reviewer_ref,
+                 review_decision.verdict,
+                 review_decision.findings,
                  %{"id" => "ctx_m3r2", "digest" => "sha256:" <> String.duplicate("a", 64)}
                )
 
-      assert review_struct.verdict == :APPROVE
+      assert review_struct.verdict == String.to_atom(review_decision.verdict)
+      assert review_struct.implementer_transcript_received == false
+      assert review_struct.reviewer_assignment_ref["digest"] != worker_output.assignment_ref["digest"]
+
       IO.puts("[m3-r2-rp] review_id: #{review_struct.id}")
       IO.puts("[m3-r2-rp] review_semantic_digest: #{review_struct.semantic_digest}")
 
