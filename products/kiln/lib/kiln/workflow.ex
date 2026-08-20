@@ -760,7 +760,24 @@ defmodule Kiln.Workflow do
         end
 
       {:error, %Kiln.Store.Error{code: code, message: message, details: details}} ->
-        {:error, Error.new(code, message, nil, details)}
+        # When the journal wraps a reducer error (the reducer returned
+        # `{:error, %{code: ...}}` and the journal re-shaped it into an
+        # `:invalid_entry`), the canonical reducer code lives in
+        # `details.code`. Promote it to the top-level so the decision
+        # lifecycle callers see the same error code the reducer decided.
+        case unwrap_reducer_error(code, details) do
+          {:ok, reducer_code} ->
+            {:error,
+             Error.new(
+               reducer_code,
+               message,
+               nil,
+               Map.delete(details, :code)
+             )}
+
+          :passthrough ->
+            {:error, Error.new(code, message, nil, details)}
+        end
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -1575,17 +1592,17 @@ defmodule Kiln.Workflow do
     with :ok <- require_application_result_schema(replay.result_schema, @application_result_schema),
          :ok <- require_valid_session_id(replay.session_id),
          :ok <- require_valid_action_id(replay.action_id),
-         :ok <- require_valid_decision_id(replay.result["decision_id"]),
-         :ok <- require_run_state(replay.result, :waiting_for_user),
-         :ok <- require_projection_digest(replay.result["projection_digest"]) do
+         :ok <- require_valid_decision_id(replay.result[:decision_id]),
+         :ok <- require_run_state(replay.result, "waiting_for_user"),
+         :ok <- require_projection_digest(replay.result) do
       {:ok,
        %{
          session_id: replay.session_id,
          action_id: replay.action_id,
-         decision_id: replay.result["decision_id"],
-         session_revision: replay.result["session_revision"],
+         decision_id: replay.result[:decision_id],
+         session_revision: replay.result[:session_revision],
          run_state: :waiting_for_user,
-         projection_digest: replay.result["projection_digest"]
+         projection_digest: replay.result[:projection_digest]
        }}
     end
   end
@@ -1594,18 +1611,18 @@ defmodule Kiln.Workflow do
     with :ok <- require_application_result_schema(replay.result_schema, @application_result_schema),
          :ok <- require_valid_session_id(replay.session_id),
          :ok <- require_valid_action_id(replay.action_id),
-         :ok <- require_valid_decision_id(replay.result["decision_id"]),
-         :ok <- require_run_state(replay.result, :ready),
-         :ok <- require_projection_digest(replay.result["projection_digest"]) do
+         :ok <- require_valid_decision_id(replay.result[:decision_id]),
+         :ok <- require_run_state(replay.result, "ready"),
+         :ok <- require_projection_digest(replay.result) do
       {:ok,
        %{
          session_id: replay.session_id,
          action_id: replay.action_id,
-         decision_id: replay.result["decision_id"],
-         response: replay.result["response"],
-         session_revision: replay.result["session_revision"],
+         decision_id: replay.result[:decision_id],
+         response: replay.result[:response],
+         session_revision: replay.result[:session_revision],
          run_state: :ready,
-         projection_digest: replay.result["projection_digest"]
+         projection_digest: replay.result[:projection_digest]
        }}
     end
   end
@@ -1847,7 +1864,10 @@ defmodule Kiln.Workflow do
   # the public contract uses. Task and run IDs are present only in start
   # results; for transition results JSON omits them and the atom-keyed map
   # carries nil. The validators below treat `nil` as a missing field for
-  # start results and ignore it for transition results.
+  # start results and ignore it for transition results. The decision
+  # lifecycle fields (decision_id, response) survive normalization so the
+  # decision result readers can consume the same atom-keyed shape every
+  # other reader consumes.
   defp string_keyed_to_atom(result) when is_map(result) do
     %{
       session_id: result["session_id"],
@@ -1856,7 +1876,9 @@ defmodule Kiln.Workflow do
       action_id: result["action_id"],
       session_revision: result["session_revision"],
       run_state: result["run_state"],
-      projection_digest: result["projection_digest"]
+      projection_digest: result["projection_digest"],
+      decision_id: result["decision_id"],
+      response: result["response"]
     }
   end
 
@@ -2154,6 +2176,25 @@ defmodule Kiln.Workflow do
   defp corrupt_result_error(message, detail) do
     {:error, Error.new(:corrupt_result, message, nil, Map.put(detail, :reason, :corrupt_result))}
   end
+
+  # When the journal reports `:invalid_entry` because a reducer entry
+  # raised an error, the canonical reducer code lives at
+  # `details.decode_code` (the journal re-shapes reducer errors into
+  # `{type: "<reduce>", decode_code: <code>, decode_detail: <detail>}`).
+  # Promoting it preserves the error code the decision lifecycle
+  # callers expect (e.g. `:decision_response_not_permitted`,
+  # `:no_current_decision`). Non-reducer wrap errors fall through.
+  defp unwrap_reducer_error(:invalid_entry, details) when is_map(details) do
+    case Map.fetch(details, :decode_code) do
+      {:ok, reducer_code} when is_atom(reducer_code) ->
+        {:ok, reducer_code}
+
+      _ ->
+        :passthrough
+    end
+  end
+
+  defp unwrap_reducer_error(_code, _details), do: :passthrough
 
   # The fresh-commit path has not yet passed through `Replay.rebuild`, but the
   # journal has just stamped the freshly computed projection into
