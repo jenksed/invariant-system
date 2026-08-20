@@ -109,6 +109,15 @@ export function normalizeSessionQuery(
   if (typeof projection['session_revision'] === 'number') {
     result['session_revision'] = projection['session_revision'];
   }
+  if (typeof projection['objective'] === 'string') {
+    result['objective'] = projection['objective'];
+  }
+  if (
+    Array.isArray(projection['criteria']) &&
+    projection['criteria'].every((criterion) => typeof criterion === 'string')
+  ) {
+    result['criteria'] = projection['criteria'];
+  }
   if (projection['pending_decision'] !== undefined) {
     result['pending_decision'] = projection['pending_decision'];
   }

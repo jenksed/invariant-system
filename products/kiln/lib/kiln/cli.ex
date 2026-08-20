@@ -2172,6 +2172,12 @@ defmodule Kiln.CLI do
   defp description_for(:cancel), do: "cancel the Run when no operation is open or unknown"
   defp description_for(:resume), do: "report the current projection and valid next actions"
 
+  defp description_for(:candidate_invocation),
+    do: "run one bounded provider candidate invocation in evaluation or production mode"
+
+  defp description_for(:candidate_invocation_digest),
+    do: "show the implementation digest for the bounded candidate-invocation adapter"
+
   defp description_for(:supervise),
     do: "supervise one Repository Recon Work Envelope through Kiln.Supervision"
 
@@ -2186,6 +2192,10 @@ defmodule Kiln.CLI do
   defp description_for(:patch_apply),
     do:
       "(M8) apply the exact approved bytes after APPROVE_EXACT_BYTES and emit canonical patch-application-evidence/m0-v1"
+
+  defp description_for(:patch_apply_governed),
+    do:
+      "(M8) apply an exact approved patch through the governed provider lifecycle and preserve canonical evidence"
 
   defp description_for(:patch_recover),
     do:

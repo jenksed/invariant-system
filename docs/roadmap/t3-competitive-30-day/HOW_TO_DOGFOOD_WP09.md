@@ -112,7 +112,7 @@ KILN_URL=http://127.0.0.1:4000 \
 KILN_READ_TOKEN=$READ \
 KILN_OPERATE_TOKEN=$OPERATE \
 KILN_WS_URL=ws://127.0.0.1:4000/ws \
-  node products/temper/dist/cli.js --live /path/to/your/repository
+  node products/temper/dist/src/cli.js --workbench /path/to/your/repository
 ```
 
 The launcher passes these env vars to Temper and waits for the WS to
@@ -337,7 +337,7 @@ Disconnect: `pkill -f "node products/temper"` (or Ctrl-C the launcher).
 Temper retains `session_id`, `last_observed_revision`, and UI selection
 as client-side hints only.
 
-Reconnect: re-run the same `node products/temper/dist/cli.js --live …`
+Reconnect: re-run the same `node products/temper/dist/src/cli.js --workbench …`
 command (or the launcher). Temper will:
 
 1. Re-authenticate (bearer token during WS upgrade).

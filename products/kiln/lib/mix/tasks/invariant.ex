@@ -40,8 +40,12 @@ defmodule Mix.Tasks.Invariant do
 
   defp start_daemon(opts) do
     configure_state_path(opts)
-    Mix.Task.run("app.start")
+    # Runtime authorization inputs must be present before the application
+    # boots. Loading scoped tokens after `app.start` left the live daemon with
+    # the empty default on an owner-machine launch, so every real Workbench RPC
+    # failed as `E_UNAUTHORIZED invalid_token` despite correct generated tokens.
     load_scoped_tokens_from_env()
+    Mix.Task.run("app.start")
     surface_state_at_boot()
     port = Keyword.get(opts, :port, 4000)
     IO.puts("Starting bounded Kiln daemon at http://localhost:#{port}")

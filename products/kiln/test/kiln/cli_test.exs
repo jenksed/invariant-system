@@ -31,6 +31,18 @@ defmodule Kiln.CLITest do
     {:ok, dir: dir}
   end
 
+  test "help renders every supported command without crashing" do
+    assert {:ok, request} = Request.parse(["--format=json", "--help"])
+    assert {%Result{status: :ok, exit_code: 0} = result, 0} = CLI.run(request)
+
+    payload = result |> JsonRenderer.render() |> JSON.decode!()
+    commands = get_in(payload, ["data", "commands"])
+
+    assert Enum.any?(commands, &(&1["command"] == "candidate_invocation"))
+    assert Enum.any?(commands, &(&1["command"] == "candidate_invocation_digest"))
+    assert Enum.all?(commands, &(is_binary(&1["description"]) and &1["description"] != ""))
+  end
+
   test "starting one Session creates durable Session, Task, and Run", %{dir: dir} do
     request = start_request(dir)
 
