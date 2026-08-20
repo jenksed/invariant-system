@@ -214,13 +214,37 @@ defmodule Kiln.Worker do
   @spec worker_provider_mode() ::
           :deterministic_fake | :real_provider | :dogfood | {:error, term()}
   def worker_provider_mode do
-    case Application.get_env(:kiln, :worker_provider_mode, :deterministic_fake) do
-      :real_provider -> :real_provider
-      :dogfood -> :dogfood
-      :deterministic_fake -> :deterministic_fake
-      other ->
+    # Distinguish "genuinely absent" (default to :deterministic_fake)
+    # from "explicitly set to an invalid value" (fail closed with
+    # :E_WORKER_PROVIDER_MODE_INVALID). Application.fetch_env/1 returns
+    # :error when the key is absent; Application.get_env/3 with a
+    # default conflates "absent" with "set to nil".
+    case Application.fetch_env(:kiln, :worker_provider_mode) do
+      {:ok, :real_provider} ->
+        :real_provider
+
+      {:ok, :dogfood} ->
+        :dogfood
+
+      {:ok, :deterministic_fake} ->
+        :deterministic_fake
+
+      {:ok, nil} ->
+        # Application.put_env(:kiln, :worker_provider_mode, nil) leaves
+        # the key set to nil; treat it the same as absent so callers
+        # can clear configuration without triggering an invalid-mode
+        # error.
+        :deterministic_fake
+
+      {:ok, other} ->
         {:error,
          %{code: :E_WORKER_PROVIDER_MODE_INVALID, reason: "unknown worker_provider_mode: #{inspect(other)}"}}
+
+      :error ->
+        # Genuinely absent configuration: default to the historical
+        # M11 E2 deterministic-fake path. Tests and dogfood runs that
+        # need a different mode MUST set the env explicitly.
+        :deterministic_fake
     end
   end
 
@@ -268,15 +292,15 @@ defmodule Kiln.Worker do
       :dogfood ->
         build_dogfood_completion(request_attrs, observation)
 
-      mode when mode == :deterministic_fake ->
+      :deterministic_fake ->
         build_bounded_completion(request_attrs)
 
-      _ ->
-        # Fail-closed: any unrecognized shape (including the bounded
-        # error tuple from worker_provider_mode/0) returns the
-        # deterministic-fake path which is the historical M11 E2
-        # safe default.
-        build_bounded_completion(request_attrs)
+      {:error, %{code: :E_WORKER_PROVIDER_MODE_INVALID}} = err ->
+        # Explicitly invalid mode is fail-closed: do NOT fall back to
+        # deterministic-fake. The error propagates through the with
+        # chain in Worker.propose/5 so the caller sees exactly which
+        # mode value was rejected.
+        err
     end
   end
 

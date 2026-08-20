@@ -216,28 +216,60 @@ defmodule Kiln.WorkerDogfoodDispatchTest do
     assert code == :E_DOGFOOD_MATCH_NOT_FOUND
   end
 
-  test "Worker.propose with unknown worker_provider_mode fails closed (deterministic-fake fallback)",
-       %{root: _} do
-    Application.put_env(:kiln, :worker_provider_mode, :something_unknown)
+  describe "worker_provider_mode semantics" do
+    test "absent configuration defaults to :deterministic_fake" do
+      Application.delete_env(:kiln, :worker_provider_mode)
+      assert Worker.worker_provider_mode() == :deterministic_fake
+    end
 
-    # For unknown mode, the Worker falls back to deterministic-fake.
-    # The deterministic-fake path encodes request_attrs as a bounded
-    # envelope and validates it through PatchProposal. If request_attrs
-    # is not envelope-shaped, the deterministic-fake path returns a
-    # bounded validation error (not a dogfood error).
-    request_attrs = %{
-      "attempt_ref" => "att_test"
-    }
+    test "explicitly set :deterministic_fake is honored" do
+      Application.put_env(:kiln, :worker_provider_mode, :deterministic_fake)
+      assert Worker.worker_provider_mode() == :deterministic_fake
+    end
 
-    # The bounded validation error from deterministic-fake is the
-    # expected outcome for an unknown mode + non-envelope-shaped input.
-    assert {:error, %{code: _}} =
-             Worker.propose(
-               assignment_fixture(),
-               eligibility_fixture(),
-               profile_fixture(),
-               request_attrs,
-               @fixture_root
-             )
+    test "explicitly set :dogfood is honored" do
+      Application.put_env(:kiln, :worker_provider_mode, :dogfood)
+      assert Worker.worker_provider_mode() == :dogfood
+    end
+
+    test "explicitly set :real_provider is honored" do
+      Application.put_env(:kiln, :worker_provider_mode, :real_provider)
+      assert Worker.worker_provider_mode() == :real_provider
+    end
+
+    test "explicitly invalid mode fails closed (no silent fallback to :deterministic_fake)" do
+      Application.put_env(:kiln, :worker_provider_mode, :something_unknown)
+
+      assert {:error, %{code: :E_WORKER_PROVIDER_MODE_INVALID}} =
+               Worker.worker_provider_mode()
+    end
+
+    test "nil is treated as a missing key, not as a value to validate" do
+      Application.put_env(:kiln, :worker_provider_mode, nil)
+      assert Worker.worker_provider_mode() == :deterministic_fake
+    end
+
+    test "Worker.propose with explicit invalid mode returns the bounded error", %{root: root} do
+      Application.put_env(:kiln, :worker_provider_mode, :something_unknown)
+
+      request_attrs = %{
+        "attempt_ref" => "att_test",
+        "dogfood_task_spec" => %{
+          "kind" => "add_attribute",
+          "target" => "bounded.ex",
+          "match" => "  @moduledoc \"original\"",
+          "after" => "\n  @m3_dogfood_first_task \"x\""
+        }
+      }
+
+      assert {:error, %{code: :E_WORKER_PROVIDER_MODE_INVALID}} =
+               Worker.propose(
+                 assignment_fixture(),
+                 eligibility_fixture(),
+                 profile_fixture(),
+                 request_attrs,
+                 root
+               )
+    end
   end
 end
