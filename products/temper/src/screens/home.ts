@@ -256,23 +256,25 @@ function renderHome(state: HomeState, ctx: ScreenContext): Frame {
   putLabeledBox(frame, { rect: { row, col: 1, rows: 3, cols: ctx.cols - 2 }, title: 'INTENT' });
   row += 1;
   const promptText = state.input.prompt;
-  const valueLines = wrapText(state.input.value, ctx.cols - 6);
+  const inputWidth = Math.max(1, ctx.cols - 6);
+  const valueLines = wrapText(state.input.value, inputWidth);
   putString(frame, row, 3, promptText, 'accent');
-  if (valueLines.length > 0 && valueLines[0]) {
-    const first = valueLines[0] ?? '';
-    putString(frame, row, 3 + promptText.length, first.slice(Math.max(0, valueLines[0].length - (ctx.cols - 6 - promptText.length))), 'input_focused');
-  }
-  if (valueLines.length > 1) {
-    for (let i = 1; i < valueLines.length && i < 1; i += 1) {
-      const line = valueLines[i] ?? '';
-      putString(frame, row, 3, line.slice(0, ctx.cols - 6), 'input_focused');
-    }
-  }
+  // Render the LAST visible line of the wrapped value so the cursor
+  // stays in view as the operator types. Multi-line input is
+  // supported; only the tail is shown given the bounded 3-row input
+  // box. Earlier lines remain in `state.input.value` for submission.
+  const visibleTail = valueLines[valueLines.length - 1] ?? '';
+  putString(
+    frame,
+    row,
+    3 + promptText.length,
+    visibleTail.slice(Math.max(0, visibleTail.length - (inputWidth - promptText.length))),
+    'input_focused'
+  );
 
   // Footer
   const footer = ' Enter submit · esc clear · ctrl-k palette · q quit · ctrl-c interrupt ';
   putString(frame, ctx.rows - 1, 0, pad(footer, ctx.cols), 'footer');
-  void bodyHeight;
   return frame;
 }
 
