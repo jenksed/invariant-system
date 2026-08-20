@@ -1,0 +1,10 @@
+TEMPER — M4  ● GOVERNED  needs you: 0
+OBJECTIVE
+Compact narrow rendering must remain coherent
+  │
+      Worker  wko_snap01
+    [ Verify ·   ]   [ Review ·   ]
+      Patch  pp_snap01
+      Human  hd_snap01
+    ▶ Applied  pe_snap01
+↑↓ select  ENTER inspect  p proof  q quit   4 working  2 done  0 need you  0 blo

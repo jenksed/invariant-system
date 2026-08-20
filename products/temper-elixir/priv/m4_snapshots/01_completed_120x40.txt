@@ -1,0 +1,13 @@
+TEMPER — M4  ● GOVERNED  needs you: 0                                    INSPECTOR
+OBJECTIVE                                                                PatchEvidence
+Improve reconnect clarity and add regression scenario for M2             Applied
+  │                                                                      complete
+      Worker  wko_snap01
+                                                                         id
+    [ Verify ·   ]   [ Review ·   ]                                      pe_snap01
+      Patch  pp_snap01                                                   canonical digest
+                                                                         sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                                                                         attention
+      Human  hd_snap01                                                   COMPLETE
+    ▶ Applied  pe_snap01
+↑↓ select  ENTER inspect  p proof  q quit   4 working  2 done  0 need you  0 blocked  0 failed

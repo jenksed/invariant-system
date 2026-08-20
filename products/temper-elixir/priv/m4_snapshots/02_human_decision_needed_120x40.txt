@@ -1,0 +1,12 @@
+TEMPER — M4  ● GOVERNED  needs you: 0  ★ YOUR CALL                       INSPECTOR
+OBJECTIVE                                                                Review
+Test the human-decision visual signal                                    Review ✓
+  │
+      Worker  wko_snap01
+                                                                         id
+    [ Verify ·   ]   [ Review ·   ]                                      rev_snap01
+      Patch  pp_snap01                                                   canonical digest
+                                                                         sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+                                                                         attention
+                                                                         WORKING
+↑↓ select  ENTER inspect  p proof  q quit   4 working  0 done  0 need you  0 blocked  0 failed
