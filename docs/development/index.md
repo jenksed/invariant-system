@@ -14,6 +14,7 @@ audience:
 # Development
 
 - [Evidence-driven engineering process](engineering-process.md) — the governing change loop and work-package contract.
+- [Branch policy](branch-policy.md) — branch semantics and the promotion path from work/experiment through dev to main.
 - [Repository layout](repository-layout.md)
 - [Architecture boundaries](architecture-boundaries.md)
 - [Contracts](contracts.md)
