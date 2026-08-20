@@ -156,6 +156,25 @@ export class WorkbenchConnection {
     if (!this.projection.sessionId) {
       return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
     }
+    // M2 (TEMPER DURABLE): the canonical decision identity (decision_id)
+    // and the canonical session_revision are read from the live
+    // projection (pending_decision.id + session_revision). The decision
+    // identity is NEVER carried in client memory across reconnect.
+    const sq = this.projection.sessionQuery;
+    const pending = sq?.pending_decision;
+    const decisionId =
+      pending && typeof pending === 'object' && typeof (pending as { id?: unknown }).id === 'string'
+        ? ((pending as { id: string }).id)
+        : null;
+    if (!decisionId) {
+      return {
+        ok: false,
+        errorCode: 'E_NO_PENDING_DECISION',
+        errorReason: 'no canonical pending_decision on the live projection'
+      };
+    }
+    const expectedSessionRevision =
+      typeof sq?.session_revision === 'number' ? (sq.session_revision as number) : 0;
     const params: Record<string, unknown> = {
       plan_ref: envelope.plan_ref,
       patch_ref: envelope.patch_ref,
@@ -163,7 +182,9 @@ export class WorkbenchConnection {
       decision,
       actor_id: actorId,
       ...(envelope.review_ref ? { review_ref: envelope.review_ref } : {}),
-      session_id: this.projection.sessionId
+      session_id: this.projection.sessionId,
+      decision_id: decisionId,
+      expected_session_revision: expectedSessionRevision
     };
     const resp = await this.client.call<typeof params, Record<string, unknown>>({
       method: 'human.decide',
