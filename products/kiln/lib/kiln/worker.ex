@@ -456,7 +456,31 @@ defmodule Kiln.Worker do
           {:ok, map()} | {:error, term()}
   def merge_dispatch_attrs(profile, eligibility, request_attrs)
       when is_map(profile) and is_map(eligibility) and is_map(request_attrs) do
-    _ = request_attrs
+    # M3-R2 bounded fix: when the request carries an engineering
+    # objective (real-worker dogfood), surface it into the bounded
+    # dispatch context the model sees via the context_manifest_ref.
+    # The schema's artifactRef permits any non-empty string for id
+    # with a sha256:-prefixed digest. The model already reads
+    # context_manifest_ref from `bounded_context_text/1`. Encoding the
+    # objective as the ref's id gives the model the bounded task
+    # statement without expanding the canonical schema. Determinism
+    # preserved: the digest is sha256 of the objective bytes.
+    objective = Map.get(request_attrs, "engineering_objective")
+
+    context_manifest_ref =
+      case objective do
+        obj when is_binary(obj) and byte_size(obj) > 0 ->
+          %{
+            "id" => obj,
+            "digest" => "sha256:" <> Base.encode16(:crypto.hash(:sha256, obj), case: :lower)
+          }
+
+        _ ->
+          %{
+            "id" => profile["system_config"]["id"],
+            "digest" => profile["system_config"]["digest"]
+          }
+      end
 
     attrs = %{
       "invocation_id" => "inv_e2_" <> short_id(),
@@ -465,10 +489,7 @@ defmodule Kiln.Worker do
         "id" => profile["profile_id"],
         "digest" => profile["semantic_digest"]
       },
-      "context_manifest_ref" => %{
-        "id" => profile["system_config"]["id"],
-        "digest" => profile["system_config"]["digest"]
-      },
+      "context_manifest_ref" => context_manifest_ref,
       "tool_policy_ref" => %{
         "id" => profile["tool_policy"]["id"],
         "digest" => profile["tool_policy"]["digest"]
