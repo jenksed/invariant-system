@@ -7,10 +7,34 @@
 #
 #   session.start  (M1-A)
 #   session.query  (M1-B)
-#   review-propose (CLI) + human.decide (M1-C)
+#   review-propose (CLI) + human.decide  (M1-C, harness-defect)
 #
 # Cleanup is unconditional via shell traps. No long-lived secrets,
 # no external network, no fixed sleeps.
+#
+# --------------------------------------------------------------------------
+# STATUS: FROZEN HISTORICAL ARTIFACT — not current regression authority.
+#
+# The M1-C slice below invokes `mix kiln session-resume`, which is not a
+# Mix task in the canonical CLI surface (the canonical transition is the
+# bounded `session.resume` HTTP RPC). This harness defect was present in
+# the original M1 acceptance at 5d152e7 and is left untouched here so that
+# the historical evidence is reproducible verbatim.
+#
+# Current regression authority for the M1-C property (real daemon, real
+# RPC boundary, real human.decide, canonical waiting_for_user → ready
+# transition) lives in:
+#
+#   products/temper/scripts/m2_probe.sh
+#     → M2-B (drives :running → :waiting_for_user)
+#     → M2-B-VERIFY (reconnect, submitHumanDecision, run_state=ready)
+#
+# A green end-to-end m2_probe.sh run + a green
+# products/kiln/test/kiln/decision_lifecycle_test.exs (10/10) together
+# prove the M1-C property holds today. Do not interpret a non-zero
+# m1_probe.sh exit as a regression of M1-C — interpret it as the known
+# harness defect documented above.
+# --------------------------------------------------------------------------
 
 set -euo pipefail
 
