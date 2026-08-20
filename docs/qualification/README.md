@@ -45,36 +45,61 @@ Earlier diagnostic runs under OTP 29 remain useful diagnostic evidence but are N
 
 ## Pre-qualification proof of state
 
-A fresh, detached worktree is required. The qualification must begin by proving:
+A fresh, detached worktree is required. Every runtime-sensitive command below runs under the project-scoped mise environment, so the recorded runtime identity is consistent with the runtime that will run the Mix tests.
+
+The root `./invariant` script reads the host shell's `PATH`; it is NOT mise-aware by itself. To make the boundary check and the preflight report the pinned runtime, invoke the script under `mise --cd products/kiln exec --` so that `elixir --version` (called by `invariant doctor`) reports OTP 28.
+
+The verified invocation is:
+
+```bash
+# From the monorepo root, after `cd "$REPO_ROOT"`:
+mise --cd products/kiln exec -- "$REPO_ROOT/invariant" status
+```
+
+Substitute `"$REPO_ROOT"` with the absolute path to the qualification worktree.
+
+The qualification must begin by proving:
 
 ```bash
 # 1. exact candidate SHA
 git rev-parse HEAD
-# expect: 11ba660037f33c87f8bbbf671b4b94873d7e6b3f
+# expect: <exact repair SHA recorded in the evidence>
 
 # 2. clean git status
 git status --short
 # expect: empty output
 
-# 3. Erlang 28.4, Elixir 1.20.2-otp-28
+# 3. pinned-runtime identity (every command runs under mise)
 mise --cd products/kiln exec -- erl -eval 'io:format("~s~n", [erlang:system_info(otp_release)]), halt().' -noshell
 # expect: 28
 mise --cd products/kiln exec -- elixir --version
 # expect: Elixir 1.20.2 (compiled with Erlang/OTP 28)
+mise --cd products/kiln exec -- mix --version
+# expect: Mix 1.20.2 (compiled with Erlang/OTP 28)
 
 # 4. Node 22.x
 node --version
 # expect: v22.x.x
 
-# 5. monorepo status
-./invariant status
+# 5. monorepo status under the pinned runtime
+mise --cd products/kiln exec -- "$REPO_ROOT/invariant" status
+# expect (under OTP 28):
+#   elixir:  Elixir 1.20.2 (compiled with Erlang/OTP 28)
 
-# 6. boundary check (deterministic, no network)
-./invariant check boundaries
+# 6. doctor under the pinned runtime (shows pinned-vs-detected comparison)
+mise --cd products/kiln exec -- "$REPO_ROOT/invariant" doctor
+# expect:
+#   ok       elixir     Elixir 1.20.2 (compiled with Erlang/OTP 28)
+#   info     kiln-pinned   mise.toml: erlang=28.4 elixir=1.20.2-otp-28; detected: erlang=28 elixir=1.20.2
+
+# 7. boundary check (deterministic, no network)
+mise --cd products/kiln exec -- "$REPO_ROOT/invariant" check boundaries
 # expect: ok for every check; no nested .git
 ```
 
-If any of these fails, stop and record the failure. Do not proceed.
+If the preflight shows a non-pinned runtime (`Erlang/OTP 29`), the misconfigured shell is leaking the host's runtime into the qualification. Stop and fix the shell environment before recording any evidence. Do not paper over the contradiction by claiming the test command "really" ran under OTP 28.
+
+If any other preflight step fails, stop and record the failure. Do not proceed.
 
 ## Tier 1 — deterministic / local qualification
 
@@ -110,9 +135,11 @@ Property proven: source-checkout isolation (no `products/*/.git` after lifecycle
 
 ### Group 1.4 — Temper-Elixir M4 surface
 
+temper-elixir does not own a `mise.toml`; the pinned runtime is loaded from `products/kiln/mise.toml` and re-exported into the temper-elixir subprocess.
+
 ```bash
-( cd products/temper-elixir && mise exec -- mix deps.get )
-( cd products/temper-elixir && mise exec -- mix test test/cell_frame_test.exs test/m4_live_projection_test.exs test/m4_navigation_test.exs test/m4_snapshot_test.exs test/m4_why_dispatcher_test.exs test/m4_why_result_test.exs )
+mise --cd products/kiln exec -- bash -lc 'cd products/temper-elixir && mix deps.get'
+mise --cd products/kiln exec -- bash -lc 'cd products/temper-elixir && mix test test/cell_frame_test.exs test/m4_live_projection_test.exs test/m4_navigation_test.exs test/m4_snapshot_test.exs test/m4_why_dispatcher_test.exs test/m4_why_result_test.exs'
 ```
 
 Property proven: bounded cell buffer + byte diff, navigation, snapshot stability, why dispatcher + result, live projection. Exactly one `defmodule Temper.CellFrame` source is compiled (no BEAM redefinition warning).

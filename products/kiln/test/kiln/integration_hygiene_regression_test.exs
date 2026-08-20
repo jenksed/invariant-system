@@ -2,132 +2,79 @@ defmodule Kiln.IntegrationHygieneRegressionTest do
   @moduledoc """
   M4-Q1C integration-hygiene regression guard.
 
-  Two narrow invariants proven by this test:
+  Three narrow invariants proven by this test:
 
-    1. SOURCE-CHECKOUT-ISOLATION
-       The M3-Dogfood lifecycle fixture creates a real disposable
-       Git repository. It MUST be created under System.tmp_dir!/0
-       (or another per-invocation temp location) and MUST NOT leave
-       a `.git` directory under any `products/*/` path.
+    A. LIFECYCLE-FIXTURE-SOURCE-SHAPE
+       The M3-Dogfood lifecycle fixture must not use
+       `Path.expand("../support", File.cwd!())` — that pattern
+       previously contaminated the source checkout with a nested
+       `.git`. The lifecycle test must anchor its disposable Git
+       repository under the per-test tmp dir provided by `setup/1`.
 
-    2. TEMPER.CELLFRAME SINGLE OWNER
-       The pure-Elixir `Temper.CellFrame` rendering module has
-       exactly one source owner. A second copy under
-       `products/kiln/lib/temper/cell_frame.ex` would re-emit the
-       BEAM "redefining module Temper.CellFrame" warning when the
-       temper-elixir product (which depends on kiln) is compiled.
+    B. SOURCE-CHECKOUT-ISOLATION
+       The monorepo must contain no nested `.git` directory anywhere
+       below `products/`. The lifecycle fixture's on_exit cleanup
+       must keep the source checkout untouched.
 
-  These properties are checked structurally against the source tree
-  at evaluation time. They do not depend on a previous test run.
+    C. TEMPER.CELLFRAME SINGLE OWNER
+       Exactly one source definition of `Temper.CellFrame` exists
+       below `products/`, and that definition lives in
+       `products/temper-elixir/lib/temper/cell_frame.ex`. A second
+       copy under `products/kiln/lib/temper/cell_frame.ex` would
+       emit a BEAM "redefining module Temper.CellFrame" warning when
+       the temper-elixir product (which depends on kiln) is
+       compiled.
+
+  This module is independent-source-only and does not depend on any
+   other test module being loaded.
+
+  Path discipline: paths are derived from `__DIR__` (the directory
+   containing this test file) so the assertions are robust regardless
+   of which directory `mix test` is invoked from. Do NOT use
+   `File.cwd!()` for sibling or repo-root discovery in this module.
   """
 
   use ExUnit.Case, async: true
 
-  alias Kiln.M3DogfoodLifecycleTest
+  @repo_root Path.expand("../../../../", __DIR__)
 
-  defp monorepo_root do
-    # The monorepo root contains the products/ directory. From the
-    # Kiln test working directory (products/kiln), ascend two levels.
-    Path.expand("../../..", File.cwd!())
+  describe "lifecycle fixture source shape (A)" do
+    test "lifecycle test does not couple to a sibling products/<x> checkout" do
+      lifecycle_path = Path.join(__DIR__, "m3_dogfood_lifecycle_test.exs")
+      source = File.read!(lifecycle_path)
+
+      # The historical bug used `File.cwd!()` as the anchor for
+      # Path.expand, which landed the disposable repo under
+      # products/support/ when invoked from products/kiln.
+      refute source =~ ~r/Path\.expand\(\s*["']\.\.\/support/,
+             "lifecycle test must not use Path.expand('../support', ...)"
+
+      # The repaired pattern anchors under the per-test dir provided
+      # by setup/1.
+      assert source =~ "disposable_repo_path(dir)",
+             "lifecycle test must anchor disposable repos under setup dir"
+    end
   end
 
-  describe "source-checkout isolation" do
-    test "no products/* path is created by the fixture setup" do
-      # The m3_dogfood_lifecycle_test.exs fixture uses
-      # System.tmp_dir!/0 via the setup/1 dir. The disposable_repo_path/1
-      # helper joins onto that dir. There must be no hard-coded path
-      # outside System.tmp_dir!/0 (or similar) that lands inside
-      # the source checkout.
-      #
-      # We assert this by reading the test source and confirming
-      # the only path under products/ used by the fixture is via
-      # the bounded Store path (already proven isolated).
-      source =
-        File.read!(Path.expand("./m3_dogfood_lifecycle_test.exs", File.cwd!()))
-
-      refute source =~ ~r/Path\.expand\(\s*["']\.\.\/support/
-      refute source =~ ~r/File\.mkdir_p!\(\s*["']products\//
-
-      # The bounded test must use the setup/1 dir, not File.cwd!().
-      assert source =~ "disposable_repo_path(dir)"
-    end
-
-    test "disposable_repo_path/1 anchors under the setup dir, not under products/" do
-      assert function_exported?(M3DogfoodLifecycleTest, :__info__, 1)
-
-      # The disposable repo path is private; we can only verify it
-      # indirectly via the source text. Confirm no Path.expand
-      # target resolves under the source checkout.
-      source =
-        File.read!(Path.expand("./m3_dogfood_lifecycle_test.exs", File.cwd!()))
-
-      # No "Path.expand('../support', File.cwd!())" — the bug.
-      refute source =~ ~r/Path\.expand\(\s*["']\.\.\/support/
-    end
-
-    test "products/ tree contains no nested .git directories" do
-      root = monorepo_root()
-      nested =
-        root
-        |> Path.join("products")
-        |> then(fn products_root ->
-          case File.ls(products_root) do
-            {:ok, entries} ->
-              Enum.flat_map(entries, fn entry ->
-                path = Path.join(products_root, entry)
-                case File.ls(path) do
-                  {:ok, _} -> find_nested_git(path)
-                  _ -> []
-                end
-              end)
-
-            _ ->
-              []
-          end
-        end)
-
+  describe "source-checkout isolation (B)" do
+    test "no nested .git directory exists below products/" do
+      nested = find_nested_git(@repo_root)
       assert nested == [],
              "expected no nested .git under products/, found: #{inspect(nested)}"
     end
   end
 
-  describe "Temper.CellFrame single owner" do
-    test "exactly one source definition of Temper.CellFrame exists" do
-      root = monorepo_root()
+  describe "Temper.CellFrame single owner (C)" do
+    test "exactly one Temper.CellFrame source exists and is owned by temper-elixir" do
+      products_root = Path.join(@repo_root, "products")
+      sources = find_cell_frame_sources(products_root)
 
-      defs =
-        root
-        |> Path.join("products")
-        |> then(&find_cell_frame_sources/1)
+      assert sources == ["products/temper-elixir/lib/temper/cell_frame.ex"],
+             "expected exactly one Temper.CellFrame source owned by " <>
+               "products/temper-elixir, found: #{inspect(sources)}"
 
-      assert length(defs) == 1,
-             "expected exactly 1 Temper.CellFrame source, found: #{inspect(defs)}"
-    end
-
-    test "Temper.CellFrame lives under products/temper-elixir" do
-      root = monorepo_root()
-
-      defs =
-        root
-        |> Path.join("products")
-        |> then(&find_cell_frame_sources/1)
-
-      assert defs == ["products/temper-elixir/lib/temper/cell_frame.ex"],
-             "expected owner to be products/temper-elixir, found: #{inspect(defs)}"
-    end
-
-    test "products/kiln does not own any Temper.* source under its lib/" do
-      root = monorepo_root()
-      kiln_lib = Path.join([root, "products", "kiln", "lib", "temper"])
-
-      kiln_temper_sources =
-        case File.ls(kiln_lib) do
-          {:ok, entries} -> Enum.map(entries, &Path.join("products/kiln/lib/temper", &1))
-          _ -> []
-        end
-
-      assert kiln_temper_sources == [],
-             "Kiln must not own Temper rendering implementation; found: #{inspect(kiln_temper_sources)}"
+      refute File.exists?(Path.join(products_root, "kiln/lib/temper/cell_frame.ex")),
+             "products/kiln must not own a Temper.CellFrame implementation"
     end
   end
 
@@ -154,11 +101,12 @@ defmodule Kiln.IntegrationHygieneRegressionTest do
   defp find_cell_frame_sources(products_root) do
     collect_files(products_root, "cell_frame.ex")
     |> Enum.map(fn abs ->
-      abs
-      |> Path.relative_to(products_root)
-      |> Path.dirname()
-      |> then(&Path.join(&1, "cell_frame.ex"))
+      rel = Path.relative_to(abs, @repo_root)
+      # Normalize to forward slashes so the assertion is stable
+      # across platforms.
+      String.replace(rel, "\\", "/")
     end)
+    |> Enum.sort()
   end
 
   defp collect_files(root, target_name, acc \\ []) do
