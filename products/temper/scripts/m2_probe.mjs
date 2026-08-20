@@ -168,7 +168,18 @@ function runMixKiln(args, env) {
   });
 }
 
-// --- M2-A: active-session reconnect ---
+// --- M2-A: ACTIVE WORK reconnect (ready → running, then client death) ---
+//
+// M2-A proves that genuine ACTIVE governed work survives loss of the
+// Temper client and is reconstructable from Kiln alone. The session
+// starts in :ready, transitions to :running via the bounded
+// session.resume RPC (the canonical production path used by every
+// upstream worker), and is captured in :running with the canonical
+// session_revision. Then the Temper client process exits; the canonical
+// state is held by Kiln. A fresh Temper process reconnects, calls
+// project.open, and observes the SAME session_id with run_state=running
+// and the same session_revision. No client-side workflow identity is
+// carried across the process boundary.
 async function phase_A_sessionReconnect() {
   emit('M2_A_PHASE', 'start');
   const connection = new WorkbenchConnection({
@@ -180,20 +191,43 @@ async function phase_A_sessionReconnect() {
   try {
     await connection.open();
     const proj0 = await connection.startSession(
-      'M2-A: bounded intent for active-session reconnect',
+      'M2-A: bounded intent for active-work reconnect',
       'temper_operator'
     );
     sessionId = proj0.sessionId;
     if (!sessionId || !sessionId.startsWith('ses_')) {
       throw new Error(`session.start returned ${sessionId}; expected ses_<32hex>`);
     }
+    // Transition ready → running through the bounded session.resume
+    // RPC — the same canonical seam any worker or operator uses to
+    // signal that governed work has begun.
+    const resumeResp = await rpcCall('session.resume', {
+      session_id: sessionId,
+      actor_id: 'temper_operator',
+      expected_session_revision: 0
+    }, KILN_OPERATE_TOKEN);
+    if (!resumeResp.ok) {
+      throw new Error(`session.resume failed: ${JSON.stringify(resumeResp.error)}`);
+    }
     const proj1 = await connection.resync('resync');
-    if (!proj1.sessionQuery || proj1.sessionQuery.session_id !== sessionId) {
-      throw new Error(`resync did not populate sessionQuery.session_id=${sessionId}`);
+    const sq1 = proj1.sessionQuery;
+    if (!sq1 || sq1.session_id !== sessionId) {
+      throw new Error('resync did not populate sessionQuery.session_id');
+    }
+    if (sq1.run_state !== 'running') {
+      throw new Error(`expected run_state=running after session.resume, got ${sq1.run_state}`);
+    }
+    const initialRevision = typeof sq1.session_revision === 'number' ? sq1.session_revision : null;
+    if (initialRevision === null) {
+      throw new Error('session_revision missing from running projection');
     }
     emit('M2_A_INITIAL_SESSION_ID', sessionId);
-    emit('M2_A_INITIAL_RUN_STATE', String(proj1.sessionQuery.run_state ?? 'NOT_RUN'));
+    emit('M2_A_INITIAL_RUN_STATE', sq1.run_state);
+    emit('M2_A_INITIAL_SESSION_REVISION', String(initialRevision));
+    emit('M2_A_INITIAL_DIGEST', String(sq1.projection_digest ?? ''));
     appendRuntime(`M2_A_INITIAL_SESSION_ID=${sessionId}\n`);
+    appendRuntime(`M2_A_INITIAL_SESSION_REVISION=${initialRevision}\n`);
+    appendRuntime(`M2_A_INITIAL_RUN_STATE=running\n`);
   } catch (err) {
     fail('M2_A_START', err.message);
   }
@@ -204,11 +238,15 @@ async function phase_A_sessionReconnect() {
 
 async function phase_A_verifyReconnect() {
   const expected = readRuntime('M2_A_INITIAL_SESSION_ID');
+  const expectedRev = readRuntime('M2_A_INITIAL_SESSION_REVISION');
+  const expectedState = readRuntime('M2_A_INITIAL_RUN_STATE');
   if (!expected) {
     fail('M2_A_RECONNECT', 'no prior session_id recorded in runtime.info');
     return;
   }
   emit('M2_A_EXPECTED_SESSION_ID', expected);
+  emit('M2_A_EXPECTED_RUN_STATE', expectedState ?? 'unknown');
+  emit('M2_A_EXPECTED_SESSION_REVISION', expectedRev ?? 'unknown');
   const connection = new WorkbenchConnection({
     baseUrl: KILN_URL, wsUrl: KILN_WS_URL,
     readToken: KILN_READ_TOKEN, operateToken: KILN_OPERATE_TOKEN,
@@ -223,10 +261,31 @@ async function phase_A_verifyReconnect() {
     if (!sq || sq.session_id !== expected) {
       throw new Error(`session.query.session_id mismatch on reconnect`);
     }
+    // The canonical claim: active governed work (run_state=running)
+    // survives loss of the Temper client. Reconnected run_state must
+    // match the pre-termination state.
+    if (sq.run_state !== expectedState) {
+      throw new Error(`run_state on reconnect: expected=${expectedState} got=${sq.run_state}`);
+    }
+    // session_revision is monotonically increasing; if it advanced
+    // while Temper was absent, that is a stronger positive — the
+    // canonical state moved forward during client absence.
+    const recoveredRevision = typeof sq.session_revision === 'number' ? sq.session_revision : null;
+    if (recoveredRevision === null) {
+      throw new Error('recovered session_revision missing');
+    }
+    if (recoveredRevision < Number(expectedRev ?? 0)) {
+      throw new Error(`session_revision went backwards: expected>=${expectedRev} got=${recoveredRevision}`);
+    }
     emit('M2_A_RECONNECT', 'PASS');
     emit('M2_A_RECONNECTED_SESSION_ID', proj.sessionId);
-    emit('M2_A_RECONNECTED_RUN_STATE', String(sq.run_state ?? 'NOT_RUN'));
+    emit('M2_A_RECONNECTED_RUN_STATE', sq.run_state);
+    emit('M2_A_RECONNECTED_SESSION_REVISION', String(recoveredRevision));
+    emit('M2_A_RECONNECTED_DIGEST', String(sq.projection_digest ?? ''));
     emit('M2_A_RECONNECTED_KILN_HOME', proj.kilnHome);
+    if (recoveredRevision > Number(expectedRev ?? 0)) {
+      emit('M2_A_ADVANCED_DURING_ABSENCE', String(recoveredRevision - Number(expectedRev)));
+    }
   } catch (err) {
     fail('M2_A_RECONNECT', err.message);
   }
@@ -244,26 +303,28 @@ async function phase_B_decisionReconnect() {
   let sessionId = null;
   try {
     await connection.open();
-    let proj = connection.current();
-    if (!proj.sessionId) {
-      proj = await connection.startSession(
-        'M2-B: pending-decision reconnect scenario',
-        'temper_operator'
-      );
-    }
-    sessionId = proj.sessionId;
+    // The M2-A slice drove the canonical Session to :running. M2-B
+    // reuses that Session (which is exactly what real engineering
+    // work does: a single Session accumulates multiple operations).
+    // Only call session.resume if the Session is currently :ready.
+    const proj0 = await connection.resync('resync');
+    const initialState = proj0.sessionQuery?.run_state;
+    sessionId = proj0.sessionId;
     if (!sessionId) throw new Error('no active session for M2-B');
-
-    // session.resume via HTTP RPC (ready → running). The mix task
-    // 'session-resume' does not exist; the canonical transition is
-    // the bounded 'session.resume' RPC.
-    const resumeResp = await rpcCall('session.resume', {
-      session_id: sessionId,
-      actor_id: 'temper_operator',
-      expected_session_revision: 0
-    }, KILN_OPERATE_TOKEN);
-    if (!resumeResp.ok) {
-      throw new Error(`session.resume failed: ${JSON.stringify(resumeResp.error)}`);
+    if (initialState === 'ready') {
+      const resumeResp = await rpcCall('session.resume', {
+        session_id: sessionId,
+        actor_id: 'temper_operator',
+        expected_session_revision:
+          typeof proj0.sessionQuery?.session_revision === 'number'
+            ? proj0.sessionQuery.session_revision
+            : 0
+      }, KILN_OPERATE_TOKEN);
+      if (!resumeResp.ok) {
+        throw new Error(`session.resume failed: ${JSON.stringify(resumeResp.error)}`);
+      }
+    } else if (initialState !== 'running') {
+      throw new Error(`M2-B requires run_state ready|running; got ${initialState}`);
     }
 
     // review-propose → canonical pending decision (CLI; reads local SQLite).
