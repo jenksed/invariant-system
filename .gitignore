@@ -1,4 +1,5 @@
-.DS_Store
-docs-site/node_modules/
-docs-site/build/
-docs-site/.docusaurus/
+proto/render
+proto/render.o
+proto/render.exe
+proto/cache
+.zig-cache
