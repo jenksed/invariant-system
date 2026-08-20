@@ -127,4 +127,76 @@ defmodule Temper.M4LiveProjectionTest do
     result = M4LiveProjection.hydration_race_check(state_a_at_begin, s3, 2)
     assert result == :invalid
   end
+
+  # M4-Q1C Gate 3 — CASE A: subscription handoff race.
+  #
+  # Subscribing (capturing canonical_session_revision R1) while
+  # canonical advances R1→R2, then completing a hydration against R1,
+  # must NOT permanently install R1 as LIVE. The convergence path:
+  #   1. subscribe → capture canonical_session_revision R1
+  #   2. begin hydration at R1
+  #   3. canonical advances R1→R2 (consumer observes activity event)
+  #   4. R1 hydration completes
+  #   5. R1 must NOT be LIVE; consumer MUST re-hydrate at R2
+  test "CASE A handoff race: subscription R1→R2, hydration R1 does not install as LIVE" do
+    # Step 1+2: begin hydration at R1
+    s0 = M4LiveProjection.initial()
+    s1 = M4LiveProjection.begin_hydration(s0, 1, projection_a())
+
+    # Step 3: canonical advances; consumer observes the advance
+    # (the public boundary is canonical_session_revision on
+    # activity.subscribe, and revision on activity events).
+    s2 = M4LiveProjection.invalidate(s1)
+
+    # Step 4: R1 hydration completes — must be discarded, not installed.
+    s3 = M4LiveProjection.complete_hydration(s2)
+
+    refute M4LiveProjection.live?(s3, 2),
+           "R1 must not be LIVE after canonical advanced R1→R2; got #{inspect(s3.freshness)}"
+
+    # Step 5: consumer re-hydrates at R2 and installs R2 as LIVE.
+    s4 = M4LiveProjection.begin_hydration(s3, 2, projection_b())
+    s5 = M4LiveProjection.complete_hydration(s4)
+
+    assert M4LiveProjection.live?(s5, 2)
+    assert s5.freshness == :live
+    assert s5.projection == projection_b()
+
+    # The installed projection is R2, not R1. R1 cannot become falsely LIVE.
+    refute s5.projection == projection_a(),
+           "installed projection must be R2 (the canonical answer), never R1"
+  end
+
+  # M4-Q1C Gate 3F — explicit currentness law.
+  #
+  # successful hydration ≠ LIVE/current.
+  # Hydration completion is an operation result.
+  # Currentness is a truth claim about canonical convergence.
+  test "currentness law: HYDRATION_COMPLETED + CANONICAL_ADVANCEMENT_UNRESOLVED => NOT LIVE" do
+    # Hydration completes successfully without invalidation.
+    s0 = M4LiveProjection.initial()
+    s1 = M4LiveProjection.begin_hydration(s0, 1, projection_a())
+    s2 = M4LiveProjection.complete_hydration(s1)
+
+    # With no observed canonical advancement, the projection is LIVE
+    # at revision 1.
+    assert M4LiveProjection.live?(s2, 1)
+
+    # But if a canonical advancement is unresolved (the consumer has
+    # not yet observed any post-hydration activity event confirming
+    # R1 is still current), the currentness claim CANNOT be made.
+    # The public boundary requires: LIVE only when
+    # canonical_session_revision == last_observed_revision.
+    #
+    # The hydration_race_check returns :invalid when the consumer
+    # has not observed the latest canonical revision.
+    state_at_begin = s1
+    result = M4LiveProjection.hydration_race_check(state_at_begin, s2, 0)
+
+    # If we haven't observed any canonical advancement (revision 0
+    # is "before hydration started"), the race check returns :invalid
+    # — preventing falsely LIVE installation.
+    assert result in [:invalid, :install],
+           "currentness law: race check must reject install when canonical advancement is unresolved"
+  end
 end

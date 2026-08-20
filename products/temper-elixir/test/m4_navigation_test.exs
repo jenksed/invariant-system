@@ -70,4 +70,127 @@ defmodule Temper.M4NavigationTest do
     s2 = M4Navigation.initial() |> M4Navigation.set_order(projection())
     assert s1.order == s2.order
   end
+
+  # M4-Q1C Gate 5 — canonical ←/→ navigation tests.
+
+  defp linear_projection do
+    # WorkerOutput -> PatchProposal -> VerificationResult -> Review
+    %{
+      nodes: [
+        %{id: "wko_l", kind: "WorkerOutput"},
+        %{id: "pp_l", kind: "PatchProposal"},
+        %{id: "ver_l", kind: "VerificationResult"},
+        %{id: "rev_l", kind: "Review"}
+      ],
+      edges: [
+        %{id: "e1", kind: "PRODUCED", from: "wko_l", to: "pp_l"},
+        %{id: "e2", kind: "VERIFIED", from: "ver_l", to: "pp_l"},
+        %{id: "e3", kind: "REVIEWED", from: "rev_l", to: "pp_l"},
+        %{id: "e4", kind: "ASSESSED", from: "rev_l", to: "ver_l"}
+      ]
+    }
+  end
+
+  test "LEFT_UPSTREAM (linear lifecycle): from Review ← VerificationResult" do
+    s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "Review", canonical_id: "rev_l"})
+
+    s2 = M4Navigation.move(s1, :left, linear_projection())
+
+    # Review has two incoming edges: REVIEWED→pp_l and ASSESSED→ver_l.
+    # Tie-break by visible order: pp_l appears before ver_l in the
+    # visible nodes order, so ← lands on pp_l (PatchProposal).
+    assert M4Navigation.focused(s2).canonical_id == "pp_l"
+  end
+
+  test "RIGHT_DOWNSTREAM (linear lifecycle): from WorkerOutput → PatchProposal" do
+    s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "wko_l"})
+
+    s2 = M4Navigation.move(s1, :right, linear_projection())
+
+    assert M4Navigation.focused(s2).canonical_id == "pp_l"
+  end
+
+  test "RIGHT_DOWNSTREAM (no canonical edge): focus unchanged" do
+    s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "PatchProposal", canonical_id: "pp_l"})
+
+    # pp_l has no outgoing edges in this fixture.
+    s2 = M4Navigation.move(s1, :right, linear_projection())
+
+    assert M4Navigation.focused(s2).canonical_id == "pp_l"
+  end
+
+  test "NO_TYPE_INFERRED_EDGE: entity type compatibility does NOT manufacture an edge" do
+    # Two Review nodes with the same entity_type but no canonical edge
+    # between them. ←/→ must not invent a relationship based on type.
+    p = %{
+      nodes: [
+        %{id: "rev_1", kind: "Review"},
+        %{id: "rev_2", kind: "Review"}
+      ],
+      edges: []
+    }
+
+    s = M4Navigation.initial() |> M4Navigation.set_order(p)
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "Review", canonical_id: "rev_1"})
+
+    s2 = M4Navigation.move(s1, :left, p)
+    assert M4Navigation.focused(s2).canonical_id == "rev_1", "no edge → focus unchanged"
+
+    s3 = M4Navigation.move(s1, :right, p)
+    assert M4Navigation.focused(s3).canonical_id == "rev_1", "no edge → focus unchanged"
+  end
+
+  test "Multiple downstream ties: visible topology order determines tie-break" do
+    # One source, two outgoing edges. ← visible order decides.
+    p = %{
+      nodes: [
+        %{id: "src", kind: "WorkerOutput"},
+        %{id: "tgt_a", kind: "PatchProposal"},
+        %{id: "tgt_b", kind: "Review"}
+      ],
+      edges: [
+        %{id: "e1", kind: "PRODUCED", from: "src", to: "tgt_b"},
+        %{id: "e2", kind: "REVIEWED", from: "src", to: "tgt_a"}
+      ]
+    }
+
+    s = M4Navigation.initial() |> M4Navigation.set_order(p)
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "src"})
+
+    s2 = M4Navigation.move(s1, :right, p)
+    # tgt_a (PatchProposal) appears first in visible order → → lands on tgt_a
+    assert M4Navigation.focused(s2).canonical_id == "tgt_a"
+  end
+
+  test "Esc returns to prior focus" do
+    s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "wko_l"})
+    s2 = M4Navigation.set_focus(s1, %SubjectIdentity{entity_type: "Review", canonical_id: "rev_l"})
+
+    s3 = M4Navigation.move(s2, :esc, linear_projection())
+    assert M4Navigation.focused(s3).canonical_id == "wko_l"
+  end
+
+  test "UNKNOWN lifecycle + exact canonical ref: ← still traverses the exact edge" do
+    # Two nodes with no shared lifecycle_scope but a canonical edge
+    # between them. ← must traverse the edge (it is exact).
+    p = %{
+      nodes: [
+        %{id: "n1", kind: "WorkerOutput"},
+        %{id: "n2", kind: "Review"}
+      ],
+      edges: [
+        %{id: "e", kind: "REVIEWED", from: "n2", to: "n1"}
+      ]
+    }
+
+    s = M4Navigation.initial() |> M4Navigation.set_order(p)
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "Review", canonical_id: "n2"})
+
+    s2 = M4Navigation.move(s1, :left, p)
+    assert M4Navigation.focused(s2).canonical_id == "n1"
+  end
 end

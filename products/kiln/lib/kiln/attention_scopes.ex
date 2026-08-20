@@ -25,6 +25,16 @@ defmodule Kiln.AttentionScopes do
     "this thing needs you" (SELECTED).
 
   Architecture: Kiln.M4 (M4-A, lane M4).
+
+  ## Ownership classification (M4-Q1C Gate 4)
+
+  This module is a **pure projection** over canonical pending-decision
+  facts. It does NOT own selection (the caller passes selection in),
+  hydration state, or canonical workflow truth. It is correctly
+  classified as PLACEMENT_SMELL: the module name `Kiln.AttentionScopes`
+  is misleading because the projection is consumed by Temper's operator
+  attention surface. Renaming is deferred — it requires coordinated
+  updates across tests and consumers and is not low-risk for Q1C.
   """
 
   alias Kiln.Domain.SubjectIdentity

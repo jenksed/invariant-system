@@ -72,20 +72,37 @@ defmodule Kiln.M3DogfoodLifecycleTest do
   alias Kiln.Store.Canonical
   alias Kiln.Test.JournalBuilder, as: JB
 
-  @at ~U[2026-08-19 13:30:00Z]
-  @now_iso "2026-08-19T13:30:00Z"
+  # Test anchor: fixed reference time used by the bounded Store + canonical
+  # projections. Generated from current wall-clock at test compile time so
+  # the bounded currentness window (`derived_at..valid_until`) is always
+  # satisfied relative to DateTime.utc_now() when the test runs. This is
+  # the smallest legitimate time-stable mechanism: the validity horizon
+  # is bounded (24h horizon; ≤ 168h cap enforced by the product), derived
+  # from a deterministic reference time at fixture execution.
+  @test_now_fn fn ->
+    DateTime.utc_now() |> DateTime.truncate(:second)
+  end
 
   setup do
     test_id = "m3-dogfood-#{System.os_time()}-#{inspect(self())}-#{System.unique_integer([:positive])}"
     dir = Path.join(System.tmp_dir!(), test_id)
     File.mkdir_p!(dir)
 
+    # Deterministic per-test reference time: fixture is generated at
+    # setup time so the bounded currentness window
+    # (derived_at..valid_until) is always fresh relative to
+    # DateTime.utc_now() at Worker.propose invocation.
+    now_dt = @test_now_fn.()
+    now_iso = DateTime.to_iso8601(now_dt)
+
+    on_exit(fn -> :ok end)
+
     # Open a real Store against a bounded SQLite file.
     {:ready, store} =
       Store.start(
         path: Path.join(dir, "state.sqlite3"),
         store_id: "store_m3_dogfood_#{test_id}",
-        now: @now_iso,
+        now: now_iso,
         name: Kiln.Store.Connection
       )
 
@@ -101,7 +118,7 @@ defmodule Kiln.M3DogfoodLifecycleTest do
       File.rm_rf!(dir)
     end)
 
-    {:ok, store: store, dir: dir}
+    {:ok, store: store, dir: dir, now_iso: now_iso, now_dt: now_dt}
   end
 
   # ---- helpers ----
@@ -119,12 +136,14 @@ defmodule Kiln.M3DogfoodLifecycleTest do
     }
   end
 
-  defp eligibility_for do
+  defp eligibility_for(now_iso, now_dt) do
+    valid_until_dt = DateTime.add(now_dt, 24 * 3600, :second)
+
     %{
       "schema" => "test/eligibility/v0",
       "eligibility" => "QUALIFIED",
-      "derived_at" => @now_iso,
-      "valid_until" => "2026-08-20T13:30:00Z",
+      "derived_at" => now_iso,
+      "valid_until" => DateTime.to_iso8601(valid_until_dt),
       "profile_ref" => %{"id" => "prof_m3", "digest" => "sha256:" <> String.duplicate("a", 64)},
       "role" => "IMPLEMENTER"
     }
@@ -148,7 +167,9 @@ defmodule Kiln.M3DogfoodLifecycleTest do
 
   @tag :m3_dogfood
   test "M3-R1: deterministic dogfood worker drives Worker.propose → verify → review → decide → apply chain", %{
-    store: store
+    store: store,
+    now_iso: now_iso,
+    now_dt: now_dt
   } do
     # ---- Phase 1: real bounded Session via the canonical workflow ----
     domain = JB.domain()
@@ -206,7 +227,7 @@ defmodule Kiln.M3DogfoodLifecycleTest do
       assert {:ok, worker_output} =
                Worker.propose(
                  assignment_for(profile),
-                 eligibility_for(),
+                 eligibility_for(now_iso, now_dt),
                  profile,
                  request_attrs,
                  repo_root
@@ -471,6 +492,77 @@ defmodule Kiln.M3DogfoodLifecycleTest do
                Worker.worker_provider_mode()
     after
       Application.put_env(:kiln, :worker_provider_mode, previous)
+    end
+  end
+
+  # ---- Negative: expired eligibility is REJECTED (M4-Q1C M3_EXPIRED_ELIGIBILITY_REJECTED) ----
+  #
+  # M3-R1 fixture is now time-stable (generated from @test_now_fn at
+  # setup time). This test deliberately supplies an EXPIRED eligibility
+  # and proves the bounded currentness contract still rejects it. The
+  # semantics are NOT weakened: valid_until must be strictly greater
+  # than DateTime.utc_now() for dispatch.
+
+  @tag :m3_dogfood
+  test "M3-R1 negative: expired eligibility is rejected (currentness contract preserved)", %{
+    store: store,
+    now_iso: _now_iso,
+    now_dt: now_dt
+  } do
+    # Pin :dogfood mode and prepare a repo as in the positive path.
+    previous_mode = Application.get_env(:kiln, :worker_provider_mode, :deterministic_fake)
+    Application.put_env(:kiln, :worker_provider_mode, :dogfood)
+
+    profile = profile_for()
+    repo_root = Path.expand("../support", File.cwd!())
+
+    System.cmd("git", ["init", "-q", "--initial-branch=main", repo_root])
+    File.write!(
+      Path.join(repo_root, "bounded.ex"),
+      "defmodule Bounded do\n  @moduledoc \"original\"\nend\n"
+    )
+
+    System.cmd("git", ["-C", repo_root, "-c", "user.name=Temper", "-c", "user.email=temper@local", "add", "."])
+    System.cmd("git", ["-C", repo_root, "-c", "user.name=Temper", "-c", "user.email=temper@local", "commit", "-qm", "fixture"])
+
+    # Eligibility window ENDED 1 hour ago; both derived_at and
+    # valid_until are strictly before now. The bounded
+    # within_currentness_window?/1 must reject this.
+    past_dt = DateTime.add(now_dt, -3600, :second)
+    far_past_dt = DateTime.add(now_dt, -7200, :second)
+
+    expired_eligibility = %{
+      "schema" => "test/eligibility/v0",
+      "eligibility" => "QUALIFIED",
+      "derived_at" => DateTime.to_iso8601(far_past_dt),
+      "valid_until" => DateTime.to_iso8601(past_dt),
+      "profile_ref" => %{"id" => "prof_m3", "digest" => "sha256:" <> String.duplicate("a", 64)},
+      "role" => "IMPLEMENTER"
+    }
+
+    request_attrs = %{
+      "attempt_ref" => "att_m3_r1_expired",
+      "dogfood_task_spec" => %{
+        "task_id" => "expired_check",
+        "kind" => "add_attribute",
+        "target" => "bounded.ex",
+        "match" => "  @moduledoc \"original\"",
+        "after" => "\n  @expired \"should not run\"",
+        "rationale" => "expired eligibility must reject"
+      }
+    }
+
+    try do
+      assert {:error, %{code: :E_QUALIFICATION_NOT_CURRENT}} =
+               Worker.propose(
+                 assignment_for(profile),
+                 expired_eligibility,
+                 profile,
+                 request_attrs,
+                 repo_root
+               )
+    after
+      Application.put_env(:kiln, :worker_provider_mode, previous_mode)
     end
   end
 end

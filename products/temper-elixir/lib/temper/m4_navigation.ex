@@ -55,16 +55,24 @@ defmodule Temper.M4Navigation do
     %{state | order: order, focus_idx: new_idx}
   end
 
-  @doc "Move focus according to a key."
+  @doc "Move focus according to a key. ←/→ consume the canonical projection."
+  @spec move(state(), key(), any()) :: state()
+  def move(state, :up, _projection), do: shift(state, -1)
+  def move(state, :down, _projection), do: shift(state, 1)
+  def move(state, :left, projection), do: move_upstream(state, projection)
+  def move(state, :right, projection), do: move_downstream(state, projection)
+  def move(state, :enter, _projection), do: state
+  def move(state, :p, _projection), do: state
+  def move(state, :w, _projection), do: state
+  def move(state, :esc, _projection), do: pop_focus(state)
+
+  # Backward-compatible arity-2 form for tests that don't need projection
+  # (only :up/:down/:esc use this path; :left/:right require projection).
   @spec move(state(), key()) :: state()
   def move(state, :up), do: shift(state, -1)
   def move(state, :down), do: shift(state, 1)
-  def move(state, :left), do: move_upstream(state)
-  def move(state, :right), do: move_downstream(state)
-  def move(state, :enter), do: state
-  def move(state, :p), do: state
-  def move(state, :w), do: state
   def move(state, :esc), do: pop_focus(state)
+  def move(state, _other), do: state
 
   @doc "Jump to the first node matching a scope. Returns updated state or unchanged."
   @spec jump(state(), :attention | :failure | :blocked, any()) :: state()
@@ -103,23 +111,74 @@ defmodule Temper.M4Navigation do
     end
   end
 
-  defp move_upstream(state) do
-    # Move to the source of an incoming canonical edge, if any.
+  # Move to the source of an incoming canonical edge, if any.
+  # Semantic law: ← consumes only edges from the canonical projection.
+  # Entity type/shape may NOT manufacture topology.
+  # Multiple destinations → tie-break by stable visible topology order
+  # (the projection's node enumeration order, which is deterministic
+  # for the same projection).
+  defp move_upstream(state, projection) do
     current = focused(state)
 
     case current do
-      nil -> state
-      _ -> state
+      nil ->
+        state
+
+      %SubjectIdentity{canonical_id: cid} ->
+        # Incoming edges: any edge where `to` == current's id.
+        # Move to the `from` of that edge (the upstream/source).
+        sources =
+          projection.edges
+          |> Enum.filter(&(&1.to == cid))
+          |> Enum.map(& &1.from)
+          |> Enum.uniq()
+
+        # Tie-break by visible order.
+        target_id = pick_first_in_visible_order(sources, projection)
+        maybe_set_focus_by_id(state, target_id)
     end
   end
 
-  defp move_downstream(state) do
-    # Move to the first target of an outgoing canonical edge, if any.
+  # Move to the first target of an outgoing canonical edge, if any.
+  defp move_downstream(state, projection) do
     current = focused(state)
 
     case current do
+      nil ->
+        state
+
+      %SubjectIdentity{canonical_id: cid} ->
+        targets =
+          projection.edges
+          |> Enum.filter(&(&1.from == cid))
+          |> Enum.map(& &1.to)
+          |> Enum.uniq()
+
+        target_id = pick_first_in_visible_order(targets, projection)
+        maybe_set_focus_by_id(state, target_id)
+    end
+  end
+
+  # Pick the first canonical id from `candidates` that appears in the
+  # projection's visible topology ordering (projection.nodes order).
+  # If no candidate is visible, returns nil.
+  defp pick_first_in_visible_order(candidates, projection) do
+    visible_ids =
+      projection.nodes
+      |> Enum.map(& &1.id)
+      |> MapSet.new()
+
+    Enum.find(candidates, fn id -> MapSet.member?(visible_ids, id) end)
+  end
+
+  defp maybe_set_focus_by_id(state, nil), do: state
+
+  defp maybe_set_focus_by_id(state, target_id) do
+    target_node = Enum.find(state.order, &(&1.canonical_id == target_id))
+
+    case target_node do
       nil -> state
-      _ -> state
+      %SubjectIdentity{} = subject -> set_focus(state, subject)
     end
   end
 

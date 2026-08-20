@@ -233,17 +233,25 @@ defmodule Kiln.GraphProjection do
   end
 
   defp lifecycle_scope(from, to) do
-    # Lifecycle scope is derivable when both endpoints share a
-    # base_commit OR share an attempt_ref.id. The scope identifier
-    # is the shared base_commit when present, else the shared
-    # attempt_ref id. Nil when no lineage can be proven.
-    base_from = Map.get(from, :base_commit) || Map.get(from, "base_commit")
-    base_to = Map.get(to, :base_commit) || Map.get(to, "base_commit")
-
+    # Lifecycle scope (M4-Q1C Gate 2):
+    #
+    # base_commit is BASE-STATE provenance. It does NOT prove attempt
+    # identity. Two envelopes sharing base_commit may be from
+    # DIFFERENT attempts (one succeeded, one failed verification; same
+    # base state).
+    #
+    # Lifecycle scope is ONLY derived from canonical attempt identity:
+    #   - shared attempt_ref.id
+    #   - supersedes_patch_ref chain
+    #   - run_ref chain (future canonical seam)
+    #
+    # Otherwise lifecycle_scope = nil (UNKNOWN).
+    #
+    # This forbids inferred cross-entity lifecycle stitching.
+    # It does NOT suppress exact canonical ref edges: an exact
+    # canonical reference may prove a relationship even when the
+    # broader attempt identity is unknown.
     cond do
-      is_binary(base_from) and is_binary(base_to) and base_from == base_to and byte_size(base_from) > 0 ->
-        "base:" <> base_from
-
       attemp_refs_match?(from, to) ->
         "attempt:" <> (get_attempt_id(from) || "unknown")
 
@@ -260,9 +268,13 @@ defmodule Kiln.GraphProjection do
   end
 
   defp get_attempt_id(envelope) do
-    attempt_ref = Map.get(envelope, :attempt_ref) || Map.get(envelope, "attempt_ref")
-
-    case attempt_ref do
+    # Attempt identity sources (canonical lineage only):
+    #   - attempt_ref.id
+    #   - supersedes_patch_ref (a proposal supersedes another — same
+    #     attempt lineage, distinct proposal identity)
+    # No synthetic attempt identity is manufactured for graph
+    # convenience.
+    case Map.get(envelope, :attempt_ref) || Map.get(envelope, "attempt_ref") do
       %{"id" => id} when is_binary(id) -> id
       %{id: id} when is_binary(id) -> id
       _ -> nil
@@ -292,7 +304,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: wo.semantic_digest,
       attention: "WORKING",
       proposed: false,
-      lifecycle_scope: lifecycle_scope_from_base(wo.base_commit),
+      lifecycle_scope: lifecycle_scope_from_attempt(wo),
       metadata: %{
         attempt_ref: wo.attempt_ref,
         base_commit: wo.base_commit
@@ -308,7 +320,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: pp.patch_digest,
       attention: attention_for_proposal(pp),
       proposed: false,
-      lifecycle_scope: lifecycle_scope_from_base(pp.base_commit),
+      lifecycle_scope: lifecycle_scope_from_attempt(pp),
       metadata: %{
         plan_ref: pp.plan_ref,
         repository: pp.repository
@@ -379,9 +391,15 @@ defmodule Kiln.GraphProjection do
     }
   end
 
-  defp lifecycle_scope_from_base(nil), do: nil
-  defp lifecycle_scope_from_base(""), do: nil
-  defp lifecycle_scope_from_base(base) when is_binary(base), do: "base:" <> base
+  # A node's lifecycle_scope reflects the canonical attempt identity
+  # derivable from the envelope itself. base_commit is metadata only
+  # — it does NOT confer attempt identity.
+  defp lifecycle_scope_from_attempt(envelope) do
+    case get_attempt_id(envelope) do
+      id when is_binary(id) and byte_size(id) > 0 -> "attempt:" <> id
+      _ -> nil
+    end
+  end
 
   defp attention_for_proposal(_), do: "WORKING"
   defp attention_for_verification(%{status: :PASS}), do: "WORKING"

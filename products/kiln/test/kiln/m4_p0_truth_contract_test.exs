@@ -236,49 +236,114 @@ defmodule Kiln.M4P0TruthContractTest do
   end
 
   # ---------- Lifecycle Scope / No Cross-Attempt Stitching ----------
+  #
+  # M4-Q1C Gate 2:
+  #   base_commit is BASE-STATE provenance; it does NOT prove attempt
+  #   identity. Lifecycle scope is derived ONLY from canonical attempt
+  #   identity (attempt_ref.id). When two envelopes share base_commit
+  #   but have different attempt_ref.id, they MUST NOT share
+  #   lifecycle_scope — they are different attempts with the same
+  #   base state.
 
   describe "Lifecycle scope" do
-    test "edges within the same base_commit share lifecycle_scope" do
+    test "edges within same attempt_ref share lifecycle_scope (attempt identity)" do
       facts = facts_with(base(), "att1")
       {:ok, projection} = GraphProjection.build(facts)
 
-      # Edges where BOTH endpoints carry a base_commit must share scope.
-      # Edges involving PatchEvidence (which has no base_commit) may
-      # carry nil scope — the lifecycle for that evidence is implied
-      # by the patch_ref (already proven via canonical edge basis).
-      with_bases = Enum.filter(projection.edges, &(edge_has_bases?(&1, facts)))
+      with_attempt = Enum.filter(projection.edges, fn e ->
+        from = find_envelope(facts, e.from)
+        to = find_envelope(facts, e.to)
+        attempt_ids_match?(from, to)
+      end)
 
-      assert with_bases != [],
-             "test fixture must include at least one edge with two base_commits"
+      assert with_attempt != [],
+             "test fixture must include at least one edge with matching attempt_ref"
 
-      assert Enum.all?(with_bases, fn e -> e.lifecycle_scope == "base:" <> base() end),
-             "all edges with two base_commits within one lifecycle must share scope"
+      assert Enum.all?(with_attempt, fn e -> e.lifecycle_scope == "attempt:att1" end),
+             "edges within the same attempt identity must share scope"
+    end
+
+    test "same base_commit, DIFFERENT attempt_ref: NO shared lifecycle_scope (SAME_BASE_DIFFERENT_ATTEMPT_NO_STITCH)" do
+      # Adversarial: ATTEMPT A and ATTEMPT B share base_commit but
+      # have distinct attempt_ref.id. Successful A fact must NOT
+      # extend or stitch to B's lifecycle.
+      attempt_a = facts_with(base(), "att_A")
+      attempt_b = facts_with(base(), "att_B")
+
+      # A reaches governed completion (verification PASS + ACCEPT +
+      # applied). B is mid-failure (verification FAIL).
+      attempt_a = attempt_a
+      attempt_b = put_in(attempt_b, [:verification], %{attempt_b.verification | status: :FAIL})
+      attempt_b = Map.delete(attempt_b, :review)
+      attempt_b = Map.delete(attempt_b, :human_decision)
+      attempt_b = Map.delete(attempt_b, :patch_evidence)
+
+      # Build A and B separately.
+      {:ok, proj_a} = GraphProjection.build(attempt_a)
+      {:ok, proj_b} = GraphProjection.build(attempt_b)
+
+      # No edge within A may carry B's lifecycle scope, and vice versa.
+      assert Enum.all?(proj_a.edges, fn e ->
+               e.lifecycle_scope != "attempt:att_B"
+             end),
+             "attempt A must not reference attempt B's lifecycle scope"
+
+      assert Enum.all?(proj_b.edges, fn e ->
+               e.lifecycle_scope != "attempt:att_A"
+             end),
+             "attempt B must not reference attempt A's lifecycle scope"
+
+      # A's successful edges share attempt:att_A scope.
+      a_attempt_edges = Enum.filter(proj_a.edges, &(&1.lifecycle_scope == "attempt:att_A"))
+      assert a_attempt_edges != [], "attempt A must have at least one scope-tagged edge"
+
+      # B has nil scope everywhere (no attempt identity can be proven
+      # for B in this fixture because B's worker_output+proposal carry
+      # attempt_ref=att_B but B's verification has no attempt_ref,
+      # and the verification edge B's nodes are filtered).
+      # The semantic guarantee: B's remaining edges cannot stitch to
+      # A's scope.
+      refute Enum.any?(proj_b.edges, &(&1.lifecycle_scope == "attempt:att_A"))
     end
 
     test "edges across different base_commits have NO lifecycle_scope (refuse to stitch)" do
-      # Two historical envelopes share plan_ref and have the same
-      # patch_ref.id (canonical id collision is possible), but
-      # different base_commits.
       historical = facts_with(base(), "att1")
       current = facts_with(String.duplicate("1", 40), "att2")
 
-      # The "PRODUCED" edge from worker_output to proposal requires
-      # both nodes in the projection. We feed a mixed facts map: the
-      # historical worker_output + the current proposal. The
-      # projection's edges come from a single facts map, so this is
-      # constructed to test that cross-commit edges are NOT emitted.
       mixed = Map.put(current, :worker_output, historical.worker_output)
       {:ok, projection} = GraphProjection.build(mixed)
 
       produced = Enum.find(projection.edges, &(&1.kind == "PRODUCED"))
-      # Same canonical IDs in both, so the projection does emit a
-      # PRODUCED edge — but its lifecycle_scope must be nil (or
-      # different) so the renderer refuses to stitch them into one
-      # visible lineage.
+
       if produced do
-        assert produced.lifecycle_scope in [nil, "base:" <> base(), "base:" <> String.duplicate("1", 40)]
-        refute produced.lifecycle_scope == "base:" <> base() and produced.lifecycle_scope == "base:" <> String.duplicate("1", 40)
+        # Different attempts + different base_commits → no scope
+        # may be claimed.
+        assert produced.lifecycle_scope in [nil],
+               "different base_commit + different attempt_ref must produce nil lifecycle_scope"
       end
+    end
+
+    test "UNKNOWN lifecycle_scope: exact canonical ref edge SURVIVES" do
+      # Two envelopes with no shared attempt identity, no shared
+      # base_commit. They DO share an exact canonical reference
+      # (human_decision.patch_ref == proposal.id) — that edge MUST
+      # still be emitted; only its lifecycle_scope must be nil.
+      facts_x = facts_with(String.duplicate("2", 40), "att_X")
+      facts_y = facts_with(String.duplicate("3", 40), "att_Y")
+
+      # Build a mixed facts map where human_decision from X
+      # references the proposal from Y.
+      mixed = Map.put(facts_x, :proposal, facts_y.proposal)
+      {:ok, projection} = GraphProjection.build(mixed)
+
+      # The DECIDED_ON edge (human_decision → proposal via patch_ref)
+      # MUST exist even though lifecycle_scope is UNKNOWN.
+      decided = Enum.find(projection.edges, &(&1.kind == "DECIDED_ON"))
+      assert decided != nil, "exact canonical ref edge must survive"
+      assert decided.lifecycle_scope == nil,
+             "no shared attempt identity → lifecycle_scope must be nil, NOT inferred"
+      assert decided.canonical_basis == "human_decision.patch_ref",
+             "exact canonical basis must be preserved"
     end
 
     test "every edge has a canonical_basis (no naked edges)" do
@@ -287,6 +352,20 @@ defmodule Kiln.M4P0TruthContractTest do
 
       assert Enum.all?(projection.edges, fn e -> is_binary(e.canonical_basis) and byte_size(e.canonical_basis) > 0 end),
              "every rendered edge must carry a non-empty canonical_basis"
+    end
+  end
+
+  defp attempt_ids_match?(from, to) do
+    from_id = from && extract_attempt_id(from)
+    to_id = to && extract_attempt_id(to)
+    is_binary(from_id) and is_binary(to_id) and from_id == to_id and byte_size(from_id) > 0
+  end
+
+  defp extract_attempt_id(envelope) do
+    case Map.get(envelope, :attempt_ref) do
+      %{"id" => id} when is_binary(id) -> id
+      %{id: id} when is_binary(id) -> id
+      _ -> nil
     end
   end
 

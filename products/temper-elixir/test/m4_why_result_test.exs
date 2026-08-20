@@ -110,4 +110,70 @@ defmodule Temper.M4WhyResultTest do
     # Finch, HTTPoison, or model-client call in either module.
     refute function_exported?(Temper.M4WhyResult, :__network_call__, 0)
   end
+
+  # M4-Q1C Gate 6 — INCOMPLETE qualification.
+  #
+  # Controlled fixture: a subject IS present in the projection
+  # (so the relationship semantics are supported — target_subject
+  # is non-nil), but the canonical information available is
+  # insufficient (no canonical_digest, no edges, no basis). The
+  # WHY result must be INCOMPLETE, not EXPLAINABLE and not
+  # UNSUPPORTED.
+
+  test "WHY_INCOMPLETE: subject present but canonical evidence insufficient" do
+    # Hand-construct a projection where a node lacks canonical_digest
+    # and has no edges — this is a controlled fixture simulating the
+    # "supported but insufficient" state.
+    incomplete_projection = %{
+      nodes: [
+        %{
+          id: "n_incomplete",
+          kind: "WorkerOutput",
+          label: "Worker Output",
+          canonical_digest: "",
+          attention: "WORKING",
+          proposed: false,
+          lifecycle_scope: nil,
+          metadata: nil
+        }
+      ],
+      edges: []
+    }
+
+    subject = %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "n_incomplete"}
+    result = M4WhyResult.for_subject(incomplete_projection, subject)
+
+    assert result.status == :incomplete,
+           "expected :incomplete, got #{inspect(result.status)}"
+    assert result.packet != nil
+    assert result.reason =~ "insufficient"
+  end
+
+  test "INCOMPLETE != UNSUPPORTED: subject present but evidence insufficient is INCOMPLETE, not UNSUPPORTED" do
+    incomplete_projection = %{
+      nodes: [
+        %{
+          id: "n_inc",
+          kind: "WorkerOutput",
+          label: "Worker Output",
+          canonical_digest: "",
+          attention: "WORKING",
+          proposed: false,
+          lifecycle_scope: nil,
+          metadata: nil
+        }
+      ],
+      edges: []
+    }
+
+    subject = %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "n_inc"}
+    incomplete = M4WhyResult.for_subject(incomplete_projection, subject)
+
+    missing_subject = %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "n_does_not_exist"}
+    unsupported = M4WhyResult.for_subject(incomplete_projection, missing_subject)
+
+    assert incomplete.status == :incomplete
+    assert unsupported.status == :unsupported
+    assert incomplete.status != unsupported.status
+  end
 end

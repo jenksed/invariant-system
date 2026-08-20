@@ -141,13 +141,17 @@ defmodule Temper.M4LiveProjection do
     end
   end
 
-  @doc "Test invariant: installed LIVE projection reflects canonical currentness."
-  @doc "Returns true iff the projection is LIVE and the cached revision matches."
+  @doc """
+  Currentness claim: LIVE iff the projection is LIVE AND the cached
+  canonical revision matches the supplied revision.
+
+  Per Gate 3F: HYDRATION_COMPLETED + CANONICAL_ADVANCEMENT_UNRESOLVED => NOT LIVE.
+  A successful hydration is an operation result; currentness is a
+  truth claim that requires the cached revision to match the
+  consumer's last observed canonical_session_revision.
+  """
   @spec live?(state(), non_neg_integer()) :: boolean()
-  def live?(%{freshness: :live}, revision) do
-    # The canonical hydration validates its own revision via
-    # subscription.invalidations; live? is the consumer's check.
-    _ = revision
+  def live?(%{freshness: :live, subscription_revision: rev}, revision) when rev == revision do
     true
   end
 

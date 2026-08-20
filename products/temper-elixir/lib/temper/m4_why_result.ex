@@ -65,16 +65,24 @@ defmodule Temper.M4WhyResult do
   end
 
   defp sufficient_for_explanation?(packet) do
-    # The packet has a target_subject (the focused subject). The
-    # canonical evidence is in allowed_evidence_refs and the
-    # backward chain. If the packet has a target_subject and at
-    # least one piece of canonical context (a basis or an evidence
-    # ref), it is EXPLAINABLE.
+    # INCOMPLETE vs EXPLAINABLE:
+    #
+    # EXPLAINABLE requires the packet to have BOTH a target_subject
+    # AND at least one NON-EMPTY piece of canonical context
+    # (basis, evidence refs, relationship, or backward chain).
+    #
+    # INCOMPLETE means: the subject is supported (target_subject
+    # is present) but the canonical evidence is insufficient. The
+    # packet has nothing useful to explain with — e.g. a subject
+    # present in the projection but with no canonical_digest, no
+    # edges, and no basis.
+    #
+    # An empty list counts as INSUFFICIENT (not "present").
     has_target = packet.target_subject != nil
     has_basis = is_binary(packet.canonical_basis) and byte_size(packet.canonical_basis) > 0
     has_evidence = is_list(packet.allowed_evidence_refs) and packet.allowed_evidence_refs != []
     has_relationship = is_binary(packet.relationship) and byte_size(packet.relationship) > 0
-    has_backward_chain = is_list(packet.provenance_backward_chain)
+    has_backward_chain = is_list(packet.provenance_backward_chain) and packet.provenance_backward_chain != []
 
     has_target and (has_basis or has_evidence or has_relationship or has_backward_chain)
   end

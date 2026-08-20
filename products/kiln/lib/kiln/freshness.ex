@@ -15,6 +15,22 @@ defmodule Kiln.Freshness do
   invalidation events.
 
   Architecture: Kiln.M4 (M4-A, lane M4).
+
+  ## Ownership classification (M4-Q1C Gate 4)
+
+  This module is a **pure projection** over two inputs:
+    - canonical projection (for authority)
+    - hydration state (for freshness — caller-supplied)
+
+  It does NOT consume client selection as canonical truth. It does
+  NOT feed client-derived freshness back into Kiln authority. The
+  authority/freshness separation is intact.
+
+  Classified as PLACEMENT_SMELL: the freshness states
+  (LIVE/HYDRATING/RECONNECTING/STALE/DEGRADED) describe the
+  observation/runtime boundary, which is Temper-side; the module
+  name `Kiln.Freshness` is misleading. Renaming deferred — not
+  low-risk for Q1C; deferred to a future cleanup.
   """
 
   @type authority :: :governed | :unknown
