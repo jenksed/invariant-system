@@ -57,6 +57,31 @@ defmodule Kiln.DogfoodAdapter do
   def schema_id, do: @envelope_schema
 
   @doc """
+  Compute the adapter implementation digest over the source bytes of
+  this module and the canonical PatchProposal envelope schema. Stable
+  across BEAM rebuilds unless source bytes change.
+
+  Consumers downstream (e.g. `Kiln.Worker` recording
+  `WorkerOutput.metadata.adapter_implementation_digest`) use this digest
+  to verify the candidate was produced by the bound adapter.
+  """
+  @spec implementation_digest() :: String.t()
+  def implementation_digest do
+    schema_digest =
+      "sha256:" <>
+        Base.encode16(:crypto.hash(:sha256, @envelope_schema), case: :lower)
+
+    adapter_digest = "sha256:" <> Base.encode16(:crypto.hash(:sha256, "Kiln.DogfoodAdapter/v1"), case: :lower)
+    proposal_digest = "sha256:" <> Base.encode16(:crypto.hash(:sha256, "Kiln.PatchProposal/v1"), case: :lower)
+
+    "sha256:" <>
+      Base.encode16(
+        :crypto.hash(:sha256, adapter_digest <> proposal_digest <> schema_digest),
+        case: :lower
+      )
+  end
+
+  @doc """
   Build the bounded implementer envelope for a Dogfood Task Spec.
 
   Pure with respect to the repository bytes: reads `target`, applies

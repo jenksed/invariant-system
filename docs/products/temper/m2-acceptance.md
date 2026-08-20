@@ -4,7 +4,8 @@ description: Provenance, candidate SHA, and current regression authority for the
 status: accepted
 branch: work/temper-workbench-alpha
 m1_baseline: 5d152e7
-m2_candidate: 4fdaa00
+m2_candidate: de715bc
+m3_first_commit: 1981f31
 regression_authority: m2_probe.sh (real-daemon scenario)
 audience:
   - developer
@@ -15,21 +16,36 @@ audience:
 
 ## Provenance reconciliation
 
-The previously circulated M1 baseline SHA `7d3a8d9` is **not present** in this repository — not in any branch, tag, reflog, or worktree. `git rev-parse 7d3a8d9` returns `unknown revision or path not in the working tree` from every checked-out worktree. There is therefore no recoverable "human-accepted M1 baseline at 7d3a8d9" to compare against.
+The historically declared M1 acceptance SHA is `7d3a8d9`. The current
+repository cannot resolve `7d3a8d9` — `git rev-parse 7d3a8d9` returns
+`unknown revision or path not in the working tree` from every
+checked-out worktree. There is therefore no recoverable
+"human-accepted M1 baseline at 7d3a8d9" in this repository snapshot.
 
-The actual M1 HEAD on `work/temper-workbench-alpha`, recoverable from `git log work/temper-workbench-alpha`, is:
+The repository-recoverable M1 baseline on
+`work/temper-workbench-alpha` is `5d152e7` (`test(temper): add M1
+real-daemon probe harness`). Until stronger evidence proves the
+declared `7d3a8d9` was simply erroneous, both facts are preserved.
 
 | Slot | SHA | Subject |
 |------|-----|---------|
-| **accepted M1 baseline** | `5d152e7` | test(temper): add M1 real-daemon probe harness |
-| M2 implementation parent | `5d152e7` | (same — M2 work branched from the M1 HEAD) |
-| M2 comparison base | `5d152e7` | (same) |
-
-`7d3a8d9` is recorded as an erroneous reference in upstream project documentation; the actionable M1 acceptance is at `5d152e7`. Future agents should compare against `5d152e7` unless repository evidence establishes otherwise.
+| **historically declared M1 acceptance SHA** | `7d3a8d9` | (not resolvable from current repository evidence) |
+| **repository-recoverable M1 baseline** | `5d152e7` | test(temper): add M1 real-daemon probe harness |
+| **M2 implementation parent** | `5d152e7` | (same — M2 work branched from the M1 HEAD) |
+| **M2 comparison base** | `5d152e7` | (same) |
 
 ## M2 candidate identification
 
-The current HEAD of `work/temper-workbench-alpha` is the M2 acceptance candidate. Pinned at the moment M2 closes (front matter field `m2_candidate:`). Update this field whenever the candidate is rebased or amended.
+The M2-only acceptance candidate is `de715bc` (`docs(temper):
+reconcile M1/M2 acceptance provenance; mark legacy m1_probe.sh
+frozen`). The M3 first bounded piece landed at `1981f31`; a frozen
+M2 candidate must not be co-mingled with M3 implementation.
+
+| Slot | SHA | Subject |
+|------|-----|---------|
+| **final M2-only candidate** | `de715bc` | docs(temper): reconcile M1/M2 acceptance provenance; mark legacy m1_probe.sh frozen |
+| **M3 first bounded piece** | `1981f31` | feat(kiln): M3 first-dogfood bounded deterministic worker adapter |
+| **current HEAD** | `1981f31` | (post-M3-first-piece) |
 
 ## M2 acceptance property
 

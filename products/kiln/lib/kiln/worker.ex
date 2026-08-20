@@ -20,6 +20,7 @@ defmodule Kiln.Worker do
   """
 
   alias Kiln.CandidateInvocation
+  alias Kiln.DogfoodAdapter
   alias Kiln.MinimaxM3Adapter
   alias Kiln.ExecutionAuthorityGate
   alias Kiln.RepositoryObservation
@@ -164,7 +165,7 @@ defmodule Kiln.Worker do
         "raw_completion_ref" => raw_completion_ref,
         "parsed_candidate_digest" => parsed_digest,
         "metadata" => %{
-          "adapter_implementation_digest" => MinimaxM3Adapter.implementation_digest(),
+          "adapter_implementation_digest" => adapter_implementation_digest(),
           "base_commit" => observation.current_commit,
           "base_state_digest" => observation.repository_state_digest,
           "produced_at" => DateTime.utc_now() |> DateTime.to_iso8601()
@@ -186,7 +187,7 @@ defmodule Kiln.Worker do
          completion_bytes: completion_bytes,
          base_commit: observation.current_commit,
          base_state_digest: observation.repository_state_digest,
-         adapter_implementation_digest: MinimaxM3Adapter.implementation_digest()
+         adapter_implementation_digest: adapter_implementation_digest()
        }}
     end
   end
@@ -196,17 +197,42 @@ defmodule Kiln.Worker do
   which preserves the accepted M11 E2 deterministic path. Setting
   `:worker_provider_mode` to `:real_provider` exercises the bounded
   MiniMax M3 adapter via the deterministic transport seam for tests,
-  or the actual Finch transport in production.
+  or the actual Finch transport in production. Setting the mode to
+  `:dogfood` exercises the bounded deterministic
+  `Kiln.DogfoodAdapter` (M3 dogfood / self-hosting) which emits real
+  bounded source mutations from a task spec carried in
+  `request_attrs["dogfood_task_spec"]`.
 
   This is the ONLY decision the Worker makes about provider selection.
   The Worker does not select providers; the runtime/operator configures
   the mode before dispatch.
+
+  Fail-closed: unknown values are returned as
+  `{:error, %{code: :E_WORKER_PROVIDER_MODE_INVALID, reason: ...}}`
+  rather than masquerading as a valid mode.
   """
-  @spec worker_provider_mode() :: :deterministic_fake | :real_provider
+  @spec worker_provider_mode() ::
+          :deterministic_fake | :real_provider | :dogfood | {:error, term()}
   def worker_provider_mode do
     case Application.get_env(:kiln, :worker_provider_mode, :deterministic_fake) do
       :real_provider -> :real_provider
-      _ -> :deterministic_fake
+      :dogfood -> :dogfood
+      :deterministic_fake -> :deterministic_fake
+      other ->
+        {:error,
+         %{code: :E_WORKER_PROVIDER_MODE_INVALID, reason: "unknown worker_provider_mode: #{inspect(other)}"}}
+    end
+  end
+
+  # The adapter_implementation_digest records which adapter actually
+  # produced the completion_bytes. Each adapter's implementation_digest/0
+  # is computed from its source bytes; consumers downstream can use
+  # this to verify the candidate was produced by the bound adapter.
+  defp adapter_implementation_digest do
+    case worker_provider_mode() do
+      :dogfood -> DogfoodAdapter.implementation_digest()
+      :real_provider -> MinimaxM3Adapter.implementation_digest()
+      _ -> MinimaxM3Adapter.implementation_digest()
     end
   end
 
@@ -239,8 +265,47 @@ defmodule Kiln.Worker do
       :real_provider ->
         build_provider_completion(ci_request, observation, base_commit)
 
-      _ ->
+      :dogfood ->
+        build_dogfood_completion(request_attrs, observation)
+
+      mode when mode == :deterministic_fake ->
         build_bounded_completion(request_attrs)
+
+      _ ->
+        # Fail-closed: any unrecognized shape (including the bounded
+        # error tuple from worker_provider_mode/0) returns the
+        # deterministic-fake path which is the historical M11 E2
+        # safe default.
+        build_bounded_completion(request_attrs)
+    end
+  end
+
+  # M3 (DOGFOOD / SELF-HOSTING) bounded path. The Dogfood Task Spec
+  # is carried in request_attrs["dogfood_task_spec"]. The Adapter
+  # produces canonical bounded bytes that decode through
+  # Kiln.PatchProposal.decode_envelope/1; the same canonical contract
+  # the other provider modes obey. The Adapter is NOT execution
+  # authority — it emits a candidate only; the canonical
+  # human.decide / patch.apply path remains the only place that
+  # can authorize effects.
+  defp build_dogfood_completion(request_attrs, observation) do
+    case Map.fetch(request_attrs, "dogfood_task_spec") do
+      {:ok, spec} when is_map(spec) ->
+        case DogfoodAdapter.build_envelope(spec, observation.repository) do
+          {:ok, bytes, semantic} ->
+            {:ok, bytes, semantic}
+
+          {:error, %{code: _} = err} ->
+            {:error, err}
+        end
+
+      _ ->
+        {:error,
+         %{
+           code: :E_DOGFOOD_TASK_SPEC_MISSING,
+           reason:
+             "worker_provider_mode=:dogfood requires request_attrs['dogfood_task_spec'] to be a JSON object"
+         }}
     end
   end
 
