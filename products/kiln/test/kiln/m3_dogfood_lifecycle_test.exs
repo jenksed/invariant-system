@@ -72,30 +72,23 @@ defmodule Kiln.M3DogfoodLifecycleTest do
   alias Kiln.Store.Canonical
   alias Kiln.Test.JournalBuilder, as: JB
 
-  # Test anchor: fixed reference time used by the bounded Store + canonical
-  # projections. Generated from current wall-clock at test compile time so
-  # the bounded currentness window (`derived_at..valid_until`) is always
-  # satisfied relative to DateTime.utc_now() when the test runs. This is
-  # the smallest legitimate time-stable mechanism: the validity horizon
-  # is bounded (24h horizon; ≤ 168h cap enforced by the product), derived
-  # from a deterministic reference time at fixture execution.
-  @test_now_fn fn ->
-    DateTime.utc_now() |> DateTime.truncate(:second)
-  end
-
   setup do
     test_id = "m3-dogfood-#{System.os_time()}-#{inspect(self())}-#{System.unique_integer([:positive])}"
     dir = Path.join(System.tmp_dir!(), test_id)
     File.mkdir_p!(dir)
 
-    # Deterministic per-test reference time: fixture is generated at
-    # setup time so the bounded currentness window
-    # (derived_at..valid_until) is always fresh relative to
-    # DateTime.utc_now() at Worker.propose invocation.
-    now_dt = @test_now_fn.()
+    # Single runtime anchor (M3-R1 fixture time-stability).
+    #
+    # The bounded currentness contract (Kiln.Worker.within_currentness_window?/1)
+    # uses DateTime.utc_now() and rejects when valid_until is in the past.
+    # We derive exactly ONE anchor here and reuse it for:
+    #   - the bounded Store `now` parameter
+    #   - eligibility derived_at
+    #   - eligibility valid_until (24h horizon; ≤ 168h product cap)
+    # so the fixture is always fresh at test-execution time without
+    # weakening the product contract.
+    now_dt = DateTime.utc_now() |> DateTime.truncate(:second)
     now_iso = DateTime.to_iso8601(now_dt)
-
-    on_exit(fn -> :ok end)
 
     # Open a real Store against a bounded SQLite file.
     {:ready, store} =
@@ -495,13 +488,13 @@ defmodule Kiln.M3DogfoodLifecycleTest do
     end
   end
 
-  # ---- Negative: expired eligibility is REJECTED (M4-Q1C M3_EXPIRED_ELIGIBILITY_REJECTED) ----
+  # ---- Negative: expired eligibility is REJECTED (M3_EXPIRED_ELIGIBILITY_REJECTED) ----
   #
-  # M3-R1 fixture is now time-stable (generated from @test_now_fn at
-  # setup time). This test deliberately supplies an EXPIRED eligibility
-  # and proves the bounded currentness contract still rejects it. The
-  # semantics are NOT weakened: valid_until must be strictly greater
-  # than DateTime.utc_now() for dispatch.
+  # M3-R1 fixture is now time-stable (generated from a single runtime
+  # `now_dt` anchor at setup time). This test deliberately supplies an
+  # EXPIRED eligibility and proves the bounded currentness contract
+  # still rejects it. The semantics are NOT weakened: valid_until must
+  # be strictly greater than DateTime.utc_now() for dispatch.
 
   @tag :m3_dogfood
   test "M3-R1 negative: expired eligibility is rejected (currentness contract preserved)", %{
