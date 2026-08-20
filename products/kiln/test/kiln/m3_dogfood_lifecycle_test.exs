@@ -156,11 +156,20 @@ defmodule Kiln.M3DogfoodLifecycleTest do
   defp short_id, do: :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
   defp long_id, do: :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
 
+  # Disposable Git repository path under the per-test `dir` provided by
+  # setup/1. Each test invocation gets its own unique tmp directory
+  # (created by setup/1) and registers an on_exit/1 callback that
+  # removes it. This fixture MUST NOT touch the source checkout.
+  defp disposable_repo_path(dir) do
+    Path.join(dir, "disposable_repo")
+  end
+
   # ---- M3-R1 lifecycle: full chain end-to-end ----
 
   @tag :m3_dogfood
   test "M3-R1: deterministic dogfood worker drives Worker.propose → verify → review → decide → apply chain", %{
     store: store,
+    dir: dir,
     now_iso: now_iso,
     now_dt: now_dt
   } do
@@ -187,7 +196,7 @@ defmodule Kiln.M3DogfoodLifecycleTest do
     # engineering decision was supplied by the test (not by a worker
     # reasoning about the repository — that is M3-R2).
     profile = profile_for()
-    repo_root = Path.expand("../support", File.cwd!())
+    repo_root = disposable_repo_path(dir)
 
     # Initialize the repository for the bounded Worker.propose/5 path.
     System.cmd("git", ["init", "-q", "--initial-branch=main", repo_root])
@@ -499,6 +508,7 @@ defmodule Kiln.M3DogfoodLifecycleTest do
   @tag :m3_dogfood
   test "M3-R1 negative: expired eligibility is rejected (currentness contract preserved)", %{
     store: store,
+    dir: dir,
     now_iso: _now_iso,
     now_dt: now_dt
   } do
@@ -507,7 +517,7 @@ defmodule Kiln.M3DogfoodLifecycleTest do
     Application.put_env(:kiln, :worker_provider_mode, :dogfood)
 
     profile = profile_for()
-    repo_root = Path.expand("../support", File.cwd!())
+    repo_root = disposable_repo_path(dir)
 
     System.cmd("git", ["init", "-q", "--initial-branch=main", repo_root])
     File.write!(
