@@ -1,7 +1,11 @@
 ---
 title: M2 — Temper Durable Acceptance Record
 description: Provenance, candidate SHA, and current regression authority for the M2 milestone.
-status: accepted
+status: historical
+verified_at_commit: de715bcdd7dbc42b3ea26441506f8576299ae39f
+source_paths:
+  - products/temper/scripts/m2_probe.sh
+  - products/kiln/test/kiln/decision_lifecycle_test.exs
 branch: work/temper-workbench-alpha
 m1_baseline: 5d152e7
 m2_candidate: de715bc

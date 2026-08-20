@@ -91,3 +91,25 @@ and rendering at 60-, 80-, 100-, and 128-column widths.
 
 See [docs/SOURCES.md](docs/SOURCES.md) for the field-level source map and the
 commands that produce each visible fact.
+
+## Two-track relationship
+
+This TypeScript product is the existing operator workbench on both historical
+two-track candidates. Candidate A0 adds the real daemon-backed Workbench Alpha,
+disconnect/reconnect, human decision, diff, and dogfood views. Candidate B0
+retains this product and separately adds `products/temper-elixir` for M4 Graph
+projection research. The Elixir surface has not been proven to replace this
+workbench. It is now visible to root checks but is not in the Lab service
+definition and currently violates the sibling-source-import boundary. Do not describe it as the
+canonical Temper replacement without a human architecture decision and a
+qualified interface.
+
+From the monorepo root, the shortest bounded local launcher is:
+
+```bash
+./invariant run /path/to/practice-repository
+```
+
+For historical candidate comparison, use `./invariant track create`, then
+`./invariant track use` or `./invariant track lab`; these verify the exact clean
+candidate before delegating to the existing public-boundary launcher.

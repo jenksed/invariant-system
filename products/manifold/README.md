@@ -51,3 +51,11 @@ or orchestration. Manifold continues to grow only when Invariant Development
 Loop v0 needs selection among more than one qualified intelligence
 configuration; the activated surface here is the minimal runtime allowed to
 support that bounded decision.
+
+## Two-track qualification note
+
+The selection-only implementation is identical in role across candidates A0
+and B0; its 17 deterministic tests passed on both. Graph support in B0 does not
+expand Manifold's authority and does not make it an orchestrator. Any future
+Graph-based selection input must arrive through an explicit contract rather
+than a sibling-product source import.

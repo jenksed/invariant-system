@@ -23,3 +23,9 @@ Before changing code:
 Read root `AGENTS.md` and the applicable product-local `AGENTS.md`. Keep commits bounded by ownership. Do not mix historical-record cleanup, runtime semantics, contract redesign, and unrelated refactors into one change.
 
 Before declaring completion, run the gates that prove the intended property and report anything you could not execute.
+
+For a short iteration loop, use `./invariant test changed HEAD --list` to inspect
+the conservative routing and `./invariant test changed <base>` to run it. Do not
+describe that result as the full gate. Dependency setup is project-local via
+`./invariant setup <target>`, and formatting is non-mutating unless
+`./invariant format <target> --write` is explicit.

@@ -4,10 +4,15 @@
 # Usage:
 #   ./invariant status                 repository and environment overview
 #   ./invariant doctor                 toolchain prerequisites check
+#   ./invariant setup [product]        install project-local dependencies
+#   ./invariant format TARGET [--write] check formatting; mutate only with --write
 #   ./invariant check                  fast structural checks
 #   ./invariant check boundaries       deterministic architecture-boundary checks
 #   ./invariant test [product]         canonical validation (default: all)
-#       products: arsenal loadout kiln temper integration
+#       products/profiles: arsenal loadout kiln temper manifold contracts
+#                          integration runtime tooling changed (graph on dev)
+#   ./invariant run REPOSITORY         start Kiln + Temper against a repository
+#   ./invariant track ...              create, test, run, or Lab-install A0/B0
 #   ./invariant docs check             documentation metadata/link/source checks
 #   ./invariant docs build             build static documentation HTML
 #   ./invariant docs dev               run local documentation development server
@@ -52,6 +57,9 @@ cmd_status() {
       say "  $p: MISSING"
     fi
   done
+  if [[ -d products/temper-elixir ]]; then
+    say "  temper-elixir: products/temper-elixir (experimental)"
+  fi
   say "runtimes:"
   say "  git:     $(version_of git --version)"
   say "  node:    $(version_of node --version)"
@@ -234,7 +242,6 @@ check_boundaries() {
     # Activated source must not import subprocess/socket/urllib/requests/
     # http.client/asyncio/multiprocessing/ctypes/os — selection is pure
     # stdlib data in/out with no process/network/environment surface.
-    local src_test_glob='products/manifold/{src,tests}'
     local bad_imports
     bad_imports=$(rg -n 'subprocess|socket|urllib|requests|http\.client|asyncio|multiprocessing|ctypes|import\s+os\b' \
       -g 'products/manifold/src/**' -g 'products/manifold/tests/**' \
@@ -260,6 +267,20 @@ check_boundaries() {
     bad "temper src references sibling product trees"
   else
     ok "temper has no sibling-product source coupling"
+  fi
+
+  # 4b. The experimental Elixir Temper surface is still a product boundary.
+  # A path dependency or source reference into Kiln makes tests pass by
+  # compilation coupling rather than by a canonical contract/public API.
+  if [[ -d products/temper-elixir ]]; then
+    local temper_elixir_coupling
+    temper_elixir_coupling=$(rg -n '(path:[[:space:]]*"\.\./kiln"|\.\./kiln|products/kiln)' \
+      products/temper-elixir/mix.exs products/temper-elixir/lib 2>/dev/null || true)
+    if [[ -n "$temper_elixir_coupling" ]]; then
+      bad "temper-elixir references Kiln source directly: $temper_elixir_coupling"
+    else
+      ok "temper-elixir has no sibling-product source coupling"
+    fi
   fi
 
   # 5. Canonical contracts live exactly once, at contracts/.
@@ -333,6 +354,15 @@ test_temper() {
   (cd products/temper && npm run ci)
 }
 
+test_temper_elixir() {
+  [[ -d products/temper-elixir ]] || fail "products/temper-elixir is not present on this track"
+  (cd products/temper-elixir
+  [[ -d deps ]] || mix deps.get
+  mix format --check-formatted mix.exs 'lib/**/*.{ex,exs}' 'test/**/*.{ex,exs}'
+  mix compile --warnings-as-errors
+  mix test)
+}
+
 test_integration() {
   ./integration/scenarios/repository-recon/run.sh
 }
@@ -359,23 +389,242 @@ print(f'MANIFEST ok: {len(entries)} entries')
 "
 }
 
+test_runtime() {
+  ./integration/scenarios/wp-08-session-restart/run.sh
+  ./integration/scenarios/wp-09-temper-rpc/run.sh
+}
+
+test_graph() {
+  [[ -d products/temper-elixir ]] || fail "Graph profile requires products/temper-elixir"
+  (cd products/kiln
+  [[ -d deps ]] || mix deps.get
+  env -u MINIMAX_API_KEY mix test \
+    test/kiln/m4_a_graph_projection_test.exs \
+    test/kiln/m4_p0_truth_contract_test.exs \
+    test/kiln/freshness_test.exs \
+    test/kiln/header_priority_test.exs \
+    test/kiln/why_packet_test.exs \
+    test/kiln/integration_hygiene_regression_test.exs)
+  test_temper_elixir
+}
+
+test_tooling() {
+  bash -n invariant scripts/two-track scripts/temper-live
+  if have shellcheck; then
+    shellcheck invariant scripts/two-track scripts/temper-live
+  else
+    say "note: shellcheck unavailable; bash syntax still checked"
+  fi
+  ./scripts/two-track doctor
+  ./scripts/two-track list >/dev/null
+  ./scripts/two-track help >/dev/null
+  ./scripts/temper-live --help >/dev/null
+  say "tooling smoke: PASS"
+}
+
+add_changed_target() {
+  local wanted=$1 existing
+  for existing in "${CHANGED_TARGETS[@]:-}"; do
+    [[ "$existing" == "$wanted" ]] && return 0
+  done
+  CHANGED_TARGETS+=("$wanted")
+}
+
+test_changed() {
+  local base=${1:-origin/main} mode=${2:-} changed_files file target rc=0
+  CHANGED_TARGETS=()
+
+  [[ -z "$mode" || "$mode" == "--list" ]] \
+    || fail "changed-test usage: ./invariant test changed [BASE] [--list]"
+
+  git rev-parse --verify "${base}^{commit}" >/dev/null 2>&1 \
+    || fail "changed-test base is not a local commit: $base"
+
+  changed_files=$({
+    git diff --name-only "$base"...HEAD
+    git diff --name-only
+    git diff --cached --name-only
+    git ls-files --others --exclude-standard
+  } | sort -u)
+
+  if [[ -z "$changed_files" ]]; then
+    say "changed-test: no changed files relative to $base"
+    return 0
+  fi
+
+  while IFS= read -r file; do
+    case "$file" in
+      contracts/*|invariant.boundaries.json)
+        add_changed_target all
+        ;;
+      integration/*)
+        add_changed_target all
+        ;;
+      products/*/README.md) add_changed_target docs ;;
+      products/*/AGENTS.md) add_changed_target tooling ;;
+      products/arsenal/*) add_changed_target arsenal ;;
+      products/loadout/*) add_changed_target loadout ;;
+      products/kiln/lib/kiln/graph_projection.ex|products/kiln/lib/kiln/why_packet.ex|products/kiln/lib/kiln/freshness.ex|products/kiln/lib/kiln/header_priority.ex|products/kiln/lib/kiln/domain/subject_identity.ex|products/kiln/test/kiln/m4_*|products/kiln/test/kiln/freshness_test.exs|products/kiln/test/kiln/header_priority_test.exs|products/kiln/test/kiln/why_packet_test.exs)
+        add_changed_target kiln
+        add_changed_target graph
+        ;;
+      products/kiln/*) add_changed_target kiln ;;
+      products/temper-elixir/*) add_changed_target graph ;;
+      products/temper/*) add_changed_target temper ;;
+      products/manifold/*) add_changed_target manifold ;;
+      docs/*|README.md|MIGRATION-REPORT.md)
+        add_changed_target docs
+        ;;
+      invariant|scripts/*|.editorconfig|.gitignore|AGENTS.md)
+        add_changed_target tooling
+        ;;
+      *) add_changed_target all ;;
+    esac
+  done <<< "$changed_files"
+
+  say "changed-test base: $base"
+  say "changed files:"
+  while IFS= read -r file; do say "  $file"; done <<< "$changed_files"
+  say "selected fast-feedback gates:"
+  for target in "${CHANGED_TARGETS[@]}"; do say "  $target"; done
+  say "note: changed-test is feedback, not promotion qualification; use ./invariant test for the canonical gate"
+
+  if [[ "$mode" == "--list" ]]; then
+    return 0
+  fi
+
+  if ! check_structure; then rc=1; fi
+  if ! check_boundaries; then rc=1; fi
+
+  for target in "${CHANGED_TARGETS[@]}"; do
+    case "$target" in
+      docs) if ! cmd_docs check; then rc=1; fi ;;
+      tooling) if ! test_tooling; then rc=1; fi ;;
+      all) if ! cmd_test all; then rc=1; fi ;;
+      *) if ! cmd_test "$target"; then rc=1; fi ;;
+    esac
+  done
+  return "$rc"
+}
+
 cmd_test() {
   local target=${1:-all}
   case "$target" in
-    arsenal|loadout|kiln|temper|manifold|integration|contracts) "test_$target" ;;
+    arsenal|loadout|kiln|temper|temper-elixir|manifold|integration|contracts|runtime|graph|tooling)
+      "test_${target//-/_}"
+      ;;
+    changed)
+      local changed_base=${2:-origin/main} changed_mode=${3:-}
+      if [[ "$changed_base" == "--list" ]]; then
+        changed_base=origin/main
+        changed_mode=--list
+      fi
+      test_changed "$changed_base" "$changed_mode"
+      ;;
     all)
       test_arsenal
       test_loadout
       test_kiln
       test_temper
+      if [[ -d products/temper-elixir ]]; then
+        test_temper_elixir
+      fi
       test_manifold
       test_contracts
       test_integration
       say ""
       say "invariant test: all products passed"
       ;;
-    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|manifold|integration|contracts)" ;;
+    *) fail "unknown test target: $target (expected: all|arsenal|loadout|kiln|temper|temper-elixir|manifold|integration|contracts|runtime|graph|tooling|changed)" ;;
   esac
+}
+
+setup_one() {
+  case "$1" in
+    arsenal)
+      say "arsenal: no package-manager install; doctor checks required Python modules"
+      ;;
+    loadout|temper)
+      (cd "products/$1" && npm ci)
+      ;;
+    kiln)
+      (cd products/kiln && mix deps.get)
+      ;;
+    temper-elixir)
+      [[ -d products/temper-elixir ]] || fail "products/temper-elixir is not present"
+      (cd products/temper-elixir && mix deps.get)
+      ;;
+    manifold)
+      say "manifold: stdlib-only; no dependency install"
+      ;;
+    docs)
+      (cd docs-site && npm ci)
+      ;;
+    *) fail "unknown setup target: $1 (expected: all|arsenal|loadout|kiln|temper|temper-elixir|manifold|docs)" ;;
+  esac
+}
+
+cmd_setup() {
+  local target=${1:-all} setup_target
+  if [[ "$target" == "all" ]]; then
+    for setup_target in arsenal loadout kiln temper manifold docs; do
+      setup_one "$setup_target"
+    done
+    if [[ -d products/temper-elixir ]]; then setup_one temper-elixir; fi
+  else
+    setup_one "$target"
+  fi
+}
+
+format_one() {
+  local target=$1 write=$2
+  case "$target" in
+    loadout)
+      if (( write == 1 )); then
+        (cd products/loadout && npm run format)
+      else
+        (cd products/loadout && npm run format:check)
+      fi
+      ;;
+    kiln)
+      if (( write == 1 )); then
+        (cd products/kiln && mix format)
+      else
+        (cd products/kiln && mix format --check-formatted)
+      fi
+      ;;
+    temper-elixir)
+      [[ -d products/temper-elixir ]] || fail "products/temper-elixir is not present"
+      if (( write == 1 )); then
+        (cd products/temper-elixir && mix format mix.exs 'lib/**/*.{ex,exs}' 'test/**/*.{ex,exs}')
+      else
+        (cd products/temper-elixir && mix format --check-formatted mix.exs 'lib/**/*.{ex,exs}' 'test/**/*.{ex,exs}')
+      fi
+      ;;
+    *) fail "no canonical formatter for '$target' (supported: all|loadout|kiln|temper-elixir)" ;;
+  esac
+}
+
+cmd_format() {
+  local target=${1:-} write=0
+  [[ -n "$target" ]] || fail "format requires a target: all|loadout|kiln|temper-elixir"
+  shift || true
+  if [[ "${1:-}" == "--write" ]]; then
+    write=1
+    shift
+  fi
+  [[ $# -eq 0 ]] || fail "format usage: ./invariant format TARGET [--write]"
+
+  if (( write == 0 )); then
+    say "format: check-only (pass --write to modify files)"
+  fi
+  if [[ "$target" == "all" ]]; then
+    format_one loadout "$write"
+    format_one kiln "$write"
+    if [[ -d products/temper-elixir ]]; then format_one temper-elixir "$write"; fi
+  else
+    format_one "$target" "$write"
+  fi
 }
 
 cmd_docs() {
@@ -396,12 +645,23 @@ cmd_docs() {
   esac
 }
 
+cmd_run() {
+  [[ $# -ge 1 ]] || fail "run requires a repository path (try: ./invariant run /path/to/repository)"
+  exec "$ROOT/scripts/temper-live" "$@"
+}
+
+cmd_track() {
+  exec "$ROOT/scripts/two-track" "$@"
+}
+
 main() {
   local cmd=${1:-help}
   shift || true
   case "$cmd" in
     status)  cmd_status ;;
     doctor)  cmd_doctor ;;
+    setup)   cmd_setup "$@" ;;
+    format)  cmd_format "$@" ;;
     check)
       if [[ "${1:-}" == "boundaries" ]]; then
         check_boundaries
@@ -412,9 +672,11 @@ main() {
       fi
       ;;
     test)    cmd_test "$@" ;;
+    run)     cmd_run "$@" ;;
+    track)   cmd_track "$@" ;;
     docs)    cmd_docs "$@" ;;
     help|--help|-h)
-      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'
       ;;
     *) fail "unknown command: $cmd (try: ./invariant help)" ;;
   esac
