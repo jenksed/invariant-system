@@ -80,9 +80,11 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
       try {
         await connection.startSession(intent, options.actorId ?? 'temper_operator');
         // Transition: replace Home with Work.
-        runtime.replace(workScreen(intent));
+        const nextScreen = workScreen(intent);
+        workState = setWorkProjection(nextScreen.init() as WorkState, connection.current());
+        runtime.replace(nextScreen);
         active = 'work';
-        if (workState) runtime.setTopState(workState);
+        runtime.setTopState(workState);
         return { ok: true };
       } catch (err) {
         return { ok: false, error: (err as Error).message };
@@ -203,7 +205,13 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     });
   }
 
+  // Keep the orchestration mirror initialized alongside the runtime's copy.
+  // Projection callbacks arrive asynchronously after `connection.open()`;
+  // leaving this mirror null strands the UI on the splash forever because
+  // there is no state object to hydrate and hand back to the runtime.
+  homeState = homeScreen.init() as HomeState;
   runtime.push(homeScreen);
+  runtime.setTopState(homeState);
 
   // Wire projection updates into the active screen state. Both
   // screens always receive the latest projection so the Work screen
@@ -254,8 +262,12 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
   try {
     await connection.open();
   } catch (err) {
-    runtime.stop();
     if (options.once) {
+      runtime.stop();
+      await connection.stop();
+      unsubProjection();
+      unsubActivity();
+      unsubConnection();
       process.stderr.write(`temper: ${(err as Error).message}\n`);
       return 1;
     }
@@ -271,13 +283,25 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     await connection.stop();
     unsubProjection();
     unsubActivity();
+    unsubConnection();
     return 0;
   }
 
   await new Promise<void>((resolve) => {
-    process.stdin.on('end', () => resolve());
-    process.on('SIGINT', () => resolve());
-    process.on('SIGTERM', () => resolve());
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      offClose();
+      process.stdin.off('end', finish);
+      process.off('SIGINT', finish);
+      process.off('SIGTERM', finish);
+      resolve();
+    };
+    const offClose = runtime.onClose(finish);
+    process.stdin.once('end', finish);
+    process.once('SIGINT', finish);
+    process.once('SIGTERM', finish);
   });
 
   runtime.stop();

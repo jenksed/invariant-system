@@ -230,16 +230,22 @@ test('runtime: push + key dispatch + render', () => {
   void out;
 });
 
-test('runtime: quit message closes the runtime', () => {
+test('runtime: quit message closes the runtime and notifies once', () => {
   const { runtime, out, input } = makeRuntime();
   const { screen } = makeCountScreen('home');
+  let closeCount = 0;
+  runtime.onClose(() => {
+    closeCount += 1;
+  });
   runtime.push(screen);
   input.write('q');
   // After the quit message, runtime.stop() should have written the
   // SHOW_CURSOR escape; subsequent renders should be no-ops.
   const text = out.collected;
   assert.match(text, /\x1b\[\?25h/);
+  assert.equal(closeCount, 1);
   runtime.stop();
+  assert.equal(closeCount, 1);
 });
 
 test('runtime: alt-screen writes enter code on start', () => {

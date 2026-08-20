@@ -59,6 +59,7 @@ export class TuiRuntime {
   private cols: number;
   private rows: number;
   private closed = false;
+  private readonly closeListeners = new Set<() => void>();
   private attached = false;
   private onStdoutData?: (chunk: string) => void;
   private onStdinData?: (chunk: Buffer | string) => void;
@@ -180,6 +181,22 @@ export class TuiRuntime {
     if (this.onResize && typeof this.out.off === 'function') {
       this.out.off('resize', this.onResize);
     }
+    for (const listener of this.closeListeners) {
+      listener();
+    }
+    this.closeListeners.clear();
+  }
+
+  /** Subscribe to terminal closure (including the screen-level quit action). */
+  onClose(listener: () => void): () => void {
+    if (this.closed) {
+      queueMicrotask(listener);
+      return () => {};
+    }
+    this.closeListeners.add(listener);
+    return () => {
+      this.closeListeners.delete(listener);
+    };
   }
 
   /** Install the input listener if not already installed. */
