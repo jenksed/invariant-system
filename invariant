@@ -128,11 +128,20 @@ cmd_doctor() {
     fi
   done
 
-  # 3. MINIMAX_API_KEY presence only — value is NEVER printed.
-  # Credential presence is a configuration fact, NOT provider health.
-  # Do not report presence as proof of live dispatch.
-  if [[ -n "${MINIMAX_API_KEY:-}" ]]; then
-    printf 'ok       credential   MINIMAX_API_KEY present (value not shown)\n'
+  # 3. MINIMAX_API_KEY presence only — value is NEVER printed, even
+  # under `bash -x`. Credential presence is a configuration fact, NOT
+  # provider health. Do not report presence as proof of live dispatch.
+  #
+  # The check uses two non-value-revealing constructs so the trace
+  # line never expands the secret:
+  #   - ${MINIMAX_API_KEY+set} returns "set" or "" based on existence
+  #   - ${#MINIMAX_API_KEY} returns the byte length, not the value
+  cred_present=0
+  if [[ "${MINIMAX_API_KEY+set}" == "set" ]] && (( ${#MINIMAX_API_KEY} > 0 )); then
+    cred_present=1
+  fi
+  if (( cred_present == 1 )); then
+    printf 'ok       credential   MINIMAX_API_KEY present (length=%d)\n' "${#MINIMAX_API_KEY}"
   else
     printf 'note     credential   MINIMAX_API_KEY not set (live dispatch unavailable; deterministic fakes still supported)\n'
   fi
@@ -147,10 +156,21 @@ cmd_doctor() {
 
   # 5. Pinned Kiln toolchain line (products/kiln/mise.toml) vs detected
   #    Erlang / Elixir versions. Display only.
-  pinned_erlang=$(grep -E '^erlang *=' products/kiln/mise.toml 2>/dev/null | sed -E 's/.*"([0-9.]+)".*/\1/' | head -1)
-  pinned_elixir=$(grep -E '^elixir *=' products/kiln/mise.toml 2>/dev/null | sed -E 's/.*"([0-9.ot-]+)".*/\1/' | head -1)
-  detected_erlang=$(if have elixir; then elixir --version 2>/dev/null | grep -oE 'Erlang [0-9.]+' | head -1 | awk '{print $2}'; fi)
-  detected_elixir=$(if have elixir; then elixir --version 2>/dev/null | grep -oE 'Elixir [0-9.]+' | head -1 | awk '{print $2}'; fi)
+  #
+  # Pinned extraction: split on the first double-quote pair after `=`.
+  # This is a minimal deterministic field extraction; no fragile regex.
+  pinned_erlang=$(awk -F'"' '/^erlang *=/ {print $2; exit}' products/kiln/mise.toml 2>/dev/null)
+  pinned_elixir=$(awk -F'"' '/^elixir *=/ {print $2; exit}' products/kiln/mise.toml 2>/dev/null)
+  #
+  # Detected extraction: query the runtime directly. No banner parsing.
+  # `set +e` around the call so a missing or failing elixir does not
+  # abort the doctor under `set -e`/`pipefail`.
+  detected_erlang=""
+  detected_elixir=""
+  if have elixir; then
+    detected_erlang=$(set +e; elixir -e 'IO.write(System.otp_release())' 2>/dev/null)
+    detected_elixir=$(set +e; elixir -e 'IO.write(System.version())' 2>/dev/null)
+  fi
   printf 'info     kiln-pinned   mise.toml: erlang=%s elixir=%s; detected: erlang=%s elixir=%s\n' \
     "${pinned_erlang:-?}" "${pinned_elixir:-?}" "${detected_erlang:-?}" "${detected_elixir:-?}"
 

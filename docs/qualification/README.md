@@ -77,9 +77,12 @@ mise --cd products/kiln exec -- elixir --version
 mise --cd products/kiln exec -- mix --version
 # expect: Mix 1.20.2 (compiled with Erlang/OTP 28)
 
-# 4. Node 22.x
+# 4. Node contract
 node --version
-# expect: v22.x.x
+# expect: v22.x.x (>= 22.0.0 per products/temper/package.json)
+# The repository does not pin Node to an exact version. The
+# qualification rule is: NODE_VERSION >= 22.0.0. Record the actual
+# version observed.
 
 # 5. monorepo status under the pinned runtime
 mise --cd products/kiln exec -- "$REPO_ROOT/invariant" status
@@ -88,9 +91,13 @@ mise --cd products/kiln exec -- "$REPO_ROOT/invariant" status
 
 # 6. doctor under the pinned runtime (shows pinned-vs-detected comparison)
 mise --cd products/kiln exec -- "$REPO_ROOT/invariant" doctor
-# expect:
+# expect exit 0 only when every required prerequisite is satisfied.
+# At minimum the following lines must be present:
 #   ok       elixir     Elixir 1.20.2 (compiled with Erlang/OTP 28)
 #   info     kiln-pinned   mise.toml: erlang=28.4 elixir=1.20.2-otp-28; detected: erlang=28 elixir=1.20.2
+# The credential line must be present in the `length=N` form, not
+# in any form that prints the value. Example acceptable line:
+#   ok       credential   MINIMAX_API_KEY present (length=N)
 
 # 7. boundary check (deterministic, no network)
 mise --cd products/kiln exec -- "$REPO_ROOT/invariant" check boundaries
