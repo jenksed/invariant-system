@@ -35,6 +35,7 @@ defmodule Kiln.GraphProjection do
           required(:canonical_digest) => String.t(),
           required(:attention) => attention(),
           required(:proposed) => boolean(),
+          required(:lifecycle_scope) => String.t() | nil,
           required(:metadata) => map()
         }
 
@@ -43,6 +44,9 @@ defmodule Kiln.GraphProjection do
           required(:kind) => edge_kind(),
           required(:from) => node_id(),
           required(:to) => node_id(),
+          required(:direction) => :forward | :backward,
+          required(:lifecycle_scope) => String.t() | nil,
+          required(:canonical_basis) => String.t(),
           required(:proposed) => boolean()
         }
 
@@ -210,17 +214,70 @@ defmodule Kiln.GraphProjection do
         edges
 
       true ->
+        scope = lifecycle_scope(from, to)
+        basis = canonical_basis(kind)
+
         edge = %{
           id: "edg_#{kind}_#{node_id_of(from)}_#{node_id_of(to)}",
           kind: kind,
           from: node_id_of(from),
           to: node_id_of(to),
+          direction: :forward,
+          lifecycle_scope: scope,
+          canonical_basis: basis,
           proposed: false
         }
 
         [edge | edges]
     end
   end
+
+  defp lifecycle_scope(from, to) do
+    # Lifecycle scope is derivable when both endpoints share a
+    # base_commit OR share an attempt_ref.id. The scope identifier
+    # is the shared base_commit when present, else the shared
+    # attempt_ref id. Nil when no lineage can be proven.
+    base_from = Map.get(from, :base_commit) || Map.get(from, "base_commit")
+    base_to = Map.get(to, :base_commit) || Map.get(to, "base_commit")
+
+    cond do
+      is_binary(base_from) and is_binary(base_to) and base_from == base_to and byte_size(base_from) > 0 ->
+        "base:" <> base_from
+
+      attemp_refs_match?(from, to) ->
+        "attempt:" <> (get_attempt_id(from) || "unknown")
+
+      true ->
+        nil
+    end
+  end
+
+  defp attemp_refs_match?(from, to) do
+    from_id = get_attempt_id(from)
+    to_id = get_attempt_id(to)
+
+    is_binary(from_id) and is_binary(to_id) and from_id == to_id and byte_size(from_id) > 0
+  end
+
+  defp get_attempt_id(envelope) do
+    attempt_ref = Map.get(envelope, :attempt_ref) || Map.get(envelope, "attempt_ref")
+
+    case attempt_ref do
+      %{"id" => id} when is_binary(id) -> id
+      %{id: id} when is_binary(id) -> id
+      _ -> nil
+    end
+  end
+
+  defp canonical_basis("VERIFIED"), do: "verification_result.patch_ref"
+  defp canonical_basis("REVIEWED"), do: "review.patch_ref"
+  defp canonical_basis("ASSESSED"), do: "review.verifier_ref"
+  defp canonical_basis("DECIDED_ON"), do: "human_decision.patch_ref"
+  defp canonical_basis("AUTHORIZED"), do: "human_decision.review_ref"
+  defp canonical_basis("APPLIED"), do: "patch_evidence.patch_ref"
+  defp canonical_basis("APPLIED_AFTER"), do: "patch_evidence.decision_ref"
+  defp canonical_basis("PRODUCED"), do: "patch_proposal.build/4(worker_output, ...)"
+  defp canonical_basis(other), do: other
 
   defp node_id_of(%{id: id}), do: id
   defp node_id_of(%{"id" => id}), do: id
@@ -235,6 +292,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: wo.semantic_digest,
       attention: "WORKING",
       proposed: false,
+      lifecycle_scope: lifecycle_scope_from_base(wo.base_commit),
       metadata: %{
         attempt_ref: wo.attempt_ref,
         base_commit: wo.base_commit
@@ -250,6 +308,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: pp.patch_digest,
       attention: attention_for_proposal(pp),
       proposed: false,
+      lifecycle_scope: lifecycle_scope_from_base(pp.base_commit),
       metadata: %{
         plan_ref: pp.plan_ref,
         repository: pp.repository
@@ -265,6 +324,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: vr.semantic_digest,
       attention: attention_for_verification(vr),
       proposed: false,
+      lifecycle_scope: nil,
       metadata: %{
         result_state_digest: vr.result_state_digest,
         status: vr.status
@@ -280,6 +340,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: r.semantic_digest,
       attention: attention_for_review(r),
       proposed: false,
+      lifecycle_scope: nil,
       metadata: %{
         verdict: r.verdict,
         implementer_transcript_received: r.implementer_transcript_received
@@ -295,6 +356,7 @@ defmodule Kiln.GraphProjection do
       canonical_digest: hd.semantic_digest,
       attention: "COMPLETE",
       proposed: false,
+      lifecycle_scope: nil,
       metadata: %{
         decision: hd.decision
       }
@@ -309,12 +371,17 @@ defmodule Kiln.GraphProjection do
       canonical_digest: pe.semantic_digest,
       attention: "COMPLETE",
       proposed: false,
+      lifecycle_scope: nil,
       metadata: %{
         effect: pe.effect,
         post_state_digest: pe.post_state_digest
       }
     }
   end
+
+  defp lifecycle_scope_from_base(nil), do: nil
+  defp lifecycle_scope_from_base(""), do: nil
+  defp lifecycle_scope_from_base(base) when is_binary(base), do: "base:" <> base
 
   defp attention_for_proposal(_), do: "WORKING"
   defp attention_for_verification(%{status: :PASS}), do: "WORKING"
