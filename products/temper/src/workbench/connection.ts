@@ -25,7 +25,7 @@ import type { ActivityNotificationFrame, KilnClientConfig, ProjectOpenResult } f
 import type { WorkbenchProjection } from './projection.js';
 import { applySessionQuery, projectionFromProjectOpen } from './projection.js';
 import { sessionQuery } from './session_query.js';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 export interface WorkbenchConnectionConfig extends KilnClientConfig {
   repository: string;
@@ -287,8 +287,7 @@ function buildProjectObservation(repositoryRoot: string): {
 } {
   // SHA-256 of the absolute path; matches the bounded convention used
   // by the CLI's build_project_observation/1.
-  const crypto = require('node:crypto') as typeof import('node:crypto');
-  const hash = crypto.createHash('sha256').update(repositoryRoot).digest('hex');
+  const hash = createHash('sha256').update(repositoryRoot).digest('hex');
   return {
     repository_root: repositoryRoot,
     repository_fingerprint: `sha256:${hash}`,
