@@ -14,6 +14,8 @@ audience:
 # Development
 
 - [Evidence-driven engineering process](engineering-process.md) — the governing change loop and work-package contract.
+- [Developer loop](developer-loop.md) — setup, fast changed-file feedback, formatting, local operation, and canonical escalation.
+- [Two-track branch reconciliation ledger](branch-reconciliation.md)
 - [Repository layout](repository-layout.md)
 - [Architecture boundaries](architecture-boundaries.md)
 - [Contracts](contracts.md)

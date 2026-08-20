@@ -100,3 +100,13 @@ It must not:
 - absorb Manifold selection semantics merely because selection becomes convenient.
 
 See `../../docs/products/loadout/index.md` and `../../docs/architecture/product-boundaries.md` for the system-level view.
+
+## Two-track qualification note
+
+Loadout is materially the same planning owner in candidates A0 and B0. Its
+canonical gate passed 140 tests on both candidates, and the real
+Loadout→Kiln→Temper integration scenario passed without simulation. That
+evidence proves the bounded handoff path; it does not qualify either complete
+candidate or grant Loadout runtime authority. Graph facts in B0 remain
+downstream execution/projection concerns and do not alter this product's
+contract.

@@ -18,5 +18,6 @@ audience:
 - [Commands](commands.md)
 - [Contracts](contracts.md)
 - [Engineering traceability](traceability.md)
+- [Two-track current-system inventory](current-system-inventory.md)
 - [Status model](status-model.md)
 - [Terminology](terminology.md)

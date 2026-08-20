@@ -502,3 +502,15 @@ python3 scripts/arsenal_audit.py --write-catalog
 Project Arsenal is not finished becoming a capability system.
 
 It is already useful while it gets there.
+
+---
+
+## Two-track qualification note
+
+Arsenal and Bench remain the engineering-intelligence and qualification owners
+on both historical candidates; neither gains execution authority from the
+Graph delta. Their deterministic root-runner suites passed during the A0/B0
+assessment. The unique `research/arsenal-program-foundation` branch remains
+research infrastructure: preserve it, then selectively review portable
+evidence/harness work for `dev` rather than treating research existence as
+product promotion.

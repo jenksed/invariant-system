@@ -24,6 +24,19 @@ This page is intentionally harder to impress than a roadmap.
 
 The table below remains bound to `verified_at_commit`. Active local/worktree engineering may be newer. Reported milestone completion does not advance this table until the implementation, tests/evidence, accepted candidate state, and relevant decision are inspectable from the documented repository context.
 
+## Two-track qualification notice
+
+The pre-Graph `main` lineage is rooted at candidate A0
+(`0c6ed3ad39c6a9a8808a37c8728c56f3dcd254af`) and Graph-enabled `dev`
+is rooted at B0 (`5e7b0134d5e901603904ca5b1f4f3f16d4a472ec`). Both historical
+runtime candidates are **NOT QUALIFIED**. Publishing documentation and
+developer tooling on those branch lines does not advance this canonical status
+matrix or turn branch identity into acceptance evidence. A0 fails the
+canonical Kiln gate; B0 also fails shared Kiln tests and its Elixir Temper
+experiment crosses the Kiln source boundary. See [the two-track qualification record](qualification/two-track-qualification.md)
+for exact evidence and [the candidate inventory](reference/current-system-inventory.md)
+for the material capability delta.
+
 | Area | Status | Works today | Partial / bounded | Not yet |
 | --- | --- | --- | --- | --- |
 | Invariant root | **current** | one Git root; root status/doctor/check/test delegation; machine-readable boundary policy | docs foundation/process traceability is new | no claim of full product loop on this verified state |

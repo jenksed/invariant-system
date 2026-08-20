@@ -1,0 +1,393 @@
+#!/usr/bin/env bash
+# two-track — reproducible access to the historical A0/B0 candidates.
+# Invoked through `./invariant track`; not a second root entry point.
+
+set -euo pipefail
+
+SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
+ROOT=$(cd "$SCRIPT_DIR/.." && pwd -P)
+
+MAIN_SHA="0c6ed3ad39c6a9a8808a37c8728c56f3dcd254af"
+DEV_SHA="5e7b0134d5e901603904ca5b1f4f3f16d4a472ec"
+
+say() { printf '%s\n' "$*"; }
+fail() { printf 'invariant track: %s\n' "$1" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+Invariant two-track helper
+
+Historical candidates (not qualified canonical refs):
+  main  0c6ed3ad39c6a9a8808a37c8728c56f3dcd254af  pre-Graph A0
+  dev   5e7b0134d5e901603904ca5b1f4f3f16d4a472ec  Graph-enabled B0
+
+Usage:
+  ./invariant track list
+  ./invariant track doctor [LAB_ROOT]
+  ./invariant track create <main|dev> DESTINATION
+  ./invariant track inspect <main|dev> SOURCE_WORKTREE
+  ./invariant track test <main|dev> SOURCE_WORKTREE [PROFILE] [--output DIR]
+  ./invariant track use <main|dev> SOURCE_WORKTREE TARGET_REPOSITORY [TEMPER_ARGS...]
+  ./invariant track lab <main|dev> SOURCE_WORKTREE LAB_ROOT
+
+Test profiles:
+  smoke          status, doctor, structure, and boundary checks
+  full           smoke plus the canonical full root suite
+  runtime        public daemon/RPC restart and Temper RPC scenarios
+  graph          focused Graph + Temper-Elixir suite (dev only)
+  qualification  smoke + full + runtime (+ graph for dev); default
+
+Properties:
+  - exact immutable candidate identities; no fetch or branch/ref movement
+  - clean source required before test/use/Lab installation
+  - MINIMAX_API_KEY removed from qualification commands
+  - every test gate writes a log and summary; failures do not hide later gates
+  - no live provider tests, push, merge, reset, worktree removal, or Lab destroy
+USAGE
+}
+
+track_sha() {
+  case "$1" in
+    main) printf '%s\n' "$MAIN_SHA" ;;
+    dev) printf '%s\n' "$DEV_SHA" ;;
+    *) fail "unknown track '$1' (expected main or dev)" ;;
+  esac
+}
+
+track_description() {
+  case "$1" in
+    main) printf '%s\n' "pre-Graph conservative candidate A0" ;;
+    dev) printf '%s\n' "Graph-enabled development candidate B0" ;;
+    *) fail "unknown track '$1' (expected main or dev)" ;;
+  esac
+}
+
+absolute_existing_dir() {
+  [[ -d "$1" ]] || fail "directory does not exist: $1"
+  (cd "$1" && pwd -P)
+}
+
+validate_source() {
+  local track=$1
+  local source=$2
+  local expected actual dirty
+  expected=$(track_sha "$track")
+  source=$(absolute_existing_dir "$source")
+
+  git -C "$source" rev-parse --is-inside-work-tree >/dev/null 2>&1 \
+    || fail "source is not a Git worktree: $source"
+  actual=$(git -C "$source" rev-parse HEAD)
+  [[ "$actual" == "$expected" ]] \
+    || fail "$track source HEAD is $actual; expected $expected"
+
+  dirty=$(git -C "$source" status --porcelain)
+  [[ -z "$dirty" ]] \
+    || fail "$track source is dirty; use a clean exact-candidate worktree"
+
+  [[ -x "$source/invariant" ]] || fail "source has no executable ./invariant: $source"
+  printf '%s\n' "$source"
+}
+
+cmd_list() {
+  printf '%-6s %-40s %-15s %s\n' TRACK SHA VERDICT DESCRIPTION
+  printf '%-6s %-40s %-15s %s\n' main "$MAIN_SHA" NOT_QUALIFIED "$(track_description main)"
+  printf '%-6s %-40s %-15s %s\n' dev "$DEV_SHA" NOT_QUALIFIED "$(track_description dev)"
+  say ""
+  say "Published refs are not changed by this helper."
+}
+
+cmd_doctor() {
+  [[ $# -le 1 ]] || fail "doctor usage: ./invariant track doctor [LAB_ROOT]"
+  local rc=0 candidate_sha candidate_name lab_root="${1:-}"
+
+  for candidate_name in main dev; do
+    candidate_sha=$(track_sha "$candidate_name")
+    if git -C "$ROOT" cat-file -e "${candidate_sha}^{commit}" 2>/dev/null; then
+      printf 'ok       %-8s %s\n' "$candidate_name" "$candidate_sha"
+    else
+      printf 'MISSING  %-8s %s\n' "$candidate_name" "$candidate_sha"
+      rc=1
+    fi
+  done
+
+  if git -C "$ROOT" merge-base --is-ancestor "$MAIN_SHA" "$DEV_SHA" 2>/dev/null; then
+    printf 'ok       ancestry main candidate is an ancestor of dev candidate\n'
+  else
+    printf 'FAIL     ancestry expected main candidate to be an ancestor of dev candidate\n'
+    rc=1
+  fi
+
+  for candidate_sha in "$MAIN_SHA" "$DEV_SHA"; do
+    for required_surface in invariant scripts/temper-live; do
+      if ! git -C "$ROOT" cat-file -e "${candidate_sha}:${required_surface}" 2>/dev/null; then
+        printf 'MISSING  surface  %s:%s\n' "$candidate_sha" "$required_surface"
+        rc=1
+      fi
+    done
+  done
+  if git -C "$ROOT" cat-file -e "${MAIN_SHA}:products/temper-elixir" 2>/dev/null; then
+    printf 'FAIL     topology main candidate unexpectedly contains temper-elixir\n'
+    rc=1
+  else
+    printf 'ok       topology main is pre-Graph (no products/temper-elixir)\n'
+  fi
+  if git -C "$ROOT" cat-file -e "${DEV_SHA}:products/temper-elixir" 2>/dev/null; then
+    printf 'ok       topology dev contains products/temper-elixir\n'
+  else
+    printf 'MISSING  topology dev has no products/temper-elixir\n'
+    rc=1
+  fi
+
+  if [[ -n "$lab_root" ]]; then
+    lab_root=$(absolute_existing_dir "$lab_root")
+    if [[ -x "$lab_root/bin/lab-switch" ]]; then
+      printf 'ok       lab      %s/bin/lab-switch\n' "$lab_root"
+    else
+      printf 'MISSING  lab      %s/bin/lab-switch\n' "$lab_root"
+      rc=1
+    fi
+  else
+    printf 'note     lab      not checked (pass LAB_ROOT to verify)\n'
+  fi
+
+  return "$rc"
+}
+
+cmd_create() {
+  [[ $# -eq 2 ]] || fail "create usage: ./invariant track create <main|dev> DESTINATION"
+  local track=$1 destination=$2 expected parent
+  expected=$(track_sha "$track")
+  if [[ "$destination" != /* ]]; then
+    destination="$PWD/$destination"
+  fi
+  [[ ! -e "$destination" ]] || fail "destination already exists: $destination"
+
+  git -C "$ROOT" cat-file -e "${expected}^{commit}" 2>/dev/null \
+    || fail "candidate object is unavailable locally: $expected (fetch explicitly, then retry)"
+
+  parent=$(dirname "$destination")
+  mkdir -p "$parent"
+  git -C "$ROOT" worktree add --detach "$destination" "$expected"
+  destination=$(validate_source "$track" "$destination")
+
+  say "created $track candidate worktree"
+  say "  source: $destination"
+  say "  HEAD:   $expected"
+  say "next: ./invariant track test $track '$destination' qualification"
+}
+
+cmd_inspect() {
+  [[ $# -eq 2 ]] || fail "inspect usage: ./invariant track inspect <main|dev> SOURCE_WORKTREE"
+  local track=$1 source expected
+  source=$(validate_source "$track" "$2")
+  expected=$(track_sha "$track")
+  say "track:       $track"
+  say "description: $(track_description "$track")"
+  say "source:      $source"
+  say "HEAD:        $expected"
+  say "tree:        clean"
+  say "verdict:     NOT_QUALIFIED"
+}
+
+TEST_OUTPUT=""
+TEST_SOURCE=""
+TEST_OVERALL=0
+
+run_gate() {
+  local name=$1
+  shift
+  local log_file="$TEST_OUTPUT/${name}.log" rc
+  say ""
+  say "==> $name"
+  set +e
+  (cd "$TEST_SOURCE" && "$@") 2>&1 | tee "$log_file"
+  rc=${PIPESTATUS[0]}
+  set -e
+  printf '%s\t%s\t%s\n' "$name" "$rc" "$log_file" >> "$TEST_OUTPUT/summary.tsv"
+  if (( rc == 0 )); then
+    say "PASS $name"
+  else
+    say "FAIL $name (exit $rc)"
+    TEST_OVERALL=1
+  fi
+}
+
+run_smoke() {
+  run_gate status env -u MINIMAX_API_KEY ./invariant status
+  run_gate doctor env -u MINIMAX_API_KEY ./invariant doctor
+  run_gate structure env -u MINIMAX_API_KEY ./invariant check
+  run_gate boundaries env -u MINIMAX_API_KEY ./invariant check boundaries
+}
+
+run_full() {
+  run_gate full-root env -u MINIMAX_API_KEY ./invariant test
+}
+
+run_runtime() {
+  run_gate session-restart env -u MINIMAX_API_KEY ./integration/scenarios/wp-08-session-restart/run.sh
+  run_gate temper-rpc env -u MINIMAX_API_KEY ./integration/scenarios/wp-09-temper-rpc/run.sh
+}
+
+run_graph() {
+  [[ -d "$TEST_SOURCE/products/temper-elixir" ]] \
+    || fail "Graph profile requires products/temper-elixir"
+
+  run_gate graph-dependencies env -u MINIMAX_API_KEY bash -c '
+    if [[ ! -d products/kiln/deps ]]; then
+      (cd products/kiln && mix deps.get)
+    fi
+    if [[ ! -d products/temper-elixir/deps ]]; then
+      (cd products/temper-elixir && mix deps.get)
+    fi
+  '
+
+  run_gate graph-kiln env -u MINIMAX_API_KEY bash -c '
+    if [[ ! -d products/kiln/deps ]]; then
+      echo "Kiln dependencies missing; run: (cd products/kiln && mix deps.get)"
+      exit 1
+    fi
+    cd products/kiln
+    mix test \
+      test/kiln/m4_a_graph_projection_test.exs \
+      test/kiln/m4_p0_truth_contract_test.exs \
+      test/kiln/freshness_test.exs \
+      test/kiln/header_priority_test.exs \
+      test/kiln/why_packet_test.exs \
+      test/kiln/integration_hygiene_regression_test.exs
+  '
+  run_gate graph-temper-elixir env -u MINIMAX_API_KEY bash -c '
+    if [[ ! -d products/temper-elixir/deps ]]; then
+      echo "Temper-Elixir dependencies missing; run: (cd products/temper-elixir && mix deps.get)"
+      exit 1
+    fi
+    cd products/temper-elixir
+    mix format --check-formatted mix.exs "lib/**/*.{ex,exs}" "test/**/*.{ex,exs}" &&
+      mix compile --warnings-as-errors &&
+      mix test
+  '
+}
+
+cmd_test() {
+  [[ $# -ge 2 ]] || fail "test usage: ./invariant track test <main|dev> SOURCE_WORKTREE [PROFILE] [--output DIR]"
+  local track=$1 source_arg=$2 profile="qualification" output_arg=""
+  shift 2
+
+  if [[ $# -gt 0 && "$1" != "--output" ]]; then
+    profile=$1
+    shift
+  fi
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --output)
+        [[ $# -ge 2 ]] || fail "--output requires a directory"
+        output_arg=$2
+        shift 2
+        ;;
+      *) fail "unknown test option: $1" ;;
+    esac
+  done
+
+  case "$profile" in
+    smoke|full|runtime|graph|qualification) ;;
+    *) fail "unknown profile '$profile' (expected smoke|full|runtime|graph|qualification)" ;;
+  esac
+  [[ "$profile" != "graph" || "$track" == "dev" ]] \
+    || fail "Graph profile is only valid for the dev candidate"
+
+  TEST_SOURCE=$(validate_source "$track" "$source_arg")
+  if [[ -n "$output_arg" ]]; then
+    [[ ! -e "$output_arg" ]] || fail "output directory already exists: $output_arg"
+    mkdir -p "$output_arg"
+    TEST_OUTPUT=$(cd "$output_arg" && pwd -P)
+  else
+    TEST_OUTPUT=$(mktemp -d "${TMPDIR:-/tmp}/invariant-${track}-${profile}.XXXXXX")
+  fi
+
+  {
+    printf 'track=%s\n' "$track"
+    printf 'candidate_sha=%s\n' "$(track_sha "$track")"
+    printf 'source=%s\n' "$TEST_SOURCE"
+    printf 'profile=%s\n' "$profile"
+    printf 'started_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'node=%s\n' "$(node --version 2>/dev/null || printf missing)"
+    printf 'elixir=%s\n' "$(elixir --version 2>/dev/null | tail -1 || printf missing)"
+  } > "$TEST_OUTPUT/identity.txt"
+  printf 'gate\texit_code\tlog\n' > "$TEST_OUTPUT/summary.tsv"
+
+  say "qualification evidence: $TEST_OUTPUT"
+  case "$profile" in
+    smoke) run_smoke ;;
+    full) run_smoke; run_full ;;
+    runtime) run_runtime ;;
+    graph) run_smoke; run_graph ;;
+    qualification)
+      run_smoke
+      run_full
+      run_runtime
+      if [[ "$track" == "dev" ]]; then run_graph; fi
+      ;;
+  esac
+  # Expansion belongs to the candidate-worktree bash, not this helper.
+  # shellcheck disable=SC2016
+  run_gate final-clean-tree env -u MINIMAX_API_KEY bash -c '
+    if [[ -n "$(git status --porcelain)" ]]; then
+      echo "candidate worktree became dirty during qualification"
+      git status --short
+      exit 1
+    fi
+  '
+
+  say ""
+  say "summary: $TEST_OUTPUT/summary.tsv"
+  if (( TEST_OVERALL == 0 )); then
+    say "two-track test: PASS"
+  else
+    say "two-track test: FAIL (see per-gate logs)"
+  fi
+  return "$TEST_OVERALL"
+}
+
+cmd_use() {
+  [[ $# -ge 3 ]] || fail "use usage: ./invariant track use <main|dev> SOURCE_WORKTREE TARGET_REPOSITORY [TEMPER_ARGS...]"
+  local track=$1 source_arg=$2 target=$3 source
+  shift 3
+  source=$(validate_source "$track" "$source_arg")
+  target=$(absolute_existing_dir "$target")
+  [[ -x "$source/scripts/temper-live" ]] \
+    || fail "candidate has no scripts/temper-live launcher"
+  say "starting $(track_description "$track")"
+  say "  source: $source"
+  say "  target: $target"
+  exec "$source/scripts/temper-live" "$target" "$@"
+}
+
+cmd_lab() {
+  [[ $# -eq 3 ]] || fail "lab usage: ./invariant track lab <main|dev> SOURCE_WORKTREE LAB_ROOT"
+  local track=$1 source_arg=$2 lab_arg=$3 source lab_root
+  source=$(validate_source "$track" "$source_arg")
+  lab_root=$(absolute_existing_dir "$lab_arg")
+  [[ -x "$lab_root/bin/lab-switch" ]] \
+    || fail "Lab root has no executable bin/lab-switch: $lab_root"
+  say "installing $(track_description "$track") into Lab"
+  say "  source: $source"
+  say "  Lab:    $lab_root"
+  exec "$lab_root/bin/lab-switch" "$source"
+}
+
+main() {
+  local command=${1:-help}
+  shift || true
+  case "$command" in
+    list) cmd_list "$@" ;;
+    doctor) cmd_doctor "$@" ;;
+    create) cmd_create "$@" ;;
+    inspect) cmd_inspect "$@" ;;
+    test) cmd_test "$@" ;;
+    use) cmd_use "$@" ;;
+    lab) cmd_lab "$@" ;;
+    help|--help|-h) usage ;;
+    *) fail "unknown action '$command' (try: ./invariant track help)" ;;
+  esac
+}
+
+main "$@"

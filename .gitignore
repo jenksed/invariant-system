@@ -1,4 +1,13 @@
 .DS_Store
+.env
+.env.*
+!.env.example
+**/__pycache__/
+*.py[cod]
+erl_crash.dump
+kiln-m1.*/
+.codegraph/
+.claude/settings.local.json
 docs-site/node_modules/
 docs-site/build/
 docs-site/.docusaurus/

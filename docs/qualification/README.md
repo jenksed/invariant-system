@@ -17,6 +17,11 @@ audience:
 
 # Qualification Index
 
+The [two-track candidate qualification](two-track-qualification.md) records the
+2026-08-20 executed A0/B0 evidence and the resulting `NOT_QUALIFIED` verdicts.
+The groups below remain the intended promotion protocol; historical expected
+counts or prose are not a substitute for a clean candidate run.
+
 This index names the exact qualification groups, the commands that exercise them, the property each command proves, and how to record evidence. A claim that a candidate is fit to enter `dev` must be traceable to one or more commands below, executed at a documented candidate SHA, with the recorded result.
 
 ## Sandbox and runtime constraint

@@ -6,6 +6,58 @@ Invariant is a local-first engineering system for turning model intelligence int
 
 This repository is the canonical monorepo for the Invariant product system.
 
+## Two-track repository model
+
+Repository archaeology established two intentionally different branch lines:
+
+- `main` descends from A0 (`0c6ed3ad39c6a9a8808a37c8728c56f3dcd254af`), the strongest
+  pre-Graph Workbench state found;
+- `dev` descends from B0 (`5e7b0134d5e901603904ca5b1f4f3f16d4a472ec`), its Graph-enabled
+  descendant.
+
+The branches now make that distinction inspectable and independently usable;
+publication does not retroactively qualify the historical runtime candidates.
+A0 has failing Kiln tests and lacks later root/integration repairs. B0 retains
+shared Kiln failures and adds an experimental `products/temper-elixir` surface
+whose direct sibling-source dependency on Kiln violates the product boundary.
+Read the recorded limitations before treating either branch as release
+evidence.
+
+Use [the current-system inventory](docs/reference/current-system-inventory.md)
+to compare the candidates, [the qualification record](docs/qualification/two-track-qualification.md)
+for executed evidence and remaining gates, and [the branch reconciliation
+ledger](docs/development/branch-reconciliation.md) before choosing a source for
+experimentation or Lab installation. Candidate labels describe proposed roles,
+not acceptance or authority.
+
+### Fast historical-candidate workflow
+
+The root helper makes the historical versions reproducible without moving a
+branch or calling a provider:
+
+```bash
+./invariant track list
+./invariant track doctor /path/to/invariant-lab
+./invariant track create main /path/to/invariant-main-a0
+./invariant track create dev /path/to/invariant-dev-b0
+./invariant track test main /path/to/invariant-main-a0 qualification
+./invariant track test dev /path/to/invariant-dev-b0 qualification
+./invariant track use main /path/to/invariant-main-a0 /path/to/practice-repo
+./invariant track lab main /path/to/invariant-main-a0 /path/to/invariant-lab
+```
+
+`track test` removes `MINIMAX_API_KEY`, keeps every gate's output, continues
+after an individual failure, checks that tests left the candidate clean, and
+returns nonzero when any gate fails. The
+`smoke`, `full`, `runtime`, `graph`, and `qualification` profiles allow a fast
+local loop without confusing partial evidence with promotion. `graph` is valid
+only for the dev candidate. Canonical dependency setup is logged and may need
+package-network access on a fresh machine.
+
+For the current checkout, `./invariant run /path/to/practice-repo` is the short
+form of the bounded Kiln + Temper launcher. It generates scoped runtime tokens,
+uses the public daemon boundary, and does not bypass Kiln authority.
+
 ## Why this exists
 
 A coding model can produce useful code. That does not answer the harder engineering questions around the code:
@@ -111,6 +163,22 @@ Then exercise the repository-visible integration path:
 ./invariant test integration
 ```
 
+For day-to-day development:
+
+```bash
+./invariant setup <product>            # project-local dependencies
+./invariant test changed HEAD --list   # preview fast-feedback routing
+./invariant test changed origin/main   # run selected gates
+./invariant format <product>           # check only
+./invariant format <product> --write   # explicit rewrite
+./invariant run /path/to/practice-repo
+```
+
+The changed-file router is intentionally conservative and is never promotion
+evidence. Finish with the property-owning product/integration gates and
+`./invariant test` when making a repository-wide completion claim. See the
+[developer loop](docs/development/developer-loop.md).
+
 Or run all product gates:
 
 ```bash
@@ -161,6 +229,9 @@ Start here:
 
 - [Documentation home](docs/index.md)
 - [Current system status](docs/status.md)
+- [Current-system candidate inventory](docs/reference/current-system-inventory.md)
+- [Two-track qualification](docs/qualification/two-track-qualification.md)
+- [Branch reconciliation ledger](docs/development/branch-reconciliation.md)
 - [Evidence-driven engineering process](docs/development/engineering-process.md)
 - [Engineering traceability](docs/reference/traceability.md)
 - [System map](docs/architecture/system-map.md)

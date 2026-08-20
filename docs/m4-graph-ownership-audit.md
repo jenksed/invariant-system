@@ -1,3 +1,16 @@
+---
+title: M4 Graph Ownership Audit
+description: Ownership classification for canonical Graph facts and operator projections.
+status: experimental
+verified_at_commit: 5e7b0134d5e901603904ca5b1f4f3f16d4a472ec
+source_paths:
+  - products/kiln/lib/kiln/graph_projection.ex
+  - products/temper-elixir/
+audience:
+  - developer
+  - operator
+---
+
 # M4 GraphOwnership Audit
 
 ## Per-Responsibility Classification
