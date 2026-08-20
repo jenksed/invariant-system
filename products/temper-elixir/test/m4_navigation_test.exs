@@ -103,21 +103,38 @@ defmodule Temper.M4NavigationTest do
     assert M4Navigation.focused(s2).canonical_id == "pp_l"
   end
 
-  test "RIGHT_DOWNSTREAM (linear lifecycle): from WorkerOutput → PatchProposal" do
+  test "LEFT_UPSTREAM (linear lifecycle, from WorkerOutput): ← follows PRODUCED → PatchProposal" do
+    # Canonical edge PRODUCED: wko_l → pp_l. ← walks canonical
+    # outgoing edges in the emitted direction.
     s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
     s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "wko_l"})
 
-    s2 = M4Navigation.move(s1, :right, linear_projection())
+    s2 = M4Navigation.move(s1, :left, linear_projection())
 
     assert M4Navigation.focused(s2).canonical_id == "pp_l"
   end
 
-  test "RIGHT_DOWNSTREAM (no canonical edge): focus unchanged" do
+  test "RIGHT_DOWNSTREAM (linear lifecycle, from Review): → follows AUTHORIZED/REVIEWED reversed" do
+    # Review has no canonical edge where Review is the `to` target.
+    # → walks incoming edges (where current is `to`); none exist
+    # → focus unchanged. Canonical semantics, not operator intuition.
+    s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
+    s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "Review", canonical_id: "rev_l"})
+
+    s2 = M4Navigation.move(s1, :right, linear_projection())
+
+    # No incoming edges to Review → focus unchanged.
+    assert M4Navigation.focused(s2).canonical_id == "rev_l"
+  end
+
+  test "LEFT_UPSTREAM (no canonical edge): focus unchanged" do
+    # PatchProposal has no outgoing canonical edges in this fixture.
     s = M4Navigation.initial() |> M4Navigation.set_order(linear_projection())
     s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "PatchProposal", canonical_id: "pp_l"})
 
-    # pp_l has no outgoing edges in this fixture.
-    s2 = M4Navigation.move(s1, :right, linear_projection())
+    # ← walks outgoing; pp_l has no outgoing canonical edges
+    # → focus unchanged.
+    s2 = M4Navigation.move(s1, :left, linear_projection())
 
     assert M4Navigation.focused(s2).canonical_id == "pp_l"
   end
@@ -143,8 +160,12 @@ defmodule Temper.M4NavigationTest do
     assert M4Navigation.focused(s3).canonical_id == "rev_1", "no edge → focus unchanged"
   end
 
-  test "Multiple downstream ties: visible topology order determines tie-break" do
-    # One source, two outgoing edges. ← visible order decides.
+  test "Branch tie-break: ← walks canonical outgoing edges in visible topology order" do
+    # One source, two outgoing edges in edge-list order
+    # (PRODUCED→tgt_b first, REVIEWED→tgt_a second). Visible topology
+    # order has tgt_a first (PatchProposal appears before Review).
+    # ← must follow canonical edges in their emitted direction and
+    # tie-break by visible order, NOT edge-list order.
     p = %{
       nodes: [
         %{id: "src", kind: "WorkerOutput"},
@@ -160,8 +181,9 @@ defmodule Temper.M4NavigationTest do
     s = M4Navigation.initial() |> M4Navigation.set_order(p)
     s1 = M4Navigation.set_focus(s, %SubjectIdentity{entity_type: "WorkerOutput", canonical_id: "src"})
 
-    s2 = M4Navigation.move(s1, :right, p)
-    # tgt_a (PatchProposal) appears first in visible order → → lands on tgt_a
+    s2 = M4Navigation.move(s1, :left, p)
+    # ← walks outgoing canonical edges; tie-break by visible topology
+    # order → lands on tgt_a (PatchProposal, first in visible order).
     assert M4Navigation.focused(s2).canonical_id == "tgt_a"
   end
 

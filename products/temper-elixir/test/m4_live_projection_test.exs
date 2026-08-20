@@ -172,31 +172,45 @@ defmodule Temper.M4LiveProjectionTest do
   # successful hydration ≠ LIVE/current.
   # Hydration completion is an operation result.
   # Currentness is a truth claim about canonical convergence.
+  #
+  # Observable property (the public boundary): live?/2 returns true iff
+  # the projection's cached subscription_revision matches the supplied
+  # revision. If a canonical advancement is unresolved, the consumer
+  # cannot have observed any revision ≥ that advancement, so live?
+  # MUST return false.
   test "currentness law: HYDRATION_COMPLETED + CANONICAL_ADVANCEMENT_UNRESOLVED => NOT LIVE" do
-    # Hydration completes successfully without invalidation.
+    # Hydration completes successfully without invalidation at revision 1.
     s0 = M4LiveProjection.initial()
     s1 = M4LiveProjection.begin_hydration(s0, 1, projection_a())
     s2 = M4LiveProjection.complete_hydration(s1)
 
-    # With no observed canonical advancement, the projection is LIVE
-    # at revision 1.
+    # With no observed canonical advancement, the projection IS LIVE
+    # at revision 1 (cached revision == supplied revision).
     assert M4LiveProjection.live?(s2, 1)
 
-    # But if a canonical advancement is unresolved (the consumer has
-    # not yet observed any post-hydration activity event confirming
-    # R1 is still current), the currentness claim CANNOT be made.
-    # The public boundary requires: LIVE only when
-    # canonical_session_revision == last_observed_revision.
-    #
-    # The hydration_race_check returns :invalid when the consumer
-    # has not observed the latest canonical revision.
-    state_at_begin = s1
-    result = M4LiveProjection.hydration_race_check(state_at_begin, s2, 0)
+    # Now the consumer is asked about a different revision (the
+    # canonical advancement the consumer has NOT yet observed).
+    # The cached subscription_revision (1) does NOT match the
+    # supplied revision (2) → live? must return false.
+    refute M4LiveProjection.live?(s2, 2),
+           "currentness law: unresolved canonical advancement must NOT yield LIVE"
 
-    # If we haven't observed any canonical advancement (revision 0
-    # is "before hydration started"), the race check returns :invalid
-    # — preventing falsely LIVE installation.
-    assert result in [:invalid, :install],
-           "currentness law: race check must reject install when canonical advancement is unresolved"
+    # And asking about a revision BEFORE hydration started must also
+    # not yield LIVE — the cached subscription_revision (1) does not
+    # match (0).
+    refute M4LiveProjection.live?(s2, 0),
+           "currentness law: stale revision must NOT yield LIVE"
+
+    # The race check confirms: state_at_begin (revision 1) is older
+    # than a hypothetical canonical advancement (revision 2), so the
+    # race check returns :invalid — preventing falsely LIVE
+    # installation.
+    state_at_begin = s1
+    assert M4LiveProjection.hydration_race_check(state_at_begin, s2, 2) == :invalid,
+           "currentness law: race check must return :invalid when canonical advancement is unresolved"
+
+    # And when canonical advancement equals the cached revision, the
+    # race check returns :ok.
+    assert M4LiveProjection.hydration_race_check(state_at_begin, s2, 1) == :ok
   end
 end

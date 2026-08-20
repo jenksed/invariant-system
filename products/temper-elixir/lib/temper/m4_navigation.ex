@@ -111,12 +111,26 @@ defmodule Temper.M4Navigation do
     end
   end
 
-  # Move to the source of an incoming canonical edge, if any.
-  # Semantic law: ← consumes only edges from the canonical projection.
-  # Entity type/shape may NOT manufacture topology.
-  # Multiple destinations → tie-break by stable visible topology order
-  # (the projection's node enumeration order, which is deterministic
-  # for the same projection).
+  # Navigation contract (M4-Q1C Gate 5):
+  #
+  # Canonical edges in Kiln.GraphProjection are emitted `from → to`.
+  # The canonical direction IS the operator navigation direction:
+  #   ← walks canonical edges in the emitted direction
+  #      (focused node → its canonical `to` target)
+  #   → walks canonical edges in the reverse direction
+  #      (focused node → the `from` of incoming canonical edges)
+  #
+  # This is unambiguous: there are no operator-direction decisions;
+  # navigation is purely canonical-edge-driven.
+  #
+  # Tie-break: visible topology order (projection.nodes enumeration
+  # order), NOT edge-list order. Multiple canonical destinations are
+  # resolved by selecting the first one in visible topology order.
+  #
+  # Entity type/shape may NOT manufacture topology. UNKNOWN
+  # lifecycle_scope may NOT prevent traversal of an exact canonical
+  # relationship — exact edges are navigable regardless of scope.
+
   defp move_upstream(state, projection) do
     current = focused(state)
 
@@ -125,29 +139,9 @@ defmodule Temper.M4Navigation do
         state
 
       %SubjectIdentity{canonical_id: cid} ->
-        # Incoming edges: any edge where `to` == current's id.
-        # Move to the `from` of that edge (the upstream/source).
-        sources =
-          projection.edges
-          |> Enum.filter(&(&1.to == cid))
-          |> Enum.map(& &1.from)
-          |> Enum.uniq()
-
-        # Tie-break by visible order.
-        target_id = pick_first_in_visible_order(sources, projection)
-        maybe_set_focus_by_id(state, target_id)
-    end
-  end
-
-  # Move to the first target of an outgoing canonical edge, if any.
-  defp move_downstream(state, projection) do
-    current = focused(state)
-
-    case current do
-      nil ->
-        state
-
-      %SubjectIdentity{canonical_id: cid} ->
+        # ← walks canonical edges in the emitted `from → to` direction:
+        # outgoing edges from the focused node, picking the first `to`
+        # target by visible topology order.
         targets =
           projection.edges
           |> Enum.filter(&(&1.from == cid))
@@ -159,16 +153,35 @@ defmodule Temper.M4Navigation do
     end
   end
 
-  # Pick the first canonical id from `candidates` that appears in the
-  # projection's visible topology ordering (projection.nodes order).
+  defp move_downstream(state, projection) do
+    current = focused(state)
+
+    case current do
+      nil ->
+        state
+
+      %SubjectIdentity{canonical_id: cid} ->
+        # → walks canonical edges in the reverse direction:
+        # incoming edges (where the focused node is the `to`), picking
+        # the first `from` source by visible topology order.
+        sources =
+          projection.edges
+          |> Enum.filter(&(&1.to == cid))
+          |> Enum.map(&(&1.from))
+          |> Enum.uniq()
+
+        source_id = pick_first_in_visible_order(sources, projection)
+        maybe_set_focus_by_id(state, source_id)
+    end
+  end
+
+  # Pick the first candidate id that appears in the projection's
+  # visible topology ordering (projection.nodes enumeration order).
   # If no candidate is visible, returns nil.
   defp pick_first_in_visible_order(candidates, projection) do
-    visible_ids =
-      projection.nodes
-      |> Enum.map(& &1.id)
-      |> MapSet.new()
+    visible_ids = projection.nodes |> Enum.map(& &1.id)
 
-    Enum.find(candidates, fn id -> MapSet.member?(visible_ids, id) end)
+    Enum.find(visible_ids, fn id -> id in candidates end)
   end
 
   defp maybe_set_focus_by_id(state, nil), do: state
