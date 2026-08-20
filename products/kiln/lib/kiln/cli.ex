@@ -538,6 +538,31 @@ defmodule Kiln.CLI do
   # includes the IMPLEMENTER's transcript (implementer_transcript_received:
   # false is enforced by Kiln.Review.build/9).
   defp run_review_propose(%Request{options: opts} = request) do
+    case Runtime.open(request.kiln_home, :write) do
+      {:ok, :ready} ->
+        try do
+          do_review_propose(request)
+          |> normalize_dispatch_result(request)
+        after
+          Runtime.stop()
+        end
+
+      {:absent} ->
+        absent_result(request)
+
+      {:blocked, state, _error} ->
+        blocked_result(request, state)
+    end
+  end
+
+  # M2 (TEMPER DURABLE): the bounded review-propose path that records the
+  # canonical pending decision must own the same bounded Store lifecycle
+  # as worker-propose (lib/kiln/cli.ex:run_worker_propose/1). Without this
+  # wrapper opening Runtime, Workflow.current_session/0 inside
+  # record_pending_decision_at_review/5 observes an empty journal and
+  # silently no-ops, leaving the run_state at running instead of
+  # waiting_for_user. This blocks M2-B's bounded production path.
+  defp do_review_propose(%Request{options: opts} = request) do
     result_state_digest = opts["result-state-digest"]
     verdict = opts["verdict"]
 
@@ -610,7 +635,6 @@ defmodule Kiln.CLI do
     else
       {:error, %Result{} = result} -> {:error, result}
     end
-    |> normalize_dispatch_result(request)
   end
 
   # -- command: human-decide --
