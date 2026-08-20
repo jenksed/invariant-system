@@ -58,7 +58,8 @@ defmodule Kiln.IntegrationHygieneRegressionTest do
 
   describe "source-checkout isolation (B)" do
     test "no nested .git directory exists below products/" do
-      nested = find_nested_git(@repo_root)
+      products_root = Path.join(@repo_root, "products")
+      nested = find_nested_git(products_root, @repo_root)
       assert nested == [],
              "expected no nested .git under products/, found: #{inspect(nested)}"
     end
@@ -80,16 +81,25 @@ defmodule Kiln.IntegrationHygieneRegressionTest do
 
   # ---- helpers ----
 
-  defp find_nested_git(dir) do
-    case File.ls(dir) do
+  # Walk `start` recursively and report every `.git` directory found.
+  # Returned paths are reported relative to `display_root` so the
+  # assertion message is stable regardless of where the worktree
+  # lives on disk.
+  defp find_nested_git(start, display_root) do
+    case File.ls(start) do
       {:ok, entries} ->
         Enum.flat_map(entries, fn entry ->
-          path = Path.join(dir, entry)
+          path = Path.join(start, entry)
 
           cond do
-            entry == ".git" -> [path]
-            File.dir?(path) -> find_nested_git(path)
-            true -> []
+            entry == ".git" ->
+              [relative_path(path, display_root)]
+
+            File.dir?(path) ->
+              find_nested_git(path, display_root)
+
+            true ->
+              []
           end
         end)
 
@@ -125,5 +135,11 @@ defmodule Kiln.IntegrationHygieneRegressionTest do
       _ ->
         acc
     end
+  end
+
+  defp relative_path(abs, root) do
+    abs
+    |> Path.relative_to(root)
+    |> String.replace("\\", "/")
   end
 end
