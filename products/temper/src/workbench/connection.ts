@@ -90,8 +90,6 @@ export class WorkbenchConnection {
     await this.maybeQuerySession('open');
     this.emitProjection('open');
 
-    // Subscribe to the activity stream (best-effort; failure does not
-    // poison the canonical projection).
     await this.startStream();
     return this.projection;
   }
@@ -112,9 +110,8 @@ export class WorkbenchConnection {
       throw new Error(`session.start failed: ${resp.error.code} ${resp.error.reason ?? ''}`);
     }
     const sessionId = resp.result?.session_id;
-    if (!sessionId) {
-      throw new Error('session.start returned no session_id');
-    }
+    if (!sessionId) throw new Error('session.start returned no session_id');
+
     this.projection = {
       ...this.projection,
       sessionId,
@@ -205,11 +202,9 @@ export class WorkbenchConnection {
   }
 
   /**
-   * Submit a governed human decision (ACCEPT | REJECT |
-   * REQUEST_REVISION) through the existing real `human.decide`
-   * Kiln RPC. The RPC result is not enough to claim completion: on
-   * success we re-query the canonical Session and return an explicit
-   * unknown-effect error when that confirmation cannot be obtained.
+   * Submit a governed human decision through the existing real
+   * `human.decide` Kiln RPC. A 2xx/RPC success alone is not enough to
+   * claim completion: the canonical Session is re-read before success.
    */
   async submitHumanDecision(
     decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION',
@@ -294,9 +289,6 @@ export class WorkbenchConnection {
     return () => this.connectionListeners.delete(listener);
   }
 
-  /** Subscribe to raw activity frames (one per activity.notification
-   *  that survived stale/duplicate/gap filters). Use this to feed a
-   *  Pulse log; do not use it to derive Motion. */
   onActivity(listener: ActivityListener): () => void {
     this.activityListeners.add(listener);
     return () => this.activityListeners.delete(listener);
@@ -366,9 +358,7 @@ export class WorkbenchConnection {
   private confirmCanonicalSession(
     expectedSessionId: string
   ): { ok: true; value: CanonicalConfirmation } | { ok: false; reason: string } {
-    if (this.projection.lastError) {
-      return { ok: false, reason: this.projection.lastError };
-    }
+    if (this.projection.lastError) return { ok: false, reason: this.projection.lastError };
     const query = this.projection.sessionQuery;
     if (!query) return { ok: false, reason: 'session.query returned no canonical projection' };
     if (query.session_id && query.session_id !== expectedSessionId) {
@@ -395,9 +385,6 @@ export class WorkbenchConnection {
     const query = await sessionQuery(this.client, this.projection.sessionId);
     if (query.ok && query.result) {
       const next = applySessionQuery(this.projection, query.result);
-      // A previous transport/query error is not canonical state. Once a
-      // subsequent query succeeds, remove it rather than poisoning every
-      // future doctor/confirmation result with stale failure history.
       const { lastError: _staleError, ...confirmed } = next;
       this.projection = confirmed;
     } else if (!query.ok) {
@@ -415,6 +402,9 @@ export class WorkbenchConnection {
       ...this.config,
       subscriptionId: this.subscriptionId,
       ...(sessionId ? { sessionId } : {}),
+      onConnectionState: (state) => {
+        if (!this.stopped) this.setConnection(state);
+      },
       onActivity: (frame) => {
         if (this.stopped) return;
         for (const l of this.activityListeners) l(frame);
@@ -423,8 +413,10 @@ export class WorkbenchConnection {
       onResync: (reason) => {
         if (this.stopped) return;
         if (reason === 'reconnect') {
-          this.setConnection('reconnecting');
-          void this.resync('reconnect').then(() => this.setConnection('connected'));
+          // ActivityStream only emits reconnect after the replacement socket
+          // actually opened. Re-read canonical truth without pretending the
+          // transport is still reconnecting.
+          void this.resync('reconnect');
         } else {
           void this.resync('activity');
         }
@@ -468,8 +460,6 @@ function buildProjectObservation(repositoryRoot: string): {
   repository_fingerprint: string;
   observed_at: string;
 } {
-  // SHA-256 of the absolute path; matches the bounded convention used
-  // by the CLI's build_project_observation/1.
   const hash = createHash('sha256').update(repositoryRoot).digest('hex');
   return {
     repository_root: repositoryRoot,
