@@ -86,9 +86,11 @@ export class WorkbenchConnection {
   }
 
   /**
-   * Begin a new Session and canonically confirm it. After the Session ID is
-   * known, rebuild the activity subscription so it is filtered to that exact
-   * Session rather than retaining a filter from the prior project.open state.
+   * Begin a new Session and canonically confirm it. The activity subscription
+   * is then rebound to that exact Session ID. Failure to rebind the stream
+   * does not undo or falsely reject a Session that Kiln already created and
+   * canonically confirmed; the projection instead remains disconnected and
+   * the stream's bounded retry machinery continues from the new instance.
    */
   async startSession(intent: string, actorId: string): Promise<WorkbenchProjection> {
     const projectObservation = buildProjectObservation(this.config.repository);
@@ -148,12 +150,16 @@ export class WorkbenchConnection {
     return { ok: true, result: resp.result };
   }
 
+  /** Manual reconnect succeeds only when the replacement WS really opens. */
   async reconnect(): Promise<WorkbenchProjection> {
     this.retireActivityStream();
     this.stopped = false;
     this.setConnection('reconnecting');
     try {
       const projection = await this.open();
+      if (projection.connection !== 'connected') {
+        throw new Error(`activity transport did not reconnect; state=${projection.connection}`);
+      }
       if (projection.sessionId) {
         const confirmation = this.confirmCanonicalSession(projection.sessionId);
         if (!confirmation.ok) {
@@ -369,7 +375,13 @@ export class WorkbenchConnection {
 
   private async rebindActivityStream(): Promise<void> {
     this.retireActivityStream();
-    await this.startStream();
+    try {
+      await this.startStream();
+    } catch {
+      // The Session is already canonically confirmed. Preserve that fact and
+      // surface disconnected transport state; ActivityStream owns bounded
+      // reconnect retries for its failed replacement socket.
+    }
   }
 
   private retireActivityStream(): void {
@@ -402,8 +414,9 @@ export class WorkbenchConnection {
     try {
       await this.stream.open();
       this.setConnection('connected');
-    } catch {
+    } catch (err) {
       this.setConnection('disconnected');
+      throw err;
     }
   }
 
@@ -411,6 +424,10 @@ export class WorkbenchConnection {
     if (this.projection.connection === state) return;
     this.projection = { ...this.projection, connection: state };
     for (const l of this.connectionListeners) l(state);
+    // Home consumes projection callbacks rather than the Work-only connection
+    // listener. Push transport changes through the same projection channel so
+    // no screen can retain a stale connection claim.
+    this.emitProjection('reconnect');
   }
 
   private emitProjection(source: 'open' | 'resync' | 'activity' | 'reconnect'): void {
