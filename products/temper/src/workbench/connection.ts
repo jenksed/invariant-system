@@ -39,6 +39,13 @@ export type ProjectionListener = (projection: WorkbenchProjection, source: 'open
 export type ConnectionListener = (state: WorkbenchProjection['connection']) => void;
 export type ActivityListener = (frame: ActivityNotificationFrame) => void;
 
+export interface BoundedCommandResult {
+  ok: boolean;
+  result?: Record<string, unknown>;
+  errorCode?: string;
+  errorReason?: string;
+}
+
 export class WorkbenchConnection {
   private readonly config: WorkbenchConnectionConfig;
   private readonly client: KilnClient;
@@ -110,6 +117,52 @@ export class WorkbenchConnection {
     return this.projection;
   }
 
+  /** Cancel the live Session using its canonical revision. */
+  async cancelSession(actorId: string): Promise<BoundedCommandResult> {
+    return this.sessionLifecycle('session.cancel', actorId);
+  }
+
+  /** Resume the live Session using its canonical revision. */
+  async resumeSession(actorId: string): Promise<BoundedCommandResult> {
+    return this.sessionLifecycle('session.resume', actorId);
+  }
+
+  /** Ask Kiln, not Temper, which actions are valid from the current Session. */
+  async nextActions(): Promise<BoundedCommandResult> {
+    if (!this.projection.sessionId) {
+      return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
+    }
+    const resp = await this.client.call<{ session_id: string }, Record<string, unknown>>({
+      method: 'session.next_actions',
+      params: { session_id: this.projection.sessionId }
+    });
+    if (!resp.ok) {
+      return { ok: false, errorCode: resp.error.code, errorReason: resp.error.reason ?? '' };
+    }
+    return { ok: true, result: resp.result };
+  }
+
+  /**
+   * Deliberately rebuild the real transport boundary. This does not
+   * "toggle" a local connected flag: the activity stream is closed,
+   * project.open/session.query are re-run, and a fresh WebSocket
+   * subscription is established before the command can report success.
+   */
+  async reconnect(): Promise<WorkbenchProjection> {
+    if (this.stream) {
+      this.stream.close();
+      delete (this as unknown as { stream?: ActivityStream }).stream;
+    }
+    this.stopped = false;
+    this.setConnection('reconnecting');
+    try {
+      return await this.open();
+    } catch (err) {
+      this.setConnection('disconnected');
+      throw err;
+    }
+  }
+
   /** Re-query the canonical Session. Called on every activity frame
    *  and after reconnect. */
   async resync(reason: 'activity' | 'reconnect' | 'resync' = 'resync'): Promise<WorkbenchProjection> {
@@ -147,12 +200,7 @@ export class WorkbenchConnection {
       review_ref?: { id: string; digest: string } | null;
     },
     actorId: string
-  ): Promise<{
-    ok: boolean;
-    result?: Record<string, unknown>;
-    errorCode?: string;
-    errorReason?: string;
-  }> {
+  ): Promise<BoundedCommandResult> {
     if (!this.projection.sessionId) {
       return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
     }
@@ -231,6 +279,34 @@ export class WorkbenchConnection {
   }
 
   // -- private --
+
+  private async sessionLifecycle(
+    method: 'session.cancel' | 'session.resume',
+    actorId: string
+  ): Promise<BoundedCommandResult> {
+    const sessionId = this.projection.sessionId;
+    if (!sessionId) {
+      return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
+    }
+    const revision = this.projection.sessionQuery?.session_revision ?? this.projection.canonicalSessionRevision;
+    if (typeof revision !== 'number' || revision < 0) {
+      return {
+        ok: false,
+        errorCode: 'E_SESSION_REVISION_UNAVAILABLE',
+        errorReason: 'no canonical session revision is available for a mutating lifecycle operation'
+      };
+    }
+    const params = {
+      session_id: sessionId,
+      actor_id: actorId,
+      expected_session_revision: revision
+    };
+    const resp = await this.client.call<typeof params, Record<string, unknown>>({ method, params });
+    if (!resp.ok) {
+      return { ok: false, errorCode: resp.error.code, errorReason: resp.error.reason ?? '' };
+    }
+    return { ok: true, result: resp.result };
+  }
 
   private async maybeQuerySession(source: 'open' | 'resync' | 'activity' | 'reconnect'): Promise<void> {
     if (!this.projection.sessionId) return;
