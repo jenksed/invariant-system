@@ -54,8 +54,13 @@ function updateCommandScreen(
   deps: CommandScreenDeps
 ): { state: CommandScreenState; msgs: ScreenMsg[] } {
   if (key.kind === 'ctrl' && key.value === 'c') return { state, msgs: [{ kind: 'quit' }] };
-  if (key.kind === 'escape') return { state, msgs: [{ kind: 'pop' }] };
+
+  // A command may be carrying a real Kiln mutation. Keep the console
+  // attached until the bounded result returns so an async completion cannot
+  // later pop or replace a different screen after the operator escaped away.
   if (state.running) return { state, msgs: [] };
+
+  if (key.kind === 'escape') return { state, msgs: [{ kind: 'pop' }] };
 
   if (key.kind === 'enter') {
     const value = state.input.value.trim();
@@ -117,7 +122,9 @@ function renderCommandScreen(state: CommandScreenState, ctx: ScreenContext): Fra
     }
   }
 
-  const footer = ' Enter execute · ↑/↓ history · esc back · ctrl-c quit ';
+  const footer = state.running
+    ? ' command in flight · ctrl-c interrupt '
+    : ' Enter execute · ↑/↓ history · esc back · ctrl-c quit ';
   putString(frame, ctx.rows - 1, 0, pad(footer, ctx.cols), 'footer');
   return frame;
 }
