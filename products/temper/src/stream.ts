@@ -48,6 +48,12 @@ export class ActivityStream {
   private readonly seen = new Set<string>();
   private pingTimer?: ReturnType<typeof setInterval>;
   private reconnectAttempts = 0;
+  /**
+   * Manual lifecycle guard. `close()` means the owner intentionally
+   * retired this stream; a WebSocket close event must not resurrect it.
+   * Unexpected network closes leave this false and retain bounded retry.
+   */
+  private closed = false;
 
   constructor(config: StreamConfig) {
     this.config = config;
@@ -56,6 +62,7 @@ export class ActivityStream {
 
   /** Open the WS, subscribe, and start the keepalive ping loop. */
   public async open(): Promise<void> {
+    if (this.closed) return;
     // Node 22+ global WebSocket accepts a headers option in its
     // implementation but its TypeScript signature does not export
     // WebSocketConstructorOptions. Cast to the standard second-arg
@@ -71,6 +78,10 @@ export class ActivityStream {
     this.ws = ws;
 
     ws.addEventListener('open', () => {
+      if (this.closed) {
+        ws.close(1000, 'temper-close');
+        return;
+      }
       this.reconnectAttempts = 0;
       const frame: ActivitySubscribeFrame = {
         type: 'activity.subscribe',
@@ -85,12 +96,13 @@ export class ActivityStream {
     });
 
     ws.addEventListener('message', (event) => {
+      if (this.closed) return;
       this.handleFrame(typeof event.data === 'string' ? event.data : '');
     });
 
     ws.addEventListener('close', () => {
       this.stopPing();
-      this.scheduleReconnect();
+      if (!this.closed) this.scheduleReconnect();
     });
 
     ws.addEventListener('error', () => {
@@ -98,8 +110,9 @@ export class ActivityStream {
     });
   }
 
-  /** Close the WS cleanly. */
+  /** Close the WS cleanly and permanently retire this stream instance. */
   public close(): void {
+    this.closed = true;
     this.stopPing();
     if (this.ws) {
       this.ws.close(1000, 'temper-close');
@@ -120,6 +133,7 @@ export class ActivityStream {
   // -- private --
 
   private handleFrame(raw: string): void {
+    if (this.closed) return;
     let frame: ActivityFrame;
     try {
       frame = JSON.parse(raw) as ActivityFrame;
@@ -140,6 +154,7 @@ export class ActivityStream {
   }
 
   private processNotification(frame: ActivityNotificationFrame): void {
+    if (this.closed) return;
     // Stale guard (contract freeze §7).
     if (frame.revision < this.lastObservedRevision) {
       return;
@@ -164,9 +179,10 @@ export class ActivityStream {
   }
 
   private startPing(): void {
+    if (this.closed) return;
     const interval = this.config.pingIntervalMs ?? 15_000;
     this.pingTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === this.ws.OPEN) {
+      if (!this.closed && this.ws && this.ws.readyState === this.ws.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, interval);
@@ -182,10 +198,12 @@ export class ActivityStream {
   }
 
   private scheduleReconnect(): void {
+    if (this.closed) return;
     this.reconnectAttempts += 1;
     // bounded backoff: 250ms, 500ms, 1s, 2s, 4s, then capped at 5s.
     const delay = Math.min(5_000, 250 * 2 ** Math.min(this.reconnectAttempts, 4));
     setTimeout(() => {
+      if (this.closed) return;
       this.config.onResync?.('reconnect');
       void this.open();
     }, delay);
