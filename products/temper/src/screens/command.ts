@@ -97,7 +97,7 @@ function renderCommandScreen(state: CommandScreenState, ctx: ScreenContext): Fra
     const boxRows = Math.max(5, ctx.rows - row - 3);
     putLabeledBox(frame, { rect: { row, col: 1, rows: boxRows, cols: Math.max(10, ctx.cols - 2) }, title: label });
     row += 1;
-    const style = state.result.ok ? 'default' : 'error';
+    const style = state.result.ok ? 'normal' : 'error';
     for (const line of state.result.lines) {
       for (const wrapped of wrapText(line, Math.max(8, ctx.cols - 7))) {
         if (row >= ctx.rows - 3) break;
