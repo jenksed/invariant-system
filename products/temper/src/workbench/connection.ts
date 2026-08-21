@@ -19,13 +19,13 @@
  */
 
 import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { KilnClient } from '../client.js';
 import { ActivityStream } from '../stream.js';
 import type { ActivityNotificationFrame, KilnClientConfig, ProjectOpenResult } from '../types.js';
 import type { WorkbenchProjection } from './projection.js';
 import { applySessionQuery, projectionFromProjectOpen } from './projection.js';
 import { sessionQuery } from './session_query.js';
-import { createHash, randomUUID } from 'node:crypto';
 
 export interface WorkbenchConnectionConfig extends KilnClientConfig {
   repository: string;
@@ -44,6 +44,14 @@ export interface BoundedCommandResult {
   result?: Record<string, unknown>;
   errorCode?: string;
   errorReason?: string;
+}
+
+interface CanonicalConfirmation {
+  session_id: string;
+  session_revision: number | null;
+  session_state: string | null;
+  run_state: string | null;
+  workflow_step: string | null;
 }
 
 export class WorkbenchConnection {
@@ -83,7 +91,7 @@ export class WorkbenchConnection {
     this.emitProjection('open');
 
     // Subscribe to the activity stream (best-effort; failure does not
-    // poison the projection).
+    // poison the canonical projection).
     await this.startStream();
     return this.projection;
   }
@@ -114,6 +122,13 @@ export class WorkbenchConnection {
     };
     await this.maybeQuerySession('open');
     this.emitProjection('open');
+
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      throw new Error(
+        `session.start accepted by Kiln but canonical confirmation failed: ${confirmation.reason}`
+      );
+    }
     return this.projection;
   }
 
@@ -156,7 +171,19 @@ export class WorkbenchConnection {
     this.stopped = false;
     this.setConnection('reconnecting');
     try {
-      return await this.open();
+      const projection = await this.open();
+      if (projection.sessionId) {
+        const confirmation = this.confirmCanonicalSession(projection.sessionId);
+        if (!confirmation.ok) {
+          if (this.stream) {
+            this.stream.close();
+            delete (this as unknown as { stream?: ActivityStream }).stream;
+          }
+          this.setConnection('disconnected');
+          throw new Error(`canonical confirmation failed after reconnect: ${confirmation.reason}`);
+        }
+      }
+      return projection;
     } catch (err) {
       this.setConnection('disconnected');
       throw err;
@@ -180,16 +207,9 @@ export class WorkbenchConnection {
   /**
    * Submit a governed human decision (ACCEPT | REJECT |
    * REQUEST_REVISION) through the existing real `human.decide`
-   * Kiln RPC. Returns the canonical bounded envelope result.
-   *
-   * The bounded envelope fields (plan_ref, patch_ref,
-   * result_state_digest, review_ref) are passed through
-   * unchanged. Temper does not invent them. If they are
-   * placeholders or stale, Kiln returns a bounded error
-   * (E_HUMAN_DECISION_INVALID, E_RUN_TRANSITION_NOT_ALLOWED,
-   * E_MISSING_FIELDS, E_INVALID_DIGEST) and the result
-   * `ok: false` carries the exact code + reason. The
-   * operator sees the real result.
+   * Kiln RPC. The RPC result is not enough to claim completion: on
+   * success we re-query the canonical Session and return an explicit
+   * unknown-effect error when that confirmation cannot be obtained.
    */
   async submitHumanDecision(
     decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION',
@@ -204,10 +224,7 @@ export class WorkbenchConnection {
     if (!this.projection.sessionId) {
       return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
     }
-    // M2 (TEMPER DURABLE): the canonical decision identity (decision_id)
-    // and the canonical session_revision are read from the live
-    // projection (pending_decision.id + session_revision). The decision
-    // identity is NEVER carried in client memory across reconnect.
+    const sessionId = this.projection.sessionId;
     const sq = this.projection.sessionQuery;
     const pending = sq?.pending_decision;
     const decisionId =
@@ -230,7 +247,7 @@ export class WorkbenchConnection {
       decision,
       actor_id: actorId,
       ...(envelope.review_ref ? { review_ref: envelope.review_ref } : {}),
-      session_id: this.projection.sessionId,
+      session_id: sessionId,
       decision_id: decisionId,
       expected_session_revision: expectedSessionRevision
     };
@@ -245,7 +262,26 @@ export class WorkbenchConnection {
         errorReason: resp.error.reason ?? ''
       };
     }
-    return { ok: true, result: resp.result };
+
+    await this.maybeQuerySession('resync');
+    this.emitProjection('resync');
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      return {
+        ok: false,
+        errorCode: 'E_CANONICAL_CONFIRMATION_FAILED',
+        errorReason:
+          `human.decide was accepted by Kiln but post-operation canonical confirmation failed; effect is unknown: ${confirmation.reason}`
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        ...(resp.result ?? {}),
+        canonical_confirmation: confirmation.value
+      }
+    };
   }
 
   onProjection(listener: ProjectionListener): () => void {
@@ -305,14 +341,65 @@ export class WorkbenchConnection {
     if (!resp.ok) {
       return { ok: false, errorCode: resp.error.code, errorReason: resp.error.reason ?? '' };
     }
-    return { ok: true, result: resp.result };
+
+    await this.maybeQuerySession('resync');
+    this.emitProjection('resync');
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      return {
+        ok: false,
+        errorCode: 'E_CANONICAL_CONFIRMATION_FAILED',
+        errorReason:
+          `${method} was accepted by Kiln but post-operation canonical confirmation failed; effect is unknown: ${confirmation.reason}`
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        ...(resp.result ?? {}),
+        canonical_confirmation: confirmation.value
+      }
+    };
+  }
+
+  private confirmCanonicalSession(
+    expectedSessionId: string
+  ): { ok: true; value: CanonicalConfirmation } | { ok: false; reason: string } {
+    if (this.projection.lastError) {
+      return { ok: false, reason: this.projection.lastError };
+    }
+    const query = this.projection.sessionQuery;
+    if (!query) return { ok: false, reason: 'session.query returned no canonical projection' };
+    if (query.session_id && query.session_id !== expectedSessionId) {
+      return {
+        ok: false,
+        reason: `session.query returned ${query.session_id}, expected ${expectedSessionId}`
+      };
+    }
+    return {
+      ok: true,
+      value: {
+        session_id: expectedSessionId,
+        session_revision:
+          typeof query.session_revision === 'number' ? query.session_revision : this.projection.canonicalSessionRevision,
+        session_state: typeof query.session_state === 'string' ? query.session_state : null,
+        run_state: typeof query.run_state === 'string' ? query.run_state : null,
+        workflow_step: typeof query.workflow_step === 'string' ? query.workflow_step : null
+      }
+    };
   }
 
   private async maybeQuerySession(source: 'open' | 'resync' | 'activity' | 'reconnect'): Promise<void> {
     if (!this.projection.sessionId) return;
     const query = await sessionQuery(this.client, this.projection.sessionId);
     if (query.ok && query.result) {
-      this.projection = applySessionQuery(this.projection, query.result);
+      const next = applySessionQuery(this.projection, query.result);
+      // A previous transport/query error is not canonical state. Once a
+      // subsequent query succeeds, remove it rather than poisoning every
+      // future doctor/confirmation result with stale failure history.
+      const { lastError: _staleError, ...confirmed } = next;
+      this.projection = confirmed;
     } else if (!query.ok) {
       this.projection = {
         ...this.projection,
@@ -330,7 +417,6 @@ export class WorkbenchConnection {
       ...(sessionId ? { sessionId } : {}),
       onActivity: (frame) => {
         if (this.stopped) return;
-        // Emit to listeners first; then resync.
         for (const l of this.activityListeners) l(frame);
         void this.resync('activity');
       },
