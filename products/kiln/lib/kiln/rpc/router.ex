@@ -33,6 +33,7 @@ defmodule Kiln.RPC.Router do
     "project.open" => "orchestration:operate",
     "project.list" => "orchestration:read",
     "activity.subscribe" => "orchestration:read",
+    "graph.query" => "orchestration:read",
     "terminal.attach" => "terminal:operate",
     # WP-08 Lane 2 — session-family methods
     "session.start" => "orchestration:operate",
@@ -137,6 +138,9 @@ defmodule Kiln.RPC.Router do
 
       "session.next_actions" ->
         Kiln.RPC.Handlers.Session.handle("session.next_actions", params, opts)
+
+      "graph.query" ->
+        Kiln.RPC.Handlers.Graph.handle("graph.query", params, opts)
 
       "patch.apply" ->
         Kiln.RPC.Handlers.Patch.handle("patch.apply", params, opts)
