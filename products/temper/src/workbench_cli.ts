@@ -10,13 +10,15 @@
  * events to Kiln.
  */
 
+import { execFileSync } from 'node:child_process';
 import { TuiRuntime } from './tui/tui.js';
+import { setInputValue } from './tui/input.js';
+import type { ScreenSpec } from './tui/screen.js';
 import {
   createHomeScreen,
   setHomeProjection,
   type HomeState
 } from './screens/home.js';
-import { execFileSync } from 'node:child_process';
 import {
   appendWorkMotion,
   appendWorkPulse,
@@ -28,7 +30,10 @@ import {
   type WorkState
 } from './screens/work.js';
 import { createDiffScreen } from './screens/diff.js';
+import { createCommandScreen } from './screens/command.js';
 import { WorkbenchConnection } from './workbench/connection.js';
+import { CommandExecutor } from './workbench/commands.js';
+import { readTemperConfig, resolveTemperConfigPath } from './workbench/config.js';
 import { MotionLog } from './workbench/motion.js';
 import { PulseLog } from './workbench/pulse.js';
 import type { WorkbenchProjection } from './workbench/projection.js';
@@ -43,7 +48,7 @@ export interface WorkbenchCliOptions {
   readToken: string;
   /** Operate-scoped token (env KILN_OPERATE_TOKEN). */
   operateToken: string;
-  /** Actor id used for session.start; defaults to "temper_operator". */
+  /** Actor id used for session operations; defaults to "temper_operator". */
   actorId?: string;
   /** Directory for milestone snapshots (env TEMPER_SNAPSHOT_DIR). */
   snapshotDir?: string;
@@ -65,6 +70,22 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     options.snapshotDir ? { snapshotDir: options.snapshotDir } : {}
   );
 
+  // Actor identity is operator configuration, not workflow authority.
+  // /config set actor_id changes this value for subsequent real RPCs in
+  // this process and persists it for future launches.
+  let actorId = options.actorId ?? 'temper_operator';
+
+  const commandExecutor = new CommandExecutor(connection, {
+    repository: options.repository,
+    baseUrl: options.baseUrl,
+    wsUrl: options.wsUrl,
+    ...(options.snapshotDir ? { snapshotDir: options.snapshotDir } : {}),
+    getActorId: () => actorId,
+    setActorId: (value) => {
+      actorId = value;
+    }
+  });
+
   // Bounded projection vocabulary derived from authoritative sources.
   const motionLog = new MotionLog();
   const pulseLog = new PulseLog();
@@ -75,10 +96,62 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
   let workState: WorkState | null = null;
   let active: 'home' | 'work' = 'home';
 
-  const homeScreen = createHomeScreen({
+  function openDiffSurface(): void {
+    const repoRoot = options.repository;
+    const diffSource = (root: string): Promise<{ ok: boolean; text: string; error?: string }> => {
+      try {
+        const text = execFileSync('git', ['-C', root, 'diff'], {
+          encoding: 'utf8',
+          maxBuffer: 2 * 1024 * 1024,
+          stdio: ['ignore', 'pipe', 'pipe']
+        });
+        return Promise.resolve({ ok: true, text: text ?? '' });
+      } catch (err) {
+        const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+        const stdout = typeof e.stdout === 'string' ? e.stdout : e.stdout?.toString('utf8') ?? '';
+        const stderr = typeof e.stderr === 'string' ? e.stderr : e.stderr?.toString('utf8') ?? '';
+        if (stdout.length > 0) return Promise.resolve({ ok: true, text: stdout });
+        return Promise.resolve({
+          ok: false,
+          text: '',
+          error: stderr || e.message || 'git diff failed'
+        });
+      }
+    };
+    runtime.push(
+      createDiffScreen({
+        repositoryRoot: repoRoot,
+        diffSource,
+        onExit: () => runtime.pop(),
+        onResult: (result) => {
+          void result;
+        }
+      })
+    );
+  }
+
+  function openCommandConsole(initial = '/', executeOnOpen = false): void {
+    runtime.push(
+      createCommandScreen({
+        initial,
+        executeOnOpen,
+        execute: (input) => commandExecutor.execute(input),
+        invalidate: () => runtime.invalidate(),
+        onOpenDiff: () => {
+          // Replace the command console with the bounded diff instead of
+          // stacking a diff over a stale command result.
+          runtime.pop();
+          openDiffSurface();
+        },
+        onQuit: () => runtime.stop()
+      })
+    );
+  }
+
+  const baseHomeScreen = createHomeScreen({
     onSubmitIntent: async (intent) => {
       try {
-        await connection.startSession(intent, options.actorId ?? 'temper_operator');
+        await connection.startSession(intent, actorId);
         // Transition: replace Home with Work.
         const nextScreen = workScreen(intent);
         workState = setWorkProjection(nextScreen.init() as WorkState, connection.current());
@@ -89,11 +162,33 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
       } catch (err) {
         return { ok: false, error: (err as Error).message };
       }
-    }
+    },
+    onOpenPalette: () => openCommandConsole('/')
   });
 
-  function workScreen(intent: string) {
-    return createWorkScreen({
+  // Home's main text box remains the free-text intent surface, but a
+  // leading slash is never allowed to become a Session objective. Enter on
+  // `/status` opens the same command console and executes that exact command.
+  const homeScreen: ScreenSpec = {
+    ...baseHomeScreen,
+    update: (state, key, ctx) => {
+      const home = state as HomeState;
+      if (key.kind === 'enter' && home.submitState === 'idle') {
+        const candidate = home.input.value.trim();
+        if (candidate.startsWith('/') && candidate.length > 1) {
+          openCommandConsole(candidate, true);
+          return {
+            state: { ...home, input: setInputValue(home.input, '') },
+            msgs: []
+          };
+        }
+      }
+      return baseHomeScreen.update(state, key, ctx);
+    }
+  };
+
+  function workScreen(intent: string): ScreenSpec {
+    const base = createWorkScreen({
       intent,
       onExit: () => {
         runtime.replace(homeScreen);
@@ -102,14 +197,7 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
       },
       onHumanDecide: async (decision) => {
         // N2 (Repair A): invoke the real bounded `human.decide` Kiln RPC.
-        // The bounded envelope is constructed ONLY from canonical
-        // state — the four bounded refs the operator must submit
-        // are read from session.query.projection.references.decision_envelope,
-        // recorded by Kiln at the decision-creation lifecycle point
-        // (review-propose). Temper does NOT invent placeholders.
-        //
-        // If canonical context is unavailable, the operator sees
-        // "decision action unavailable" rather than fabricated refs.
+        // The bounded envelope is constructed ONLY from canonical state.
         if (!workState) {
           return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'no work state' };
         }
@@ -140,16 +228,10 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
               result_state_digest: envelope.result_state_digest,
               review_ref: envelope.review_ref
             },
-            options.actorId ?? 'temper_operator'
+            actorId
           );
           setResult(result);
-          // After a successful human.decide, the canonical
-          // Session has advanced; resync so the next render
-          // shows the new state and a freshly derived envelope
-          // (or null when no longer waiting_for_user).
-          if (result.ok) {
-            await connection.resync('resync');
-          }
+          if (result.ok) await connection.resync('resync');
           return result;
         } catch (err) {
           const errResult = { ok: false, errorCode: 'E_TRANSPORT', errorReason: (err as Error).message };
@@ -157,70 +239,33 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
           return errResult;
         }
       },
-      onOpenDiff: () => {
-        // N3: open the bounded diff surface. The diff screen
-        // reads `git diff` from the current worktree via a
-        // bounded execFileSync. No new contracts.
-        const repoRoot = options.repository;
-        const diffSource = (root: string): Promise<{ ok: boolean; text: string; error?: string }> => {
-          try {
-            const text = execFileSync('git', ['-C', root, 'diff'], {
-              encoding: 'utf8',
-              maxBuffer: 2 * 1024 * 1024,
-              stdio: ['ignore', 'pipe', 'pipe']
-            });
-            return Promise.resolve({ ok: true, text: text ?? '' });
-          } catch (err) {
-            const e = err as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
-            const stdout = typeof e.stdout === 'string' ? e.stdout : e.stdout?.toString('utf8') ?? '';
-            const stderr = typeof e.stderr === 'string' ? e.stderr : e.stderr?.toString('utf8') ?? '';
-            if (stdout.length > 0) {
-              return Promise.resolve({ ok: true, text: stdout });
-            }
-            return Promise.resolve({
-              ok: false,
-              text: '',
-              error: stderr || e.message || 'git diff failed'
-            });
-          }
-        };
-        runtime.push(
-          createDiffScreen({
-            repositoryRoot: repoRoot,
-            diffSource,
-            onExit: () => {
-              runtime.pop();
-            },
-            onResult: (result) => {
-              // The Diff screen is push-only and self-contained;
-              // it does not project into the workbench state.
-              // This is a deliberate boundary: a diff is a
-              // snapshot of current worktree bytes, not a
-              // canonical projection.
-              void result;
-            }
-          })
-        );
-      }
+      onOpenDiff: openDiffSurface
     });
+
+    // Active Work is not an input screen, so intercept `/` and ctrl-k at
+    // the screen boundary and open the same command console used by Home.
+    return {
+      ...base,
+      update: (state, key, ctx) => {
+        if ((key.kind === 'char' && key.value === '/') || (key.kind === 'ctrl' && key.value === 'k')) {
+          openCommandConsole('/');
+          return { state, msgs: [] };
+        }
+        return base.update(state, key, ctx);
+      }
+    };
   }
 
   // Keep the orchestration mirror initialized alongside the runtime's copy.
-  // Projection callbacks arrive asynchronously after `connection.open()`;
-  // leaving this mirror null strands the UI on the splash forever because
-  // there is no state object to hydrate and hand back to the runtime.
   homeState = homeScreen.init() as HomeState;
   runtime.push(homeScreen);
   runtime.setTopState(homeState);
 
-  // Wire projection updates into the active screen state. Both
-  // screens always receive the latest projection so the Work screen
-  // is ready to render as soon as the operator transitions.
+  // Wire projection updates into the active screen state. Both screens
+  // receive the latest projection so the Work screen is ready immediately.
   const unsubProjection = connection.onProjection((projection: WorkbenchProjection) => {
     if (homeState) homeState = setHomeProjection(homeState, projection);
     if (workState) workState = setWorkProjection(workState, projection);
-    // Run the canonical query through the Motion log; emit any new
-    // Motion events into the Work screen.
     if (projection.sessionQuery) {
       const emitted = motionLog.observe(projection.sessionQuery);
       for (const ev of emitted) {
@@ -231,8 +276,6 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     if (active === 'work' && workState) runtime.setTopState(workState);
   });
 
-  // Wire raw activity frames into the Pulse log. Pulse is appended
-  // to the Work screen state; the Home screen does not show Pulse.
   const unsubActivity = connection.onActivity((frame) => {
     const event = pulseLog.observe(frame);
     if (workState) {
@@ -241,10 +284,6 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
     }
   });
 
-  // Wire connection state transitions into the Work screen so it
-  // can show a prominent disconnect banner and the "since you
-  // left" feed on reconnect. We track the previous state to
-  // detect the transition that triggers the reconnect banner.
   let previousConnection: WorkbenchProjection['connection'] | null = null;
   const unsubConnection = connection.onConnection((state) => {
     if (!workState) return;
@@ -276,9 +315,7 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
   if (options.once) {
     await new Promise((resolve) => setTimeout(resolve, 50));
     const snapshotPath = runtime.snapshot('workbench-open');
-    if (snapshotPath) {
-      process.stderr.write(`temper: snapshot written: ${snapshotPath}\n`);
-    }
+    if (snapshotPath) process.stderr.write(`temper: snapshot written: ${snapshotPath}\n`);
     runtime.stop();
     await connection.stop();
     unsubProjection();
@@ -312,7 +349,9 @@ export async function runWorkbench(options: WorkbenchCliOptions): Promise<number
   return 0;
 }
 
-/** Resolve WorkbenchCliOptions from CLI flags + env vars. */
+/** Resolve WorkbenchCliOptions from CLI flags + env + persistent config.
+ * Precedence: CLI > environment > persistent non-secret config.
+ * Secrets are never read from persistent config. */
 export function resolveWorkbenchOptions(
   flags: {
     repository: string;
@@ -325,21 +364,28 @@ export function resolveWorkbenchOptions(
   },
   env: NodeJS.ProcessEnv = process.env
 ): WorkbenchCliOptions | { error: string } {
-  const baseUrl = flags.baseUrl ?? env.KILN_URL;
-  const wsUrl = flags.wsUrl ?? env.KILN_WS_URL;
+  const configPath = resolveTemperConfigPath(env);
+  const persisted = readTemperConfig(configPath);
+  if (persisted.error) return { error: `invalid Temper config ${configPath}: ${persisted.error}` };
+
+  const baseUrl = flags.baseUrl ?? env.KILN_URL ?? persisted.config.kiln_url;
+  const wsUrl = flags.wsUrl ?? env.KILN_WS_URL ?? persisted.config.kiln_ws_url;
   const readToken = flags.readToken ?? env.KILN_READ_TOKEN;
   const operateToken = flags.operateToken ?? env.KILN_OPERATE_TOKEN;
-  if (!baseUrl) return { error: 'KILN_URL (or --kiln-url) is required' };
-  if (!wsUrl) return { error: 'KILN_WS_URL (or --kiln-ws-url) is required' };
-  if (!readToken) return { error: 'KILN_READ_TOKEN (or --kiln-read-token) is required' };
-  if (!operateToken) return { error: 'KILN_OPERATE_TOKEN (or --kiln-operate-token) is required' };
+  const snapshotDir = flags.snapshotDir ?? env.TEMPER_SNAPSHOT_DIR ?? persisted.config.snapshot_dir;
+  const actorId = flags.actorId ?? env.TEMPER_ACTOR_ID ?? persisted.config.actor_id;
+
+  if (!baseUrl) return { error: 'KILN_URL, --kiln-url, or persisted kiln_url is required' };
+  if (!wsUrl) return { error: 'KILN_WS_URL, --kiln-ws-url, or persisted kiln_ws_url is required' };
+  if (!readToken) return { error: 'KILN_READ_TOKEN (or --kiln-read-token) is required; secrets are not persisted' };
+  if (!operateToken) return { error: 'KILN_OPERATE_TOKEN (or --kiln-operate-token) is required; secrets are not persisted' };
   return {
     repository: flags.repository,
     baseUrl,
     wsUrl,
     readToken,
     operateToken,
-    ...(flags.snapshotDir ? { snapshotDir: flags.snapshotDir } : {}),
-    ...(flags.actorId ? { actorId: flags.actorId } : {})
+    ...(snapshotDir ? { snapshotDir } : {}),
+    ...(actorId ? { actorId } : {})
   };
 }
