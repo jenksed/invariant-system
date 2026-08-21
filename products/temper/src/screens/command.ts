@@ -53,13 +53,13 @@ function updateCommandScreen(
   _ctx: ScreenContext,
   deps: CommandScreenDeps
 ): { state: CommandScreenState; msgs: ScreenMsg[] } {
-  if (key.kind === 'ctrl' && key.value === 'c') return { state, msgs: [{ kind: 'quit' }] };
-
   // A command may be carrying a real Kiln mutation. Keep the console
-  // attached until the bounded result returns so an async completion cannot
-  // later pop or replace a different screen after the operator escaped away.
+  // attached and input-locked until the bounded result returns. Temper has
+  // no generic RPC cancellation contract, so Ctrl-C must not pretend it can
+  // cancel an already-dispatched operation.
   if (state.running) return { state, msgs: [] };
 
+  if (key.kind === 'ctrl' && key.value === 'c') return { state, msgs: [{ kind: 'quit' }] };
   if (key.kind === 'escape') return { state, msgs: [{ kind: 'pop' }] };
 
   if (key.kind === 'enter') {
@@ -123,7 +123,7 @@ function renderCommandScreen(state: CommandScreenState, ctx: ScreenContext): Fra
   }
 
   const footer = state.running
-    ? ' command in flight · ctrl-c interrupt '
+    ? ' command in flight · input locked until bounded result '
     : ' Enter execute · ↑/↓ history · esc back · ctrl-c quit ';
   putString(frame, ctx.rows - 1, 0, pad(footer, ctx.cols), 'footer');
   return frame;
