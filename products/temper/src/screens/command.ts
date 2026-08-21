@@ -12,6 +12,7 @@ import { commandSuggestions, type CommandResult } from '../workbench/commands.js
 
 export interface CommandScreenDeps {
   initial?: string;
+  executeOnOpen?: boolean;
   execute: (input: string) => Promise<CommandResult>;
   invalidate: () => void;
   onOpenDiff: () => void;
@@ -28,11 +29,19 @@ export function createCommandScreen(deps: CommandScreenDeps): ScreenSpec {
   return {
     id: 'commands',
     title: 'Commands',
-    init: () => ({
-      input: focusInput(createInputState({ prompt: '> ', initial: deps.initial ?? '/', history: [] }), true),
-      running: false,
-      result: null
-    }),
+    init: () => {
+      const initial = deps.initial ?? '/';
+      const state: CommandScreenState = {
+        input: focusInput(createInputState({ prompt: '> ', initial, history: [] }), true),
+        running: false,
+        result: null
+      };
+      if (deps.executeOnOpen && initial.trim().length > 1) {
+        state.running = true;
+        queueMicrotask(() => void runCommand(state, initial, deps));
+      }
+      return state;
+    },
     view: (state, ctx) => renderCommandScreen(state as CommandScreenState, ctx),
     update: (state, key, ctx) => updateCommandScreen(state as CommandScreenState, key, ctx, deps)
   };
