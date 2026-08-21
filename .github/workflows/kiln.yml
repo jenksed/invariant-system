@@ -101,20 +101,19 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      # Temporary feature-branch diagnostic: let the pinned Elixir formatter
-      # produce the canonical bytes for the two new graph files, then preserve
-      # those bytes as an artifact. Remove this step once the normalized bytes
-      # are committed to work/operator-preview-v01.
-      - name: Normalize new graph files for diagnostic capture
-        run: mix format lib/kiln/rpc/handlers/graph.ex test/kiln/graph_rpc_test.exs
+      # Temporary feature-branch diagnostic: let the pinned formatter normalize
+      # the whole Kiln tree and export only the resulting diff. This identifies
+      # every remaining formatter-dirty file without guessing.
+      - name: Capture formatter diff
+        run: |
+          mix format
+          git diff -- . > formatter-diagnostic.patch
 
-      - name: Upload normalized graph files
+      - name: Upload formatter diagnostic
         uses: actions/upload-artifact@v4
         with:
-          name: kiln-graph-format-normalized
-          path: |
-            products/kiln/lib/kiln/rpc/handlers/graph.ex
-            products/kiln/test/kiln/graph_rpc_test.exs
+          name: kiln-formatter-diagnostic
+          path: products/kiln/formatter-diagnostic.patch
           if-no-files-found: error
 
       - name: Check formatting
