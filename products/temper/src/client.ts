@@ -30,7 +30,9 @@ import type {
   RpcError
 } from './types.js';
 
-// Scope map: method → required scope. Frozen at contract-freeze time.
+// Scope map: method → required scope. Frozen at contract-freeze time, extended
+// only when Kiln exposes a real routed method. `graph.query` is read-only and
+// derives exclusively from canonical Session state.
 const SCOPE_TABLE: Record<string, RpcScope> = {
   'worker.propose': 'orchestration:operate',
   'patch.apply': 'orchestration:operate',
@@ -40,6 +42,7 @@ const SCOPE_TABLE: Record<string, RpcScope> = {
   'project.open': 'orchestration:operate',
   'project.list': 'orchestration:read',
   'activity.subscribe': 'orchestration:read',
+  'graph.query': 'orchestration:read',
   'terminal.attach': 'terminal:operate',
   'session.start': 'orchestration:operate',
   'session.cancel': 'orchestration:operate',
@@ -154,16 +157,11 @@ export class KilnClient {
         error: {
           code: errBody.code ?? 'E_DISPATCH_FAILED',
           reason: errBody.reason ?? `http ${res.status}`,
-          // exactOptionalPropertyTypes: do not assign undefined to an
-          // optional field. Spread only when present.
           ...(errBody.method ? { method: errBody.method } : {})
         }
       };
     }
 
-    // Success body is the result map directly (per router.ex:65 — the
-    // handler returns `{:ok, result}` and the service.ex:73 encodes it
-    // bare). We wrap it in `{ ok: true, result }` for caller ergonomics.
     return { ok: true, result: body as R };
   }
 
