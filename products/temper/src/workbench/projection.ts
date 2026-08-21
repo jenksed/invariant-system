@@ -84,7 +84,10 @@ export function projectionFromProjectOpen(open: ProjectOpenResult, repositoryNam
     canonicalSessionRevision: open.canonical_session_revision ?? null,
     orphaned: open.orphaned === true,
     unknowns: open.unknowns ?? [],
-    connection: 'connected',
+    // HTTP project.open proves the daemon answered; it does not prove the
+    // activity WebSocket is open. WorkbenchConnection upgrades this to
+    // `connected` only after ActivityStream observes the real open event.
+    connection: 'reconnecting',
     builtAt: new Date().toISOString()
   };
 }
@@ -110,9 +113,7 @@ export function clearSessionQuery(projection: WorkbenchProjection): WorkbenchPro
     connection: projection.connection,
     builtAt: projection.builtAt
   };
-  if (projection.lastError !== undefined) {
-    next.lastError = projection.lastError;
-  }
+  if (projection.lastError !== undefined) next.lastError = projection.lastError;
   return next;
 }
 

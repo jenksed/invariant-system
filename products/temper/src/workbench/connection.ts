@@ -10,34 +10,42 @@
  * The connection never invents state. It only forwards what Kiln
  * reports. The TUI is a pure consumer of `onProjection` callbacks.
  *
- * Reconnect: when the WebSocket disconnects, we mark the projection
- * 'reconnecting'; when it re-opens, we re-query canonically and
- * discard any cached local state.
- *
  * Authority rule: WorkbenchConnection never holds a workflow boolean.
  * `connection` is transport state, not workflow state.
  */
 
 import path from 'node:path';
+import { createHash, randomUUID } from 'node:crypto';
 import { KilnClient } from '../client.js';
 import { ActivityStream } from '../stream.js';
 import type { ActivityNotificationFrame, KilnClientConfig, ProjectOpenResult } from '../types.js';
 import type { WorkbenchProjection } from './projection.js';
 import { applySessionQuery, projectionFromProjectOpen } from './projection.js';
 import { sessionQuery } from './session_query.js';
-import { createHash, randomUUID } from 'node:crypto';
 
 export interface WorkbenchConnectionConfig extends KilnClientConfig {
   repository: string;
-  /** When true, session.start is invoked automatically if project.open
-   *  returns session_id=null. Useful for the Home → Work flow when
-   *  the operator submits an intent before any session exists. */
   autoStartOnEmpty?: boolean;
 }
 
 export type ProjectionListener = (projection: WorkbenchProjection, source: 'open' | 'resync' | 'activity' | 'reconnect') => void;
 export type ConnectionListener = (state: WorkbenchProjection['connection']) => void;
 export type ActivityListener = (frame: ActivityNotificationFrame) => void;
+
+export interface BoundedCommandResult {
+  ok: boolean;
+  result?: Record<string, unknown>;
+  errorCode?: string;
+  errorReason?: string;
+}
+
+interface CanonicalConfirmation {
+  session_id: string;
+  session_revision: number | null;
+  session_state: string | null;
+  run_state: string | null;
+  workflow_step: string | null;
+}
 
 export class WorkbenchConnection {
   private readonly config: WorkbenchConnectionConfig;
@@ -58,7 +66,6 @@ export class WorkbenchConnection {
     this.subscriptionId = `sub_${randomUUID().replace(/-/g, '').slice(0, 32)}`;
   }
 
-  /** Open the connection: project.open, session.query, subscribe. */
   async open(): Promise<WorkbenchProjection> {
     const openResp = await this.client.call<{ path: string }, ProjectOpenResult>({
       method: 'project.open',
@@ -74,14 +81,17 @@ export class WorkbenchConnection {
     this.projection = projectionFromProjectOpen(openResp.result, path.basename(this.config.repository));
     await this.maybeQuerySession('open');
     this.emitProjection('open');
-
-    // Subscribe to the activity stream (best-effort; failure does not
-    // poison the projection).
     await this.startStream();
     return this.projection;
   }
 
-  /** Begin a new Session with the given intent as the bounded objective. */
+  /**
+   * Begin a new Session and canonically confirm it. The activity subscription
+   * is then rebound to that exact Session ID. Failure to rebind the stream
+   * does not undo or falsely reject a Session that Kiln already created and
+   * canonically confirmed; the projection instead remains disconnected and
+   * the stream's bounded retry machinery continues from the new instance.
+   */
   async startSession(intent: string, actorId: string): Promise<WorkbenchProjection> {
     const projectObservation = buildProjectObservation(this.config.repository);
     const resp = await this.client.call<Record<string, unknown>, { session_id?: string }>({
@@ -97,9 +107,8 @@ export class WorkbenchConnection {
       throw new Error(`session.start failed: ${resp.error.code} ${resp.error.reason ?? ''}`);
     }
     const sessionId = resp.result?.session_id;
-    if (!sessionId) {
-      throw new Error('session.start returned no session_id');
-    }
+    if (!sessionId) throw new Error('session.start returned no session_id');
+
     this.projection = {
       ...this.projection,
       sessionId,
@@ -107,11 +116,65 @@ export class WorkbenchConnection {
     };
     await this.maybeQuerySession('open');
     this.emitProjection('open');
+
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      throw new Error(
+        `session.start accepted by Kiln but canonical confirmation failed: ${confirmation.reason}`
+      );
+    }
+
+    await this.rebindActivityStream();
     return this.projection;
   }
 
-  /** Re-query the canonical Session. Called on every activity frame
-   *  and after reconnect. */
+  async cancelSession(actorId: string): Promise<BoundedCommandResult> {
+    return this.sessionLifecycle('session.cancel', actorId);
+  }
+
+  async resumeSession(actorId: string): Promise<BoundedCommandResult> {
+    return this.sessionLifecycle('session.resume', actorId);
+  }
+
+  async nextActions(): Promise<BoundedCommandResult> {
+    if (!this.projection.sessionId) {
+      return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
+    }
+    const resp = await this.client.call<{ session_id: string }, Record<string, unknown>>({
+      method: 'session.next_actions',
+      params: { session_id: this.projection.sessionId }
+    });
+    if (!resp.ok) {
+      return { ok: false, errorCode: resp.error.code, errorReason: resp.error.reason ?? '' };
+    }
+    return { ok: true, result: resp.result };
+  }
+
+  /** Manual reconnect succeeds only when the replacement WS really opens. */
+  async reconnect(): Promise<WorkbenchProjection> {
+    this.retireActivityStream();
+    this.stopped = false;
+    this.setConnection('reconnecting');
+    try {
+      const projection = await this.open();
+      if (projection.connection !== 'connected') {
+        throw new Error(`activity transport did not reconnect; state=${projection.connection}`);
+      }
+      if (projection.sessionId) {
+        const confirmation = this.confirmCanonicalSession(projection.sessionId);
+        if (!confirmation.ok) {
+          this.retireActivityStream();
+          this.setConnection('disconnected');
+          throw new Error(`canonical confirmation failed after reconnect: ${confirmation.reason}`);
+        }
+      }
+      return projection;
+    } catch (err) {
+      this.setConnection('disconnected');
+      throw err;
+    }
+  }
+
   async resync(reason: 'activity' | 'reconnect' | 'resync' = 'resync'): Promise<WorkbenchProjection> {
     if (this.resyncInFlight) return this.projection;
     this.resyncInFlight = true;
@@ -124,20 +187,6 @@ export class WorkbenchConnection {
     return this.projection;
   }
 
-  /**
-   * Submit a governed human decision (ACCEPT | REJECT |
-   * REQUEST_REVISION) through the existing real `human.decide`
-   * Kiln RPC. Returns the canonical bounded envelope result.
-   *
-   * The bounded envelope fields (plan_ref, patch_ref,
-   * result_state_digest, review_ref) are passed through
-   * unchanged. Temper does not invent them. If they are
-   * placeholders or stale, Kiln returns a bounded error
-   * (E_HUMAN_DECISION_INVALID, E_RUN_TRANSITION_NOT_ALLOWED,
-   * E_MISSING_FIELDS, E_INVALID_DIGEST) and the result
-   * `ok: false` carries the exact code + reason. The
-   * operator sees the real result.
-   */
   async submitHumanDecision(
     decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION',
     envelope: {
@@ -147,19 +196,11 @@ export class WorkbenchConnection {
       review_ref?: { id: string; digest: string } | null;
     },
     actorId: string
-  ): Promise<{
-    ok: boolean;
-    result?: Record<string, unknown>;
-    errorCode?: string;
-    errorReason?: string;
-  }> {
+  ): Promise<BoundedCommandResult> {
     if (!this.projection.sessionId) {
       return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
     }
-    // M2 (TEMPER DURABLE): the canonical decision identity (decision_id)
-    // and the canonical session_revision are read from the live
-    // projection (pending_decision.id + session_revision). The decision
-    // identity is NEVER carried in client memory across reconnect.
+    const sessionId = this.projection.sessionId;
     const sq = this.projection.sessionQuery;
     const pending = sq?.pending_decision;
     const decisionId =
@@ -182,7 +223,7 @@ export class WorkbenchConnection {
       decision,
       actor_id: actorId,
       ...(envelope.review_ref ? { review_ref: envelope.review_ref } : {}),
-      session_id: this.projection.sessionId,
+      session_id: sessionId,
       decision_id: decisionId,
       expected_session_revision: expectedSessionRevision
     };
@@ -197,7 +238,26 @@ export class WorkbenchConnection {
         errorReason: resp.error.reason ?? ''
       };
     }
-    return { ok: true, result: resp.result };
+
+    await this.maybeQuerySession('resync');
+    this.emitProjection('resync');
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      return {
+        ok: false,
+        errorCode: 'E_CANONICAL_CONFIRMATION_FAILED',
+        errorReason:
+          `human.decide was accepted by Kiln but post-operation canonical confirmation failed; effect is unknown: ${confirmation.reason}`
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        ...(resp.result ?? {}),
+        canonical_confirmation: confirmation.value
+      }
+    };
   }
 
   onProjection(listener: ProjectionListener): () => void {
@@ -210,9 +270,6 @@ export class WorkbenchConnection {
     return () => this.connectionListeners.delete(listener);
   }
 
-  /** Subscribe to raw activity frames (one per activity.notification
-   *  that survived stale/duplicate/gap filters). Use this to feed a
-   *  Pulse log; do not use it to derive Motion. */
   onActivity(listener: ActivityListener): () => void {
     this.activityListeners.add(listener);
     return () => this.activityListeners.delete(listener);
@@ -224,25 +281,113 @@ export class WorkbenchConnection {
 
   async stop(): Promise<void> {
     this.stopped = true;
-    if (this.stream) {
-      this.stream.close();
-      delete (this as unknown as { stream?: ActivityStream }).stream;
-    }
+    this.retireActivityStream();
   }
 
   // -- private --
+
+  private async sessionLifecycle(
+    method: 'session.cancel' | 'session.resume',
+    actorId: string
+  ): Promise<BoundedCommandResult> {
+    const sessionId = this.projection.sessionId;
+    if (!sessionId) {
+      return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
+    }
+    const revision = this.projection.sessionQuery?.session_revision ?? this.projection.canonicalSessionRevision;
+    if (typeof revision !== 'number' || revision < 0) {
+      return {
+        ok: false,
+        errorCode: 'E_SESSION_REVISION_UNAVAILABLE',
+        errorReason: 'no canonical session revision is available for a mutating lifecycle operation'
+      };
+    }
+    const params = {
+      session_id: sessionId,
+      actor_id: actorId,
+      expected_session_revision: revision
+    };
+    const resp = await this.client.call<typeof params, Record<string, unknown>>({ method, params });
+    if (!resp.ok) {
+      return { ok: false, errorCode: resp.error.code, errorReason: resp.error.reason ?? '' };
+    }
+
+    await this.maybeQuerySession('resync');
+    this.emitProjection('resync');
+    const confirmation = this.confirmCanonicalSession(sessionId);
+    if (!confirmation.ok) {
+      return {
+        ok: false,
+        errorCode: 'E_CANONICAL_CONFIRMATION_FAILED',
+        errorReason:
+          `${method} was accepted by Kiln but post-operation canonical confirmation failed; effect is unknown: ${confirmation.reason}`
+      };
+    }
+
+    return {
+      ok: true,
+      result: {
+        ...(resp.result ?? {}),
+        canonical_confirmation: confirmation.value
+      }
+    };
+  }
+
+  private confirmCanonicalSession(
+    expectedSessionId: string
+  ): { ok: true; value: CanonicalConfirmation } | { ok: false; reason: string } {
+    if (this.projection.lastError) return { ok: false, reason: this.projection.lastError };
+    const query = this.projection.sessionQuery;
+    if (!query) return { ok: false, reason: 'session.query returned no canonical projection' };
+    if (query.session_id && query.session_id !== expectedSessionId) {
+      return {
+        ok: false,
+        reason: `session.query returned ${query.session_id}, expected ${expectedSessionId}`
+      };
+    }
+    return {
+      ok: true,
+      value: {
+        session_id: expectedSessionId,
+        session_revision:
+          typeof query.session_revision === 'number' ? query.session_revision : this.projection.canonicalSessionRevision,
+        session_state: typeof query.session_state === 'string' ? query.session_state : null,
+        run_state: typeof query.run_state === 'string' ? query.run_state : null,
+        workflow_step: typeof query.workflow_step === 'string' ? query.workflow_step : null
+      }
+    };
+  }
 
   private async maybeQuerySession(source: 'open' | 'resync' | 'activity' | 'reconnect'): Promise<void> {
     if (!this.projection.sessionId) return;
     const query = await sessionQuery(this.client, this.projection.sessionId);
     if (query.ok && query.result) {
-      this.projection = applySessionQuery(this.projection, query.result);
+      const next = applySessionQuery(this.projection, query.result);
+      const { lastError: _staleError, ...confirmed } = next;
+      this.projection = confirmed;
     } else if (!query.ok) {
       this.projection = {
         ...this.projection,
         lastError: `session.query failed: ${query.errorCode} ${query.errorReason ?? ''}`.trim()
       };
     }
+  }
+
+  private async rebindActivityStream(): Promise<void> {
+    this.retireActivityStream();
+    try {
+      await this.startStream();
+    } catch {
+      // The Session is already canonically confirmed. Preserve that fact and
+      // surface disconnected transport state; ActivityStream owns bounded
+      // reconnect retries for its failed replacement socket.
+    }
+  }
+
+  private retireActivityStream(): void {
+    if (!this.stream) return;
+    this.stream.close();
+    delete (this as unknown as { stream?: ActivityStream }).stream;
   }
 
   private async startStream(): Promise<void> {
@@ -252,27 +397,26 @@ export class WorkbenchConnection {
       ...this.config,
       subscriptionId: this.subscriptionId,
       ...(sessionId ? { sessionId } : {}),
+      onConnectionState: (state) => {
+        if (!this.stopped) this.setConnection(state);
+      },
       onActivity: (frame) => {
         if (this.stopped) return;
-        // Emit to listeners first; then resync.
         for (const l of this.activityListeners) l(frame);
         void this.resync('activity');
       },
       onResync: (reason) => {
         if (this.stopped) return;
-        if (reason === 'reconnect') {
-          this.setConnection('reconnecting');
-          void this.resync('reconnect').then(() => this.setConnection('connected'));
-        } else {
-          void this.resync('activity');
-        }
+        if (reason === 'reconnect') void this.resync('reconnect');
+        else void this.resync('activity');
       }
     });
     try {
       await this.stream.open();
       this.setConnection('connected');
-    } catch {
+    } catch (err) {
       this.setConnection('disconnected');
+      throw err;
     }
   }
 
@@ -280,6 +424,10 @@ export class WorkbenchConnection {
     if (this.projection.connection === state) return;
     this.projection = { ...this.projection, connection: state };
     for (const l of this.connectionListeners) l(state);
+    // Home consumes projection callbacks rather than the Work-only connection
+    // listener. Push transport changes through the same projection channel so
+    // no screen can retain a stale connection claim.
+    this.emitProjection('reconnect');
   }
 
   private emitProjection(source: 'open' | 'resync' | 'activity' | 'reconnect'): void {
@@ -306,8 +454,6 @@ function buildProjectObservation(repositoryRoot: string): {
   repository_fingerprint: string;
   observed_at: string;
 } {
-  // SHA-256 of the absolute path; matches the bounded convention used
-  // by the CLI's build_project_observation/1.
   const hash = createHash('sha256').update(repositoryRoot).digest('hex');
   return {
     repository_root: repositoryRoot,

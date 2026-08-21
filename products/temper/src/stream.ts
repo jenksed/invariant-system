@@ -30,12 +30,14 @@ import { KilnClient } from './client.js';
 
 export type ActivityEventListener = (frame: ActivityNotificationFrame) => void;
 export type ResyncListener = (reason: 'stale' | 'gap' | 'reconnect') => void;
+export type StreamConnectionListener = (state: 'connected' | 'reconnecting' | 'disconnected') => void;
 
 export interface StreamConfig extends KilnClientConfig {
   subscriptionId: string;
   sessionId?: string;
   onActivity?: ActivityEventListener;
   onResync?: ResyncListener;
+  onConnectionState?: StreamConnectionListener;
   pingIntervalMs?: number;
 }
 
@@ -48,18 +50,26 @@ export class ActivityStream {
   private readonly seen = new Set<string>();
   private pingTimer?: ReturnType<typeof setInterval>;
   private reconnectAttempts = 0;
+  /**
+   * Manual lifecycle guard. `close()` means the owner intentionally
+   * retired this stream; a WebSocket close event must not resurrect it.
+   * Unexpected network closes leave this false and retain bounded retry.
+   */
+  private closed = false;
 
   constructor(config: StreamConfig) {
     this.config = config;
     this.client = new KilnClient(config);
   }
 
-  /** Open the WS, subscribe, and start the keepalive ping loop. */
+  /**
+   * Open the WebSocket and resolve only after the actual `open` event.
+   * The old implementation returned immediately after construction, which
+   * allowed callers to report `connected` before the transport handshake.
+   */
   public async open(): Promise<void> {
-    // Node 22+ global WebSocket accepts a headers option in its
-    // implementation but its TypeScript signature does not export
-    // WebSocketConstructorOptions. Cast to the standard second-arg
-    // shape so the compiler accepts the runtime-accepted headers.
+    if (this.closed) throw new Error('activity stream is permanently closed');
+
     const ws = new WebSocket(
       this.config.wsUrl,
       { headers: { authorization: `Bearer ${this.config.operateToken}` } } as unknown as
@@ -70,41 +80,70 @@ export class ActivityStream {
 
     this.ws = ws;
 
-    ws.addEventListener('open', () => {
-      this.reconnectAttempts = 0;
-      const frame: ActivitySubscribeFrame = {
-        type: 'activity.subscribe',
-        subscription_id: this.config.subscriptionId,
-        ...(this.config.sessionId
-          ? { filter: { session_id: this.config.sessionId } }
-          : {}),
-        since_revision: this.lastObservedRevision
-      };
-      ws.send(JSON.stringify(frame));
-      this.startPing();
-    });
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
 
-    ws.addEventListener('message', (event) => {
-      this.handleFrame(typeof event.data === 'string' ? event.data : '');
-    });
+      ws.addEventListener('open', () => {
+        if (this.closed) {
+          ws.close(1000, 'temper-close');
+          if (!settled) {
+            settled = true;
+            reject(new Error('activity stream closed during connection'));
+          }
+          return;
+        }
+        this.reconnectAttempts = 0;
+        const frame: ActivitySubscribeFrame = {
+          type: 'activity.subscribe',
+          subscription_id: this.config.subscriptionId,
+          ...(this.config.sessionId
+            ? { filter: { session_id: this.config.sessionId } }
+            : {}),
+          since_revision: this.lastObservedRevision
+        };
+        ws.send(JSON.stringify(frame));
+        this.startPing();
+        this.config.onConnectionState?.('connected');
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      });
 
-    ws.addEventListener('close', () => {
-      this.stopPing();
-      this.scheduleReconnect();
-    });
+      ws.addEventListener('message', (event) => {
+        if (this.closed) return;
+        this.handleFrame(typeof event.data === 'string' ? event.data : '');
+      });
 
-    ws.addEventListener('error', () => {
-      // Close handler will fire next; reconnect logic handles it.
+      ws.addEventListener('close', () => {
+        this.stopPing();
+        if (this.closed) return;
+        this.config.onConnectionState?.('reconnecting');
+        if (!settled) {
+          settled = true;
+          reject(new Error('activity websocket closed before connection completed'));
+        }
+        this.scheduleReconnect();
+      });
+
+      ws.addEventListener('error', () => {
+        if (this.closed) return;
+        this.config.onConnectionState?.('disconnected');
+        if (!settled) {
+          settled = true;
+          reject(new Error('activity websocket connection failed'));
+        }
+        // The close event normally follows and owns bounded retry.
+      });
     });
   }
 
-  /** Close the WS cleanly. */
+  /** Close the WS cleanly and permanently retire this stream instance. */
   public close(): void {
+    this.closed = true;
     this.stopPing();
     if (this.ws) {
       this.ws.close(1000, 'temper-close');
-      // exactOptionalPropertyTypes: `?:` fields cannot be assigned
-      // undefined. Use delete to clear the optional slot.
       delete (this as unknown as { ws?: WebSocket }).ws;
     }
   }
@@ -120,6 +159,7 @@ export class ActivityStream {
   // -- private --
 
   private handleFrame(raw: string): void {
+    if (this.closed) return;
     let frame: ActivityFrame;
     try {
       frame = JSON.parse(raw) as ActivityFrame;
@@ -132,7 +172,8 @@ export class ActivityStream {
     } else if (frame.type === 'pong') {
       // keepalive ack; nothing to do
     } else if (frame.type === 'activity.error') {
-      // surface but do not throw — the daemon decides close codes
+      // The daemon reported stream divergence/error while the socket still
+      // exists. Force canonical resync; do not invent a notification.
       this.config.onResync?.('reconnect');
     }
     // activity.snapshot is informational; canonical resync is via
@@ -140,12 +181,9 @@ export class ActivityStream {
   }
 
   private processNotification(frame: ActivityNotificationFrame): void {
-    // Stale guard (contract freeze §7).
-    if (frame.revision < this.lastObservedRevision) {
-      return;
-    }
+    if (this.closed) return;
+    if (frame.revision < this.lastObservedRevision) return;
 
-    // Gap guard — discard and request canonical resync.
     if (frame.revision > this.lastObservedRevision + 1 && this.lastObservedRevision !== 0) {
       this.config.onResync?.('gap');
       this.lastObservedRevision = frame.revision;
@@ -153,7 +191,6 @@ export class ActivityStream {
       return;
     }
 
-    // Duplicate guard.
     const key = `${frame.revision}:${frame.event_kind}:${frame.subject.id}`;
     if (this.seen.has(key)) return;
     this.seen.add(key);
@@ -164,9 +201,10 @@ export class ActivityStream {
   }
 
   private startPing(): void {
+    if (this.closed) return;
     const interval = this.config.pingIntervalMs ?? 15_000;
     this.pingTimer = setInterval(() => {
-      if (this.ws && this.ws.readyState === this.ws.OPEN) {
+      if (!this.closed && this.ws && this.ws.readyState === this.ws.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ping' }));
       }
     }, interval);
@@ -175,19 +213,24 @@ export class ActivityStream {
   private stopPing(): void {
     if (this.pingTimer) {
       clearInterval(this.pingTimer);
-      // exactOptionalPropertyTypes: `?:` fields cannot be assigned
-      // undefined. Use delete to clear the optional slot.
       delete (this as unknown as { pingTimer?: ReturnType<typeof setInterval> }).pingTimer;
     }
   }
 
   private scheduleReconnect(): void {
+    if (this.closed) return;
     this.reconnectAttempts += 1;
-    // bounded backoff: 250ms, 500ms, 1s, 2s, 4s, then capped at 5s.
     const delay = Math.min(5_000, 250 * 2 ** Math.min(this.reconnectAttempts, 4));
     setTimeout(() => {
-      this.config.onResync?.('reconnect');
-      void this.open();
+      if (this.closed) return;
+      void this.open()
+        .then(() => {
+          if (!this.closed) this.config.onResync?.('reconnect');
+        })
+        .catch(() => {
+          // `open()` reports the failed attempt through connection state.
+          // The socket close event owns scheduling the next bounded retry.
+        });
     }, delay);
   }
 }
