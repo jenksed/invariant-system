@@ -5,7 +5,13 @@ defmodule Kiln.GraphRPCTest do
 
   setup do
     stop_registered_store()
-    dir = Path.join(System.tmp_dir!(), "kiln-graph-rpc-#{System.unique_integer([:positive])}")
+
+    dir =
+      Path.join(
+        System.tmp_dir!(),
+        "kiln-graph-rpc-#{System.unique_integer([:positive])}"
+      )
+
     File.mkdir_p!(dir)
 
     on_exit(fn ->
@@ -24,14 +30,17 @@ defmodule Kiln.GraphRPCTest do
     {:ok, store: store}
   end
 
-  test "graph.query projects canonical Session/Task/Run identities without writing", %{store: store} do
+  test "graph.query projects canonical Session/Task/Run identities without writing", %{
+    store: store
+  } do
     {:ok, started} =
       Workflow.start_session(
         objective: "prove graph transport",
         criteria: ["canonical graph is readable"],
         project_observation: %{
           repository_root: "/tmp/invariant-graph-fixture",
-          repository_fingerprint: "sha256:0000000000000000000000000000000000000000000000000000000000000001",
+          repository_fingerprint:
+            "sha256:0000000000000000000000000000000000000000000000000000000000000001",
           observed_at: ~U[2026-08-20 20:00:00Z]
         },
         actor_id: "user:test"
@@ -65,12 +74,17 @@ defmodule Kiln.GraphRPCTest do
     assert {:error, %{code: :E_SCOPE_INSUFFICIENT}} =
              Kiln.RPC.Router.dispatch(
                "orchestration:operate",
-               %{"method" => "graph.query", "params" => %{"session_id" => "ses_0123456789abcdef0123456789abcdef"}}
+               %{
+                 "method" => "graph.query",
+                 "params" => %{"session_id" => "ses_0123456789abcdef0123456789abcdef"}
+               }
              )
   end
 
   defp count(conn, table) do
-    {:ok, %{rows: [[value]]}} = Exqlite.Sqlite3.execute(conn, "SELECT COUNT(*) FROM #{table}")
+    {:ok, %{rows: [[value]]}} =
+      Exqlite.Sqlite3.execute(conn, "SELECT COUNT(*) FROM #{table}")
+
     value
   end
 
