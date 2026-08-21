@@ -101,21 +101,6 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
 
-      # Temporary feature-branch diagnostic: let the pinned formatter normalize
-      # the whole Kiln tree and export only the resulting diff. This identifies
-      # every remaining formatter-dirty file without guessing.
-      - name: Capture formatter diff
-        run: |
-          mix format
-          git diff -- . > formatter-diagnostic.patch
-
-      - name: Upload formatter diagnostic
-        uses: actions/upload-artifact@v4
-        with:
-          name: kiln-formatter-diagnostic
-          path: products/kiln/formatter-diagnostic.patch
-          if-no-files-found: error
-
       - name: Check formatting
         run: mix format --check-formatted
 
