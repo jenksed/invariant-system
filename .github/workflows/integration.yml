@@ -39,7 +39,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.10.0
+          node-version: 22
 
       - name: Set up Erlang and Elixir
         uses: erlef/setup-beam@v1
@@ -102,7 +102,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.10.0
+          node-version: 22
 
       - name: Set up Erlang and Elixir
         uses: erlef/setup-beam@v1
@@ -110,11 +110,17 @@ jobs:
           otp-version: "28.4"
           elixir-version: "1.20.2"
 
-      - run: mix deps.get
+      - name: Install Kiln dependencies
+        run: mix deps.get
         working-directory: products/kiln
 
-      - run: mix deps.get
+      - name: Install Loadout dependencies
+        run: npm ci
         working-directory: products/loadout
+
+      - name: Install Temper dependencies
+        run: npm ci
+        working-directory: products/temper
 
       - name: Run implement-change golden path
         run: ./integration/scenarios/implement-change/run.sh
