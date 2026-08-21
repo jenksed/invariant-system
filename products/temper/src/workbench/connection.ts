@@ -10,10 +10,6 @@
  * The connection never invents state. It only forwards what Kiln
  * reports. The TUI is a pure consumer of `onProjection` callbacks.
  *
- * Reconnect: when the WebSocket disconnects, we mark the projection
- * 'reconnecting'; when it re-opens, we re-query canonically and
- * discard any cached local state.
- *
  * Authority rule: WorkbenchConnection never holds a workflow boolean.
  * `connection` is transport state, not workflow state.
  */
@@ -29,9 +25,6 @@ import { sessionQuery } from './session_query.js';
 
 export interface WorkbenchConnectionConfig extends KilnClientConfig {
   repository: string;
-  /** When true, session.start is invoked automatically if project.open
-   *  returns session_id=null. Useful for the Home → Work flow when
-   *  the operator submits an intent before any session exists. */
   autoStartOnEmpty?: boolean;
 }
 
@@ -73,7 +66,6 @@ export class WorkbenchConnection {
     this.subscriptionId = `sub_${randomUUID().replace(/-/g, '').slice(0, 32)}`;
   }
 
-  /** Open the connection: project.open, session.query, subscribe. */
   async open(): Promise<WorkbenchProjection> {
     const openResp = await this.client.call<{ path: string }, ProjectOpenResult>({
       method: 'project.open',
@@ -89,12 +81,15 @@ export class WorkbenchConnection {
     this.projection = projectionFromProjectOpen(openResp.result, path.basename(this.config.repository));
     await this.maybeQuerySession('open');
     this.emitProjection('open');
-
     await this.startStream();
     return this.projection;
   }
 
-  /** Begin a new Session with the given intent as the bounded objective. */
+  /**
+   * Begin a new Session and canonically confirm it. After the Session ID is
+   * known, rebuild the activity subscription so it is filtered to that exact
+   * Session rather than retaining a filter from the prior project.open state.
+   */
   async startSession(intent: string, actorId: string): Promise<WorkbenchProjection> {
     const projectObservation = buildProjectObservation(this.config.repository);
     const resp = await this.client.call<Record<string, unknown>, { session_id?: string }>({
@@ -126,20 +121,19 @@ export class WorkbenchConnection {
         `session.start accepted by Kiln but canonical confirmation failed: ${confirmation.reason}`
       );
     }
+
+    await this.rebindActivityStream();
     return this.projection;
   }
 
-  /** Cancel the live Session using its canonical revision. */
   async cancelSession(actorId: string): Promise<BoundedCommandResult> {
     return this.sessionLifecycle('session.cancel', actorId);
   }
 
-  /** Resume the live Session using its canonical revision. */
   async resumeSession(actorId: string): Promise<BoundedCommandResult> {
     return this.sessionLifecycle('session.resume', actorId);
   }
 
-  /** Ask Kiln, not Temper, which actions are valid from the current Session. */
   async nextActions(): Promise<BoundedCommandResult> {
     if (!this.projection.sessionId) {
       return { ok: false, errorCode: 'E_NO_ACTIVE_SESSION', errorReason: 'project.open returned no session_id' };
@@ -154,17 +148,8 @@ export class WorkbenchConnection {
     return { ok: true, result: resp.result };
   }
 
-  /**
-   * Deliberately rebuild the real transport boundary. This does not
-   * "toggle" a local connected flag: the activity stream is closed,
-   * project.open/session.query are re-run, and a fresh WebSocket
-   * subscription is established before the command can report success.
-   */
   async reconnect(): Promise<WorkbenchProjection> {
-    if (this.stream) {
-      this.stream.close();
-      delete (this as unknown as { stream?: ActivityStream }).stream;
-    }
+    this.retireActivityStream();
     this.stopped = false;
     this.setConnection('reconnecting');
     try {
@@ -172,10 +157,7 @@ export class WorkbenchConnection {
       if (projection.sessionId) {
         const confirmation = this.confirmCanonicalSession(projection.sessionId);
         if (!confirmation.ok) {
-          if (this.stream) {
-            this.stream.close();
-            delete (this as unknown as { stream?: ActivityStream }).stream;
-          }
+          this.retireActivityStream();
           this.setConnection('disconnected');
           throw new Error(`canonical confirmation failed after reconnect: ${confirmation.reason}`);
         }
@@ -187,8 +169,6 @@ export class WorkbenchConnection {
     }
   }
 
-  /** Re-query the canonical Session. Called on every activity frame
-   *  and after reconnect. */
   async resync(reason: 'activity' | 'reconnect' | 'resync' = 'resync'): Promise<WorkbenchProjection> {
     if (this.resyncInFlight) return this.projection;
     this.resyncInFlight = true;
@@ -201,11 +181,6 @@ export class WorkbenchConnection {
     return this.projection;
   }
 
-  /**
-   * Submit a governed human decision through the existing real
-   * `human.decide` Kiln RPC. A 2xx/RPC success alone is not enough to
-   * claim completion: the canonical Session is re-read before success.
-   */
   async submitHumanDecision(
     decision: 'ACCEPT' | 'REJECT' | 'REQUEST_REVISION',
     envelope: {
@@ -300,10 +275,7 @@ export class WorkbenchConnection {
 
   async stop(): Promise<void> {
     this.stopped = true;
-    if (this.stream) {
-      this.stream.close();
-      delete (this as unknown as { stream?: ActivityStream }).stream;
-    }
+    this.retireActivityStream();
   }
 
   // -- private --
@@ -395,6 +367,17 @@ export class WorkbenchConnection {
     }
   }
 
+  private async rebindActivityStream(): Promise<void> {
+    this.retireActivityStream();
+    await this.startStream();
+  }
+
+  private retireActivityStream(): void {
+    if (!this.stream) return;
+    this.stream.close();
+    delete (this as unknown as { stream?: ActivityStream }).stream;
+  }
+
   private async startStream(): Promise<void> {
     if (this.stream) return;
     const sessionId = this.projection.sessionId ?? undefined;
@@ -412,14 +395,8 @@ export class WorkbenchConnection {
       },
       onResync: (reason) => {
         if (this.stopped) return;
-        if (reason === 'reconnect') {
-          // ActivityStream only emits reconnect after the replacement socket
-          // actually opened. Re-read canonical truth without pretending the
-          // transport is still reconnecting.
-          void this.resync('reconnect');
-        } else {
-          void this.resync('activity');
-        }
+        if (reason === 'reconnect') void this.resync('reconnect');
+        else void this.resync('activity');
       }
     });
     try {
