@@ -35,12 +35,17 @@ defmodule Kiln.RPC.Handlers.Graph do
 
   defp normalize_query({:ok, query}) when is_map(query), do: {:ok, query}
 
-  defp normalize_query({:error, %DomainError{code: code, message: message, field: field, details: details}}) do
+  defp normalize_query(
+         {:error,
+          %DomainError{code: code, message: message, field: field, details: details}}
+       ) do
     {:error, %{code: code, reason: message, field: field, details: details}}
   end
 
   defp normalize_query({:error, %{code: _} = err}), do: {:error, err}
-  defp normalize_query({:error, reason}), do: {:error, %{code: :E_GRAPH_QUERY_FAILED, reason: reason}}
+
+  defp normalize_query({:error, reason}),
+    do: {:error, %{code: :E_GRAPH_QUERY_FAILED, reason: reason}}
 
   defp build_graph(query) do
     projection = query.projection
@@ -65,7 +70,13 @@ defmodule Kiln.RPC.Handlers.Graph do
       []
       |> maybe_edge(session["id"], task["id"], "CONTAINS", "projection.task", node_ids)
       |> maybe_edge(task["id"], run["id"], "HAS_RUN", "projection.run", node_ids)
-      |> maybe_edge(run["id"], pending["id"], "AWAITS_DECISION", "projection.pending_decision", node_ids)
+      |> maybe_edge(
+        run["id"],
+        pending["id"],
+        "AWAITS_DECISION",
+        "projection.pending_decision",
+        node_ids
+      )
       |> add_reference_edges(run["id"], references, node_ids)
       |> Enum.sort_by(& &1.id)
 
@@ -85,7 +96,16 @@ defmodule Kiln.RPC.Handlers.Graph do
     case entity["id"] do
       id when is_binary(id) and byte_size(id) > 0 ->
         metadata = Map.take(entity, metadata_keys)
-        [%{"id" => id, "kind" => kind, "canonical_digest" => digest, "metadata" => metadata} | nodes]
+
+        [
+          %{
+            "id" => id,
+            "kind" => kind,
+            "canonical_digest" => digest,
+            "metadata" => metadata
+          }
+          | nodes
+        ]
 
       _ ->
         nodes
@@ -95,8 +115,23 @@ defmodule Kiln.RPC.Handlers.Graph do
   defp add_pending_decision_node(nodes, pending, digest) do
     case pending["id"] do
       id when is_binary(id) and byte_size(id) > 0 ->
-        metadata = Map.take(pending, ["subject_kind", "subject_id", "subject_revision", "permitted_responses"])
-        [%{"id" => id, "kind" => "Decision", "canonical_digest" => digest, "metadata" => metadata} | nodes]
+        metadata =
+          Map.take(pending, [
+            "subject_kind",
+            "subject_id",
+            "subject_revision",
+            "permitted_responses"
+          ])
+
+        [
+          %{
+            "id" => id,
+            "kind" => "Decision",
+            "canonical_digest" => digest,
+            "metadata" => metadata
+          }
+          | nodes
+        ]
 
       _ ->
         nodes
@@ -114,7 +149,15 @@ defmodule Kiln.RPC.Handlers.Graph do
     |> Enum.reduce(nodes, fn {kind, ref}, acc ->
       case {ref["id"], ref["digest"]} do
         {id, digest} when is_binary(id) and is_binary(digest) ->
-          [%{"id" => id, "kind" => kind, "canonical_digest" => digest, "metadata" => %{}} | acc]
+          [
+            %{
+              "id" => id,
+              "kind" => kind,
+              "canonical_digest" => digest,
+              "metadata" => %{}
+            }
+            | acc
+          ]
 
         _ ->
           acc
@@ -126,9 +169,21 @@ defmodule Kiln.RPC.Handlers.Graph do
     decision_envelope = map_or_empty(references["decision_envelope"])
 
     [
-      {map_or_empty(decision_envelope["plan_ref"])["id"], "REFERENCES_PLAN", "references.decision_envelope.plan_ref"},
-      {map_or_empty(decision_envelope["patch_ref"])["id"], "REFERENCES_PATCH", "references.decision_envelope.patch_ref"},
-      {map_or_empty(decision_envelope["review_ref"])["id"], "REFERENCES_REVIEW", "references.decision_envelope.review_ref"}
+      {
+        map_or_empty(decision_envelope["plan_ref"])["id"],
+        "REFERENCES_PLAN",
+        "references.decision_envelope.plan_ref"
+      },
+      {
+        map_or_empty(decision_envelope["patch_ref"])["id"],
+        "REFERENCES_PATCH",
+        "references.decision_envelope.patch_ref"
+      },
+      {
+        map_or_empty(decision_envelope["review_ref"])["id"],
+        "REFERENCES_REVIEW",
+        "references.decision_envelope.review_ref"
+      }
     ]
     |> Enum.reduce(edges, fn {to_id, kind, basis}, acc ->
       maybe_edge(acc, run_id, to_id, kind, basis, node_ids)
@@ -161,8 +216,12 @@ defmodule Kiln.RPC.Handlers.Graph do
 
   defp require_string(params, key) do
     case Map.get(params, key) do
-      value when is_binary(value) and byte_size(value) > 0 -> {:ok, value}
-      _ -> {:error, %{code: :E_INVALID_FIELD, reason: "#{key} must be a non-empty string", field: key}}
+      value when is_binary(value) and byte_size(value) > 0 ->
+        {:ok, value}
+
+      _ ->
+        {:error,
+         %{code: :E_INVALID_FIELD, reason: "#{key} must be a non-empty string", field: key}}
     end
   end
 end
