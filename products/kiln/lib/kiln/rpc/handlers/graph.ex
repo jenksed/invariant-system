@@ -36,8 +36,7 @@ defmodule Kiln.RPC.Handlers.Graph do
   defp normalize_query({:ok, query}) when is_map(query), do: {:ok, query}
 
   defp normalize_query(
-         {:error,
-          %DomainError{code: code, message: message, field: field, details: details}}
+         {:error, %DomainError{code: code, message: message, field: field, details: details}}
        ) do
     {:error, %{code: code, reason: message, field: field, details: details}}
   end
