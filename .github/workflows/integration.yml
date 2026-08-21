@@ -47,16 +47,42 @@ jobs:
           otp-version: "28.4"
           elixir-version: "1.20.2"
 
-      # The scenario runner builds Loadout and Temper (npm) and compiles
-      # Kiln (mix) from this checkout, then executes the Wave 3 golden
-      # path: Loadout plan -> real Kiln supervision -> Temper rendering.
       - name: Run repository-recon golden path
         run: ./integration/scenarios/repository-recon/run.sh
 
-  # M11 E6 — wiring two of the three E6 jobs that are
-  # dependency-independent of E2. The third E6 job
-  # (implement-change-golden-path) is deferred until the E2
-  # implement-change scenario ships.
+  # Temper control-surface vertical: compiled Temper slash-command registry
+  # -> real Kiln HTTP/WS boundary -> canonical session.query confirmation.
+  # This is deliberately separate from unit tests so a local UI preference
+  # cannot masquerade as an operational control.
+  temper-command-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: products/temper/package-lock.json
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28.4"
+          elixir-version: "1.20.2"
+
+      - name: Install Kiln dependencies
+        run: mix deps.get
+        working-directory: products/kiln
+
+      - name: Install Temper dependencies
+        run: npm ci
+        working-directory: products/temper
+
+      - name: Run real-daemon Temper command vertical
+        run: bash ./integration/scenarios/temper-command-control/run.sh
+
   m0-conformance:
     runs-on: ubuntu-latest
     steps:
@@ -83,19 +109,11 @@ jobs:
           ./invariant test manifold
           ./invariant check boundaries
 
-  # M11 E6 — complete the third required job. The
-  # implement-change-golden-path proves the bounded M0 governed chain
-  # end-to-end (publish → build → decide → apply_with_completion_ref)
-  # via a deterministic fake profile. No live network. No credentials.
-  # No MINIMAX_API_KEY in the environment. Mutations are confined to
-  # the runner's mktemp + a real bounded kiln_home.
   implement-change-golden-path:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      # No live provider; deterministic fake path only.
       KILN_PROVIDER: deterministic_fake
-      # Belt-and-suspenders: explicitly unset any residual key.
       MINIMAX_API_KEY: ""
     steps:
       - uses: actions/checkout@v4
